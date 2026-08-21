@@ -51,13 +51,7 @@ final class CommercialApiController
     if (!array_key_exists($bucket, CommercialStatusCatalog::buckets()) || !$this->policy->canView($bucket)) {
       JsonResponse::error('No tienes permiso para consultar esta vista.', 403);
     }
-    $filters = [
-      'estado' => trim((string) ($input['estado'] ?? '')),
-      'busqueda' => trim((string) ($input['busqueda'] ?? '')),
-      'id_empleado' => trim((string) ($input['id_empleado'] ?? '')),
-      'page' => max(1, (int) ($input['page'] ?? 1)),
-      'per_page' => 24,
-    ];
+    $filters = $this->ticketFilters($input);
     $result = $this->tickets->search($bucket, $filters);
     JsonResponse::success([
       'html' => CommercialDashboardView::renderTickets(
@@ -65,6 +59,7 @@ final class CommercialApiController
         $result,
         $filters,
         $this->tickets->ticketEmployees(),
+        $this->tickets->filterOptions(),
         $this->policy,
         $this->baseUrl
       ),
@@ -275,6 +270,31 @@ final class CommercialApiController
   private function notifyTargets(array $input): array
   {
     return !empty($input['notificar_solicitante']) ? ['solicitante'] : [];
+  }
+
+  /** @param array<string,mixed> $input @return array<string,mixed> */
+  private function ticketFilters(array $input): array
+  {
+    $clean = static fn(string $key): string => trim((string) ($input[$key] ?? ''));
+    return [
+      'estado' => $clean('estado'),
+      'busqueda' => $clean('busqueda'),
+      'id_empleado' => $clean('id_empleado'),
+      'ticket_id' => $clean('ticket_id'),
+      'solicitante' => $clean('solicitante'),
+      'celular' => $clean('celular'),
+      'correo' => $clean('correo'),
+      'inmueble' => $clean('inmueble'),
+      'medio' => $clean('medio'),
+      'prioridad' => $clean('prioridad'),
+      'tema' => $clean('tema'),
+      'seguimiento' => $clean('seguimiento'),
+      'fecha_desde' => $clean('fecha_desde'),
+      'fecha_hasta' => $clean('fecha_hasta'),
+      'sla_filter' => $clean('sla_filter'),
+      'page' => max(1, (int) ($input['page'] ?? 1)),
+      'per_page' => 24,
+    ];
   }
 
   /** @return array<int,string> */

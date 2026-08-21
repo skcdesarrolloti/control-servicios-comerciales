@@ -22,6 +22,7 @@ final class CommercialDashboardView
     $views = is_array($data['visible_views'] ?? null) ? $data['visible_views'] : [];
     $calendarEmployees = is_array($data['calendar_employees'] ?? null) ? $data['calendar_employees'] : [];
     $ticketEmployees = is_array($data['ticket_employees'] ?? null) ? $data['ticket_employees'] : [];
+    $filterOptions = is_array($data['filter_options'] ?? null) ? $data['filter_options'] : [];
     $baseUrl = rtrim((string) ($data['base_url'] ?? ''), '/');
 
     ob_start();
@@ -87,7 +88,7 @@ final class CommercialDashboardView
     <?php else: ?>
       <section class="scm-tab-panel commercial-panel<?php echo $bucket !== 'calendario' ? ' active' : ''; ?>" id="commercial-tickets-panel" data-commercial-tickets-panel aria-live="polite">
         <?php if ($bucket !== 'calendario'): ?>
-          <?php echo self::renderTickets($bucket, $result, $filters, $ticketEmployees, $policy, $baseUrl); ?>
+          <?php echo self::renderTickets($bucket, $result, $filters, $ticketEmployees, $filterOptions, $policy, $baseUrl); ?>
         <?php endif; ?>
       </section>
       <section class="scm-tab-panel commercial-panel<?php echo $bucket === 'calendario' ? ' active' : ''; ?>" id="scm-panel-actividades-administrativas" data-commercial-calendar-panel>
@@ -121,14 +122,16 @@ final class CommercialDashboardView
     return (string) ob_get_clean();
   }
 
-  /** @param array<string,mixed> $result @param array<string,mixed> $filters @param array<int,array<string,string>> $ticketEmployees */
-  public static function renderTickets(string $bucket, array $result, array $filters, array $ticketEmployees, $policy, string $baseUrl): string
+  /** @param array<string,mixed> $result @param array<string,mixed> $filters @param array<int,array<string,string>> $ticketEmployees @param array<string,mixed> $filterOptions */
+  public static function renderTickets(string $bucket, array $result, array $filters, array $ticketEmployees, array $filterOptions, $policy, string $baseUrl): string
   {
     $bucketDef = CommercialStatusCatalog::buckets()[$bucket] ?? CommercialStatusCatalog::buckets()['abiertos'];
     $rows = is_array($result['rows'] ?? null) ? $result['rows'] : [];
     $counts = is_array($result['counts'] ?? null) ? $result['counts'] : [];
     $pagination = is_array($result['pagination'] ?? null) ? $result['pagination'] : [];
+    $slaSummary = is_array($result['sla_summary'] ?? null) ? $result['sla_summary'] : [];
     $bucketTotal = array_sum(array_intersect_key($counts, array_flip($bucketDef['statuses'])));
+    $baseFilterParams = self::filterParams($filters);
     ob_start();
 ?>
     <div class="commercial-section-head">
@@ -137,17 +140,33 @@ final class CommercialDashboardView
     </div>
 
     <div class="commercial-status-strip" aria-label="Estados de <?php echo esc_attr(mb_strtolower($bucketDef['label'])); ?>">
-      <a class="commercial-status-chip<?php echo empty($filters['estado']) ? ' active' : ''; ?>" data-commercial-filter-link href="<?php echo esc_url(self::url($baseUrl, ['tab' => $bucket])); ?>"><span>Todos</span><strong><?php echo esc_html((string) $bucketTotal); ?></strong></a>
+      <a class="commercial-status-chip<?php echo empty($filters['estado']) ? ' active' : ''; ?>" data-commercial-filter-link href="<?php echo esc_url(self::url($baseUrl, ['tab' => $bucket] + array_diff_key($baseFilterParams, ['estado' => true, 'page' => true]))); ?>"><span>Todos</span><strong><?php echo esc_html((string) $bucketTotal); ?></strong></a>
       <?php foreach ($bucketDef['statuses'] as $status): ?>
-        <a class="commercial-status-chip<?php echo (($filters['estado'] ?? '') === $status) ? ' active' : ''; ?>" data-commercial-filter-link href="<?php echo esc_url(self::url($baseUrl, ['tab' => $bucket, 'estado' => $status])); ?>"><span><?php echo esc_html($status); ?></span><strong><?php echo esc_html((string) ($counts[$status] ?? 0)); ?></strong></a>
+        <a class="commercial-status-chip<?php echo (($filters['estado'] ?? '') === $status) ? ' active' : ''; ?>" data-commercial-filter-link href="<?php echo esc_url(self::url($baseUrl, ['tab' => $bucket, 'estado' => $status] + array_diff_key($baseFilterParams, ['estado' => true, 'page' => true]))); ?>"><span><?php echo esc_html($status); ?></span><strong><?php echo esc_html((string) ($counts[$status] ?? 0)); ?></strong></a>
       <?php endforeach; ?>
     </div>
+
+    <?php if ($bucket === 'abiertos'): ?>
+      <?php echo self::renderSlaSummary($slaSummary, $filters); ?>
+    <?php endif; ?>
 
     <form class="commercial-filter-card" data-commercial-filter-form method="get" action="<?php echo esc_url($baseUrl . '/index.php'); ?>">
       <input type="hidden" name="tab" value="<?php echo esc_attr($bucket); ?>">
       <div class="commercial-field commercial-field--wide"><label for="commercial-search">Buscar</label><input id="commercial-search" type="search" name="busqueda" value="<?php echo esc_attr((string) ($filters['busqueda'] ?? '')); ?>" placeholder="Ticket, asunto, solicitante, inmueble…"></div>
+      <div class="commercial-field"><label for="commercial-ticket-id">ID ticket</label><input id="commercial-ticket-id" type="text" name="ticket_id" value="<?php echo esc_attr((string) ($filters['ticket_id'] ?? '')); ?>" placeholder="Ej: 8604"></div>
       <div class="commercial-field"><label for="commercial-status">Estado comercial</label><select id="commercial-status" name="estado"><option value="">Todos</option><?php foreach ($bucketDef['statuses'] as $status): ?><option value="<?php echo esc_attr($status); ?>"<?php selected((string) ($filters['estado'] ?? ''), $status); ?>><?php echo esc_html($status); ?></option><?php endforeach; ?></select></div>
       <div class="commercial-field"><label for="commercial-employee">Responsable</label><select id="commercial-employee" name="id_empleado"><option value="">Todos</option><?php foreach ($ticketEmployees as $employee): ?><option value="<?php echo esc_attr($employee['id']); ?>"<?php selected((string) ($filters['id_empleado'] ?? ''), $employee['id']); ?>><?php echo esc_html($employee['name']); ?></option><?php endforeach; ?></select></div>
+      <?php if ($bucket === 'abiertos'): ?><div class="commercial-field"><label for="commercial-sla-filter">Tiempo de atención</label><select id="commercial-sla-filter" name="sla_filter"><option value="">Todos</option><option value="atrasado"<?php selected((string) ($filters['sla_filter'] ?? ''), 'atrasado'); ?>>Atrasados</option><option value="al_dia"<?php selected((string) ($filters['sla_filter'] ?? ''), 'al_dia'); ?>>Al día</option></select></div><?php endif; ?>
+      <div class="commercial-field"><label for="commercial-requester">Solicitante</label><input id="commercial-requester" type="text" name="solicitante" value="<?php echo esc_attr((string) ($filters['solicitante'] ?? '')); ?>" placeholder="Nombre"></div>
+      <div class="commercial-field"><label for="commercial-phone">Celular</label><input id="commercial-phone" type="text" name="celular" value="<?php echo esc_attr((string) ($filters['celular'] ?? '')); ?>" placeholder="Número"></div>
+      <div class="commercial-field"><label for="commercial-email">Correo</label><input id="commercial-email" type="text" name="correo" value="<?php echo esc_attr((string) ($filters['correo'] ?? '')); ?>" placeholder="correo@dominio.com"></div>
+      <div class="commercial-field"><label for="commercial-property">Inmueble / barrio</label><input id="commercial-property" type="text" name="inmueble" value="<?php echo esc_attr((string) ($filters['inmueble'] ?? '')); ?>" placeholder="Código, barrio o dirección"></div>
+      <div class="commercial-field"><label for="commercial-topic">Tema</label><?php echo self::selectFromOptions('commercial-topic', 'tema', $filterOptions['temas'] ?? [], (string) ($filters['tema'] ?? '')); ?></div>
+      <div class="commercial-field"><label for="commercial-medium">Medio</label><?php echo self::selectFromOptions('commercial-medium', 'medio', $filterOptions['medios'] ?? [], (string) ($filters['medio'] ?? '')); ?></div>
+      <div class="commercial-field"><label for="commercial-priority">Prioridad</label><?php echo self::selectFromOptions('commercial-priority', 'prioridad', $filterOptions['prioridades'] ?? [], (string) ($filters['prioridad'] ?? '')); ?></div>
+      <div class="commercial-field"><label for="commercial-follow-up">Seguimiento</label><select id="commercial-follow-up" name="seguimiento"><option value="">Todos</option><option value="Si"<?php selected((string) ($filters['seguimiento'] ?? ''), 'Si'); ?>>Con seguimiento</option><option value="No"<?php selected((string) ($filters['seguimiento'] ?? ''), 'No'); ?>>Sin seguimiento</option></select></div>
+      <div class="commercial-field"><label for="commercial-date-from">Fecha desde</label><input id="commercial-date-from" type="date" name="fecha_desde" value="<?php echo esc_attr((string) ($filters['fecha_desde'] ?? '')); ?>"></div>
+      <div class="commercial-field"><label for="commercial-date-to">Fecha hasta</label><input id="commercial-date-to" type="date" name="fecha_hasta" value="<?php echo esc_attr((string) ($filters['fecha_hasta'] ?? '')); ?>"></div>
       <div class="commercial-filter-actions"><button class="commercial-primary-btn" type="submit"><i class="fas fa-filter" aria-hidden="true"></i> Filtrar</button><a class="commercial-secondary-btn" data-commercial-filter-link href="<?php echo esc_url(self::url($baseUrl, ['tab' => $bucket])); ?>">Limpiar</a></div>
     </form>
 
@@ -176,12 +195,19 @@ final class CommercialDashboardView
     $location = trim(implode(' · ', array_filter([(string) ($row['inmueble'] ?? ''), (string) ($row['barrio'] ?? ''), (string) ($row['direccion'] ?? '')])));
     $timestamp = (int) ($row['fecha_actualizacion'] ?? $row['fecha'] ?? 0);
     $canOpen = $policy instanceof CommercialAccessPolicy && $policy->canAct('ver_ticket');
+    $slaLabel = trim((string) ($row['scm_sla_label'] ?? ''));
+    $slaStatus = trim((string) ($row['scm_sla_status'] ?? ''));
+    $attentionDays = (int) ($row['scm_attention_days'] ?? 0);
+    $dueDays = (int) ($row['scm_sla_due_days'] ?? 0);
     ob_start();
 ?>
-    <article class="commercial-ticket-card" data-commercial-ticket="<?php echo esc_attr((string) $pk); ?>">
+    <article class="commercial-ticket-card<?php echo $slaStatus === 'atrasado' ? ' commercial-ticket-card--overdue' : ''; ?>" data-commercial-ticket="<?php echo esc_attr((string) $pk); ?>">
       <header>
         <span class="commercial-ticket-id">#<?php echo esc_html($logicalId); ?></span>
-        <span class="commercial-status-badge commercial-status-badge--<?php echo esc_attr(CommercialStatusCatalog::bucketForStatus($status)); ?>"><?php echo esc_html($status); ?></span>
+        <span class="commercial-card-badges">
+          <?php if ($slaLabel !== ''): ?><span class="commercial-sla-badge commercial-sla-badge--<?php echo esc_attr($slaStatus); ?>"><?php echo esc_html($slaLabel); ?></span><?php endif; ?>
+          <span class="commercial-status-badge commercial-status-badge--<?php echo esc_attr(CommercialStatusCatalog::bucketForStatus($status)); ?>"><?php echo esc_html($status); ?></span>
+        </span>
       </header>
       <h3><?php echo esc_html($subject); ?></h3>
       <?php if ($description !== ''): ?><p class="commercial-ticket-description"><?php echo esc_html(mb_strimwidth($description, 0, 190, '…', 'UTF-8')); ?></p><?php endif; ?>
@@ -190,6 +216,7 @@ final class CommercialDashboardView
         <div><dt><i class="fas fa-user-tie" aria-hidden="true"></i> Responsable</dt><dd data-commercial-assignee-label><?php echo esc_html($assigned); ?></dd></div>
         <?php if ($location !== ''): ?><div><dt><i class="fas fa-location-dot" aria-hidden="true"></i> Inmueble</dt><dd><?php echo esc_html($location); ?></dd></div><?php endif; ?>
         <div><dt><i class="far fa-clock" aria-hidden="true"></i> Actualizado</dt><dd><?php echo esc_html(self::formatTimestamp($timestamp)); ?></dd></div>
+        <?php if ($slaLabel !== ''): ?><div><dt><i class="fas fa-hourglass-half" aria-hidden="true"></i> Atención</dt><dd><?php echo esc_html((string) $attentionDays); ?> días<?php echo $dueDays > 0 ? ' / límite ' . esc_html((string) $dueDays) . ' días' : ''; ?></dd></div><?php endif; ?>
       </dl>
       <?php if ($canOpen): ?><footer><button class="commercial-primary-btn" type="button" data-commercial-open-case="<?php echo esc_attr((string) $pk); ?>"><span>Ver caso</span><i class="fas fa-arrow-right" aria-hidden="true"></i></button></footer><?php endif; ?>
     </article>
@@ -205,7 +232,7 @@ final class CommercialDashboardView
     if ($totalPages <= 1) return '';
     $start = max(1, $page - 2);
     $end = min($totalPages, $page + 2);
-    $common = ['tab' => $bucket, 'estado' => (string) ($filters['estado'] ?? ''), 'busqueda' => (string) ($filters['busqueda'] ?? ''), 'id_empleado' => (string) ($filters['id_empleado'] ?? '')];
+    $common = ['tab' => $bucket] + array_diff_key(self::filterParams($filters), ['page' => true]);
     ob_start();
 ?>
     <nav class="commercial-pagination" aria-label="Paginación de tickets">
@@ -215,6 +242,72 @@ final class CommercialDashboardView
     </nav>
 <?php
     return (string) ob_get_clean();
+  }
+
+  /** @param array<string,mixed> $summary @param array<string,mixed> $filters */
+  private static function renderSlaSummary(array $summary, array $filters): string
+  {
+    if ($summary === []) {
+      return '';
+    }
+    $total = (int) ($summary['total'] ?? 0);
+    $visible = (int) ($summary['visible_total'] ?? $total);
+    $onTime = (int) ($summary['al_dia'] ?? 0);
+    $overdue = (int) ($summary['atrasados'] ?? 0);
+    $latePct = (int) ($summary['porcentaje_atraso'] ?? 0);
+    $okPct = (int) ($summary['porcentaje_cumplimiento'] ?? 0);
+    $activeSlaFilter = trim((string) ($filters['sla_filter'] ?? ''));
+    ob_start();
+?>
+    <section class="commercial-sla-summary" aria-label="Control de tickets abiertos atrasados">
+      <div class="commercial-sla-chart" style="--commercial-sla-ok: <?php echo esc_attr((string) $okPct); ?>%; --commercial-sla-late: <?php echo esc_attr((string) $latePct); ?>%;">
+        <span><?php echo esc_html((string) $okPct); ?>%</span>
+      </div>
+      <div class="commercial-sla-copy">
+        <span class="commercial-kicker">Control de atrasados</span>
+        <h3>Tiempo de atención de tickets abiertos</h3>
+        <p><?php echo esc_html((string) $overdue); ?> atrasados de <?php echo esc_html((string) $total); ?> tickets abiertos<?php echo $activeSlaFilter !== '' ? ' · mostrando ' . esc_html((string) $visible) : ''; ?>.</p>
+      </div>
+      <div class="commercial-sla-kpis">
+        <div><span>Al día</span><strong><?php echo esc_html((string) $onTime); ?></strong></div>
+        <div class="is-late"><span>Atrasados</span><strong><?php echo esc_html((string) $overdue); ?></strong></div>
+        <div><span>% atraso</span><strong><?php echo esc_html((string) $latePct); ?>%</strong></div>
+      </div>
+    </section>
+<?php
+    return (string) ob_get_clean();
+  }
+
+  /** @param array<int,mixed> $options */
+  private static function selectFromOptions(string $id, string $name, array $options, string $selected): string
+  {
+    $html = '<select id="' . esc_attr($id) . '" name="' . esc_attr($name) . '"><option value="">Todos</option>';
+    foreach ($options as $option) {
+      $value = trim((string) $option);
+      if ($value === '') {
+        continue;
+      }
+      $html .= '<option value="' . esc_attr($value) . '"' . selected($selected, $value, false) . '>' . esc_html($value) . '</option>';
+    }
+    return $html . '</select>';
+  }
+
+  /** @param array<string,mixed> $filters @return array<string,string> */
+  private static function filterParams(array $filters): array
+  {
+    $keys = [
+      'estado', 'busqueda', 'id_empleado', 'ticket_id', 'solicitante', 'celular', 'correo',
+      'inmueble', 'medio', 'prioridad', 'tema', 'seguimiento', 'fecha_desde', 'fecha_hasta',
+      'sla_filter', 'page',
+    ];
+    $params = [];
+    foreach ($keys as $key) {
+      $value = trim((string) ($filters[$key] ?? ''));
+      if ($value !== '') {
+        $params[$key] = $value;
+      }
+    }
+    return $params;
   }
 
   /** @param array<string,mixed> $config @param array<int,array<string,string>> $employees */

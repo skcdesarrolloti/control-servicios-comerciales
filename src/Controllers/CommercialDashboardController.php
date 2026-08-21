@@ -41,13 +41,7 @@ final class CommercialDashboardController
     $visibleViews = array_values(array_filter(array_keys(CommercialAccessPolicy::VIEWS), static fn(string $view): bool => $policy->canView($view)));
     $requested = trim((string) ($input['tab'] ?? 'abiertos'));
     $bucket = $visibleViews === [] ? 'sin_acceso' : (in_array($requested, $visibleViews, true) ? $requested : $visibleViews[0]);
-    $filters = [
-      'estado' => trim((string) ($input['estado'] ?? '')),
-      'busqueda' => trim((string) ($input['busqueda'] ?? '')),
-      'id_empleado' => trim((string) ($input['id_empleado'] ?? '')),
-      'page' => max(1, (int) ($input['page'] ?? 1)),
-      'per_page' => 24,
-    ];
+    $filters = $this->ticketFilters($input);
     $result = in_array($bucket, ['calendario', 'sin_acceso'], true) ? ['rows' => [], 'counts' => [], 'pagination' => []] : $repository->search($bucket, $filters);
     $calendarEmployees = $repository->activeEmployeesByCargos($calendarCargos);
     $currentCalendarEmployeeId = '';
@@ -81,10 +75,36 @@ final class CommercialDashboardController
       'policy' => $policy,
       'visible_views' => $visibleViews,
       'ticket_employees' => $repository->ticketEmployees(),
+      'filter_options' => $repository->filterOptions(),
       'calendar_employees' => $calendarEmployees,
       'runtime' => $runtime,
       'base_url' => (string) SCM_BASE_URL,
       'ticket_url' => (string) ($this->config['ticket_url'] ?? ''),
     ]);
+  }
+
+  /** @param array<string,mixed> $input @return array<string,mixed> */
+  private function ticketFilters(array $input): array
+  {
+    $clean = static fn(string $key): string => trim((string) ($input[$key] ?? ''));
+    return [
+      'estado' => $clean('estado'),
+      'busqueda' => $clean('busqueda'),
+      'id_empleado' => $clean('id_empleado'),
+      'ticket_id' => $clean('ticket_id'),
+      'solicitante' => $clean('solicitante'),
+      'celular' => $clean('celular'),
+      'correo' => $clean('correo'),
+      'inmueble' => $clean('inmueble'),
+      'medio' => $clean('medio'),
+      'prioridad' => $clean('prioridad'),
+      'tema' => $clean('tema'),
+      'seguimiento' => $clean('seguimiento'),
+      'fecha_desde' => $clean('fecha_desde'),
+      'fecha_hasta' => $clean('fecha_hasta'),
+      'sla_filter' => $clean('sla_filter'),
+      'page' => max(1, (int) ($input['page'] ?? 1)),
+      'per_page' => 24,
+    ];
   }
 }

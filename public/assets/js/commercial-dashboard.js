@@ -195,7 +195,25 @@
     setVisiblePanel(tab);
 
     var data = new FormData();
-    ["tab", "estado", "busqueda", "id_empleado", "page"].forEach(function (key) {
+    [
+      "tab",
+      "estado",
+      "busqueda",
+      "id_empleado",
+      "ticket_id",
+      "solicitante",
+      "celular",
+      "correo",
+      "inmueble",
+      "medio",
+      "prioridad",
+      "tema",
+      "seguimiento",
+      "fecha_desde",
+      "fecha_hasta",
+      "sla_filter",
+      "page",
+    ].forEach(function (key) {
       data.append(key, nextUrl.searchParams.get(key) || "");
     });
     return request("commercial_tickets_filter", data, listRequest.signal)

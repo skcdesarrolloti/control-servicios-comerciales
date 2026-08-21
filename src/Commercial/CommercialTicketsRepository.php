@@ -11,15 +11,17 @@ use SCM\Support\HistoryLinkMap;
 final class CommercialTicketsRepository
 {
   private Database $db;
+  private CommercialSlaService $sla;
 
   public function __construct(Database $db)
   {
     $this->db = $db;
+    $this->sla = new CommercialSlaService($db);
   }
 
   /**
    * @param array<string,mixed> $filters
-   * @return array{rows:array<int,array<string,mixed>>,pagination:array<string,int>,counts:array<string,int>}
+   * @return array{rows:array<int,array<string,mixed>>,pagination:array<string,int>,counts:array<string,int>,sla_summary?:array<string,int>}
    */
   public function search(string $bucket, array $filters = []): array
   {
@@ -35,8 +37,8 @@ final class CommercialTicketsRepository
     $search = trim((string) ($filters['busqueda'] ?? ''));
     if ($search !== '') {
       $like = '%' . $this->db->escapeLike($search) . '%';
-      $where[] = "(CAST(t.`_ID` AS CHAR) LIKE ? OR t.`id_ticket` LIKE ? OR t.`asunto` LIKE ? OR t.`descripcion` LIKE ? OR t.`solicitante` LIKE ? OR t.`nombre_empleado` LIKE ? OR t.`inmueble` LIKE ? OR t.`direccion` LIKE ?)";
-      array_push($args, $like, $like, $like, $like, $like, $like, $like, $like);
+      $where[] = "(CAST(t.`_ID` AS CHAR) LIKE ? OR t.`id_ticket` LIKE ? OR t.`asunto` LIKE ? OR t.`descripcion` LIKE ? OR t.`solicitante` LIKE ? OR t.`correo_solicitante` LIKE ? OR t.`celular_solicitante` LIKE ? OR t.`nombre_empleado` LIKE ? OR t.`inmueble` LIKE ? OR t.`id_inmueble` LIKE ? OR t.`direccion` LIKE ? OR t.`barrio` LIKE ? OR t.`tema_ayuda` LIKE ? OR t.`medio` LIKE ? OR t.`prioridad` LIKE ?)";
+      array_push($args, $like, $like, $like, $like, $like, $like, $like, $like, $like, $like, $like, $like, $like, $like, $like);
     }
 
     $employee = trim((string) ($filters['id_empleado'] ?? ''));
@@ -45,29 +47,114 @@ final class CommercialTicketsRepository
       $args[] = $employee;
     }
 
+    $ticketId = trim((string) ($filters['ticket_id'] ?? ''));
+    if ($ticketId !== '') {
+      $like = '%' . $this->db->escapeLike($ticketId) . '%';
+      $where[] = '(CAST(t.`_ID` AS CHAR) = ? OR t.`id_ticket` LIKE ?)';
+      array_push($args, $ticketId, $like);
+    }
+
+    foreach ([
+      'solicitante' => 'solicitante',
+      'celular' => 'celular_solicitante',
+      'correo' => 'correo_solicitante',
+    ] as $filterKey => $column) {
+      $value = trim((string) ($filters[$filterKey] ?? ''));
+      if ($value === '') {
+        continue;
+      }
+      $where[] = "t.`{$column}` LIKE ?";
+      $args[] = '%' . $this->db->escapeLike($value) . '%';
+    }
+
+    $property = trim((string) ($filters['inmueble'] ?? ''));
+    if ($property !== '') {
+      $like = '%' . $this->db->escapeLike($property) . '%';
+      $where[] = "(t.`inmueble` LIKE ? OR t.`id_inmueble` LIKE ? OR t.`direccion` LIKE ? OR t.`barrio` LIKE ?)";
+      array_push($args, $like, $like, $like, $like);
+    }
+
+    foreach ([
+      'medio' => 'medio',
+      'prioridad' => 'prioridad',
+      'tema' => 'tema_ayuda',
+    ] as $filterKey => $column) {
+      $value = trim((string) ($filters[$filterKey] ?? ''));
+      if ($value === '') {
+        continue;
+      }
+      $where[] = "TRIM(COALESCE(t.`{$column}`, '')) = ?";
+      $args[] = $value;
+    }
+
+    $followUp = mb_strtolower(trim((string) ($filters['seguimiento'] ?? '')), 'UTF-8');
+    if (in_array($followUp, ['si', 'no'], true)) {
+      if ($followUp === 'si') {
+        $where[] = "LOWER(TRIM(COALESCE(t.`tuvo_seguimiento`, ''))) = 'si'";
+      } else {
+        $where[] = "(t.`tuvo_seguimiento` IS NULL OR LOWER(TRIM(t.`tuvo_seguimiento`)) <> 'si')";
+      }
+    }
+
+    foreach ([['fecha_desde', false, '>='], ['fecha_hasta', true, '<=']] as [$filterKey, $endOfDay, $operator]) {
+      $timestamp = $this->dateFilterTimestamp(trim((string) ($filters[$filterKey] ?? '')), (bool) $endOfDay);
+      if ($timestamp <= 0) {
+        continue;
+      }
+      $where[] = "COALESCE(NULLIF(t.`fecha`, 0), UNIX_TIMESTAMP(t.`cct_created`), 0) {$operator} ?";
+      $args[] = $timestamp;
+    }
+
     $page = max(1, (int) ($filters['page'] ?? 1));
     $perPage = min(60, max(12, (int) ($filters['per_page'] ?? 24)));
     $whereSql = implode(' AND ', $where);
-    $total = (int) $this->db->getVar("SELECT COUNT(*) FROM `{$table}` t WHERE {$whereSql}", $args);
-    $totalPages = max(1, (int) ceil($total / $perPage));
-    $page = min($page, $totalPages);
-    $offset = ($page - 1) * $perPage;
 
-    $rows = $this->db->getResults(
-      "SELECT t.`_ID`, t.`id_ticket`, t.`estado_comercial`, t.`asunto`, t.`descripcion`,
+    $selectSql = "SELECT t.`_ID`, t.`id_ticket`, t.`estado_comercial`, t.`asunto`, t.`descripcion`,
               t.`solicitante`, t.`correo_solicitante`, t.`celular_solicitante`,
               t.`id_empleado`, t.`nombre_empleado`, t.`correo_empleado`, t.`celular_empleado`,
               t.`inmueble`, t.`id_inmueble`, t.`direccion`, t.`barrio`, t.`tipo_inmueble`,
-              t.`medio`, t.`prioridad`, t.`fecha`, t.`fecha_actualizacion`, t.`cct_created`
+              t.`medio`, t.`prioridad`, t.`tema_ayuda`, t.`tuvo_seguimiento`, t.`fecha_seguimiento`,
+              t.`fecha`, t.`fecha_actualizacion`, t.`cct_created`, t.`cct_modified`
          FROM `{$table}` t
         WHERE {$whereSql}
-        ORDER BY COALESCE(NULLIF(t.`fecha_actualizacion`, 0), NULLIF(t.`fecha`, 0), UNIX_TIMESTAMP(t.`cct_created`)) DESC, t.`_ID` DESC
-        LIMIT {$perPage} OFFSET {$offset}",
-      $args
-    );
-    $rows = $this->enrichPropertyData($rows);
+        ORDER BY COALESCE(NULLIF(t.`fecha_actualizacion`, 0), NULLIF(t.`fecha`, 0), UNIX_TIMESTAMP(t.`cct_created`)) DESC, t.`_ID` DESC";
+    $summary = null;
 
-    return [
+    if ($bucket === 'abiertos') {
+      $allRows = $this->decorateCommercialSla($this->enrichPropertyData($this->db->getResults($selectSql, $args)));
+      $summary = $this->sla->summary($allRows);
+      $slaFilter = trim((string) ($filters['sla_filter'] ?? ''));
+      if (in_array($slaFilter, ['atrasado', 'al_dia'], true)) {
+        $allRows = array_values(array_filter($allRows, static function (array $row) use ($slaFilter): bool {
+          return (string) ($row['scm_sla_status'] ?? '') === $slaFilter;
+        }));
+      }
+      usort($allRows, static function (array $a, array $b): int {
+        $priority = (int) ($b['scm_sla_priority'] ?? 0) <=> (int) ($a['scm_sla_priority'] ?? 0);
+        if ($priority !== 0) {
+          return $priority;
+        }
+        $days = (int) ($b['scm_attention_days'] ?? 0) <=> (int) ($a['scm_attention_days'] ?? 0);
+        if ($days !== 0) {
+          return $days;
+        }
+        return (int) ($b['_ID'] ?? 0) <=> (int) ($a['_ID'] ?? 0);
+      });
+      $total = count($allRows);
+      $totalPages = max(1, (int) ceil($total / $perPage));
+      $page = min($page, $totalPages);
+      $offset = ($page - 1) * $perPage;
+      $rows = array_slice($allRows, $offset, $perPage);
+      $summary['visible_total'] = $total;
+    } else {
+      $total = (int) $this->db->getVar("SELECT COUNT(*) FROM `{$table}` t WHERE {$whereSql}", $args);
+      $totalPages = max(1, (int) ceil($total / $perPage));
+      $page = min($page, $totalPages);
+      $offset = ($page - 1) * $perPage;
+      $rows = $this->enrichPropertyData($this->db->getResults($selectSql . " LIMIT {$perPage} OFFSET {$offset}", $args));
+    }
+
+    $payload = [
       'rows' => $rows,
       'pagination' => [
         'page' => $page,
@@ -77,6 +164,11 @@ final class CommercialTicketsRepository
       ],
       'counts' => $this->statusCounts(),
     ];
+    if (is_array($summary)) {
+      $payload['sla_summary'] = $summary;
+    }
+
+    return $payload;
   }
 
   /**
@@ -194,6 +286,16 @@ final class CommercialTicketsRepository
     ], $rows);
   }
 
+  /** @return array{medios:array<int,string>,prioridades:array<int,string>,temas:array<int,string>} */
+  public function filterOptions(): array
+  {
+    return [
+      'medios' => $this->distinctTicketValues('medio'),
+      'prioridades' => $this->distinctTicketValues('prioridad'),
+      'temas' => $this->distinctTicketValues('tema_ayuda'),
+    ];
+  }
+
   /** @param array<int,string> $cargoIds @return array<int,array<string,string>> */
   public function activeEmployeesByCargos(array $cargoIds): array
   {
@@ -258,6 +360,41 @@ final class CommercialTicketsRepository
       }
       throw $exception;
     }
+  }
+
+  /** @return array<int,string> */
+  private function distinctTicketValues(string $column): array
+  {
+    if (!in_array($column, ['medio', 'prioridad', 'tema_ayuda'], true)) {
+      return [];
+    }
+    $table = $this->db->table('jet_cct_tickets');
+    $rows = $this->db->getCol(
+      "SELECT DISTINCT TRIM(COALESCE(`{$column}`, '')) AS value
+         FROM `{$table}`
+        WHERE TRIM(COALESCE(`{$column}`, '')) <> ''
+        ORDER BY value ASC"
+    );
+    return array_values(array_filter(array_map('strval', $rows), static fn(string $value): bool => trim($value) !== ''));
+  }
+
+  private function dateFilterTimestamp(string $date, bool $endOfDay): int
+  {
+    if ($date === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+      return 0;
+    }
+    $time = $endOfDay ? '23:59:59' : '00:00:00';
+    $dt = \DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $date . ' ' . $time, new \DateTimeZone('America/Bogota'));
+    return $dt instanceof \DateTimeImmutable ? $dt->getTimestamp() : 0;
+  }
+
+  /**
+   * @param array<int,array<string,mixed>> $rows
+   * @return array<int,array<string,mixed>>
+   */
+  private function decorateCommercialSla(array $rows): array
+  {
+    return array_map(fn(array $row): array => $this->sla->decorateTicket($row), $rows);
   }
 
   /** @param array<int,string> $allowedCargos */
