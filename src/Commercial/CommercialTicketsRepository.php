@@ -77,6 +77,61 @@ final class CommercialTicketsRepository
     ];
   }
 
+  /**
+   * @return array{ticket:array<string,mixed>,timeline:array<int,array<string,mixed>>}
+   */
+  public function detail(int $ticketPk): array
+  {
+    if ($ticketPk <= 0) {
+      throw new \InvalidArgumentException('Ticket inválido.');
+    }
+
+    $ticket = $this->db->getRow(
+      "SELECT * FROM `{$this->db->table('jet_cct_tickets')}` WHERE `_ID` = ? LIMIT 1",
+      [$ticketPk]
+    );
+    if (!is_array($ticket)) {
+      throw new \RuntimeException('El ticket comercial no existe.');
+    }
+
+    $logicalId = trim((string) ($ticket['id_ticket'] ?? ''));
+    if ($logicalId === '') {
+      $logicalId = (string) $ticketPk;
+    }
+    $keys = array_values(array_unique([(string) $ticketPk, $logicalId]));
+    $placeholders = implode(',', array_fill(0, count($keys), '?'));
+    $historyTable = $this->db->table('jet_cct_historial_del_ticket');
+    $followUpTable = $this->db->table('jet_cct_seguimiento_ticket');
+    $notesTable = $this->db->table('jet_cct_notas_ticket');
+    $timeline = $this->db->getResults(
+      "SELECT activity.*
+         FROM (
+           SELECT `_ID`, `id_ticket`, `fecha`, `cct_created`, `nombre`, `respuesta` AS `message`, 'respuesta' AS `type`,
+                  COALESCE(NULLIF(`fecha`, 0), UNIX_TIMESTAMP(`cct_created`), 0) AS `_timestamp`
+             FROM `{$historyTable}`
+            WHERE CAST(`id_ticket` AS CHAR) IN ({$placeholders}) AND TRIM(COALESCE(`respuesta`, '')) <> ''
+           UNION ALL
+           SELECT `_ID`, `id_ticket`, `fecha`, `cct_created`, `nombre`, `observacion` AS `message`, 'seguimiento' AS `type`,
+                  COALESCE(NULLIF(`fecha`, 0), UNIX_TIMESTAMP(`cct_created`), 0) AS `_timestamp`
+             FROM `{$followUpTable}`
+            WHERE CAST(`id_ticket` AS CHAR) IN ({$placeholders}) AND TRIM(COALESCE(`observacion`, '')) <> ''
+           UNION ALL
+           SELECT `_ID`, `id_ticket`, `fecha`, `cct_created`, `nombre`, `observacion` AS `message`, 'nota' AS `type`,
+                  COALESCE(NULLIF(`fecha`, 0), UNIX_TIMESTAMP(`cct_created`), 0) AS `_timestamp`
+             FROM `{$notesTable}`
+            WHERE CAST(`id_ticket` AS CHAR) IN ({$placeholders}) AND TRIM(COALESCE(`observacion`, '')) <> ''
+         ) activity
+        ORDER BY activity.`_timestamp` DESC, activity.`_ID` DESC
+        LIMIT 100",
+      array_merge($keys, $keys, $keys)
+    );
+
+    return [
+      'ticket' => $ticket,
+      'timeline' => $timeline,
+    ];
+  }
+
   /** @return array<string,int> */
   public function statusCounts(): array
   {
@@ -252,4 +307,5 @@ final class CommercialTicketsRepository
       'respuesta' => $message,
     ]);
   }
+
 }

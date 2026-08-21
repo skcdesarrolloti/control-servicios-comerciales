@@ -18,7 +18,13 @@ final class CommercialAccessPolicy
   ];
 
   public const ACTIONS = [
-    'ver_ticket' => 'Abrir ticket original',
+    'ver_ticket' => 'Ver detalle del ticket',
+    'responder' => 'Responder al solicitante',
+    'agregar_nota' => 'Agregar notas internas',
+    'seguimiento' => 'Registrar seguimientos',
+    'postergar' => 'Postergar tickets',
+    'activar' => 'Activar tickets',
+    'cerrar' => 'Cerrar tickets',
     'cambiar_estado' => 'Cambiar estado comercial',
     'reasignar' => 'Reasignar responsable',
   ];

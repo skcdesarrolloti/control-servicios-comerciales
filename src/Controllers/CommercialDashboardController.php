@@ -81,7 +81,6 @@ final class CommercialDashboardController
       'policy' => $policy,
       'visible_views' => $visibleViews,
       'ticket_employees' => $repository->ticketEmployees(),
-      'commercial_employees' => $calendarEmployees,
       'calendar_employees' => $calendarEmployees,
       'runtime' => $runtime,
       'base_url' => (string) SCM_BASE_URL,

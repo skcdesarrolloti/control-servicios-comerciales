@@ -7,5 +7,8 @@ parameters:
     - src/Http/Api/CommercialActionRouter.php
     - src/Http/Controller/CommercialApiController.php
     - src/Http/Response
+    - src/Views/CommercialDashboardView.php
+    - src/Views/CommercialGuideView.php
+    - src/Views/CommercialTicketModalView.php
   bootstrapFiles:
     - tests/phpstan-bootstrap.php

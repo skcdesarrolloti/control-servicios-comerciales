@@ -21,10 +21,8 @@ final class CommercialDashboardView
     $runtimeJson = json_encode($runtime, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
     $views = is_array($data['visible_views'] ?? null) ? $data['visible_views'] : [];
     $calendarEmployees = is_array($data['calendar_employees'] ?? null) ? $data['calendar_employees'] : [];
-    $commercialEmployees = is_array($data['commercial_employees'] ?? null) ? $data['commercial_employees'] : [];
     $ticketEmployees = is_array($data['ticket_employees'] ?? null) ? $data['ticket_employees'] : [];
     $baseUrl = rtrim((string) ($data['base_url'] ?? ''), '/');
-    $ticketUrl = (string) ($data['ticket_url'] ?? '');
 
     ob_start();
 ?>
@@ -54,7 +52,7 @@ final class CommercialDashboardView
       <span><strong><?php echo esc_html(Auth::user()); ?></strong><small><?php echo esc_html(Auth::userRol()); ?></small></span>
       <form method="post" action="<?php echo esc_url($baseUrl . '/logout.php'); ?>">
         <?php echo \SCM\Core\App::csrf()->field('logout'); ?>
-        <button type="submit" class="commercial-icon-btn" aria-label="Cerrar sesión" title="Cerrar sesión"><i class="fas fa-right-from-bracket" aria-hidden="true"></i></button>
+        <button type="submit" class="commercial-icon-btn" aria-label="Cerrar sesión" title="Cerrar sesión">Salir</button>
       </form>
     </div>
   </header>
@@ -74,11 +72,11 @@ final class CommercialDashboardView
       </div>
     </section>
 
-    <nav class="scm-tabs scm-main-tabs commercial-tabs" aria-label="Secciones del panel">
+    <nav class="commercial-tabs" aria-label="Secciones del panel">
       <?php foreach (CommercialAccessPolicy::VIEWS as $viewKey => $label): ?>
         <?php if (!in_array($viewKey, $views, true)) continue; ?>
-        <?php $panelId = $viewKey === 'calendario' ? 'scm-panel-actividades-administrativas' : 'scm-panel-' . $viewKey; ?>
-        <a class="scm-tab<?php echo (($viewKey === $bucket) || ($viewKey === 'calendario' && $bucket === 'calendario')) ? ' active' : ''; ?>" data-tab="<?php echo esc_attr($panelId); ?>" href="<?php echo esc_url(self::url($baseUrl, ['tab' => $viewKey])); ?>"><?php echo esc_html($label); ?></a>
+        <?php $icons = ['abiertos' => 'fa-inbox', 'postergados' => 'fa-clock-rotate-left', 'cerrados' => 'fa-circle-check', 'calendario' => 'fa-calendar-days']; ?>
+        <a class="commercial-tab<?php echo $viewKey === $bucket ? ' active' : ''; ?>" data-commercial-tab="<?php echo esc_attr($viewKey); ?>" href="<?php echo esc_url(self::url($baseUrl, ['tab' => $viewKey])); ?>"<?php echo $viewKey === $bucket ? ' aria-current="page"' : ''; ?>><i class="fas <?php echo esc_attr($icons[$viewKey]); ?>" aria-hidden="true"></i><span><?php echo esc_html($label); ?></span></a>
       <?php endforeach; ?>
     </nav>
 
@@ -86,19 +84,27 @@ final class CommercialDashboardView
       <section class="scm-tab-panel active" id="scm-panel-sin_acceso">
         <div class="commercial-empty"><i class="fas fa-lock" aria-hidden="true"></i><h2>Sin vistas habilitadas</h2><p>Tu cargo no tiene secciones visibles en este panel. Solicita acceso a un administrador.</p></div>
       </section>
-    <?php elseif ($bucket === 'calendario'): ?>
-      <section class="scm-tab-panel active" id="scm-panel-actividades-administrativas">
+    <?php else: ?>
+      <section class="scm-tab-panel commercial-panel<?php echo $bucket !== 'calendario' ? ' active' : ''; ?>" id="commercial-tickets-panel" data-commercial-tickets-panel aria-live="polite">
+        <?php if ($bucket !== 'calendario'): ?>
+          <?php echo self::renderTickets($bucket, $result, $filters, $ticketEmployees, $policy, $baseUrl); ?>
+        <?php endif; ?>
+      </section>
+      <section class="scm-tab-panel commercial-panel<?php echo $bucket === 'calendario' ? ' active' : ''; ?>" id="scm-panel-actividades-administrativas" data-commercial-calendar-panel>
         <div class="scm-admin-activities">
           <div class="scm-admin-activity-panel active" id="scm-panel-calendario-actividades" data-admin-activity-panel="calendario_actividades">
             <?php echo self::renderCalendar($runtime['config'] ?? [], $calendarEmployees); ?>
           </div>
         </div>
       </section>
-    <?php else: ?>
-      <section class="scm-tab-panel active" id="scm-panel-<?php echo esc_attr($bucket); ?>">
-        <?php echo self::renderTickets($bucket, $result, $filters, $ticketEmployees, $commercialEmployees, $policy, $baseUrl, $ticketUrl); ?>
-      </section>
     <?php endif; ?>
+
+    <div class="commercial-modal commercial-case-modal" id="commercial-case-modal" role="dialog" aria-modal="true" aria-labelledby="commercial-case-title" aria-hidden="true">
+      <div class="commercial-modal-card commercial-case-card" role="document">
+        <button type="button" class="commercial-modal-close commercial-case-close" data-commercial-close-case aria-label="Cerrar detalle">&times;</button>
+        <div class="commercial-case-content" data-commercial-case-content><div class="commercial-case-loading"><span></span><span></span><span></span><p>Cargando información del caso…</p></div></div>
+      </div>
+    </div>
 
     <?php echo CommercialGuideView::render(); ?>
     <?php if ($policy instanceof CommercialAccessPolicy && $policy->canManage()): ?>
@@ -115,8 +121,8 @@ final class CommercialDashboardView
     return (string) ob_get_clean();
   }
 
-  /** @param array<string,mixed> $result @param array<string,mixed> $filters @param array<int,array<string,string>> $ticketEmployees @param array<int,array<string,string>> $commercialEmployees */
-  private static function renderTickets(string $bucket, array $result, array $filters, array $ticketEmployees, array $commercialEmployees, $policy, string $baseUrl, string $ticketUrl): string
+  /** @param array<string,mixed> $result @param array<string,mixed> $filters @param array<int,array<string,string>> $ticketEmployees */
+  public static function renderTickets(string $bucket, array $result, array $filters, array $ticketEmployees, $policy, string $baseUrl): string
   {
     $bucketDef = CommercialStatusCatalog::buckets()[$bucket] ?? CommercialStatusCatalog::buckets()['abiertos'];
     $rows = is_array($result['rows'] ?? null) ? $result['rows'] : [];
@@ -131,25 +137,25 @@ final class CommercialDashboardView
     </div>
 
     <div class="commercial-status-strip" aria-label="Estados de <?php echo esc_attr(mb_strtolower($bucketDef['label'])); ?>">
-      <a class="commercial-status-chip<?php echo empty($filters['estado']) ? ' active' : ''; ?>" href="<?php echo esc_url(self::url($baseUrl, ['tab' => $bucket])); ?>"><span>Todos</span><strong><?php echo esc_html((string) $bucketTotal); ?></strong></a>
+      <a class="commercial-status-chip<?php echo empty($filters['estado']) ? ' active' : ''; ?>" data-commercial-filter-link href="<?php echo esc_url(self::url($baseUrl, ['tab' => $bucket])); ?>"><span>Todos</span><strong><?php echo esc_html((string) $bucketTotal); ?></strong></a>
       <?php foreach ($bucketDef['statuses'] as $status): ?>
-        <a class="commercial-status-chip<?php echo (($filters['estado'] ?? '') === $status) ? ' active' : ''; ?>" href="<?php echo esc_url(self::url($baseUrl, ['tab' => $bucket, 'estado' => $status])); ?>"><span><?php echo esc_html($status); ?></span><strong><?php echo esc_html((string) ($counts[$status] ?? 0)); ?></strong></a>
+        <a class="commercial-status-chip<?php echo (($filters['estado'] ?? '') === $status) ? ' active' : ''; ?>" data-commercial-filter-link href="<?php echo esc_url(self::url($baseUrl, ['tab' => $bucket, 'estado' => $status])); ?>"><span><?php echo esc_html($status); ?></span><strong><?php echo esc_html((string) ($counts[$status] ?? 0)); ?></strong></a>
       <?php endforeach; ?>
     </div>
 
-    <form class="commercial-filter-card" method="get" action="<?php echo esc_url($baseUrl . '/index.php'); ?>">
+    <form class="commercial-filter-card" data-commercial-filter-form method="get" action="<?php echo esc_url($baseUrl . '/index.php'); ?>">
       <input type="hidden" name="tab" value="<?php echo esc_attr($bucket); ?>">
       <div class="commercial-field commercial-field--wide"><label for="commercial-search">Buscar</label><input id="commercial-search" type="search" name="busqueda" value="<?php echo esc_attr((string) ($filters['busqueda'] ?? '')); ?>" placeholder="Ticket, asunto, solicitante, inmueble…"></div>
       <div class="commercial-field"><label for="commercial-status">Estado comercial</label><select id="commercial-status" name="estado"><option value="">Todos</option><?php foreach ($bucketDef['statuses'] as $status): ?><option value="<?php echo esc_attr($status); ?>"<?php selected((string) ($filters['estado'] ?? ''), $status); ?>><?php echo esc_html($status); ?></option><?php endforeach; ?></select></div>
       <div class="commercial-field"><label for="commercial-employee">Responsable</label><select id="commercial-employee" name="id_empleado"><option value="">Todos</option><?php foreach ($ticketEmployees as $employee): ?><option value="<?php echo esc_attr($employee['id']); ?>"<?php selected((string) ($filters['id_empleado'] ?? ''), $employee['id']); ?>><?php echo esc_html($employee['name']); ?></option><?php endforeach; ?></select></div>
-      <div class="commercial-filter-actions"><button class="commercial-primary-btn" type="submit"><i class="fas fa-filter" aria-hidden="true"></i> Filtrar</button><a class="commercial-secondary-btn" href="<?php echo esc_url(self::url($baseUrl, ['tab' => $bucket])); ?>">Limpiar</a></div>
+      <div class="commercial-filter-actions"><button class="commercial-primary-btn" type="submit"><i class="fas fa-filter" aria-hidden="true"></i> Filtrar</button><a class="commercial-secondary-btn" data-commercial-filter-link href="<?php echo esc_url(self::url($baseUrl, ['tab' => $bucket])); ?>">Limpiar</a></div>
     </form>
 
     <?php if ($rows === []): ?>
       <div class="commercial-empty"><i class="far fa-folder-open" aria-hidden="true"></i><h3>Sin tickets en esta vista</h3><p>Prueba con otro estado o limpia los filtros actuales.</p></div>
     <?php else: ?>
       <div class="commercial-ticket-grid">
-        <?php foreach ($rows as $row): echo self::renderTicketCard($row, $commercialEmployees, $policy, $ticketUrl); endforeach; ?>
+        <?php foreach ($rows as $row): echo self::renderTicketCard($row, $policy); endforeach; ?>
       </div>
       <?php echo self::renderPagination($bucket, $filters, $pagination, $baseUrl); ?>
     <?php endif; ?>
@@ -157,8 +163,8 @@ final class CommercialDashboardView
     return (string) ob_get_clean();
   }
 
-  /** @param array<string,mixed> $row @param array<int,array<string,string>> $employees */
-  private static function renderTicketCard(array $row, array $employees, $policy, string $ticketUrl): string
+  /** @param array<string,mixed> $row */
+  private static function renderTicketCard(array $row, $policy): string
   {
     $pk = (int) ($row['_ID'] ?? 0);
     $logicalId = trim((string) ($row['id_ticket'] ?? '')) ?: (string) $pk;
@@ -169,10 +175,7 @@ final class CommercialDashboardView
     $requester = trim((string) ($row['solicitante'] ?? '')) ?: 'Sin solicitante';
     $location = trim(implode(' · ', array_filter([(string) ($row['inmueble'] ?? ''), (string) ($row['barrio'] ?? ''), (string) ($row['direccion'] ?? '')])));
     $timestamp = (int) ($row['fecha_actualizacion'] ?? $row['fecha'] ?? 0);
-    $external = $ticketUrl !== '' ? $ticketUrl . rawurlencode($logicalId) : '';
-    $canStatus = $policy instanceof CommercialAccessPolicy && $policy->canAct('cambiar_estado');
-    $canReassign = $policy instanceof CommercialAccessPolicy && $policy->canAct('reasignar');
-    $canOpen = $policy instanceof CommercialAccessPolicy && $policy->canAct('ver_ticket') && $external !== '';
+    $canOpen = $policy instanceof CommercialAccessPolicy && $policy->canAct('ver_ticket');
     ob_start();
 ?>
     <article class="commercial-ticket-card" data-commercial-ticket="<?php echo esc_attr((string) $pk); ?>">
@@ -188,15 +191,7 @@ final class CommercialDashboardView
         <?php if ($location !== ''): ?><div><dt><i class="fas fa-location-dot" aria-hidden="true"></i> Inmueble</dt><dd><?php echo esc_html($location); ?></dd></div><?php endif; ?>
         <div><dt><i class="far fa-clock" aria-hidden="true"></i> Actualizado</dt><dd><?php echo esc_html(self::formatTimestamp($timestamp)); ?></dd></div>
       </dl>
-      <?php if ($canStatus || $canReassign): ?>
-        <div class="commercial-inline-actions">
-          <?php if ($canStatus): ?><button type="button" class="commercial-secondary-btn" data-commercial-change-status data-current-status="<?php echo esc_attr($status); ?>"><i class="fas fa-arrow-right-arrow-left" aria-hidden="true"></i> Cambiar estado</button><?php endif; ?>
-          <?php if ($canReassign): ?><button type="button" class="commercial-secondary-btn" data-commercial-reassign><i class="fas fa-user-pen" aria-hidden="true"></i> Reasignar</button><?php endif; ?>
-        </div>
-        <div class="commercial-action-panel" data-commercial-action-panel hidden></div>
-      <?php endif; ?>
-      <?php if ($canOpen): ?><footer><a class="commercial-primary-btn" href="<?php echo esc_url($external); ?>" target="_blank" rel="noopener noreferrer">Abrir ticket <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i></a></footer><?php endif; ?>
-      <script type="application/json" data-commercial-employees><?php echo json_encode($employees, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP); ?></script>
+      <?php if ($canOpen): ?><footer><button class="commercial-primary-btn" type="button" data-commercial-open-case="<?php echo esc_attr((string) $pk); ?>"><span>Ver caso</span><i class="fas fa-arrow-right" aria-hidden="true"></i></button></footer><?php endif; ?>
     </article>
 <?php
     return (string) ob_get_clean();
@@ -214,9 +209,9 @@ final class CommercialDashboardView
     ob_start();
 ?>
     <nav class="commercial-pagination" aria-label="Paginación de tickets">
-      <?php if ($page > 1): ?><a href="<?php echo esc_url(self::url($baseUrl, $common + ['page' => $page - 1])); ?>" aria-label="Página anterior">&lsaquo;</a><?php endif; ?>
-      <?php for ($index = $start; $index <= $end; $index++): ?><a class="<?php echo $index === $page ? 'active' : ''; ?>" href="<?php echo esc_url(self::url($baseUrl, $common + ['page' => $index])); ?>"<?php echo $index === $page ? ' aria-current="page"' : ''; ?>><?php echo $index; ?></a><?php endfor; ?>
-      <?php if ($page < $totalPages): ?><a href="<?php echo esc_url(self::url($baseUrl, $common + ['page' => $page + 1])); ?>" aria-label="Página siguiente">&rsaquo;</a><?php endif; ?>
+      <?php if ($page > 1): ?><a data-commercial-filter-link href="<?php echo esc_url(self::url($baseUrl, $common + ['page' => $page - 1])); ?>" aria-label="Página anterior">&lsaquo;</a><?php endif; ?>
+      <?php for ($index = $start; $index <= $end; $index++): ?><a data-commercial-filter-link class="<?php echo $index === $page ? 'active' : ''; ?>" href="<?php echo esc_url(self::url($baseUrl, $common + ['page' => $index])); ?>"<?php echo $index === $page ? ' aria-current="page"' : ''; ?>><?php echo $index; ?></a><?php endfor; ?>
+      <?php if ($page < $totalPages): ?><a data-commercial-filter-link href="<?php echo esc_url(self::url($baseUrl, $common + ['page' => $page + 1])); ?>" aria-label="Página siguiente">&rsaquo;</a><?php endif; ?>
     </nav>
 <?php
     return (string) ob_get_clean();
@@ -255,7 +250,7 @@ final class CommercialDashboardView
         <form id="commercial-permissions-form">
           <div class="commercial-permissions-grid">
             <?php foreach ($policy->cargoOptions() as $cargo): $current = $permissions[$cargo['id']] ?? ['views' => array_keys(CommercialAccessPolicy::VIEWS), 'actions' => array_keys(CommercialAccessPolicy::ACTIONS)]; ?>
-              <fieldset class="commercial-permission-card" data-cargo="<?php echo esc_attr($cargo['id']); ?>"><legend><?php echo esc_html($cargo['name']); ?> <small>ID <?php echo esc_html($cargo['id']); ?> · <?php echo esc_html((string) $cargo['total']); ?> activos</small></legend><input type="hidden" name="permissions[<?php echo esc_attr($cargo['id']); ?>][configured]" value="1"><div><strong>Vistas</strong><?php foreach (CommercialAccessPolicy::VIEWS as $key => $label): ?><label><input type="checkbox" name="permissions[<?php echo esc_attr($cargo['id']); ?>][views][]" value="<?php echo esc_attr($key); ?>"<?php checked(in_array($key, $current['views'] ?? [], true)); ?>> <?php echo esc_html($label); ?></label><?php endforeach; ?></div><div><strong>Acciones</strong><?php foreach (CommercialAccessPolicy::ACTIONS as $key => $label): ?><label><input type="checkbox" name="permissions[<?php echo esc_attr($cargo['id']); ?>][actions][]" value="<?php echo esc_attr($key); ?>"<?php checked(in_array($key, $current['actions'] ?? [], true)); ?>> <?php echo esc_html($label); ?></label><?php endforeach; ?></div></fieldset>
+              <fieldset class="commercial-permission-card" data-cargo="<?php echo esc_attr($cargo['id']); ?>"><legend><?php echo esc_html($cargo['name']); ?> <small>ID <?php echo esc_html($cargo['id']); ?> · <?php echo esc_html((string) $cargo['total']); ?> activos</small></legend><input type="hidden" name="permissions[<?php echo esc_attr($cargo['id']); ?>][configured]" value="1"><div><strong>Vistas</strong><?php foreach (CommercialAccessPolicy::VIEWS as $key => $label): ?><label><input type="checkbox" name="permissions[<?php echo esc_attr($cargo['id']); ?>][views][]" value="<?php echo esc_attr($key); ?>"<?php checked(in_array($key, $current['views'], true)); ?>> <?php echo esc_html($label); ?></label><?php endforeach; ?></div><div><strong>Acciones</strong><?php foreach (CommercialAccessPolicy::ACTIONS as $key => $label): ?><label><input type="checkbox" name="permissions[<?php echo esc_attr($cargo['id']); ?>][actions][]" value="<?php echo esc_attr($key); ?>"<?php checked(in_array($key, $current['actions'], true)); ?>> <?php echo esc_html($label); ?></label><?php endforeach; ?></div></fieldset>
             <?php endforeach; ?>
           </div>
           <footer><span data-commercial-permissions-message aria-live="polite"></span><button type="button" class="commercial-secondary-btn" data-commercial-close-permissions>Cancelar</button><button type="submit" class="commercial-primary-btn">Guardar configuración</button></footer>

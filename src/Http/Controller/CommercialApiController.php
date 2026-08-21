@@ -5,17 +5,26 @@ declare(strict_types=1);
 namespace SCM\Http\Controller;
 
 use SCM\Commercial\CommercialAccessPolicy;
+use SCM\Commercial\CommercialStatusCatalog;
 use SCM\Commercial\CommercialTicketsRepository;
 use SCM\Core\Csrf;
 use SCM\Core\Database;
 use SCM\Core\Settings;
 use SCM\Http\Response\JsonResponse;
+use SCM\Modules\ServiciosInmobiliarios\SeguimientoService;
+use SCM\Support\EmailQueue;
+use SCM\Support\SchemaInspector;
+use SCM\Views\CommercialDashboardView;
+use SCM\Views\CommercialTicketModalView;
 
 final class CommercialApiController
 {
   private CommercialTicketsRepository $tickets;
   private CommercialAccessPolicy $policy;
   private Csrf $csrf;
+  private SeguimientoService $workflow;
+  private string $baseUrl;
+  private string $ticketUrl;
   /** @var array<int,string> */
   private array $commercialCargos;
 
@@ -27,6 +36,59 @@ final class CommercialApiController
     $adminCargos = is_array($config['dashboard_admin_cargos'] ?? null) ? $config['dashboard_admin_cargos'] : ['11', '12', '13', '14'];
     $this->commercialCargos = is_array($config['calendar_allowed_cargos'] ?? null) ? array_values(array_map('strval', $config['calendar_allowed_cargos'])) : ['9', '10', '17'];
     $this->policy = new CommercialAccessPolicy($settings, $db, $adminCargos);
+    $this->workflow = new SeguimientoService($db, new SchemaInspector($db));
+    $this->workflow->setQueue(new EmailQueue($db));
+    $this->baseUrl = rtrim((string) SCM_BASE_URL, '/');
+    $this->ticketUrl = (string) ($config['ticket_url'] ?? '');
+  }
+
+  /** @param array<string,mixed> $input */
+  public function filterTickets(array $input): never
+  {
+    $this->verify($input);
+    $bucket = trim((string) ($input['tab'] ?? 'abiertos'));
+    if (!array_key_exists($bucket, CommercialStatusCatalog::buckets()) || !$this->policy->canView($bucket)) {
+      JsonResponse::error('No tienes permiso para consultar esta vista.', 403);
+    }
+    $filters = [
+      'estado' => trim((string) ($input['estado'] ?? '')),
+      'busqueda' => trim((string) ($input['busqueda'] ?? '')),
+      'id_empleado' => trim((string) ($input['id_empleado'] ?? '')),
+      'page' => max(1, (int) ($input['page'] ?? 1)),
+      'per_page' => 24,
+    ];
+    $result = $this->tickets->search($bucket, $filters);
+    JsonResponse::success([
+      'html' => CommercialDashboardView::renderTickets(
+        $bucket,
+        $result,
+        $filters,
+        $this->tickets->ticketEmployees(),
+        $this->policy,
+        $this->baseUrl
+      ),
+      'tab' => $bucket,
+    ]);
+  }
+
+  /** @param array<string,mixed> $input */
+  public function ticketDetail(array $input): never
+  {
+    $this->verify($input);
+    $this->authorize('ver_ticket', 'No tienes permiso para ver este ticket.');
+    try {
+      $detail = $this->tickets->detail((int) ($input['ticket_pk'] ?? 0));
+    } catch (\InvalidArgumentException | \RuntimeException $exception) {
+      JsonResponse::error($exception->getMessage(), 404);
+    }
+    JsonResponse::success([
+      'html' => CommercialTicketModalView::render(
+        $detail,
+        $this->policy,
+        $this->tickets->activeEmployeesByCargos($this->commercialCargos),
+        $this->ticketUrl
+      ),
+    ]);
   }
 
   /** @param array<string,mixed> $input */
@@ -72,10 +134,145 @@ final class CommercialApiController
   }
 
   /** @param array<string,mixed> $input */
+  public function reply(array $input): never
+  {
+    $this->verify($input);
+    $this->authorize('responder', 'No tienes permiso para responder tickets.');
+    $message = trim(wp_kses_post(stripslashes((string) ($input['respuesta'] ?? ''))));
+    if ($message === '') {
+      JsonResponse::error('La respuesta no puede estar vacía.', 422);
+    }
+    $result = $this->workflow->saveTicketResponse(
+      (int) ($input['ticket_pk'] ?? 0),
+      $message,
+      '__keep__',
+      false,
+      $this->notifyTargets($input)
+    );
+    $this->workflowResponse($result, 'Respuesta guardada.');
+  }
+
+  /** @param array<string,mixed> $input */
+  public function addNote(array $input): never
+  {
+    $this->verify($input);
+    $this->authorize('agregar_nota', 'No tienes permiso para agregar notas.');
+    $message = trim(wp_kses_post(stripslashes((string) ($input['observacion'] ?? ''))));
+    if ($message === '') {
+      JsonResponse::error('La nota no puede estar vacía.', 422);
+    }
+    $this->workflowResponse(
+      $this->workflow->saveNote((int) ($input['ticket_pk'] ?? 0), $message),
+      'Nota guardada.'
+    );
+  }
+
+  /** @param array<string,mixed> $input */
+  public function followUp(array $input): never
+  {
+    $this->verify($input);
+    $this->authorize('seguimiento', 'No tienes permiso para registrar seguimientos.');
+    $message = trim(wp_kses_post(stripslashes((string) ($input['observacion'] ?? ''))));
+    if ($message === '') {
+      JsonResponse::error('El seguimiento no puede estar vacío.', 422);
+    }
+    $this->workflowResponse(
+      $this->workflow->save(
+        (int) ($input['ticket_pk'] ?? 0),
+        $message,
+        '__keep__',
+        '__keep__',
+        '__keep__',
+        false,
+        $this->notifyTargets($input)
+      ),
+      'Seguimiento guardado.'
+    );
+  }
+
+  /** @param array<string,mixed> $input */
+  public function postpone(array $input): never
+  {
+    $this->verify($input);
+    $this->authorize('postergar', 'No tienes permiso para postergar tickets.');
+    $ticketPk = (int) ($input['ticket_pk'] ?? 0);
+    $message = trim(wp_kses_post(stripslashes((string) ($input['observacion'] ?? ''))));
+    if ($message === '') {
+      JsonResponse::error('El motivo de postergación es obligatorio.', 422);
+    }
+    $result = $this->workflow->postponeTicket($ticketPk, $message, $this->notifyTargets($input));
+    $this->ensureWorkflowSucceeded($result);
+    $this->tickets->changeStatus($ticketPk, 'Postergado');
+    JsonResponse::success(['message' => (string) ($result['message'] ?? 'Ticket postergado.'), 'refresh' => true]);
+  }
+
+  /** @param array<string,mixed> $input */
+  public function activate(array $input): never
+  {
+    $this->verify($input);
+    $this->authorize('activar', 'No tienes permiso para activar tickets.');
+    $ticketPk = (int) ($input['ticket_pk'] ?? 0);
+    $message = trim(wp_kses_post(stripslashes((string) ($input['motivo'] ?? ''))));
+    $status = trim((string) ($input['estado'] ?? 'Nuevo'));
+    if ($message === '' || !in_array($status, CommercialStatusCatalog::OPEN, true)) {
+      JsonResponse::error('Selecciona un estado activo e indica el motivo.', 422);
+    }
+    $result = $this->workflow->activateTicket($ticketPk, $message);
+    $this->ensureWorkflowSucceeded($result);
+    $this->tickets->changeStatus($ticketPk, $status);
+    JsonResponse::success(['message' => (string) ($result['message'] ?? 'Ticket activado.'), 'refresh' => true]);
+  }
+
+  /** @param array<string,mixed> $input */
+  public function close(array $input): never
+  {
+    $this->verify($input);
+    $this->authorize('cerrar', 'No tienes permiso para cerrar tickets.');
+    $ticketPk = (int) ($input['ticket_pk'] ?? 0);
+    $message = trim(wp_kses_post(stripslashes((string) ($input['observacion'] ?? ''))));
+    $status = trim((string) ($input['estado'] ?? 'Finalizado'));
+    if ($message === '' || !in_array($status, CommercialStatusCatalog::CLOSED, true)) {
+      JsonResponse::error('Selecciona un estado de cierre e indica el motivo.', 422);
+    }
+    $result = $this->workflow->closeTicket($ticketPk, $message);
+    $this->ensureWorkflowSucceeded($result);
+    $this->tickets->changeStatus($ticketPk, $status);
+    JsonResponse::success(['message' => (string) ($result['message'] ?? 'Ticket cerrado.'), 'refresh' => true]);
+  }
+
+  /** @param array<string,mixed> $input */
   private function verify(array $input): void
   {
     if (!$this->csrf->verify('commercial_nonce', (string) ($input['nonce'] ?? ''), false)) {
       JsonResponse::error('Verificación de seguridad fallida.', 403);
     }
+  }
+
+  private function authorize(string $action, string $message): void
+  {
+    if (!$this->policy->canAct($action)) {
+      JsonResponse::error($message, 403);
+    }
+  }
+
+  /** @param array<string,mixed> $input @return array<int,string> */
+  private function notifyTargets(array $input): array
+  {
+    return !empty($input['notificar_solicitante']) ? ['solicitante'] : [];
+  }
+
+  /** @param array<string,string> $result */
+  private function ensureWorkflowSucceeded(array $result): void
+  {
+    if (($result['ok'] ?? '0') !== '1') {
+      JsonResponse::error((string) ($result['message'] ?? 'No se pudo completar la acción.'), 422);
+    }
+  }
+
+  /** @param array<string,string> $result */
+  private function workflowResponse(array $result, string $fallback): never
+  {
+    $this->ensureWorkflowSucceeded($result);
+    JsonResponse::success(['message' => (string) ($result['message'] ?? $fallback), 'refresh' => true]);
   }
 }
