@@ -24,13 +24,9 @@ final class CommercialTicketModalView
     $description = trim(wp_strip_all_tags((string) ($ticket['descripcion'] ?? ''), true));
     $requester = trim((string) ($ticket['solicitante'] ?? '')) ?: 'Sin solicitante';
     $assignee = trim((string) ($ticket['nombre_empleado'] ?? $ticket['empleado'] ?? '')) ?: 'Sin asignar';
-    $location = trim(implode(' · ', array_filter([
-      trim((string) ($ticket['inmueble'] ?? '')),
-      trim((string) ($ticket['barrio'] ?? '')),
-      trim((string) ($ticket['direccion'] ?? '')),
-    ])));
     $external = $ticketUrl !== '' ? $ticketUrl . rawurlencode($logicalId) : '';
     $bucket = CommercialStatusCatalog::bucketForStatus($status);
+    $timelineCounts = self::timelineCounts($timeline);
 
     ob_start();
 ?>
@@ -66,7 +62,7 @@ final class CommercialTicketModalView
           <?php echo self::detailRow('Correo', trim((string) ($ticket['correo_solicitante'] ?? '')) ?: 'No registrado', 'fa-envelope'); ?>
           <?php echo self::detailRow('Celular', trim((string) ($ticket['celular_solicitante'] ?? '')) ?: 'No registrado', 'fa-phone'); ?>
           <?php echo self::detailRow('Responsable', $assignee, 'fa-user-tie'); ?>
-          <?php echo self::detailRow('Inmueble', $location !== '' ? $location : 'No registrado', 'fa-location-dot'); ?>
+          <?php echo self::propertyRow($ticket); ?>
           <?php echo self::detailRow('Prioridad', trim((string) ($ticket['prioridad'] ?? '')) ?: 'No definida', 'fa-flag'); ?>
           <?php echo self::detailRow('Medio', trim((string) ($ticket['medio'] ?? '')) ?: 'No registrado', 'fa-message'); ?>
           <?php echo self::detailRow('Actualizado', self::formatDate($ticket['fecha_actualizacion'] ?? $ticket['fecha'] ?? 0), 'fa-clock'); ?>
@@ -103,7 +99,15 @@ final class CommercialTicketModalView
       </div>
 
       <section class="commercial-timeline" aria-labelledby="commercial-timeline-title">
-        <div class="commercial-case-section-title"><div><span>Actividad</span><h3 id="commercial-timeline-title">Historial del caso</h3></div><strong><?php echo esc_html((string) count($timeline)); ?> registros</strong></div>
+        <div class="commercial-case-section-title commercial-case-section-title--stacked">
+          <div><span>Actividad</span><h3 id="commercial-timeline-title">Historial del caso</h3></div>
+          <div class="commercial-timeline-counts" aria-label="Resumen del historial">
+            <strong><?php echo esc_html((string) count($timeline)); ?> registros</strong>
+            <small><?php echo esc_html((string) $timelineCounts['respuesta']); ?> respuestas</small>
+            <small><?php echo esc_html((string) $timelineCounts['seguimiento']); ?> seguimientos</small>
+            <small><?php echo esc_html((string) $timelineCounts['nota']); ?> notas</small>
+          </div>
+        </div>
         <?php if ($timeline === []): ?>
           <div class="commercial-timeline-empty"><i class="far fa-comments" aria-hidden="true"></i><p>Aún no hay respuestas, seguimientos o notas para este ticket.</p></div>
         <?php else: ?>
@@ -111,10 +115,20 @@ final class CommercialTicketModalView
             <?php foreach ($timeline as $item):
               $type = (string) ($item['type'] ?? 'respuesta');
               $labels = ['respuesta' => 'Respuesta', 'seguimiento' => 'Seguimiento', 'nota' => 'Nota interna'];
+              $author = trim((string) ($item['nombre'] ?? '')) ?: 'Sistema';
+              $actorId = trim((string) ($item['actor_id'] ?? ''));
+              $actorEmail = trim((string) ($item['actor_email'] ?? ''));
             ?>
               <li class="commercial-timeline-item commercial-timeline-item--<?php echo esc_attr($type); ?>">
                 <span class="commercial-timeline-icon" aria-hidden="true"><?php echo esc_html(mb_strtoupper(mb_substr($labels[$type] ?? 'A', 0, 1))); ?></span>
-                <div><header><span><?php echo esc_html($labels[$type] ?? 'Actividad'); ?></span><time><?php echo esc_html(self::formatDate($item['_timestamp'] ?? $item['fecha'] ?? 0)); ?></time></header><p><?php echo nl2br(esc_html(trim(wp_strip_all_tags((string) ($item['message'] ?? ''), true)))); ?></p><small>Por <?php echo esc_html(trim((string) ($item['nombre'] ?? '')) ?: 'Sistema'); ?></small></div>
+                <div>
+                  <header>
+                    <span><?php echo esc_html(($labels[$type] ?? 'Actividad') . ' · ' . $author); ?></span>
+                    <time><?php echo esc_html(self::formatDate($item['_timestamp'] ?? $item['fecha'] ?? 0)); ?></time>
+                  </header>
+                  <p><?php echo nl2br(esc_html(trim(wp_strip_all_tags((string) ($item['message'] ?? ''), true)))); ?></p>
+                  <small><?php echo esc_html(self::actorMeta($actorId, $actorEmail)); ?></small>
+                </div>
               </li>
             <?php endforeach; ?>
           </ol>
@@ -129,6 +143,67 @@ final class CommercialTicketModalView
   private static function detailRow(string $label, string $value, string $icon): string
   {
     return '<div><dt><i class="fas ' . esc_attr($icon) . '" aria-hidden="true"></i>' . esc_html($label) . '</dt><dd>' . esc_html($value) . '</dd></div>';
+  }
+
+  /** @param array<string,mixed> $ticket */
+  private static function propertyRow(array $ticket): string
+  {
+    $property = is_array($ticket['_scm_inmueble_data'] ?? null) ? $ticket['_scm_inmueble_data'] : [];
+    $code = trim((string) ($ticket['id_inmueble'] ?? $ticket['inmueble'] ?? $property['codigo'] ?? ''));
+    if ($code === '') {
+      $code = trim((string) ($property['codigo'] ?? ''));
+    }
+    $type = trim((string) ($ticket['tipo_inmueble'] ?? $property['tipo_inmueble'] ?? ''));
+    $neighborhood = trim((string) ($ticket['barrio'] ?? $property['barrio'] ?? ''));
+    $city = trim((string) ($property['ciudad'] ?? ''));
+    $address = trim((string) ($ticket['direccion'] ?? $property['direccion'] ?? ''));
+    $url = trim((string) ($ticket['_scm_inmueble_url'] ?? ''));
+
+    $parts = array_filter([$type, $neighborhood, $city], static fn(string $value): bool => trim($value) !== '');
+    $html = '<div class="commercial-property-row"><dt><i class="fas fa-location-dot" aria-hidden="true"></i>Inmueble</dt><dd>';
+    if ($code === '' && $parts === [] && $address === '') {
+      return $html . 'No registrado</dd></div>';
+    }
+
+    $html .= '<span class="commercial-property-main">' . esc_html($code !== '' ? ('Código ' . $code) : 'Inmueble registrado') . '</span>';
+    if ($parts !== []) {
+      $html .= '<span class="commercial-property-meta">' . esc_html(implode(' · ', $parts)) . '</span>';
+    }
+    if ($address !== '') {
+      $html .= '<span class="commercial-property-address">' . esc_html($address) . '</span>';
+    }
+    if ($url !== '') {
+      $html .= '<a class="commercial-property-link" href="' . esc_url($url) . '" target="_blank" rel="noopener noreferrer">Ver inmueble</a>';
+    }
+    return $html . '</dd></div>';
+  }
+
+  /**
+   * @param array<int,array<string,mixed>> $timeline
+   * @return array{respuesta:int,seguimiento:int,nota:int}
+   */
+  private static function timelineCounts(array $timeline): array
+  {
+    $counts = ['respuesta' => 0, 'seguimiento' => 0, 'nota' => 0];
+    foreach ($timeline as $item) {
+      $type = (string) ($item['type'] ?? '');
+      if (array_key_exists($type, $counts)) {
+        $counts[$type]++;
+      }
+    }
+    return $counts;
+  }
+
+  private static function actorMeta(string $actorId, string $actorEmail): string
+  {
+    $parts = [];
+    if ($actorId !== '') {
+      $parts[] = 'ID funcionario ' . $actorId;
+    }
+    if ($actorEmail !== '') {
+      $parts[] = $actorEmail;
+    }
+    return $parts !== [] ? implode(' · ', $parts) : 'Autor registrado en historial';
   }
 
   private static function messageForm(int $pk, string $action, string $title, string $help, string $field, string $placeholder, string $submit, bool $notify = false, bool $danger = false): string

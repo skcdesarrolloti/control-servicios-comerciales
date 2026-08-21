@@ -6,6 +6,7 @@ namespace SCM\Commercial;
 
 use SCM\Core\Auth;
 use SCM\Core\Database;
+use SCM\Support\HistoryLinkMap;
 
 final class CommercialTicketsRepository
 {
@@ -64,6 +65,7 @@ final class CommercialTicketsRepository
         LIMIT {$perPage} OFFSET {$offset}",
       $args
     );
+    $rows = $this->enrichPropertyData($rows);
 
     return [
       'rows' => $rows,
@@ -93,33 +95,50 @@ final class CommercialTicketsRepository
     if (!is_array($ticket)) {
       throw new \RuntimeException('El ticket comercial no existe.');
     }
+    $enrichedTickets = $this->enrichPropertyData([$ticket]);
+    $ticket = $enrichedTickets[0] ?? $ticket;
 
-    $logicalId = trim((string) ($ticket['id_ticket'] ?? ''));
-    if ($logicalId === '') {
-      $logicalId = (string) $ticketPk;
-    }
-    $keys = array_values(array_unique([(string) $ticketPk, $logicalId]));
+    $keys = $this->ticketLookupKeys($ticket, $ticketPk);
     $placeholders = implode(',', array_fill(0, count($keys), '?'));
     $historyTable = $this->db->table('jet_cct_historial_del_ticket');
     $followUpTable = $this->db->table('jet_cct_seguimiento_ticket');
     $notesTable = $this->db->table('jet_cct_notas_ticket');
+    $employeesTable = $this->db->table('jet_cct_funcionarios');
     $timeline = $this->db->getResults(
       "SELECT activity.*
          FROM (
-           SELECT `_ID`, `id_ticket`, `fecha`, `cct_created`, `nombre`, `respuesta` AS `message`, 'respuesta' AS `type`,
-                  COALESCE(NULLIF(`fecha`, 0), UNIX_TIMESTAMP(`cct_created`), 0) AS `_timestamp`
-             FROM `{$historyTable}`
-            WHERE CAST(`id_ticket` AS CHAR) IN ({$placeholders}) AND TRIM(COALESCE(`respuesta`, '')) <> ''
+           SELECT h.`_ID`, h.`id_ticket`, h.`fecha`, h.`cct_created`,
+                  COALESCE(NULLIF(TRIM(h.`nombre`), ''), NULLIF(TRIM(f.`nombre`), ''), 'Sistema') AS `nombre`,
+                  COALESCE(NULLIF(TRIM(h.`id_empleado`), ''), NULLIF(TRIM(h.`cct_author_id`), '')) AS `actor_id`,
+                  COALESCE(NULLIF(TRIM(h.`correo`), ''), NULLIF(TRIM(f.`correo`), '')) AS `actor_email`,
+                  h.`respuesta` AS `message`, 'respuesta' AS `type`,
+                  COALESCE(NULLIF(h.`fecha`, 0), UNIX_TIMESTAMP(h.`cct_created`), 0) AS `_timestamp`
+             FROM `{$historyTable}` h
+             LEFT JOIN `{$employeesTable}` f
+               ON TRIM(f.`id_empleado`) = COALESCE(NULLIF(TRIM(h.`id_empleado`), ''), NULLIF(TRIM(h.`cct_author_id`), ''))
+            WHERE CAST(h.`id_ticket` AS CHAR) IN ({$placeholders}) AND TRIM(COALESCE(h.`respuesta`, '')) <> ''
            UNION ALL
-           SELECT `_ID`, `id_ticket`, `fecha`, `cct_created`, `nombre`, `observacion` AS `message`, 'seguimiento' AS `type`,
-                  COALESCE(NULLIF(`fecha`, 0), UNIX_TIMESTAMP(`cct_created`), 0) AS `_timestamp`
-             FROM `{$followUpTable}`
-            WHERE CAST(`id_ticket` AS CHAR) IN ({$placeholders}) AND TRIM(COALESCE(`observacion`, '')) <> ''
+           SELECT s.`_ID`, s.`id_ticket`, s.`fecha`, s.`cct_created`,
+                  COALESCE(NULLIF(TRIM(s.`nombre`), ''), NULLIF(TRIM(f.`nombre`), ''), 'Sistema') AS `nombre`,
+                  COALESCE(NULLIF(TRIM(s.`id_empleado`), ''), NULLIF(TRIM(s.`id_coordinador`), ''), NULLIF(TRIM(s.`cct_author_id`), '')) AS `actor_id`,
+                  NULLIF(TRIM(f.`correo`), '') AS `actor_email`,
+                  s.`observacion` AS `message`, 'seguimiento' AS `type`,
+                  COALESCE(NULLIF(s.`fecha`, 0), UNIX_TIMESTAMP(s.`cct_created`), 0) AS `_timestamp`
+             FROM `{$followUpTable}` s
+             LEFT JOIN `{$employeesTable}` f
+               ON TRIM(f.`id_empleado`) = COALESCE(NULLIF(TRIM(s.`id_empleado`), ''), NULLIF(TRIM(s.`id_coordinador`), ''), NULLIF(TRIM(s.`cct_author_id`), ''))
+            WHERE CAST(s.`id_ticket` AS CHAR) IN ({$placeholders}) AND TRIM(COALESCE(s.`observacion`, '')) <> ''
            UNION ALL
-           SELECT `_ID`, `id_ticket`, `fecha`, `cct_created`, `nombre`, `observacion` AS `message`, 'nota' AS `type`,
-                  COALESCE(NULLIF(`fecha`, 0), UNIX_TIMESTAMP(`cct_created`), 0) AS `_timestamp`
-             FROM `{$notesTable}`
-            WHERE CAST(`id_ticket` AS CHAR) IN ({$placeholders}) AND TRIM(COALESCE(`observacion`, '')) <> ''
+           SELECT n.`_ID`, n.`id_ticket`, n.`fecha`, n.`cct_created`,
+                  COALESCE(NULLIF(TRIM(n.`nombre`), ''), NULLIF(TRIM(f.`nombre`), ''), 'Sistema') AS `nombre`,
+                  COALESCE(NULLIF(TRIM(n.`id_empleado`), ''), NULLIF(TRIM(n.`cct_author_id`), '')) AS `actor_id`,
+                  NULLIF(TRIM(f.`correo`), '') AS `actor_email`,
+                  n.`observacion` AS `message`, 'nota' AS `type`,
+                  COALESCE(NULLIF(n.`fecha`, 0), UNIX_TIMESTAMP(n.`cct_created`), 0) AS `_timestamp`
+             FROM `{$notesTable}` n
+             LEFT JOIN `{$employeesTable}` f
+               ON TRIM(f.`id_empleado`) = COALESCE(NULLIF(TRIM(n.`id_empleado`), ''), NULLIF(TRIM(n.`cct_author_id`), ''))
+            WHERE CAST(n.`id_ticket` AS CHAR) IN ({$placeholders}) AND TRIM(COALESCE(n.`observacion`, '')) <> ''
          ) activity
         ORDER BY activity.`_timestamp` DESC, activity.`_ID` DESC
         LIMIT 100",
@@ -306,6 +325,121 @@ final class CommercialTicketsRepository
       'id_empleado' => Auth::employeeId() !== '' ? Auth::employeeId() : (string) Auth::userId(),
       'respuesta' => $message,
     ]);
+  }
+
+  /**
+   * @param array<int,array<string,mixed>> $rows
+   * @return array<int,array<string,mixed>>
+   */
+  private function enrichPropertyData(array $rows): array
+  {
+    if ($rows === []) {
+      return $rows;
+    }
+
+    $propertyKeys = [];
+    foreach ($rows as $row) {
+      foreach ($this->propertyLookupKeys($row) as $key) {
+        $propertyKeys[$key] = true;
+      }
+    }
+    $keys = array_map('strval', array_keys($propertyKeys));
+    if ($keys === []) {
+      return $rows;
+    }
+
+    $propertiesTable = $this->db->table('jet_cct_inmuebles');
+    $placeholders = implode(',', array_fill(0, count($keys), '?'));
+    $properties = $this->db->getResults(
+      "SELECT `_ID`, `codigo`, `barrio`, `ciudad`, `direccion`, `tipo_inmueble`, `estado`
+         FROM `{$propertiesTable}`
+        WHERE CAST(`codigo` AS CHAR) IN ({$placeholders})
+           OR CAST(`_ID` AS CHAR) IN ({$placeholders})",
+      array_merge($keys, $keys)
+    );
+    $propertyByKey = [];
+    foreach ($properties as $property) {
+      foreach ([(string) ($property['codigo'] ?? ''), (string) ($property['_ID'] ?? '')] as $key) {
+        $key = trim($key);
+        if ($key !== '' && !isset($propertyByKey[$key])) {
+          $propertyByKey[$key] = $property;
+        }
+      }
+    }
+
+    $propertyBaseUrl = (string) (HistoryLinkMap::idButtons()['id_inmueble']['base'] ?? '');
+    foreach ($rows as &$row) {
+      $property = null;
+      $rowPropertyKeys = $this->propertyLookupKeys($row);
+      $fallbackPropertyId = $rowPropertyKeys[0] ?? '';
+      if ($fallbackPropertyId !== '' && trim((string) ($row['inmueble'] ?? '')) === '') {
+        $row['inmueble'] = $fallbackPropertyId;
+      }
+      if ($propertyBaseUrl !== '' && $fallbackPropertyId !== '') {
+        $row['_scm_inmueble_url'] = $propertyBaseUrl . rawurlencode($fallbackPropertyId);
+      }
+      foreach ($rowPropertyKeys as $key) {
+        if (isset($propertyByKey[$key])) {
+          $property = $propertyByKey[$key];
+          break;
+        }
+      }
+      if (!is_array($property)) {
+        continue;
+      }
+
+      $row['_scm_inmueble_data'] = $property;
+      $propertyCode = trim((string) ($property['codigo'] ?? ''));
+      if (trim((string) ($row['inmueble'] ?? '')) === '' && $propertyCode !== '') {
+        $row['inmueble'] = $propertyCode;
+      }
+      foreach (['barrio', 'direccion', 'tipo_inmueble'] as $column) {
+        $value = trim((string) ($property[$column] ?? ''));
+        if (trim((string) ($row[$column] ?? '')) === '' && $value !== '') {
+          $row[$column] = $value;
+        }
+      }
+      if ($propertyBaseUrl !== '' && $propertyCode !== '') {
+        $row['_scm_inmueble_url'] = $propertyBaseUrl . rawurlencode($propertyCode);
+      }
+    }
+    unset($row);
+
+    return $rows;
+  }
+
+  /**
+   * @param array<string,mixed> $row
+   * @return array<int,string>
+   */
+  private function propertyLookupKeys(array $row): array
+  {
+    $keys = [];
+    foreach (['id_inmueble', 'id_inmueble_data', 'inmueble'] as $column) {
+      foreach (preg_split('/[,;|]+/', (string) ($row[$column] ?? '')) ?: [] as $value) {
+        $value = trim($value);
+        if ($value !== '') {
+          $keys[$value] = true;
+        }
+      }
+    }
+    return array_map('strval', array_keys($keys));
+  }
+
+  /**
+   * @param array<string,mixed> $ticket
+   * @return array<int,string>
+   */
+  private function ticketLookupKeys(array $ticket, int $ticketPk): array
+  {
+    $keys = [];
+    foreach ([(string) $ticketPk, (string) ($ticket['id_ticket'] ?? '')] as $key) {
+      $key = trim($key);
+      if ($key !== '') {
+        $keys[$key] = true;
+      }
+    }
+    return array_map('strval', array_keys($keys)) ?: [(string) $ticketPk];
   }
 
 }
