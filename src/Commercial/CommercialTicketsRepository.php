@@ -34,76 +34,9 @@ final class CommercialTicketsRepository
 
     $where = ['TRIM(COALESCE(t.`estado_comercial`, \'\')) IN (' . implode(',', array_fill(0, count($statuses), '?')) . ')'];
     $args = $statuses;
-    $search = trim((string) ($filters['busqueda'] ?? ''));
-    if ($search !== '') {
-      $like = '%' . $this->db->escapeLike($search) . '%';
-      $where[] = "(CAST(t.`_ID` AS CHAR) LIKE ? OR t.`id_ticket` LIKE ? OR t.`asunto` LIKE ? OR t.`descripcion` LIKE ? OR t.`solicitante` LIKE ? OR t.`correo_solicitante` LIKE ? OR t.`celular_solicitante` LIKE ? OR t.`nombre_empleado` LIKE ? OR t.`inmueble` LIKE ? OR t.`id_inmueble` LIKE ? OR t.`direccion` LIKE ? OR t.`barrio` LIKE ? OR t.`tema_ayuda` LIKE ? OR t.`medio` LIKE ? OR t.`prioridad` LIKE ?)";
-      array_push($args, $like, $like, $like, $like, $like, $like, $like, $like, $like, $like, $like, $like, $like, $like, $like);
-    }
-
-    $employee = trim((string) ($filters['id_empleado'] ?? ''));
-    if ($employee !== '') {
-      $where[] = 'TRIM(COALESCE(t.`id_empleado`, \'\')) = ?';
-      $args[] = $employee;
-    }
-
-    $ticketId = trim((string) ($filters['ticket_id'] ?? ''));
-    if ($ticketId !== '') {
-      $like = '%' . $this->db->escapeLike($ticketId) . '%';
-      $where[] = '(CAST(t.`_ID` AS CHAR) = ? OR t.`id_ticket` LIKE ?)';
-      array_push($args, $ticketId, $like);
-    }
-
-    foreach ([
-      'solicitante' => 'solicitante',
-      'celular' => 'celular_solicitante',
-      'correo' => 'correo_solicitante',
-    ] as $filterKey => $column) {
-      $value = trim((string) ($filters[$filterKey] ?? ''));
-      if ($value === '') {
-        continue;
-      }
-      $where[] = "t.`{$column}` LIKE ?";
-      $args[] = '%' . $this->db->escapeLike($value) . '%';
-    }
-
-    $property = trim((string) ($filters['inmueble'] ?? ''));
-    if ($property !== '') {
-      $like = '%' . $this->db->escapeLike($property) . '%';
-      $where[] = "(t.`inmueble` LIKE ? OR t.`id_inmueble` LIKE ? OR t.`direccion` LIKE ? OR t.`barrio` LIKE ?)";
-      array_push($args, $like, $like, $like, $like);
-    }
-
-    foreach ([
-      'medio' => 'medio',
-      'prioridad' => 'prioridad',
-      'tema' => 'tema_ayuda',
-    ] as $filterKey => $column) {
-      $value = trim((string) ($filters[$filterKey] ?? ''));
-      if ($value === '') {
-        continue;
-      }
-      $where[] = "TRIM(COALESCE(t.`{$column}`, '')) = ?";
-      $args[] = $value;
-    }
-
-    $followUp = mb_strtolower(trim((string) ($filters['seguimiento'] ?? '')), 'UTF-8');
-    if (in_array($followUp, ['si', 'no'], true)) {
-      if ($followUp === 'si') {
-        $where[] = "LOWER(TRIM(COALESCE(t.`tuvo_seguimiento`, ''))) = 'si'";
-      } else {
-        $where[] = "(t.`tuvo_seguimiento` IS NULL OR LOWER(TRIM(t.`tuvo_seguimiento`)) <> 'si')";
-      }
-    }
-
-    foreach ([['fecha_desde', false, '>='], ['fecha_hasta', true, '<=']] as [$filterKey, $endOfDay, $operator]) {
-      $timestamp = $this->dateFilterTimestamp(trim((string) ($filters[$filterKey] ?? '')), (bool) $endOfDay);
-      if ($timestamp <= 0) {
-        continue;
-      }
-      $where[] = "COALESCE(NULLIF(t.`fecha`, 0), UNIX_TIMESTAMP(t.`cct_created`), 0) {$operator} ?";
-      $args[] = $timestamp;
-    }
+    [$filterWhere, $filterArgs] = $this->ticketFilterClauses($filters);
+    $where = array_merge($where, $filterWhere);
+    $args = array_merge($args, $filterArgs);
 
     $page = max(1, (int) ($filters['page'] ?? 1));
     $perPage = min(60, max(12, (int) ($filters['per_page'] ?? 24)));
@@ -162,7 +95,7 @@ final class CommercialTicketsRepository
         'total' => $total,
         'total_pages' => $totalPages,
       ],
-      'counts' => $this->statusCounts(),
+      'counts' => $this->statusCounts($filters),
     ];
     if (is_array($summary)) {
       $payload['sla_summary'] = $summary;
@@ -246,23 +179,41 @@ final class CommercialTicketsRepository
     ];
   }
 
-  /** @return array<string,int> */
-  public function statusCounts(): array
+  /** @param array<string,mixed> $filters @return array<string,int> */
+  public function statusCounts(array $filters = []): array
   {
     $table = $this->db->table('jet_cct_tickets');
     $statuses = CommercialStatusCatalog::all();
+    $where = [
+      'TRIM(COALESCE(t.`estado_comercial`, \'\')) IN (' . implode(',', array_fill(0, count($statuses), '?')) . ')',
+    ];
+    $args = $statuses;
+    [$filterWhere, $filterArgs] = $this->ticketFilterClauses($filters);
+    $where = array_merge($where, $filterWhere);
+    $args = array_merge($args, $filterArgs);
+
     $rows = $this->db->getResults(
-      'SELECT TRIM(COALESCE(`estado_comercial`, \'\')) AS estado, COUNT(*) AS total'
-      . " FROM `{$table}` WHERE TRIM(COALESCE(`estado_comercial`, '')) IN ("
-      . implode(',', array_fill(0, count($statuses), '?'))
-      . ') GROUP BY TRIM(COALESCE(`estado_comercial`, \'\'))',
-      $statuses
+      'SELECT TRIM(COALESCE(t.`estado_comercial`, \'\')) AS estado, COUNT(*) AS total'
+      . " FROM `{$table}` t WHERE " . implode(' AND ', $where)
+      . ' GROUP BY TRIM(COALESCE(t.`estado_comercial`, \'\'))',
+      $args
     );
     $counts = array_fill_keys($statuses, 0);
     foreach ($rows as $row) {
       $counts[(string) ($row['estado'] ?? '')] = (int) ($row['total'] ?? 0);
     }
     return $counts;
+  }
+
+  /** @param array<string,mixed> $filters @return array<string,int> */
+  public function bucketCounts(array $filters = []): array
+  {
+    $statusCounts = $this->statusCounts($filters);
+    $bucketCounts = [];
+    foreach (CommercialStatusCatalog::buckets() as $bucket => $definition) {
+      $bucketCounts[$bucket] = array_sum(array_intersect_key($statusCounts, array_flip($definition['statuses'])));
+    }
+    return $bucketCounts;
   }
 
   /** @return array<int,array{id:string,name:string}> */
@@ -286,13 +237,14 @@ final class CommercialTicketsRepository
     ], $rows);
   }
 
-  /** @return array{medios:array<int,string>,prioridades:array<int,string>,temas:array<int,string>} */
+  /** @return array{medios:array<int,string>,prioridades:array<int,string>,temas:array<int,string>,barrios:array<int,string>} */
   public function filterOptions(): array
   {
     return [
       'medios' => $this->distinctTicketValues('medio'),
       'prioridades' => $this->distinctTicketValues('prioridad'),
       'temas' => $this->distinctTicketValues('tema_ayuda'),
+      'barrios' => $this->neighborhoodOptions(),
     ];
   }
 
@@ -376,6 +328,154 @@ final class CommercialTicketsRepository
         ORDER BY value ASC"
     );
     return array_values(array_filter(array_map('strval', $rows), static fn(string $value): bool => trim($value) !== ''));
+  }
+
+  /**
+   * @param array<string,mixed> $filters
+   * @return array{0:array<int,string>,1:array<int,mixed>}
+   */
+  private function ticketFilterClauses(array $filters): array
+  {
+    $where = [];
+    $args = [];
+
+    $search = trim((string) ($filters['busqueda'] ?? ''));
+    if ($search !== '') {
+      $like = '%' . $this->db->escapeLike($search) . '%';
+      $where[] = "(CAST(t.`_ID` AS CHAR) LIKE ? OR t.`id_ticket` LIKE ? OR t.`asunto` LIKE ? OR t.`descripcion` LIKE ? OR t.`solicitante` LIKE ? OR t.`correo_solicitante` LIKE ? OR t.`celular_solicitante` LIKE ? OR t.`nombre_empleado` LIKE ? OR t.`inmueble` LIKE ? OR t.`id_inmueble` LIKE ? OR t.`direccion` LIKE ? OR t.`barrio` LIKE ? OR t.`tema_ayuda` LIKE ? OR t.`medio` LIKE ? OR t.`prioridad` LIKE ?)";
+      array_push($args, $like, $like, $like, $like, $like, $like, $like, $like, $like, $like, $like, $like, $like, $like, $like);
+    }
+
+    $employee = trim((string) ($filters['id_empleado'] ?? ''));
+    if ($employee !== '') {
+      $where[] = 'TRIM(COALESCE(t.`id_empleado`, \'\')) = ?';
+      $args[] = $employee;
+    }
+
+    $ticketId = trim((string) ($filters['ticket_id'] ?? ''));
+    if ($ticketId !== '') {
+      $like = '%' . $this->db->escapeLike($ticketId) . '%';
+      $where[] = '(CAST(t.`_ID` AS CHAR) = ? OR t.`id_ticket` LIKE ?)';
+      array_push($args, $ticketId, $like);
+    }
+
+    foreach ([
+      'solicitante' => 'solicitante',
+      'celular' => 'celular_solicitante',
+      'correo' => 'correo_solicitante',
+    ] as $filterKey => $column) {
+      $value = trim((string) ($filters[$filterKey] ?? ''));
+      if ($value === '') {
+        continue;
+      }
+      $where[] = "t.`{$column}` LIKE ?";
+      $args[] = '%' . $this->db->escapeLike($value) . '%';
+    }
+
+    $property = trim((string) ($filters['inmueble'] ?? ''));
+    if ($property !== '') {
+      $like = '%' . $this->db->escapeLike($property) . '%';
+      $where[] = "(t.`inmueble` LIKE ? OR t.`id_inmueble` LIKE ? OR t.`direccion` LIKE ?)";
+      array_push($args, $like, $like, $like);
+    }
+
+    $neighborhood = trim((string) ($filters['barrio'] ?? ''));
+    if ($neighborhood !== '') {
+      $propertiesTable = $this->db->table('jet_cct_inmuebles');
+      $where[] = "(TRIM(COALESCE(t.`barrio`, '')) = ? OR EXISTS (
+        SELECT 1 FROM `{$propertiesTable}` ip
+         WHERE TRIM(COALESCE(ip.`barrio`, '')) = ?
+           AND (
+             CAST(ip.`codigo` AS CHAR) = TRIM(COALESCE(t.`id_inmueble`, ''))
+             OR CAST(ip.`_ID` AS CHAR) = TRIM(COALESCE(t.`id_inmueble`, ''))
+             OR CAST(ip.`codigo` AS CHAR) = TRIM(COALESCE(t.`id_inmueble_data`, ''))
+             OR CAST(ip.`_ID` AS CHAR) = TRIM(COALESCE(t.`id_inmueble_data`, ''))
+             OR CAST(ip.`codigo` AS CHAR) = TRIM(COALESCE(t.`inmueble`, ''))
+             OR CAST(ip.`_ID` AS CHAR) = TRIM(COALESCE(t.`inmueble`, ''))
+           )
+      ))";
+      array_push($args, $neighborhood, $neighborhood);
+    }
+
+    foreach ([
+      'medio' => 'medio',
+      'prioridad' => 'prioridad',
+      'tema' => 'tema_ayuda',
+    ] as $filterKey => $column) {
+      $value = trim((string) ($filters[$filterKey] ?? ''));
+      if ($value === '') {
+        continue;
+      }
+      $where[] = "TRIM(COALESCE(t.`{$column}`, '')) = ?";
+      $args[] = $value;
+    }
+
+    $followUp = mb_strtolower(trim((string) ($filters['seguimiento'] ?? '')), 'UTF-8');
+    if (in_array($followUp, ['si', 'no'], true)) {
+      if ($followUp === 'si') {
+        $where[] = "LOWER(TRIM(COALESCE(t.`tuvo_seguimiento`, ''))) = 'si'";
+      } else {
+        $where[] = "(t.`tuvo_seguimiento` IS NULL OR LOWER(TRIM(t.`tuvo_seguimiento`)) <> 'si')";
+      }
+    }
+
+    foreach ([['fecha_desde', false, '>='], ['fecha_hasta', true, '<=']] as [$filterKey, $endOfDay, $operator]) {
+      $timestamp = $this->dateFilterTimestamp(trim((string) ($filters[$filterKey] ?? '')), (bool) $endOfDay);
+      if ($timestamp <= 0) {
+        continue;
+      }
+      $where[] = "COALESCE(NULLIF(t.`fecha`, 0), UNIX_TIMESTAMP(t.`cct_created`), 0) {$operator} ?";
+      $args[] = $timestamp;
+    }
+
+    return [$where, $args];
+  }
+
+  /** @return array<int,string> */
+  private function neighborhoodOptions(): array
+  {
+    $barriosTable = $this->db->table('jet_cct_barrios');
+    try {
+      $rows = $this->db->getCol(
+        "SELECT DISTINCT TRIM(COALESCE(`barrio`, '')) AS barrio
+           FROM `{$barriosTable}`
+          WHERE TRIM(COALESCE(`barrio`, '')) <> ''
+          ORDER BY barrio ASC
+          LIMIT 700"
+      );
+      $barrios = array_values(array_filter(array_map('strval', $rows), static fn(string $value): bool => trim($value) !== ''));
+      if ($barrios !== []) {
+        return $barrios;
+      }
+    } catch (\Throwable $exception) {
+      // Si la tabla no existe en algún entorno, usamos las fuentes operativas del panel.
+    }
+
+    $ticketsTable = $this->db->table('jet_cct_tickets');
+    $propertiesTable = $this->db->table('jet_cct_inmuebles');
+    $barrios = [];
+    foreach ([$ticketsTable, $propertiesTable] as $table) {
+      try {
+        foreach ($this->db->getCol(
+          "SELECT DISTINCT TRIM(COALESCE(`barrio`, '')) AS barrio
+             FROM `{$table}`
+            WHERE TRIM(COALESCE(`barrio`, '')) <> ''
+            ORDER BY barrio ASC
+            LIMIT 700"
+        ) as $value) {
+          $value = trim((string) $value);
+          if ($value !== '') {
+            $barrios[$value] = true;
+          }
+        }
+      } catch (\Throwable $exception) {
+        continue;
+      }
+    }
+
+    $values = array_keys($barrios);
+    sort($values, SORT_NATURAL | SORT_FLAG_CASE);
+    return array_map('strval', $values);
   }
 
   private function dateFilterTimestamp(string $date, bool $endOfDay): int

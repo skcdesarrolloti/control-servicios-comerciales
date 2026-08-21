@@ -52,7 +52,10 @@ final class CommercialApiController
       JsonResponse::error('No tienes permiso para consultar esta vista.', 403);
     }
     $filters = $this->ticketFilters($input);
+    $filters['tab'] = $bucket;
     $result = $this->tickets->search($bucket, $filters);
+    $visibleViews = array_values(array_filter(array_keys(CommercialAccessPolicy::VIEWS), fn(string $view): bool => $this->policy->canView($view)));
+    $tabCounts = $this->tickets->bucketCounts($this->globalTicketFilters($filters));
     JsonResponse::success([
       'html' => CommercialDashboardView::renderTickets(
         $bucket,
@@ -63,6 +66,8 @@ final class CommercialApiController
         $this->policy,
         $this->baseUrl
       ),
+      'tabs_html' => CommercialDashboardView::renderTabs($visibleViews, $bucket, $filters, $tabCounts, $this->baseUrl),
+      'global_filters_html' => CommercialDashboardView::renderGlobalFilters($filters, $this->tickets->ticketEmployees(), $this->baseUrl),
       'tab' => $bucket,
     ]);
   }
@@ -285,6 +290,7 @@ final class CommercialApiController
       'celular' => $clean('celular'),
       'correo' => $clean('correo'),
       'inmueble' => $clean('inmueble'),
+      'barrio' => $clean('barrio'),
       'medio' => $clean('medio'),
       'prioridad' => $clean('prioridad'),
       'tema' => $clean('tema'),
@@ -294,6 +300,14 @@ final class CommercialApiController
       'sla_filter' => $clean('sla_filter'),
       'page' => max(1, (int) ($input['page'] ?? 1)),
       'per_page' => 24,
+    ];
+  }
+
+  /** @param array<string,mixed> $filters @return array<string,mixed> */
+  private function globalTicketFilters(array $filters): array
+  {
+    return [
+      'id_empleado' => trim((string) ($filters['id_empleado'] ?? '')),
     ];
   }
 

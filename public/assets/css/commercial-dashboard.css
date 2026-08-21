@@ -135,6 +135,38 @@ button:disabled { cursor: not-allowed; opacity: .52; }
   color: #fff;
 }
 
+.commercial-global-filter {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(260px, 360px) auto auto;
+  align-items: end;
+  gap: 10px;
+  margin: 0 0 12px;
+  padding: 13px 14px;
+  border: 1px solid #d7e4f2;
+  border-radius: 12px;
+  background: rgba(255,255,255,.92);
+  box-shadow: var(--commercial-shadow-sm);
+  backdrop-filter: blur(10px);
+}
+.commercial-global-filter label {
+  display: block;
+  margin-top: 2px;
+  color: #213852;
+  font-size: 13px;
+  font-weight: 800;
+}
+.commercial-global-filter select {
+  width: 100%;
+  min-height: 44px;
+  padding: 9px 11px;
+  border: 1px solid #bfcbd9;
+  border-radius: 9px;
+  background: #fff;
+  color: var(--commercial-ink);
+  font: inherit;
+  font-size: 12px;
+}
+
 #scm-app .commercial-tabs {
   position: sticky;
   top: 78px;
@@ -167,6 +199,7 @@ button:disabled { cursor: not-allowed; opacity: .52; }
 }
 #scm-app .commercial-tab::after { display: none !important; content: none !important; }
 #scm-app .commercial-tab span { text-decoration: none !important; }
+#scm-app .commercial-tab strong { min-width: 24px; padding: 3px 7px; border-radius: 999px; background: #e9f0f8; color: #334861; text-align: center; font-size: 10px; font-weight: 900; }
 #scm-app .commercial-tab i { color: #7890aa; }
 #scm-app .commercial-tab:hover {
   border-color: #d6e2f0;
@@ -182,6 +215,7 @@ button:disabled { cursor: not-allowed; opacity: .52; }
   text-decoration: none !important;
 }
 #scm-app .commercial-tab.active i { color: #fff; }
+#scm-app .commercial-tab.active strong { background: rgba(255,255,255,.2); color: #fff; }
 .commercial-tab i, .commercial-tools i, .commercial-ticket-meta i, .commercial-ticket-card footer i, .commercial-case-headline i, .commercial-case-action-grid i, .commercial-case-summary i { display: none; }
 
 #scm-app .commercial-panel { display: none; }
@@ -219,6 +253,11 @@ button:disabled { cursor: not-allowed; opacity: .52; }
 .commercial-field label, .commercial-workflow-form label > span { display: block; margin-bottom: 6px; color: #33465f; font-size: 11px; font-weight: 700; }
 .commercial-field input, .commercial-field select, .commercial-workflow-form select, .commercial-workflow-form textarea, #scm-app .scm-calendar-filter-form select { width: 100%; min-height: 44px; padding: 9px 11px; border: 1px solid #bfcbd9; border-radius: 9px; background: #fff; color: var(--commercial-ink); font: inherit; font-size: 12px; }
 .commercial-field input:focus, .commercial-field select:focus, .commercial-workflow-form select:focus, .commercial-workflow-form textarea:focus { border-color: var(--commercial-primary); box-shadow: 0 0 0 3px rgba(24,87,164,.1); outline: 0; }
+.commercial-locked-filter { min-height: 44px; padding: 8px 10px; border: 1px solid #f4c27e; border-radius: 10px; background: #fff8ed; }
+.commercial-locked-filter span { display: block; color: #8a4b00; font-size: 9px; font-weight: 900; letter-spacing: .05em; text-transform: uppercase; }
+.commercial-locked-filter strong { display: inline-block; margin-right: 8px; color: #452b0a; font-size: 12px; }
+.commercial-locked-filter a { color: var(--commercial-primary); font-size: 11px; font-weight: 800; text-decoration: none; }
+#scm-app .commercial-locked-filter a:hover { text-decoration: underline; }
 .commercial-filter-actions { display: flex; gap: 8px; align-items: end; }
 .commercial-filter-actions > * { flex: 1 1 0; }
 
@@ -425,6 +464,7 @@ button:disabled { cursor: not-allowed; opacity: .52; }
 @media (max-width: 1080px) {
   .commercial-ticket-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .commercial-filter-card { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .commercial-global-filter { grid-template-columns: 1fr 1fr auto auto; }
   .commercial-sla-summary { grid-template-columns: auto minmax(0,1fr); }
   .commercial-sla-kpis { grid-column: 1 / -1; }
   .commercial-case-layout { grid-template-columns: 285px minmax(0,1fr); }
@@ -438,6 +478,7 @@ button:disabled { cursor: not-allowed; opacity: .52; }
   .commercial-hero { align-items: flex-start; flex-direction: column; padding: 18px; }
   .commercial-tools { width: 100%; justify-content: flex-start; }
   .commercial-tools .scm-guide-btn { flex: 1 1 150px; }
+  .commercial-global-filter { grid-template-columns: 1fr; }
   #scm-app .commercial-tabs { position: static; margin-bottom: 18px; }
   .commercial-tab { padding-inline: 13px; }
   .commercial-section-head { align-items: flex-start; flex-direction: column; }

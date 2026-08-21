@@ -23,6 +23,7 @@ final class CommercialDashboardView
     $calendarEmployees = is_array($data['calendar_employees'] ?? null) ? $data['calendar_employees'] : [];
     $ticketEmployees = is_array($data['ticket_employees'] ?? null) ? $data['ticket_employees'] : [];
     $filterOptions = is_array($data['filter_options'] ?? null) ? $data['filter_options'] : [];
+    $tabCounts = is_array($data['tab_counts'] ?? null) ? $data['tab_counts'] : [];
     $baseUrl = rtrim((string) ($data['base_url'] ?? ''), '/');
 
     ob_start();
@@ -73,13 +74,8 @@ final class CommercialDashboardView
       </div>
     </section>
 
-    <nav class="commercial-tabs" aria-label="Secciones del panel">
-      <?php foreach (CommercialAccessPolicy::VIEWS as $viewKey => $label): ?>
-        <?php if (!in_array($viewKey, $views, true)) continue; ?>
-        <?php $icons = ['abiertos' => 'fa-inbox', 'postergados' => 'fa-clock-rotate-left', 'cerrados' => 'fa-circle-check', 'calendario' => 'fa-calendar-days']; ?>
-        <a class="commercial-tab<?php echo $viewKey === $bucket ? ' active' : ''; ?>" data-commercial-tab="<?php echo esc_attr($viewKey); ?>" href="<?php echo esc_url(self::url($baseUrl, ['tab' => $viewKey])); ?>"<?php echo $viewKey === $bucket ? ' aria-current="page"' : ''; ?>><i class="fas <?php echo esc_attr($icons[$viewKey]); ?>" aria-hidden="true"></i><span><?php echo esc_html($label); ?></span></a>
-      <?php endforeach; ?>
-    </nav>
+    <?php echo self::renderGlobalFilters($filters, $ticketEmployees, $baseUrl); ?>
+    <?php echo self::renderTabs($views, $bucket, $filters, $tabCounts, $baseUrl); ?>
 
     <?php if ($bucket === 'sin_acceso'): ?>
       <section class="scm-tab-panel active" id="scm-panel-sin_acceso">
@@ -122,6 +118,57 @@ final class CommercialDashboardView
     return (string) ob_get_clean();
   }
 
+  /** @param array<int,string> $views @param array<string,mixed> $filters @param array<string,int> $tabCounts */
+  public static function renderTabs(array $views, string $bucket, array $filters, array $tabCounts, string $baseUrl): string
+  {
+    $icons = ['abiertos' => 'fa-inbox', 'postergados' => 'fa-clock-rotate-left', 'cerrados' => 'fa-circle-check', 'calendario' => 'fa-calendar-days'];
+    $globalParams = self::globalFilterParams($filters);
+    ob_start();
+?>
+    <nav class="commercial-tabs" data-commercial-tabs aria-label="Secciones del panel">
+      <?php foreach (CommercialAccessPolicy::VIEWS as $viewKey => $label): ?>
+        <?php if (!in_array($viewKey, $views, true)) continue; ?>
+        <?php $count = (int) ($tabCounts[$viewKey] ?? 0); ?>
+        <a class="commercial-tab<?php echo $viewKey === $bucket ? ' active' : ''; ?>" data-commercial-tab="<?php echo esc_attr($viewKey); ?>" href="<?php echo esc_url(self::url($baseUrl, ['tab' => $viewKey] + $globalParams)); ?>"<?php echo $viewKey === $bucket ? ' aria-current="page"' : ''; ?>>
+          <i class="fas <?php echo esc_attr($icons[$viewKey]); ?>" aria-hidden="true"></i>
+          <span><?php echo esc_html($label); ?></span>
+          <?php if ($viewKey !== 'calendario'): ?><strong><?php echo esc_html((string) $count); ?></strong><?php endif; ?>
+        </a>
+      <?php endforeach; ?>
+    </nav>
+<?php
+    return (string) ob_get_clean();
+  }
+
+  /** @param array<string,mixed> $filters @param array<int,array<string,string>> $ticketEmployees */
+  public static function renderGlobalFilters(array $filters, array $ticketEmployees, string $baseUrl): string
+  {
+    $selectedEmployee = trim((string) ($filters['id_empleado'] ?? ''));
+    $tab = trim((string) ($filters['tab'] ?? 'abiertos'));
+    if ($tab === '') {
+      $tab = 'abiertos';
+    }
+    ob_start();
+?>
+    <form class="commercial-global-filter" data-commercial-global-filter-form method="get" action="<?php echo esc_url($baseUrl . '/index.php'); ?>">
+      <input type="hidden" name="tab" value="<?php echo esc_attr($tab); ?>">
+      <div>
+        <span class="commercial-kicker">Filtro general</span>
+        <label for="commercial-global-employee">Funcionario responsable</label>
+      </div>
+      <select id="commercial-global-employee" name="id_empleado">
+        <option value="">Todos los funcionarios</option>
+        <?php foreach ($ticketEmployees as $employee): ?>
+          <option value="<?php echo esc_attr($employee['id']); ?>"<?php selected($selectedEmployee, $employee['id']); ?>><?php echo esc_html($employee['name']); ?></option>
+        <?php endforeach; ?>
+      </select>
+      <button class="commercial-primary-btn" type="submit">Actualizar</button>
+      <?php if ($selectedEmployee !== ''): ?><a class="commercial-secondary-btn" data-commercial-global-clear href="<?php echo esc_url(self::url($baseUrl, ['tab' => $tab])); ?>">Limpiar</a><?php endif; ?>
+    </form>
+<?php
+    return (string) ob_get_clean();
+  }
+
   /** @param array<string,mixed> $result @param array<string,mixed> $filters @param array<int,array<string,string>> $ticketEmployees @param array<string,mixed> $filterOptions */
   public static function renderTickets(string $bucket, array $result, array $filters, array $ticketEmployees, array $filterOptions, $policy, string $baseUrl): string
   {
@@ -152,22 +199,24 @@ final class CommercialDashboardView
 
     <form class="commercial-filter-card" data-commercial-filter-form method="get" action="<?php echo esc_url($baseUrl . '/index.php'); ?>">
       <input type="hidden" name="tab" value="<?php echo esc_attr($bucket); ?>">
+      <?php if (!empty($filters['id_empleado'])): ?><input type="hidden" name="id_empleado" value="<?php echo esc_attr((string) $filters['id_empleado']); ?>"><?php endif; ?>
+      <?php if (!empty($filters['estado'])): ?><input type="hidden" name="estado" value="<?php echo esc_attr((string) $filters['estado']); ?>"><?php endif; ?>
       <div class="commercial-field commercial-field--wide"><label for="commercial-search">Buscar</label><input id="commercial-search" type="search" name="busqueda" value="<?php echo esc_attr((string) ($filters['busqueda'] ?? '')); ?>" placeholder="Ticket, asunto, solicitante, inmueble…"></div>
       <div class="commercial-field"><label for="commercial-ticket-id">ID ticket</label><input id="commercial-ticket-id" type="text" name="ticket_id" value="<?php echo esc_attr((string) ($filters['ticket_id'] ?? '')); ?>" placeholder="Ej: 8604"></div>
-      <div class="commercial-field"><label for="commercial-status">Estado comercial</label><select id="commercial-status" name="estado"><option value="">Todos</option><?php foreach ($bucketDef['statuses'] as $status): ?><option value="<?php echo esc_attr($status); ?>"<?php selected((string) ($filters['estado'] ?? ''), $status); ?>><?php echo esc_html($status); ?></option><?php endforeach; ?></select></div>
-      <div class="commercial-field"><label for="commercial-employee">Responsable</label><select id="commercial-employee" name="id_empleado"><option value="">Todos</option><?php foreach ($ticketEmployees as $employee): ?><option value="<?php echo esc_attr($employee['id']); ?>"<?php selected((string) ($filters['id_empleado'] ?? ''), $employee['id']); ?>><?php echo esc_html($employee['name']); ?></option><?php endforeach; ?></select></div>
       <?php if ($bucket === 'abiertos'): ?><div class="commercial-field"><label for="commercial-sla-filter">Tiempo de atención</label><select id="commercial-sla-filter" name="sla_filter"><option value="">Todos</option><option value="atrasado"<?php selected((string) ($filters['sla_filter'] ?? ''), 'atrasado'); ?>>Atrasados</option><option value="al_dia"<?php selected((string) ($filters['sla_filter'] ?? ''), 'al_dia'); ?>>Al día</option></select></div><?php endif; ?>
+      <?php if (!empty($filters['estado'])): ?><div class="commercial-locked-filter"><span>Estado comercial</span><strong><?php echo esc_html((string) $filters['estado']); ?></strong><a data-commercial-filter-link href="<?php echo esc_url(self::url($baseUrl, ['tab' => $bucket] + array_diff_key($baseFilterParams, ['estado' => true, 'page' => true]))); ?>">Ver todos</a></div><?php endif; ?>
       <div class="commercial-field"><label for="commercial-requester">Solicitante</label><input id="commercial-requester" type="text" name="solicitante" value="<?php echo esc_attr((string) ($filters['solicitante'] ?? '')); ?>" placeholder="Nombre"></div>
       <div class="commercial-field"><label for="commercial-phone">Celular</label><input id="commercial-phone" type="text" name="celular" value="<?php echo esc_attr((string) ($filters['celular'] ?? '')); ?>" placeholder="Número"></div>
       <div class="commercial-field"><label for="commercial-email">Correo</label><input id="commercial-email" type="text" name="correo" value="<?php echo esc_attr((string) ($filters['correo'] ?? '')); ?>" placeholder="correo@dominio.com"></div>
-      <div class="commercial-field"><label for="commercial-property">Inmueble / barrio</label><input id="commercial-property" type="text" name="inmueble" value="<?php echo esc_attr((string) ($filters['inmueble'] ?? '')); ?>" placeholder="Código, barrio o dirección"></div>
+      <div class="commercial-field"><label for="commercial-property">Inmueble</label><input id="commercial-property" type="text" name="inmueble" value="<?php echo esc_attr((string) ($filters['inmueble'] ?? '')); ?>" placeholder="Código o dirección"></div>
+      <div class="commercial-field"><label for="commercial-neighborhood">Barrio</label><?php echo self::selectFromOptions('commercial-neighborhood', 'barrio', $filterOptions['barrios'] ?? [], (string) ($filters['barrio'] ?? '')); ?></div>
       <div class="commercial-field"><label for="commercial-topic">Tema</label><?php echo self::selectFromOptions('commercial-topic', 'tema', $filterOptions['temas'] ?? [], (string) ($filters['tema'] ?? '')); ?></div>
       <div class="commercial-field"><label for="commercial-medium">Medio</label><?php echo self::selectFromOptions('commercial-medium', 'medio', $filterOptions['medios'] ?? [], (string) ($filters['medio'] ?? '')); ?></div>
       <div class="commercial-field"><label for="commercial-priority">Prioridad</label><?php echo self::selectFromOptions('commercial-priority', 'prioridad', $filterOptions['prioridades'] ?? [], (string) ($filters['prioridad'] ?? '')); ?></div>
       <div class="commercial-field"><label for="commercial-follow-up">Seguimiento</label><select id="commercial-follow-up" name="seguimiento"><option value="">Todos</option><option value="Si"<?php selected((string) ($filters['seguimiento'] ?? ''), 'Si'); ?>>Con seguimiento</option><option value="No"<?php selected((string) ($filters['seguimiento'] ?? ''), 'No'); ?>>Sin seguimiento</option></select></div>
       <div class="commercial-field"><label for="commercial-date-from">Fecha desde</label><input id="commercial-date-from" type="date" name="fecha_desde" value="<?php echo esc_attr((string) ($filters['fecha_desde'] ?? '')); ?>"></div>
       <div class="commercial-field"><label for="commercial-date-to">Fecha hasta</label><input id="commercial-date-to" type="date" name="fecha_hasta" value="<?php echo esc_attr((string) ($filters['fecha_hasta'] ?? '')); ?>"></div>
-      <div class="commercial-filter-actions"><button class="commercial-primary-btn" type="submit"><i class="fas fa-filter" aria-hidden="true"></i> Filtrar</button><a class="commercial-secondary-btn" data-commercial-filter-link href="<?php echo esc_url(self::url($baseUrl, ['tab' => $bucket])); ?>">Limpiar</a></div>
+      <div class="commercial-filter-actions"><button class="commercial-primary-btn" type="submit"><i class="fas fa-filter" aria-hidden="true"></i> Filtrar</button><a class="commercial-secondary-btn" data-commercial-filter-link href="<?php echo esc_url(self::url($baseUrl, ['tab' => $bucket] + self::globalFilterParams($filters))); ?>">Limpiar</a></div>
     </form>
 
     <?php if ($rows === []): ?>
@@ -297,7 +346,7 @@ final class CommercialDashboardView
   {
     $keys = [
       'estado', 'busqueda', 'id_empleado', 'ticket_id', 'solicitante', 'celular', 'correo',
-      'inmueble', 'medio', 'prioridad', 'tema', 'seguimiento', 'fecha_desde', 'fecha_hasta',
+      'inmueble', 'barrio', 'medio', 'prioridad', 'tema', 'seguimiento', 'fecha_desde', 'fecha_hasta',
       'sla_filter', 'page',
     ];
     $params = [];
@@ -308,6 +357,13 @@ final class CommercialDashboardView
       }
     }
     return $params;
+  }
+
+  /** @param array<string,mixed> $filters @return array<string,string> */
+  private static function globalFilterParams(array $filters): array
+  {
+    $employee = trim((string) ($filters['id_empleado'] ?? ''));
+    return $employee !== '' ? ['id_empleado' => $employee] : [];
   }
 
   /** @param array<string,mixed> $config @param array<int,array<string,string>> $employees */

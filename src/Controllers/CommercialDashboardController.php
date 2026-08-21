@@ -42,7 +42,9 @@ final class CommercialDashboardController
     $requested = trim((string) ($input['tab'] ?? 'abiertos'));
     $bucket = $visibleViews === [] ? 'sin_acceso' : (in_array($requested, $visibleViews, true) ? $requested : $visibleViews[0]);
     $filters = $this->ticketFilters($input);
-    $result = in_array($bucket, ['calendario', 'sin_acceso'], true) ? ['rows' => [], 'counts' => [], 'pagination' => []] : $repository->search($bucket, $filters);
+    $filters['tab'] = $bucket;
+    $tabCounts = $repository->bucketCounts($this->globalTicketFilters($filters));
+    $result = in_array($bucket, ['calendario', 'sin_acceso'], true) ? ['rows' => [], 'counts' => $repository->statusCounts($filters), 'pagination' => []] : $repository->search($bucket, $filters);
     $calendarEmployees = $repository->activeEmployeesByCargos($calendarCargos);
     $currentCalendarEmployeeId = '';
     foreach ($calendarEmployees as $employee) {
@@ -72,6 +74,7 @@ final class CommercialDashboardController
       'bucket' => $bucket,
       'filters' => $filters,
       'result' => $result,
+      'tab_counts' => $tabCounts,
       'policy' => $policy,
       'visible_views' => $visibleViews,
       'ticket_employees' => $repository->ticketEmployees(),
@@ -96,6 +99,7 @@ final class CommercialDashboardController
       'celular' => $clean('celular'),
       'correo' => $clean('correo'),
       'inmueble' => $clean('inmueble'),
+      'barrio' => $clean('barrio'),
       'medio' => $clean('medio'),
       'prioridad' => $clean('prioridad'),
       'tema' => $clean('tema'),
@@ -105,6 +109,14 @@ final class CommercialDashboardController
       'sla_filter' => $clean('sla_filter'),
       'page' => max(1, (int) ($input['page'] ?? 1)),
       'per_page' => 24,
+    ];
+  }
+
+  /** @param array<string,mixed> $filters @return array<string,mixed> */
+  private function globalTicketFilters(array $filters): array
+  {
+    return [
+      'id_empleado' => trim((string) ($filters['id_empleado'] ?? '')),
     ];
   }
 }

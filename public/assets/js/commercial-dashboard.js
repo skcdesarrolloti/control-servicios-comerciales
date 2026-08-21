@@ -13,6 +13,8 @@
   var nonce = runtime.nonce || "";
   var ticketsPanel = root.querySelector("[data-commercial-tickets-panel]");
   var calendarPanel = root.querySelector("[data-commercial-calendar-panel]");
+  var tabsNav = root.querySelector("[data-commercial-tabs]");
+  var globalFilter = root.querySelector("[data-commercial-global-filter-form]");
   var caseModal = document.getElementById("commercial-case-modal");
   var caseContent = caseModal && caseModal.querySelector("[data-commercial-case-content]");
   var currentCasePk = "";
@@ -205,6 +207,7 @@
       "celular",
       "correo",
       "inmueble",
+      "barrio",
       "medio",
       "prioridad",
       "tema",
@@ -219,6 +222,15 @@
     return request("commercial_tickets_filter", data, listRequest.signal)
       .then(function (response) {
         ticketsPanel.innerHTML = response.html || "";
+        if (response.tabs_html) {
+          if (tabsNav) tabsNav.outerHTML = response.tabs_html;
+          tabsNav = root.querySelector("[data-commercial-tabs]");
+        }
+        if (response.global_filters_html) {
+          if (globalFilter) globalFilter.outerHTML = response.global_filters_html;
+          globalFilter = root.querySelector("[data-commercial-global-filter-form]");
+        }
+        setVisiblePanel(tab);
         if (options.history !== false) updateHistory(nextUrl, !!options.replace);
         if (options.focus) {
           var heading = ticketsPanel.querySelector("h2");
@@ -345,6 +357,7 @@
   root.addEventListener("click", function (event) {
     var tab = event.target.closest("[data-commercial-tab]");
     var filterLink = event.target.closest("[data-commercial-filter-link]");
+    var globalClear = event.target.closest("[data-commercial-global-clear]");
     var openButton = event.target.closest("[data-commercial-open-case]");
     if (tab) {
       event.preventDefault();
@@ -360,6 +373,11 @@
       loadTickets(filterLink.href, { focus: false });
       return;
     }
+    if (globalClear) {
+      event.preventDefault();
+      loadTickets(globalClear.href, { focus: false });
+      return;
+    }
     if (openButton) {
       event.preventDefault();
       openCase(openButton);
@@ -367,6 +385,22 @@
   });
 
   root.addEventListener("submit", function (event) {
+    var globalForm = event.target.closest("[data-commercial-global-filter-form]");
+    if (globalForm) {
+      event.preventDefault();
+      var globalUrl = normalizedUrl(globalForm.action);
+      var currentTab = activeTab();
+      globalUrl.searchParams.set("tab", currentTab === "calendario" ? "abiertos" : currentTab);
+      new FormData(globalForm).forEach(function (value, key) {
+        if (key === "tab") return;
+        if (String(value).trim() === "") globalUrl.searchParams.delete(key);
+        else globalUrl.searchParams.set(key, String(value));
+      });
+      globalUrl.searchParams.delete("estado");
+      globalUrl.searchParams.delete("page");
+      loadTickets(globalUrl.href, { focus: false });
+      return;
+    }
     var filterForm = event.target.closest("[data-commercial-filter-form]");
     if (!filterForm) return;
     event.preventDefault();
@@ -377,6 +411,13 @@
     });
     url.searchParams.delete("page");
     loadTickets(url.href, { focus: false });
+  });
+
+  root.addEventListener("change", function (event) {
+    var form = event.target.closest("[data-commercial-global-filter-form]");
+    if (form && event.target.matches('select[name="id_empleado"]')) {
+      form.requestSubmit();
+    }
   });
 
   if (caseModal) {
