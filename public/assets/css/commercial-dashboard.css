@@ -1,0 +1,197 @@
+:root {
+  --commercial-primary: #1f4f99;
+  --commercial-primary-dark: #173f7c;
+  --commercial-accent: #f19001;
+  --commercial-ink: #172033;
+  --commercial-muted: #64748b;
+  --commercial-line: #dbe3ef;
+  --commercial-surface: #ffffff;
+  --commercial-canvas: #f4f7fb;
+  --commercial-success: #16794b;
+  --commercial-warning: #a15c00;
+  --commercial-danger: #a32626;
+}
+
+* { box-sizing: border-box; }
+
+.commercial-body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background: var(--commercial-canvas);
+  color: var(--commercial-ink);
+  font-family: "Poppins", system-ui, sans-serif;
+}
+
+.commercial-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 72px;
+  padding: 10px clamp(16px, 4vw, 52px);
+  background: #26343d;
+  border-bottom: 3px solid var(--commercial-accent);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, .12);
+}
+
+.commercial-brand, .commercial-session { display: flex; align-items: center; gap: 12px; }
+.commercial-brand { color: #fff; text-decoration: none; }
+.commercial-brand strong, .commercial-brand small, .commercial-session strong, .commercial-session small { display: block; }
+.commercial-brand strong { font-size: 14px; }
+.commercial-brand small { color: #ffd18b; font-weight: 600; }
+.commercial-logo { display: grid; place-items: center; width: 132px; min-height: 46px; padding: 5px 9px; border-radius: 8px; background: #35444d; }
+.commercial-logo img { display: block; max-width: 100%; max-height: 36px; object-fit: contain; }
+.commercial-session { color: #fff; text-align: right; }
+.commercial-session strong { font-size: 13px; }
+.commercial-session small { color: #cbd5e1; font-size: 11px; }
+.commercial-session form { margin: 0; }
+
+.commercial-icon-btn,
+.commercial-primary-btn,
+.commercial-secondary-btn,
+.commercial-modal-close {
+  min-height: 44px;
+  border-radius: 9px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color .2s ease, border-color .2s ease, color .2s ease, box-shadow .2s ease;
+}
+
+.commercial-icon-btn { width: 44px; border: 1px solid rgba(255,255,255,.28); background: transparent; color: #fff; }
+.commercial-icon-btn:hover { background: rgba(255,255,255,.1); }
+.commercial-primary-btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 10px 16px; border: 1px solid var(--commercial-primary); background: var(--commercial-primary); color: #fff; text-decoration: none; }
+.commercial-primary-btn:hover { background: var(--commercial-primary-dark); border-color: var(--commercial-primary-dark); }
+.commercial-secondary-btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 9px 14px; border: 1px solid #b8c7da; background: #fff; color: #294565; text-decoration: none; }
+.commercial-secondary-btn:hover { border-color: var(--commercial-primary); color: var(--commercial-primary); background: #f5f9ff; }
+button:disabled { cursor: not-allowed; opacity: .55; }
+:where(a, button, input, select, textarea):focus-visible { outline: 3px solid rgba(241,144,1,.42); outline-offset: 2px; }
+
+#scm-app.commercial-app { max-width: 1500px; margin: 0 auto; padding: clamp(18px, 3vw, 38px); }
+.commercial-hero { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 20px; }
+.commercial-hero h1 { margin: 3px 0 7px; font-size: clamp(26px, 4vw, 40px); line-height: 1.1; color: #172033; }
+.commercial-hero p { max-width: 760px; margin: 0; color: var(--commercial-muted); font-size: 14px; }
+.commercial-kicker { display: block; color: var(--commercial-accent); font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+.commercial-tools { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 9px; }
+#scm-app .commercial-tools .scm-guide-btn { min-height: 44px; }
+
+#scm-app .commercial-tabs { display: flex; gap: 6px; overflow-x: auto; padding: 5px; margin-bottom: 20px; border: 1px solid var(--commercial-line); border-radius: 13px; background: #fff; scrollbar-width: thin; }
+#scm-app .commercial-tabs .scm-tab { flex: 0 0 auto; min-height: 44px; display: inline-flex; align-items: center; padding: 10px 17px; border-radius: 9px; color: #52647b; font-weight: 700; text-decoration: none; }
+#scm-app .commercial-tabs .scm-tab.active { background: var(--commercial-primary); color: #fff; }
+
+.commercial-section-head { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-bottom: 14px; }
+.commercial-section-head h2 { margin: 2px 0 4px; font-size: 24px; }
+.commercial-section-head p { margin: 0; color: var(--commercial-muted); font-size: 13px; }
+.commercial-total { flex: 0 0 auto; padding: 9px 14px; border-radius: 999px; background: #eaf1fb; color: var(--commercial-primary); font-size: 12px; font-weight: 700; }
+.commercial-total strong { font-size: 16px; }
+
+.commercial-status-strip { display: flex; gap: 8px; overflow-x: auto; padding: 3px 2px 12px; margin-bottom: 6px; scrollbar-width: thin; }
+.commercial-status-chip { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 10px; min-height: 44px; padding: 8px 12px; border: 1px solid var(--commercial-line); border-radius: 10px; background: #fff; color: #344861; text-decoration: none; font-size: 12px; font-weight: 600; }
+.commercial-status-chip strong { min-width: 26px; padding: 3px 7px; border-radius: 999px; background: #edf2f8; color: #263c57; text-align: center; }
+.commercial-status-chip:hover, .commercial-status-chip.active { border-color: var(--commercial-accent); box-shadow: 0 0 0 2px rgba(241,144,1,.12); }
+.commercial-status-chip.active strong { background: var(--commercial-accent); color: #fff; }
+
+.commercial-filter-card { display: grid; grid-template-columns: minmax(240px, 1.4fr) repeat(2, minmax(180px, 1fr)) auto; align-items: end; gap: 12px; padding: 16px; margin-bottom: 18px; border: 1px solid var(--commercial-line); border-radius: 13px; background: #fff; box-shadow: 0 8px 22px rgba(37, 55, 83, .05); }
+.commercial-field label, .commercial-quick-form label > span { display: block; margin-bottom: 6px; color: #33465f; font-size: 12px; font-weight: 700; }
+.commercial-field input, .commercial-field select, .commercial-quick-form select, #scm-app .scm-calendar-filter-form select { width: 100%; min-height: 44px; padding: 9px 11px; border: 1px solid #bfcbd9; border-radius: 8px; background: #fff; color: #172033; font: inherit; font-size: 13px; }
+.commercial-filter-actions { display: flex; gap: 8px; }
+
+.commercial-ticket-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.commercial-ticket-card { display: flex; flex-direction: column; min-width: 0; padding: 18px; border: 1px solid var(--commercial-line); border-radius: 14px; background: #fff; box-shadow: 0 10px 28px rgba(33, 48, 73, .06); }
+.commercial-ticket-card > header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+.commercial-ticket-id { color: var(--commercial-primary); font-size: 12px; font-weight: 800; }
+.commercial-status-badge { display: inline-flex; align-items: center; min-height: 28px; padding: 5px 9px; border-radius: 999px; font-size: 10px; font-weight: 800; }
+.commercial-status-badge--abiertos { background: #e7f0ff; color: #174d96; }
+.commercial-status-badge--postergados { background: #fff0d8; color: #925000; }
+.commercial-status-badge--cerrados { background: #e8f5ee; color: #176940; }
+.commercial-ticket-card h3 { margin: 0 0 8px; color: #1d2a3c; font-size: 16px; line-height: 1.35; }
+.commercial-ticket-description { display: -webkit-box; overflow: hidden; -webkit-line-clamp: 3; -webkit-box-orient: vertical; min-height: 55px; margin: 0 0 12px; color: #627188; font-size: 12px; line-height: 1.55; }
+.commercial-ticket-meta { display: grid; gap: 9px; margin: 0 0 14px; }
+.commercial-ticket-meta div { display: grid; grid-template-columns: 105px minmax(0, 1fr); gap: 8px; align-items: baseline; }
+.commercial-ticket-meta dt { color: #728198; font-size: 10px; font-weight: 700; text-transform: uppercase; }
+.commercial-ticket-meta dd { min-width: 0; margin: 0; overflow-wrap: anywhere; color: #26384f; font-size: 12px; font-weight: 600; }
+.commercial-inline-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: auto; padding-top: 6px; }
+.commercial-inline-actions .commercial-secondary-btn { flex: 1 1 130px; }
+.commercial-action-panel { margin-top: 10px; }
+.commercial-ticket-card footer { margin-top: 12px; padding-top: 12px; border-top: 1px solid #e8edf4; }
+.commercial-ticket-card footer .commercial-primary-btn { width: 100%; }
+.commercial-quick-form { padding: 12px; border-radius: 10px; background: #f5f8fc; border: 1px solid #dbe5f0; }
+.commercial-quick-form > div { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+.commercial-form-message { display: block; min-height: 18px; margin-top: 7px; color: var(--commercial-danger); font-size: 11px; }
+
+.commercial-empty { padding: 56px 20px; border: 1px dashed #b9c7d8; border-radius: 14px; background: #fff; text-align: center; }
+.commercial-empty i { color: #9aacbf; font-size: 30px; }
+.commercial-empty h3 { margin: 10px 0 3px; }
+.commercial-empty p { margin: 0; color: var(--commercial-muted); }
+.commercial-pagination { display: flex; justify-content: center; gap: 7px; margin: 24px 0 4px; }
+.commercial-pagination a { display: grid; place-items: center; min-width: 44px; min-height: 44px; border: 1px solid #c6d1df; border-radius: 9px; background: #fff; color: #344861; font-weight: 700; text-decoration: none; }
+.commercial-pagination a.active { border-color: var(--commercial-primary); background: var(--commercial-primary); color: #fff; }
+
+.commercial-guide .scm-go-dialog { max-width: 1120px; }
+.commercial-guide .scm-go-header { align-items: center; }
+.commercial-guide .scm-go-header h3 { margin: 3px 0 0; }
+.commercial-guide-body { display: grid; gap: 18px; }
+.commercial-guide-group { padding: 16px; border: 1px solid var(--commercial-line); border-radius: 12px; }
+.commercial-guide-group > header h4 { margin: 0 0 3px; }
+.commercial-guide-group > header p { margin: 0 0 13px; color: var(--commercial-muted); font-size: 12px; }
+.commercial-guide-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.commercial-guide-card { display: flex; gap: 10px; padding: 12px; border-radius: 9px; background: #f7f9fc; }
+.commercial-guide-card h5 { margin: 0 0 3px; font-size: 13px; }
+.commercial-guide-card p { margin: 0; color: #63728a; font-size: 11px; line-height: 1.45; }
+.commercial-status-dot { flex: 0 0 9px; width: 9px; height: 9px; margin-top: 5px; border-radius: 50%; background: var(--commercial-primary); }
+.commercial-guide-group--postergados .commercial-status-dot { background: var(--commercial-accent); }
+.commercial-guide-group--cerrados .commercial-status-dot { background: var(--commercial-success); }
+
+.commercial-modal { position: fixed; inset: 0; z-index: 1500; display: none; align-items: center; justify-content: center; padding: 20px; background: rgba(15, 23, 42, .62); }
+.commercial-modal.open { display: flex; }
+.commercial-modal-card { width: min(1120px, 100%); max-height: calc(100vh - 40px); overflow: auto; border-radius: 16px; background: #fff; box-shadow: 0 30px 70px rgba(15,23,42,.28); }
+.commercial-modal-card > header { position: sticky; top: 0; z-index: 2; display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; padding: 20px; border-bottom: 1px solid var(--commercial-line); background: #fff; }
+.commercial-modal-card > header h2 { margin: 2px 0 4px; font-size: 21px; }
+.commercial-modal-card > header p { margin: 0; color: var(--commercial-muted); font-size: 12px; }
+.commercial-modal-close { flex: 0 0 44px; width: 44px; padding: 0; border: 1px solid #cbd5e1; background: #fff; color: #475569; font-size: 24px; }
+.commercial-permissions-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 18px; }
+.commercial-permission-card { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; padding: 14px; border: 1px solid var(--commercial-line); border-radius: 11px; }
+.commercial-permission-card legend { padding: 0 6px; color: #1e3350; font-weight: 700; }
+.commercial-permission-card legend small { display: block; color: #74839a; font-size: 10px; font-weight: 500; }
+.commercial-permission-card strong { display: block; margin-bottom: 7px; color: #52647b; font-size: 11px; text-transform: uppercase; }
+.commercial-permission-card label { display: flex; align-items: flex-start; gap: 7px; min-height: 34px; color: #2d4059; font-size: 12px; }
+.commercial-permission-card input { flex: 0 0 auto; width: 18px; height: 18px; }
+.commercial-permissions-card form > footer { position: sticky; bottom: 0; display: flex; align-items: center; justify-content: flex-end; gap: 9px; padding: 14px 18px; border-top: 1px solid var(--commercial-line); background: #fff; }
+.commercial-permissions-card form > footer span { margin-right: auto; color: var(--commercial-success); font-size: 12px; }
+.commercial-modal-open { overflow: hidden; }
+
+#scm-app .scm-calendar-panel { padding-top: 4px; }
+#scm-app .scm-calendar-head h2 { margin: 2px 0 5px; font-size: 24px; }
+#scm-app .scm-calendar-filter-form label { color: #33465f; font-size: 12px; font-weight: 700; }
+
+@media (max-width: 1080px) {
+  .commercial-ticket-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .commercial-filter-card { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .commercial-filter-actions { align-self: end; }
+}
+
+@media (max-width: 760px) {
+  .commercial-topbar { position: static; padding: 9px 14px; }
+  .commercial-logo { width: 96px; }
+  .commercial-brand > span:last-child, .commercial-session > span { display: none; }
+  #scm-app.commercial-app { padding: 16px 12px 26px; }
+  .commercial-hero, .commercial-section-head { align-items: flex-start; flex-direction: column; }
+  .commercial-tools { width: 100%; justify-content: flex-start; }
+  .commercial-tools .scm-guide-btn { flex: 1 1 150px; }
+  .commercial-ticket-grid, .commercial-guide-grid, .commercial-permissions-grid, .commercial-permission-card { grid-template-columns: 1fr; }
+  .commercial-filter-card { grid-template-columns: 1fr; }
+  .commercial-filter-actions > * { flex: 1 1 0; }
+  .commercial-ticket-meta div { grid-template-columns: 96px minmax(0, 1fr); }
+  .commercial-modal { padding: 0; }
+  .commercial-modal-card { width: 100%; max-height: 100dvh; min-height: 100dvh; border-radius: 0; }
+  .commercial-permissions-card form > footer { flex-wrap: wrap; }
+  .commercial-permissions-card form > footer span { flex: 1 0 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
+}

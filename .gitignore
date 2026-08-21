@@ -1,0 +1,16 @@
+/.env
+/.env.*
+!/.env.example
+/config.php
+/.phpunit.cache/
+/.phpunit.result.cache
+/vendor/
+/.vendor-test-junction
+/storage/data/*
+/storage/logs/*
+/storage/uploads/*
+!/storage/data/.gitkeep
+!/storage/logs/.gitkeep
+!/storage/uploads/.gitkeep
+/output/
+/.vscode/mcp.json
