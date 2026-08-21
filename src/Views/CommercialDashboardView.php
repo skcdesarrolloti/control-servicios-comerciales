@@ -66,7 +66,7 @@ final class CommercialDashboardView
       </div>
       <div class="scm-guide-bar commercial-tools">
         <?php if ($policy instanceof CommercialAccessPolicy && $policy->canManage()): ?>
-          <button class="scm-guide-btn" type="button" id="commercial-open-permissions"><i class="fas fa-sliders" aria-hidden="true"></i> Visibilidad y acciones</button>
+          <button class="scm-guide-btn scm-guide-btn--primary" type="button" id="commercial-open-permissions"><i class="fas fa-sliders" aria-hidden="true"></i> Visibilidad y acciones</button>
         <?php endif; ?>
         <button class="scm-guide-btn" type="button" id="scm-open-guide"><i class="fas fa-book-open" aria-hidden="true"></i> Ver guías</button>
       </div>
