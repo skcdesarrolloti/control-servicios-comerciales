@@ -44,6 +44,7 @@ return [
   'allow_legacy_passwords' => $envBool('AUTH_ALLOW_LEGACY_PASSWORDS', false),
   'settings_function_key' => $env('SETTINGS_FUNCTION_KEY', 'control_servicios_comerciales_config'),
   'dashboard_admin_cargos' => array_values(array_filter(array_map('trim', explode(',', (string) $env('DASHBOARD_ADMIN_CARGOS', '11,12,13,14'))))),
+  'commercial_employee_cargos' => array_values(array_filter(array_map('trim', explode(',', (string) $env('COMMERCIAL_EMPLOYEE_CARGOS', '1,6,9,10,11,12,13,14,17'))))),
   'calendar_allowed_cargos' => array_values(array_filter(array_map('trim', explode(',', (string) $env('CALENDAR_ALLOWED_CARGOS', '9,10,17'))))),
   'calendar_app_url' => $env('CALENDAR_APP_URL', 'https://calendar-skc.netlify.app'),
   'calendar_api_url' => $env('CALENDAR_API_URL', 'https://sucasainmobiliaria.com.co/calendario-actividades/index.php?action='),

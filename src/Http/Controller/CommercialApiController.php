@@ -35,7 +35,7 @@ final class CommercialApiController
     $this->tickets = new CommercialTicketsRepository($db);
     $this->csrf = $csrf;
     $adminCargos = is_array($config['dashboard_admin_cargos'] ?? null) ? $config['dashboard_admin_cargos'] : ['11', '12', '13', '14'];
-    $this->commercialCargos = is_array($config['calendar_allowed_cargos'] ?? null) ? array_values(array_map('strval', $config['calendar_allowed_cargos'])) : ['9', '10', '17'];
+    $this->commercialCargos = is_array($config['commercial_employee_cargos'] ?? null) ? array_values(array_map('strval', $config['commercial_employee_cargos'])) : ['1', '6', '9', '10', '11', '12', '13', '14', '17'];
     $this->policy = new CommercialAccessPolicy($settings, $db, $adminCargos);
     $this->workflow = new SeguimientoService($db, new SchemaInspector($db));
     $this->workflow->setQueue(new EmailQueue($db));
@@ -61,13 +61,13 @@ final class CommercialApiController
         $bucket,
         $result,
         $filters,
-        $this->tickets->ticketEmployees(),
+        $this->tickets->ticketEmployees($this->commercialCargos),
         $this->tickets->filterOptions(),
         $this->policy,
         $this->baseUrl
       ),
       'tabs_html' => CommercialDashboardView::renderTabs($visibleViews, $bucket, $filters, $tabCounts, $this->baseUrl),
-      'global_filters_html' => CommercialDashboardView::renderGlobalFilters($filters, $this->tickets->ticketEmployees(), $this->baseUrl),
+      'global_filters_html' => CommercialDashboardView::renderGlobalFilters($filters, $this->tickets->ticketEmployees($this->commercialCargos), $this->baseUrl),
       'tab' => $bucket,
     ]);
   }

@@ -36,6 +36,7 @@ final class CommercialDashboardController
     $repository = new CommercialTicketsRepository($this->db);
     $adminCargos = is_array($this->config['dashboard_admin_cargos'] ?? null) ? $this->config['dashboard_admin_cargos'] : ['11', '12', '13', '14'];
     $calendarCargos = is_array($this->config['calendar_allowed_cargos'] ?? null) ? $this->config['calendar_allowed_cargos'] : ['9', '10', '17'];
+    $commercialEmployeeCargos = is_array($this->config['commercial_employee_cargos'] ?? null) ? $this->config['commercial_employee_cargos'] : ['1', '6', '9', '10', '11', '12', '13', '14', '17'];
     $policy = new CommercialAccessPolicy($this->settings, $this->db, $adminCargos);
 
     $visibleViews = array_values(array_filter(array_keys(CommercialAccessPolicy::VIEWS), static fn(string $view): bool => $policy->canView($view)));
@@ -77,7 +78,7 @@ final class CommercialDashboardController
       'tab_counts' => $tabCounts,
       'policy' => $policy,
       'visible_views' => $visibleViews,
-      'ticket_employees' => $repository->ticketEmployees(),
+      'ticket_employees' => $repository->ticketEmployees($commercialEmployeeCargos),
       'filter_options' => $repository->filterOptions(),
       'calendar_employees' => $calendarEmployees,
       'runtime' => $runtime,

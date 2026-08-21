@@ -216,20 +216,28 @@ final class CommercialTicketsRepository
     return $bucketCounts;
   }
 
-  /** @return array<int,array{id:string,name:string}> */
-  public function ticketEmployees(): array
+  /** @param array<int,string> $cargoIds @return array<int,array{id:string,name:string}> */
+  public function ticketEmployees(array $cargoIds = []): array
   {
-    $table = $this->db->table('jet_cct_tickets');
+    $cargoIds = array_values(array_filter(array_map('trim', array_map('strval', $cargoIds)), static fn(string $id): bool => $id !== ''));
     $funcionarios = $this->db->table('jet_cct_funcionarios');
+    $whereCargo = '';
+    $args = [];
+    if ($cargoIds !== []) {
+      $whereCargo = ' AND TRIM(COALESCE(f.`id_cargo`, \'\')) IN (' . implode(',', array_fill(0, count($cargoIds), '?')) . ')';
+      $args = $cargoIds;
+    }
+
     $rows = $this->db->getResults(
-      "SELECT TRIM(COALESCE(t.`id_empleado`, '')) AS id,
-              COALESCE(NULLIF(MAX(TRIM(f.`nombre`)), ''), NULLIF(MAX(TRIM(t.`nombre_empleado`)), ''), CONCAT('ID ', t.`id_empleado`)) AS name
-         FROM `{$table}` t
-         LEFT JOIN `{$funcionarios}` f ON TRIM(COALESCE(f.`id_empleado`, '')) = TRIM(COALESCE(t.`id_empleado`, '')) AND f.`activo` = 'Si'
-        WHERE TRIM(COALESCE(t.`estado_comercial`, '')) <> ''
-          AND TRIM(COALESCE(t.`id_empleado`, '')) <> ''
-        GROUP BY TRIM(t.`id_empleado`)
-        ORDER BY name ASC"
+      "SELECT TRIM(COALESCE(f.`id_empleado`, '')) AS id,
+              TRIM(COALESCE(f.`nombre`, '')) AS name
+         FROM `{$funcionarios}` f
+        WHERE f.`activo` = 'Si'
+          AND TRIM(COALESCE(f.`id_empleado`, '')) <> ''
+          AND TRIM(COALESCE(f.`nombre`, '')) <> ''
+          {$whereCargo}
+        ORDER BY TRIM(f.`nombre`) ASC",
+      $args
     );
 
     $grouped = [];
@@ -250,6 +258,25 @@ final class CommercialTicketsRepository
         $grouped[$key] = ['name' => $name, 'ids' => []];
       }
       $grouped[$key]['ids'][$id] = true;
+    }
+
+    if ($grouped !== []) {
+      $ticketsTable = $this->db->table('jet_cct_tickets');
+      $ticketRows = $this->db->getResults(
+        "SELECT TRIM(COALESCE(t.`id_empleado`, '')) AS id,
+                TRIM(COALESCE(t.`nombre_empleado`, '')) AS name
+           FROM `{$ticketsTable}` t
+          WHERE TRIM(COALESCE(t.`estado_comercial`, '')) <> ''
+            AND TRIM(COALESCE(t.`id_empleado`, '')) <> ''
+            AND TRIM(COALESCE(t.`nombre_empleado`, '')) <> ''"
+      );
+      foreach ($ticketRows as $row) {
+        $id = trim((string) ($row['id'] ?? ''));
+        $key = $this->normalizeEmployeeLabel((string) ($row['name'] ?? ''));
+        if ($id !== '' && isset($grouped[$key])) {
+          $grouped[$key]['ids'][$id] = true;
+        }
+      }
     }
 
     $employees = [];
