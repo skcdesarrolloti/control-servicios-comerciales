@@ -328,7 +328,7 @@ trait WorkflowCommandsConcern
   /**
    * @return array<string,string>
    */
-  public function activateTicket(int $ticketPk, string $motivo): array
+  public function activateTicket(int $ticketPk, string $motivo, $evidencias = '', array $documentos = []): array
   {
     $ticketsTable = $this->db->table('jet_cct_tickets');
     $seguimientoTable = $this->db->table('jet_cct_seguimiento_ticket');
@@ -350,6 +350,13 @@ trait WorkflowCommandsConcern
     $employeeId = $this->employeeLogicalId($userId, $userInfo);
     $histObservacion = 'Ticket activado: ' . $motivo;
 
+    $evidencias = is_array($evidencias) ? array_values(array_filter(array_map('strval', $evidencias))) : [trim((string) $evidencias)];
+    $evidencias = array_values(array_filter($evidencias, static fn(string $url): bool => $url !== ''));
+    $evidenciaUrl = (string) ($evidencias[0] ?? '');
+    $documentos = array_values(array_filter($documentos, static function ($doc): bool {
+      return is_array($doc) && trim((string) ($doc['archivo'] ?? '')) !== '';
+    }));
+
     $histSaved = $this->insertHistorial(
       $histTable,
       $ticketPk,
@@ -361,7 +368,9 @@ trait WorkflowCommandsConcern
       $nowMysql,
       'En proceso',
       '__keep__',
-      'Nuevo'
+      'Nuevo',
+      $evidencias,
+      $documentos
     );
     if (!$histSaved) {
       return ['ok' => '0', 'message' => 'No se pudo guardar el historial de activacion.'];
@@ -394,7 +403,8 @@ trait WorkflowCommandsConcern
       $employeeId,
       $userName,
       $nowTs,
-      $nowMysql
+      $nowMysql,
+      $evidenciaUrl
     );
 
     return [

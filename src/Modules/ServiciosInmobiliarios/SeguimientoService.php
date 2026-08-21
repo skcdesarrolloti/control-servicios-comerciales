@@ -3,13 +3,16 @@
 namespace SCM\Modules\ServiciosInmobiliarios;
 
 use SCM\Core\Database;
+use SCM\Modules\ServiciosInmobiliarios\Concerns\WorkflowCommandsConcern;
 use SCM\Support\EmailQueue;
 use SCM\Support\EmailTemplate;
 use SCM\Support\SchemaInspector;
 
 final class SeguimientoService
 {
-  use \SCM\Modules\ServiciosInmobiliarios\Concerns\WorkflowCommandsConcern;
+  use WorkflowCommandsConcern {
+    activateTicket as private activateTicketFromWorkflow;
+  }
   use \SCM\Modules\ServiciosInmobiliarios\Concerns\PersistenceAndContactsConcern;
   use \SCM\Modules\ServiciosInmobiliarios\Concerns\NotificationDeliveryConcern;
 
@@ -31,4 +34,8 @@ final class SeguimientoService
   /**
    * @return array<string,string>
    */
+  public function activateTicket(int $ticketPk, string $motivo, $evidencias = '', array $documentos = []): array
+  {
+    return $this->activateTicketFromWorkflow($ticketPk, $motivo, $evidencias, $documentos);
+  }
 }

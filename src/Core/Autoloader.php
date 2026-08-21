@@ -7,7 +7,7 @@ final class Autoloader
 {
     private static bool $registered = false;
 
-    public static function register(string $baseDir): void
+    public static function register(string $baseDir, bool $prepend = false): void
     {
         if (self::$registered) {
             return;
@@ -30,7 +30,7 @@ final class Autoloader
             if (is_readable($path)) {
                 require_once $path;
             }
-        });
+        }, true, $prepend);
 
         self::$registered = true;
     }

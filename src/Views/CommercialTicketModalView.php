@@ -73,19 +73,19 @@ final class CommercialTicketModalView
     <section class="commercial-case-main">
       <div class="commercial-workflow-stack" data-commercial-workflow-stack hidden>
         <?php if ($policy->canAct('responder')): ?>
-          <?php echo self::messageForm($pk, 'reply', 'Responder al solicitante', 'Escribe una respuesta clara para el cliente.', 'respuesta', 'Escribe la respuesta del ticket…', 'Enviar respuesta', true); ?>
+          <?php echo self::messageForm($pk, 'reply', 'Responder al solicitante', 'Escribe una respuesta clara para el cliente.', 'respuesta', 'Escribe la respuesta del ticket…', 'Enviar respuesta', true, false, true); ?>
         <?php endif; ?>
         <?php if ($policy->canAct('agregar_nota')): ?>
           <?php echo self::messageForm($pk, 'note', 'Agregar nota interna', 'Sólo será visible para el equipo.', 'observacion', 'Escribe una nota interna…', 'Guardar nota'); ?>
         <?php endif; ?>
         <?php if ($policy->canAct('seguimiento')): ?>
-          <?php echo self::messageForm($pk, 'follow_up', 'Registrar seguimiento', 'Deja constancia de la gestión realizada.', 'observacion', 'Describe el seguimiento…', 'Guardar seguimiento', true, false); ?>
+          <?php echo self::messageForm($pk, 'follow_up', 'Registrar seguimiento', 'Deja constancia de la gestión realizada.', 'observacion', 'Describe el seguimiento…', 'Guardar seguimiento', true, false, true); ?>
         <?php endif; ?>
         <?php if ($policy->canAct('postergar')): ?>
-          <?php echo self::messageForm($pk, 'postpone', 'Postergar ticket', 'El caso pasará al estado comercial Postergado.', 'observacion', 'Indica el motivo de la postergación…', 'Postergar ticket', true, true); ?>
+          <?php echo self::messageForm($pk, 'postpone', 'Postergar ticket', 'El caso pasará al estado comercial Postergado.', 'observacion', 'Indica el motivo de la postergación…', 'Postergar ticket', true, true, true); ?>
         <?php endif; ?>
         <?php if ($policy->canAct('activar')): ?>
-          <?php echo self::statusMessageForm($pk, 'activate', 'Activar ticket', 'Selecciona el estado con el que retoma la gestión.', 'motivo', CommercialStatusCatalog::OPEN, 'Nuevo', 'Activar ticket'); ?>
+          <?php echo self::statusMessageForm($pk, 'activate', 'Activar ticket', 'Selecciona el estado con el que retoma la gestión.', 'motivo', CommercialStatusCatalog::OPEN, 'Nuevo', 'Activar ticket', false, true); ?>
         <?php endif; ?>
         <?php if ($policy->canAct('cerrar')): ?>
           <?php echo self::statusMessageForm($pk, 'close', 'Cerrar ticket', 'Elige el resultado final y registra el motivo.', 'observacion', CommercialStatusCatalog::CLOSED, 'Finalizado', 'Cerrar ticket', true); ?>
@@ -127,6 +127,7 @@ final class CommercialTicketModalView
                     <time><?php echo esc_html(self::formatDate($item['_timestamp'] ?? $item['fecha'] ?? 0)); ?></time>
                   </header>
                   <p><?php echo nl2br(esc_html(trim(wp_strip_all_tags((string) ($item['message'] ?? ''), true)))); ?></p>
+                  <?php echo self::timelineAttachments($item); ?>
                   <small><?php echo esc_html(self::actorMeta($actorId, $actorEmail)); ?></small>
                 </div>
               </li>
@@ -206,7 +207,7 @@ final class CommercialTicketModalView
     return $parts !== [] ? implode(' · ', $parts) : 'Autor registrado en historial';
   }
 
-  private static function messageForm(int $pk, string $action, string $title, string $help, string $field, string $placeholder, string $submit, bool $notify = false, bool $danger = false): string
+  private static function messageForm(int $pk, string $action, string $title, string $help, string $field, string $placeholder, string $submit, bool $notify = false, bool $danger = false, bool $attachments = false): string
   {
     ob_start();
 ?>
@@ -214,6 +215,7 @@ final class CommercialTicketModalView
       <header><div><h3><?php echo esc_html($title); ?></h3><p><?php echo esc_html($help); ?></p></div><button type="button" data-commercial-close-workflow aria-label="Cerrar formulario">&times;</button></header>
       <input type="hidden" name="ticket_pk" value="<?php echo esc_attr((string) $pk); ?>">
       <label><span>Mensaje <em>*</em></span><textarea name="<?php echo esc_attr($field); ?>" rows="5" required placeholder="<?php echo esc_attr($placeholder); ?>"></textarea></label>
+      <?php if ($attachments): ?><?php echo self::attachmentFields(); ?><?php endif; ?>
       <?php if ($notify): ?><label class="commercial-checkbox"><input type="checkbox" name="notificar_solicitante" value="1"<?php echo $action === 'reply' ? ' checked' : ''; ?>><span>Notificar por correo al solicitante</span></label><?php endif; ?>
       <footer><span class="commercial-form-message" aria-live="polite"></span><button type="button" class="commercial-secondary-btn" data-commercial-close-workflow>Cancelar</button><button type="submit" class="commercial-primary-btn"><?php echo esc_html($submit); ?></button></footer>
     </form>
@@ -222,7 +224,7 @@ final class CommercialTicketModalView
   }
 
   /** @param array<int,string> $statuses */
-  private static function statusMessageForm(int $pk, string $action, string $title, string $help, string $field, array $statuses, string $selected, string $submit, bool $danger = false): string
+  private static function statusMessageForm(int $pk, string $action, string $title, string $help, string $field, array $statuses, string $selected, string $submit, bool $danger = false, bool $attachments = false): string
   {
     ob_start();
 ?>
@@ -231,10 +233,169 @@ final class CommercialTicketModalView
       <input type="hidden" name="ticket_pk" value="<?php echo esc_attr((string) $pk); ?>">
       <label><span>Estado comercial <em>*</em></span><select name="estado" required><?php foreach ($statuses as $status): ?><option value="<?php echo esc_attr($status); ?>"<?php selected($selected, $status); ?>><?php echo esc_html($status); ?></option><?php endforeach; ?></select></label>
       <label><span>Motivo <em>*</em></span><textarea name="<?php echo esc_attr($field); ?>" rows="4" required placeholder="Describe el motivo de esta acción…"></textarea></label>
+      <?php if ($attachments): ?><?php echo self::attachmentFields(); ?><?php endif; ?>
       <footer><span class="commercial-form-message" aria-live="polite"></span><button type="button" class="commercial-secondary-btn" data-commercial-close-workflow>Cancelar</button><button type="submit" class="<?php echo $danger ? 'commercial-danger-btn' : 'commercial-primary-btn'; ?>"><?php echo esc_html($submit); ?></button></footer>
     </form>
 <?php
     return (string) ob_get_clean();
+  }
+
+  private static function attachmentFields(): string
+  {
+    $docAccept = 'image/jpeg,image/png,application/pdf,application/msword,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/zip,application/x-rar-compressed,text/html,text/plain,text/csv';
+    ob_start();
+?>
+      <fieldset class="commercial-attachment-fields">
+        <legend>Soportes opcionales</legend>
+        <label>
+          <span>Evidencia en imagen</span>
+          <input type="file" name="evidencia[]" accept="image/jpeg,image/png,image/gif,image/webp,image/bmp,image/heic,image/heif,image/tiff" multiple>
+        </label>
+        <div class="commercial-paste-evidence scm-paste-evidence" tabindex="0" role="button" data-scm-paste-evidence data-file-input-name="evidencia[]">
+          <strong>Pegar captura</strong>
+          <span>Haz clic aquí y presiona Ctrl+V para adjuntar una imagen copiada.</span>
+          <ul data-scm-paste-list></ul>
+        </div>
+        <div class="commercial-ticket-documents-zone scm-ticket-documents-zone" data-ticket-documents-zone>
+          <div class="commercial-ticket-documents-label">Documentos opcionales</div>
+          <div class="commercial-ticket-documents scm-ticket-documents" data-ticket-documents></div>
+          <button type="button" class="commercial-secondary-btn commercial-add-ticket-document" data-add-ticket-document data-document-accept="<?php echo esc_attr($docAccept); ?>">
+            <i class="fas fa-paperclip" aria-hidden="true"></i> Agregar documento
+          </button>
+        </div>
+      </fieldset>
+<?php
+    return (string) ob_get_clean();
+  }
+
+  /** @param array<string,mixed> $item */
+  private static function timelineAttachments(array $item): string
+  {
+    $images = self::extractAttachmentUrls($item['image'] ?? '');
+    $documents = self::extractHistoryDocuments($item['documents'] ?? '');
+    if ($images === [] && $documents === []) {
+      return '';
+    }
+
+    $html = '<div class="commercial-timeline-attachments">';
+    if ($images !== []) {
+      $html .= '<div class="commercial-timeline-images" aria-label="Evidencias adjuntas">';
+      foreach ($images as $url) {
+        $html .= '<a href="' . esc_url($url) . '" target="_blank" rel="noopener noreferrer">'
+          . '<img src="' . esc_url($url) . '" alt="Evidencia adjunta" loading="lazy">'
+          . '</a>';
+      }
+      $html .= '</div>';
+    }
+    if ($documents !== []) {
+      $html .= '<div class="commercial-timeline-documents" aria-label="Documentos adjuntos">';
+      foreach ($documents as $doc) {
+        $url = trim((string) ($doc['archivo'] ?? ''));
+        if ($url === '' || !filter_var($url, FILTER_VALIDATE_URL)) {
+          continue;
+        }
+        $label = trim((string) ($doc['nombre_archivo'] ?? ''));
+        if ($label === '') {
+          $label = basename((string) parse_url($url, PHP_URL_PATH)) ?: 'Ver documento';
+        }
+        $html .= '<a href="' . esc_url($url) . '" target="_blank" rel="noopener noreferrer"><i class="fas fa-file-lines" aria-hidden="true"></i>' . esc_html($label) . '</a>';
+      }
+      $html .= '</div>';
+    }
+
+    return $html . '</div>';
+  }
+
+  /** @param mixed $raw @return array<int,string> */
+  private static function extractAttachmentUrls($raw): array
+  {
+    if (is_array($raw)) {
+      $items = $raw;
+    } else {
+      $value = trim((string) $raw);
+      if ($value === '') {
+        return [];
+      }
+      $items = [$value];
+      if (preg_match('/^[aObis]:/', $value)) {
+        $decoded = @unserialize($value, ['allowed_classes' => false]);
+        if (is_array($decoded)) {
+          $items = $decoded;
+        }
+      }
+    }
+
+    $urls = [];
+    foreach ($items as $item) {
+      $url = is_array($item) ? trim((string) ($item['url'] ?? $item['archivo'] ?? '')) : trim((string) $item);
+      $url = self::normalizeHistoryAttachmentUrl($url);
+      if ($url !== '' && filter_var($url, FILTER_VALIDATE_URL)) {
+        $urls[] = $url;
+      }
+    }
+
+    return array_values(array_unique($urls));
+  }
+
+  private static function normalizeHistoryAttachmentUrl(string $url): string
+  {
+    $url = trim($url);
+    if ($url === '' || !filter_var($url, FILTER_VALIDATE_URL)) {
+      return $url;
+    }
+
+    $path = (string) parse_url($url, PHP_URL_PATH);
+    if ($path === '' || stripos($path, '/uploads/') === false) {
+      return $url;
+    }
+
+    $fileName = basename($path);
+    if (!self::isSafeLegacyAttachmentName($fileName)) {
+      return $url;
+    }
+
+    return rtrim((string) SCM_BASE_URL, '/') . '/legacy-file.php?n=' . rawurlencode($fileName);
+  }
+
+  private static function isSafeLegacyAttachmentName(string $fileName): bool
+  {
+    if (!preg_match('/^[A-Za-z0-9][A-Za-z0-9._-]{0,190}$/', $fileName)) {
+      return false;
+    }
+
+    $extension = strtolower((string) pathinfo($fileName, PATHINFO_EXTENSION));
+    return in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf', 'doc', 'docx', 'xls', 'xlsx'], true);
+  }
+
+  /** @param mixed $raw @return array<int,array{nombre_archivo:string,archivo:string}> */
+  private static function extractHistoryDocuments($raw): array
+  {
+    $value = trim((string) $raw);
+    if ($value === '') {
+      return [];
+    }
+    $decoded = preg_match('/^[aObis]:/', $value) ? @unserialize($value, ['allowed_classes' => false]) : null;
+    if (!is_array($decoded)) {
+      $url = self::normalizeHistoryAttachmentUrl($value);
+      return filter_var($url, FILTER_VALIDATE_URL) ? [['nombre_archivo' => '', 'archivo' => $url]] : [];
+    }
+
+    $documents = [];
+    foreach ($decoded as $doc) {
+      if (!is_array($doc)) {
+        continue;
+      }
+      $url = self::normalizeHistoryAttachmentUrl(trim((string) ($doc['archivo'] ?? '')));
+      if ($url === '') {
+        continue;
+      }
+      $documents[] = [
+        'nombre_archivo' => trim((string) ($doc['nombre_archivo'] ?? '')),
+        'archivo' => $url,
+      ];
+    }
+
+    return $documents;
   }
 
   /** @param array<int,string> $options */

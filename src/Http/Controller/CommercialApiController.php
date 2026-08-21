@@ -14,6 +14,7 @@ use SCM\Http\Response\JsonResponse;
 use SCM\Modules\ServiciosInmobiliarios\SeguimientoService;
 use SCM\Support\EmailQueue;
 use SCM\Support\SchemaInspector;
+use SCM\Support\StoredFileService;
 use SCM\Views\CommercialDashboardView;
 use SCM\Views\CommercialTicketModalView;
 
@@ -147,7 +148,9 @@ final class CommercialApiController
       $message,
       '__keep__',
       false,
-      $this->notifyTargets($input)
+      $this->notifyTargets($input),
+      $this->uploadedImages('evidencia'),
+      $this->uploadedDocuments()
     );
     $this->workflowResponse($result, 'Respuesta guardada.');
   }
@@ -184,7 +187,9 @@ final class CommercialApiController
         '__keep__',
         '__keep__',
         false,
-        $this->notifyTargets($input)
+        $this->notifyTargets($input),
+        $this->uploadedImages('evidencia'),
+        $this->uploadedDocuments()
       ),
       'Seguimiento guardado.'
     );
@@ -200,7 +205,13 @@ final class CommercialApiController
     if ($message === '') {
       JsonResponse::error('El motivo de postergación es obligatorio.', 422);
     }
-    $result = $this->workflow->postponeTicket($ticketPk, $message, $this->notifyTargets($input));
+    $result = $this->workflow->postponeTicket(
+      $ticketPk,
+      $message,
+      $this->notifyTargets($input),
+      $this->uploadedImages('evidencia'),
+      $this->uploadedDocuments()
+    );
     $this->ensureWorkflowSucceeded($result);
     $this->tickets->changeStatus($ticketPk, 'Postergado');
     JsonResponse::success(['message' => (string) ($result['message'] ?? 'Ticket postergado.'), 'refresh' => true]);
@@ -217,7 +228,12 @@ final class CommercialApiController
     if ($message === '' || !in_array($status, CommercialStatusCatalog::OPEN, true)) {
       JsonResponse::error('Selecciona un estado activo e indica el motivo.', 422);
     }
-    $result = $this->workflow->activateTicket($ticketPk, $message);
+    $result = $this->workflow->activateTicket(
+      $ticketPk,
+      $message,
+      $this->uploadedImages('evidencia'),
+      $this->uploadedDocuments()
+    );
     $this->ensureWorkflowSucceeded($result);
     $this->tickets->changeStatus($ticketPk, $status);
     JsonResponse::success(['message' => (string) ($result['message'] ?? 'Ticket activado.'), 'refresh' => true]);
@@ -259,6 +275,23 @@ final class CommercialApiController
   private function notifyTargets(array $input): array
   {
     return !empty($input['notificar_solicitante']) ? ['solicitante'] : [];
+  }
+
+  /** @return array<int,string> */
+  private function uploadedImages(string $fieldName): array
+  {
+    return StoredFileService::fromRuntime()->storeImages($fieldName, 10);
+  }
+
+  /** @return array<int,array{nombre_archivo:string,archivo:string}> */
+  private function uploadedDocuments(): array
+  {
+    $titles = $_POST['documento_nombre'] ?? [];
+    if (!is_array($titles)) {
+      $titles = [];
+    }
+
+    return StoredFileService::fromRuntime()->storeDocuments('documento', array_values(array_map('strval', $titles)), 10);
   }
 
   /** @param array<string,string> $result */

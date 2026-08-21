@@ -50,6 +50,77 @@
     window.alert(message);
   }
 
+  function escapeHtml(value) {
+    return String(value || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  function documentRowMarkup(accept) {
+    return (
+      '<div class="commercial-ticket-document-row scm-ticket-document-row">' +
+      '<label><span>Título del documento</span><input type="text" name="documento_nombre[]" placeholder="Ej: soporte, cédula, autorización…"></label>' +
+      '<label><span>Documento</span><input type="file" name="documento[]" accept="' + escapeHtml(accept || "image/jpeg,image/png,application/pdf,application/msword,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/zip,application/x-rar-compressed,text/html,text/plain,text/csv") + '"></label>' +
+      '<button type="button" class="commercial-secondary-btn commercial-remove-ticket-document" data-remove-ticket-document>Quitar</button>' +
+      "</div>"
+    );
+  }
+
+  function renderPastedFiles(zone, input) {
+    var list = zone.querySelector("[data-scm-paste-list]");
+    if (!list) return;
+    list.innerHTML = "";
+    Array.prototype.forEach.call(input.files || [], function (file) {
+      var item = document.createElement("li");
+      item.textContent = file.name;
+      list.appendChild(item);
+    });
+  }
+
+  function handlePasteEvidence(event) {
+    if (event.defaultPrevented) return;
+    var zone = event.target && event.target.closest ? event.target.closest("[data-scm-paste-evidence]") : null;
+    if (!zone || !caseModal || !caseModal.contains(zone)) return;
+    var clipboard = event.clipboardData || window.clipboardData;
+    var items = clipboard && clipboard.items ? clipboard.items : [];
+    var files = [];
+    for (var i = 0; i < items.length; i++) {
+      if (items[i] && /^image\//i.test(items[i].type || "")) {
+        var pasted = items[i].getAsFile();
+        if (pasted) {
+          var ext = (pasted.type || "image/png").split("/").pop() || "png";
+          files.push(new File([pasted], "captura-pegada-" + Date.now() + "-" + i + "." + ext, { type: pasted.type || "image/png" }));
+        }
+      }
+    }
+    if (!files.length) {
+      zone.classList.add("is-error");
+      var empty = zone.querySelector("[data-scm-paste-list]");
+      if (empty) empty.innerHTML = "<li>No se encontró una imagen en el portapapeles.</li>";
+      return;
+    }
+    var form = zone.closest("form");
+    var inputName = zone.getAttribute("data-file-input-name") || "evidencia[]";
+    var input = form ? form.querySelector('input[type="file"][name="' + inputName + '"]') : null;
+    if (!input || typeof DataTransfer === "undefined") {
+      zone.classList.add("is-error");
+      var unsupported = zone.querySelector("[data-scm-paste-list]");
+      if (unsupported) unsupported.innerHTML = "<li>Tu navegador no permitió adjuntar la captura pegada.</li>";
+      return;
+    }
+    var transfer = new DataTransfer();
+    Array.prototype.forEach.call(input.files || [], function (file) { transfer.items.add(file); });
+    files.forEach(function (file) { transfer.items.add(file); });
+    input.files = transfer.files;
+    zone.classList.remove("is-error");
+    zone.classList.add("has-files");
+    renderPastedFiles(zone, input);
+    event.preventDefault();
+  }
+
   function request(action, input, signal) {
     var body = input instanceof FormData ? input : new FormData();
     if (!(input instanceof FormData)) {
@@ -305,6 +376,21 @@
         closeWorkflows();
         return;
       }
+      var addDocument = event.target.closest("[data-add-ticket-document]");
+      if (addDocument) {
+        event.preventDefault();
+        var form = addDocument.closest("form");
+        var docsWrap = form ? form.querySelector("[data-ticket-documents]") : null;
+        if (docsWrap) docsWrap.insertAdjacentHTML("beforeend", documentRowMarkup(addDocument.getAttribute("data-document-accept") || ""));
+        return;
+      }
+      var removeDocument = event.target.closest("[data-remove-ticket-document]");
+      if (removeDocument) {
+        event.preventDefault();
+        var row = removeDocument.closest(".commercial-ticket-document-row, .scm-ticket-document-row");
+        if (row) row.remove();
+        return;
+      }
       if (event.target.closest("[data-commercial-retry-case]")) loadCase(currentCasePk, false);
     });
     caseModal.addEventListener("submit", function (event) {
@@ -314,6 +400,8 @@
       submitWorkflow(form);
     });
   }
+
+  document.addEventListener("paste", handlePasteEvidence);
 
   var permissionModal = document.getElementById("commercial-permissions-modal");
   var permissionOpen = document.getElementById("commercial-open-permissions");

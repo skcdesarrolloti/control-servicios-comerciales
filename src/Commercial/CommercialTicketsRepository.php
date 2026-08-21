@@ -112,6 +112,7 @@ final class CommercialTicketsRepository
                   COALESCE(NULLIF(TRIM(h.`id_empleado`), ''), NULLIF(TRIM(h.`cct_author_id`), '')) AS `actor_id`,
                   COALESCE(NULLIF(TRIM(h.`correo`), ''), NULLIF(TRIM(f.`correo`), '')) AS `actor_email`,
                   h.`respuesta` AS `message`, 'respuesta' AS `type`,
+                  h.`imagen` AS `image`, h.`archivos` AS `documents`,
                   COALESCE(NULLIF(h.`fecha`, 0), UNIX_TIMESTAMP(h.`cct_created`), 0) AS `_timestamp`
              FROM `{$historyTable}` h
              LEFT JOIN `{$employeesTable}` f
@@ -123,6 +124,7 @@ final class CommercialTicketsRepository
                   COALESCE(NULLIF(TRIM(s.`id_empleado`), ''), NULLIF(TRIM(s.`id_coordinador`), ''), NULLIF(TRIM(s.`cct_author_id`), '')) AS `actor_id`,
                   NULLIF(TRIM(f.`correo`), '') AS `actor_email`,
                   s.`observacion` AS `message`, 'seguimiento' AS `type`,
+                  s.`evidencia` AS `image`, '' AS `documents`,
                   COALESCE(NULLIF(s.`fecha`, 0), UNIX_TIMESTAMP(s.`cct_created`), 0) AS `_timestamp`
              FROM `{$followUpTable}` s
              LEFT JOIN `{$employeesTable}` f
@@ -134,6 +136,7 @@ final class CommercialTicketsRepository
                   COALESCE(NULLIF(TRIM(n.`id_empleado`), ''), NULLIF(TRIM(n.`cct_author_id`), '')) AS `actor_id`,
                   NULLIF(TRIM(f.`correo`), '') AS `actor_email`,
                   n.`observacion` AS `message`, 'nota' AS `type`,
+                  '' AS `image`, '' AS `documents`,
                   COALESCE(NULLIF(n.`fecha`, 0), UNIX_TIMESTAMP(n.`cct_created`), 0) AS `_timestamp`
              FROM `{$notesTable}` n
              LEFT JOIN `{$employeesTable}` f
