@@ -46,31 +46,36 @@ final class CommercialDashboardView
 </head>
 <body class="commercial-body">
   <header class="commercial-topbar">
-    <a class="commercial-brand" href="<?php echo esc_url($baseUrl . '/index.php'); ?>">
-      <span class="commercial-logo"><img src="<?php echo esc_url(system_image('portal_logo_url', SCM_DEFAULT_PORTAL_LOGO_URL)); ?>" alt="Su Casa Inmobiliaria"></span>
-      <span><strong>Control de Servicios</strong><small>Comerciales</small></span>
-    </a>
-    <div class="commercial-session">
-      <span><strong><?php echo esc_html(Auth::user()); ?></strong><small><?php echo esc_html(Auth::userRol()); ?></small></span>
-      <form method="post" action="<?php echo esc_url($baseUrl . '/logout.php'); ?>">
-        <?php echo \SCM\Core\App::csrf()->field('logout'); ?>
-        <button type="submit" class="commercial-icon-btn" aria-label="Cerrar sesión" title="Cerrar sesión">Salir</button>
-      </form>
+    <div class="commercial-topbar-inner">
+      <a class="commercial-brand" href="<?php echo esc_url($baseUrl . '/index.php'); ?>">
+        <span class="commercial-logo"><img src="<?php echo esc_url(system_image('portal_logo_url', SCM_DEFAULT_PORTAL_LOGO_URL)); ?>" alt="Su Casa Inmobiliaria"></span>
+        <span class="commercial-brand-title">Control Servicios Comerciales</span>
+      </a>
+      <div class="commercial-session">
+        <form method="post" action="<?php echo esc_url($baseUrl . '/logout.php'); ?>">
+          <?php echo \SCM\Core\App::csrf()->field('logout'); ?>
+          <button type="submit" class="commercial-logout-link" aria-label="Cerrar sesión" title="Cerrar sesión">Cerrar sesión</button>
+        </form>
+        <span><strong><?php echo esc_html(Auth::user()); ?></strong><small><?php echo esc_html(Auth::userRol()); ?></small></span>
+      </div>
     </div>
   </header>
 
   <main id="scm-app" class="scm-wrap scm-daisy commercial-app" data-theme="scm-daisy" data-scm-runtime="<?php echo esc_attr((string) $runtimeJson); ?>">
+    <section class="commercial-actionbar" aria-label="Acciones del panel">
+      <div class="scm-guide-bar commercial-tools">
+        <?php if ($policy instanceof CommercialAccessPolicy && $policy->canManage()): ?>
+          <button class="scm-guide-btn scm-guide-btn--primary" type="button" id="commercial-open-permissions"><i class="fas fa-sliders" aria-hidden="true"></i> Configurar permisos</button>
+        <?php endif; ?>
+        <button class="scm-guide-btn" type="button" id="scm-open-guide"><i class="fas fa-book-open" aria-hidden="true"></i> Ver guías</button>
+      </div>
+    </section>
+
     <section class="commercial-hero">
       <div>
         <span class="commercial-kicker">Gestión centralizada</span>
         <h1>Tickets comerciales</h1>
         <p>Consulta la operación por estado comercial, administra responsables y coordina la agenda del equipo.</p>
-      </div>
-      <div class="scm-guide-bar commercial-tools">
-        <?php if ($policy instanceof CommercialAccessPolicy && $policy->canManage()): ?>
-          <button class="scm-guide-btn scm-guide-btn--primary" type="button" id="commercial-open-permissions"><i class="fas fa-sliders" aria-hidden="true"></i> Visibilidad y acciones</button>
-        <?php endif; ?>
-        <button class="scm-guide-btn" type="button" id="scm-open-guide"><i class="fas fa-book-open" aria-hidden="true"></i> Ver guías</button>
       </div>
     </section>
 
