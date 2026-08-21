@@ -231,10 +231,38 @@ final class CommercialTicketsRepository
         GROUP BY TRIM(t.`id_empleado`)
         ORDER BY name ASC"
     );
-    return array_map(static fn(array $row): array => [
-      'id' => (string) ($row['id'] ?? ''),
-      'name' => (string) ($row['name'] ?? ''),
-    ], $rows);
+
+    $grouped = [];
+    foreach ($rows as $row) {
+      $id = trim((string) ($row['id'] ?? ''));
+      if ($id === '') {
+        continue;
+      }
+      $name = trim((string) ($row['name'] ?? ''));
+      if ($name === '') {
+        $name = 'ID ' . $id;
+      }
+      $key = $this->normalizeEmployeeLabel($name);
+      if ($key === '') {
+        $key = 'id:' . $id;
+      }
+      if (!isset($grouped[$key])) {
+        $grouped[$key] = ['name' => $name, 'ids' => []];
+      }
+      $grouped[$key]['ids'][$id] = true;
+    }
+
+    $employees = [];
+    foreach ($grouped as $employee) {
+      $ids = array_keys($employee['ids']);
+      sort($ids, SORT_NATURAL | SORT_FLAG_CASE);
+      $employees[] = [
+        'id' => implode(',', array_map('strval', $ids)),
+        'name' => (string) $employee['name'],
+      ];
+    }
+    usort($employees, static fn(array $a, array $b): int => strnatcasecmp((string) $a['name'], (string) $b['name']));
+    return $employees;
   }
 
   /** @return array{medios:array<int,string>,prioridades:array<int,string>,temas:array<int,string>,barrios:array<int,string>} */
@@ -348,8 +376,14 @@ final class CommercialTicketsRepository
 
     $employee = trim((string) ($filters['id_empleado'] ?? ''));
     if ($employee !== '') {
-      $where[] = 'TRIM(COALESCE(t.`id_empleado`, \'\')) = ?';
-      $args[] = $employee;
+      $employeeIds = array_values(array_unique(array_filter(array_map('trim', explode(',', $employee)), static fn(string $id): bool => $id !== '')));
+      if (count($employeeIds) > 1) {
+        $where[] = 'TRIM(COALESCE(t.`id_empleado`, \'\')) IN (' . implode(',', array_fill(0, count($employeeIds), '?')) . ')';
+        array_push($args, ...$employeeIds);
+      } else {
+        $where[] = 'TRIM(COALESCE(t.`id_empleado`, \'\')) = ?';
+        $args[] = $employeeIds[0] ?? $employee;
+      }
     }
 
     $ticketId = trim((string) ($filters['ticket_id'] ?? ''));
@@ -486,6 +520,13 @@ final class CommercialTicketsRepository
     $time = $endOfDay ? '23:59:59' : '00:00:00';
     $dt = \DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $date . ' ' . $time, new \DateTimeZone('America/Bogota'));
     return $dt instanceof \DateTimeImmutable ? $dt->getTimestamp() : 0;
+  }
+
+  private function normalizeEmployeeLabel(string $name): string
+  {
+    $name = mb_strtolower(trim($name), 'UTF-8');
+    $name = str_replace(['á', 'é', 'í', 'ó', 'ú', 'ü', 'ñ'], ['a', 'e', 'i', 'o', 'u', 'u', 'n'], $name);
+    return preg_replace('/\s+/', ' ', $name) ?? '';
   }
 
   /**

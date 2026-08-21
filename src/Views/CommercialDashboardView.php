@@ -164,7 +164,8 @@ final class CommercialDashboardView
       <select id="commercial-global-employee" name="id_empleado">
         <option value="">Todos los funcionarios</option>
         <?php foreach ($ticketEmployees as $employee): ?>
-          <option value="<?php echo esc_attr($employee['id']); ?>"<?php selected($selectedEmployee, $employee['id']); ?>><?php echo esc_html($employee['name']); ?></option>
+          <?php $employeeValue = (string) ($employee['id'] ?? ''); $employeeIds = array_values(array_filter(array_map('trim', explode(',', $employeeValue)), static fn(string $id): bool => $id !== '')); ?>
+          <option value="<?php echo esc_attr($employeeValue); ?>"<?php echo ($selectedEmployee === $employeeValue || in_array($selectedEmployee, $employeeIds, true)) ? ' selected' : ''; ?>><?php echo esc_html((string) ($employee['name'] ?? '')); ?></option>
         <?php endforeach; ?>
       </select>
       <button class="commercial-primary-btn" type="submit">Actualizar</button>
