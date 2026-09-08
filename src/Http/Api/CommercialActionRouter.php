@@ -21,6 +21,7 @@ final class CommercialActionRouter
     $method = [
       'commercial_tickets_filter' => 'filterTickets',
       'commercial_ticket_detail' => 'ticketDetail',
+      'commercial_ticket_analyze' => 'analyzeTicket',
       'commercial_ticket_status' => 'changeStatus',
       'commercial_ticket_reassign' => 'reassign',
       'commercial_ticket_reply' => 'reply',

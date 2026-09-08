@@ -6,6 +6,7 @@ namespace SCM\Http\Controller;
 
 use SCM\Commercial\CommercialAccessPolicy;
 use SCM\Commercial\CommercialStatusCatalog;
+use SCM\Commercial\CommercialTaskAssistant;
 use SCM\Commercial\CommercialTicketsRepository;
 use SCM\Core\Csrf;
 use SCM\Core\Database;
@@ -26,6 +27,8 @@ final class CommercialApiController
   private SeguimientoService $workflow;
   private string $baseUrl;
   private string $ticketUrl;
+  /** @var array<string,mixed> */
+  private array $config;
   /** @var array<int,string> */
   private array $commercialCargos;
 
@@ -41,6 +44,7 @@ final class CommercialApiController
     $this->workflow->setQueue(new EmailQueue($db));
     $this->baseUrl = rtrim((string) SCM_BASE_URL, '/');
     $this->ticketUrl = (string) ($config['ticket_url'] ?? '');
+    $this->config = $config;
   }
 
   /** @param array<string,mixed> $input */
@@ -117,6 +121,29 @@ final class CommercialApiController
         $this->ticketUrl
       ),
     ]);
+  }
+
+  /** @param array<string,mixed> $input */
+  public function analyzeTicket(array $input): never
+  {
+    $this->verify($input);
+    $this->authorize('ver_ticket', 'No tienes permiso para analizar esta tarea.');
+    $ticketPk = (int) ($input['ticket_pk'] ?? 0);
+    $this->authorizeTicketScope($ticketPk);
+    try {
+      $detail = $this->tickets->detail($ticketPk);
+      $assistant = new CommercialTaskAssistant(
+        (string) ($this->config['minimax_api_key'] ?? ''),
+        (string) ($this->config['minimax_base_url'] ?? 'https://api.minimax.io/v1'),
+        (string) ($this->config['minimax_model'] ?? 'MiniMax-M3'),
+        (int) ($this->config['minimax_timeout'] ?? 45)
+      );
+      JsonResponse::success([
+        'analysis' => $assistant->analyze($detail),
+      ]);
+    } catch (\InvalidArgumentException | \RuntimeException $exception) {
+      JsonResponse::error($exception->getMessage(), 422);
+    }
   }
 
   /** @param array<string,mixed> $input */

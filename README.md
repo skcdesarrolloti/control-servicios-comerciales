@@ -8,6 +8,7 @@ Panel PHP para consultar y gestionar tickets por `estado_comercial`, administrar
 - Las 23 categorías comerciales definidas en `CommercialStatusCatalog`.
 - Búsqueda por ticket, asunto, solicitante, responsable e inmueble.
 - Cambio de estado y reasignación con registro en el historial del ticket.
+- Análisis con asistente MiniMax desde el popup de cada tarea, usando tarea, inmueble, historial, respuestas, seguimientos y notas.
 - Permisos de vistas y acciones por cargo, persistidos en `wp_jet_cct_confi_sistema` bajo `control_servicios_comerciales_config`.
 - Guía de estados comerciales.
 - Calendario limitado por defecto a:
@@ -56,6 +57,19 @@ hex(HMAC-SHA256("usuario|expira", AUTO_LOGIN_SECRET))
 
 `auto_expires` es una marca Unix futura que no puede exceder `AUTO_LOGIN_TTL`. El funcionario también debe estar activo en `wp_jet_cct_funcionarios`.
 
+## Asistente MiniMax
+
+Para habilitar el botón **Analizar con asistente** en el popup de tareas comerciales, configura:
+
+```dotenv
+MINIMAX_API_KEY=tu-api-key
+MINIMAX_BASE_URL=https://api.minimax.io/v1
+MINIMAX_MODEL=MiniMax-M3
+MINIMAX_TIMEOUT=45
+```
+
+La API key se usa únicamente desde PHP; nunca se expone al navegador.
+
 ## Seguridad
 
 - Las credenciales y secretos solo viven en `.env`, que está ignorado por Git.
@@ -69,6 +83,7 @@ hex(HMAC-SHA256("usuario|expira", AUTO_LOGIN_SECRET))
 ```bash
 php -l public/index.php
 php -l public/api.php
+php -l src/Commercial/CommercialTaskAssistant.php
 node --check public/assets/js/commercial-dashboard.js
 ```
 

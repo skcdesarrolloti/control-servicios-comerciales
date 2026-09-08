@@ -62,6 +62,63 @@
       .replace(/'/g, "&#039;");
   }
 
+  function assistantList(items) {
+    if (!Array.isArray(items) || !items.length) return '<p class="commercial-assistant-muted">Sin hallazgos registrados.</p>';
+    return "<ul>" + items.map(function (item) { return "<li>" + escapeHtml(item) + "</li>"; }).join("") + "</ul>";
+  }
+
+  function assistantBlock(title, content, icon) {
+    return (
+      '<section class="commercial-assistant-block">' +
+      '<h4><i class="fas ' + escapeHtml(icon || "fa-circle-info") + '" aria-hidden="true"></i>' + escapeHtml(title) + "</h4>" +
+      content +
+      "</section>"
+    );
+  }
+
+  function assistantLoadingMarkup() {
+    return (
+      '<div class="commercial-assistant-loading">' +
+      '<i class="fas fa-circle-notch fa-spin" aria-hidden="true"></i>' +
+      '<div><h3>Analizando tarea con MiniMax…</h3><p>Estoy revisando datos de la tarea, inmueble, historial, respuestas, seguimientos y notas.</p></div>' +
+      "</div>"
+    );
+  }
+
+  function assistantErrorMarkup(message) {
+    return (
+      '<div class="commercial-assistant-error">' +
+      '<i class="fas fa-triangle-exclamation" aria-hidden="true"></i>' +
+      '<div><h3>No se pudo analizar la tarea</h3><p>' + escapeHtml(message || "Inténtalo nuevamente.") + "</p></div>" +
+      "</div>"
+    );
+  }
+
+  function assistantAnalysisMarkup(analysis) {
+    analysis = analysis || {};
+    var summary = escapeHtml(analysis.resumen || "Sin resumen generado.");
+    var client = analysis.cliente ? '<p>' + escapeHtml(analysis.cliente) + "</p>" : "";
+    var currentStatus = analysis.estado_actual ? '<p>' + escapeHtml(analysis.estado_actual) + "</p>" : "";
+    var suggested = analysis.mensaje_sugerido ? '<div class="commercial-assistant-suggested"><div class="commercial-assistant-suggested-actions"><button type="button" class="commercial-secondary-btn" data-commercial-use-assistant-message><i class="fas fa-reply" aria-hidden="true"></i> Usar en respuesta</button><button type="button" class="commercial-secondary-btn" data-commercial-copy-assistant-message><i class="fas fa-copy" aria-hidden="true"></i> Copiar mensaje</button></div><p>' + escapeHtml(analysis.mensaje_sugerido) + "</p></div>" : '<p class="commercial-assistant-muted">Sin mensaje sugerido.</p>';
+    return (
+      '<header class="commercial-assistant-result-head">' +
+      '<div><span>Asistente comercial</span><h3>Análisis de la tarea</h3><p>Generado con ' + escapeHtml(analysis.model || "MiniMax") + (analysis.generated_at ? " · " + escapeHtml(analysis.generated_at) : "") + "</p></div>" +
+      '<button type="button" class="commercial-modal-close commercial-assistant-close" data-commercial-close-assistant aria-label="Cerrar análisis">&times;</button>' +
+      "</header>" +
+      '<div class="commercial-assistant-summary"><i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i><p>' + summary + "</p></div>" +
+      '<div class="commercial-assistant-grid">' +
+      (client ? assistantBlock("Cliente", client, "fa-user") : "") +
+      (currentStatus ? assistantBlock("Estado actual", currentStatus, "fa-clipboard-check") : "") +
+      assistantBlock("Riesgos", assistantList(analysis.riesgos), "fa-triangle-exclamation") +
+      assistantBlock("Oportunidades", assistantList(analysis.oportunidades), "fa-bullseye") +
+      assistantBlock("Recomendaciones", assistantList(analysis.recomendaciones), "fa-lightbulb") +
+      assistantBlock("Próximos pasos", assistantList(analysis.proximos_pasos), "fa-list-check") +
+      assistantBlock("Datos faltantes", assistantList(analysis.datos_faltantes), "fa-circle-question") +
+      assistantBlock("Mensaje sugerido para el cliente", suggested, "fa-message") +
+      "</div>"
+    );
+  }
+
   function documentRowMarkup(accept) {
     return (
       '<div class="commercial-ticket-document-row scm-ticket-document-row">' +
@@ -392,6 +449,58 @@
       });
   }
 
+  function analyzeCase(button) {
+    if (!caseContent) return;
+    var ticketPk = button.getAttribute("data-ticket-pk") || currentCasePk || "";
+    var panel = caseContent.querySelector("[data-commercial-assistant-panel]");
+    if (!ticketPk || !panel) return;
+    var originalText = button.textContent;
+    button.disabled = true;
+    button.innerHTML = '<i class="fas fa-circle-notch fa-spin" aria-hidden="true"></i><span>Analizando…</span>';
+    panel.hidden = false;
+    panel.innerHTML = assistantLoadingMarkup();
+    panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    request("commercial_ticket_analyze", { ticket_pk: ticketPk })
+      .then(function (response) {
+        panel.innerHTML = assistantAnalysisMarkup(response.analysis || {});
+      })
+      .catch(function (error) {
+        panel.innerHTML = assistantErrorMarkup(error.message);
+        notify("error", error.message);
+      })
+      .finally(function () {
+        if (document.contains(button)) {
+          button.disabled = false;
+          button.innerHTML = '<i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i><span>' + escapeHtml(originalText || "Analizar con asistente") + "</span>";
+        }
+      });
+  }
+
+  function assistantSuggestedText(button) {
+    var suggested = button.closest(".commercial-assistant-suggested");
+    return suggested ? (suggested.querySelector("p") || {}).textContent || "" : "";
+  }
+
+  function useAssistantMessage(button) {
+    if (!caseContent) return;
+    var text = assistantSuggestedText(button);
+    if (!text) return;
+    var replyButton = caseContent.querySelector('[data-commercial-open-workflow="reply"]');
+    var replyForm = caseContent.querySelector('[data-commercial-workflow-form="reply"]');
+    if (!replyButton || !replyForm) {
+      notify("error", "No tienes disponible la acción Responder para esta tarea.");
+      return;
+    }
+    openWorkflow(replyButton);
+    var textarea = replyForm.querySelector('textarea[name="respuesta"]');
+    if (textarea) {
+      textarea.value = text;
+      textarea.dispatchEvent(new Event("input", { bubbles: true }));
+      textarea.focus({ preventScroll: true });
+    }
+    notify("success", "Mensaje sugerido cargado en Responder.");
+  }
+
   root.addEventListener("click", function (event) {
     var tab = event.target.closest("[data-commercial-tab]");
     var filterLink = event.target.closest("[data-commercial-filter-link]");
@@ -474,6 +583,35 @@
       var workflowButton = event.target.closest("[data-commercial-open-workflow]");
       if (workflowButton) {
         openWorkflow(workflowButton);
+        return;
+      }
+      var assistantButton = event.target.closest("[data-commercial-assistant]");
+      if (assistantButton) {
+        event.preventDefault();
+        analyzeCase(assistantButton);
+        return;
+      }
+      if (event.target.closest("[data-commercial-close-assistant]")) {
+        var assistantPanel = caseContent && caseContent.querySelector("[data-commercial-assistant-panel]");
+        if (assistantPanel) {
+          assistantPanel.hidden = true;
+          assistantPanel.innerHTML = "";
+        }
+        return;
+      }
+      var copyAssistant = event.target.closest("[data-commercial-copy-assistant-message]");
+      if (copyAssistant) {
+        event.preventDefault();
+        var text = assistantSuggestedText(copyAssistant);
+        if (text && navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(function () { notify("success", "Mensaje sugerido copiado."); });
+        }
+        return;
+      }
+      var useAssistant = event.target.closest("[data-commercial-use-assistant-message]");
+      if (useAssistant) {
+        event.preventDefault();
+        useAssistantMessage(useAssistant);
         return;
       }
       if (event.target.closest("[data-commercial-close-workflow]")) {

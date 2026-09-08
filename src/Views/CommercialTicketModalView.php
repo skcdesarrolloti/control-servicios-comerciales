@@ -44,6 +44,7 @@ final class CommercialTicketModalView
       <section class="commercial-case-actions" aria-labelledby="commercial-case-actions-title">
         <div class="commercial-case-section-title"><div><span>Gestión</span><h3 id="commercial-case-actions-title">Acciones de la tarea</h3></div></div>
         <div class="commercial-case-action-grid">
+          <button type="button" class="commercial-case-action--assistant" data-commercial-assistant data-ticket-pk="<?php echo esc_attr((string) $pk); ?>"><i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i><span>Analizar con asistente</span></button>
           <?php if ($policy->canAct('responder')): ?><button type="button" data-commercial-open-workflow="reply"><i class="fas fa-reply" aria-hidden="true"></i><span>Responder</span></button><?php endif; ?>
           <?php if ($policy->canAct('agregar_nota')): ?><button type="button" data-commercial-open-workflow="note"><i class="fas fa-note-sticky" aria-hidden="true"></i><span>Nota interna</span></button><?php endif; ?>
           <?php if ($policy->canAct('seguimiento')): ?><button type="button" data-commercial-open-workflow="follow_up"><i class="fas fa-list-check" aria-hidden="true"></i><span>Seguimiento</span></button><?php endif; ?>
@@ -71,6 +72,8 @@ final class CommercialTicketModalView
     </aside>
 
     <section class="commercial-case-main">
+      <section class="commercial-assistant-panel" data-commercial-assistant-panel aria-live="polite" hidden></section>
+
       <div class="commercial-workflow-stack" data-commercial-workflow-stack hidden>
         <?php if ($policy->canAct('responder')): ?>
           <?php echo self::messageForm($pk, 'reply', 'Responder al solicitante', 'Escribe una respuesta clara para el cliente.', 'respuesta', 'Escribe la respuesta de la tarea…', 'Enviar respuesta', true, false, true); ?>
