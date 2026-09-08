@@ -24,6 +24,7 @@ final class CommercialGuideView
         </div>
         <div class="scm-go-body commercial-guide-body">
           <?php foreach (CommercialStatusCatalog::buckets() as $key => $bucket): ?>
+            <?php if ($key === 'mis_tickets') continue; ?>
             <section class="commercial-guide-group commercial-guide-group--<?php echo esc_attr($key); ?>">
               <header>
                 <h4><?php echo esc_html($bucket['label']); ?></h4>

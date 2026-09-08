@@ -45,11 +45,14 @@ final class CommercialDashboardController
     $ticketEmployees = $repository->ticketEmployees($commercialEmployeeCargos);
     $filters = $this->ticketFilters($input);
     $filters['tab'] = $bucket;
-    $employeeFilterLocked = !$policy->canSeeAllCommercialTickets();
+    $currentEmployeeFilter = $repository->currentEmployeeTicketFilter($commercialEmployeeCargos);
+    $employeeFilterLocked = $bucket === 'mis_tickets' || !$policy->canSeeAllCommercialTickets();
     if ($employeeFilterLocked) {
-      $filters['id_empleado'] = $repository->currentEmployeeTicketFilter($commercialEmployeeCargos);
+      $filters['id_empleado'] = $currentEmployeeFilter;
     }
     $tabCounts = $repository->bucketCounts($this->globalTicketFilters($filters));
+    $myTabCounts = $repository->bucketCounts(['id_empleado' => $currentEmployeeFilter]);
+    $tabCounts['mis_tickets'] = (int) ($myTabCounts['mis_tickets'] ?? 0);
     $result = in_array($bucket, ['calendario', 'sin_acceso'], true) ? ['rows' => [], 'counts' => $repository->statusCounts($filters), 'pagination' => []] : $repository->search($bucket, $filters);
     $calendarEmployees = $repository->activeEmployeesByCargos($calendarCargos);
     $currentCalendarEmployeeId = '';

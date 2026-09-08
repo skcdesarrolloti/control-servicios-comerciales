@@ -58,6 +58,8 @@ final class CommercialApiController
     $result = $this->tickets->search($bucket, $filters);
     $visibleViews = array_values(array_filter(array_keys(CommercialAccessPolicy::VIEWS), fn(string $view): bool => $this->policy->canView($view)));
     $tabCounts = $this->tickets->bucketCounts($this->globalTicketFilters($filters));
+    $myTabCounts = $this->tickets->bucketCounts(['id_empleado' => $this->tickets->currentEmployeeTicketFilter($this->commercialCargos)]);
+    $tabCounts['mis_tickets'] = (int) ($myTabCounts['mis_tickets'] ?? 0);
     JsonResponse::success([
       'html' => CommercialDashboardView::renderTickets(
         $bucket,
@@ -69,7 +71,7 @@ final class CommercialApiController
         $this->baseUrl
       ),
       'tabs_html' => CommercialDashboardView::renderTabs($visibleViews, $bucket, $filters, $tabCounts, $this->baseUrl),
-      'global_filters_html' => CommercialDashboardView::renderGlobalFilters($filters, $ticketEmployees, $this->baseUrl, !$this->policy->canSeeAllCommercialTickets()),
+      'global_filters_html' => CommercialDashboardView::renderGlobalFilters($filters, $ticketEmployees, $this->baseUrl, $bucket === 'mis_tickets' || !$this->policy->canSeeAllCommercialTickets()),
       'tab' => $bucket,
     ]);
   }
@@ -78,7 +80,7 @@ final class CommercialApiController
   public function ticketDetail(array $input): never
   {
     $this->verify($input);
-    $this->authorize('ver_ticket', 'No tienes permiso para ver este ticket.');
+    $this->authorize('ver_ticket', 'No tienes permiso para ver esta tarea.');
     $ticketPk = (int) ($input['ticket_pk'] ?? 0);
     $this->authorizeTicketScope($ticketPk);
     try {
@@ -118,7 +120,7 @@ final class CommercialApiController
   {
     $this->verify($input);
     if (!$this->policy->canAct('reasignar')) {
-      JsonResponse::error('No tienes permiso para reasignar tickets.', 403);
+      JsonResponse::error('No tienes permiso para reasignar tareas.', 403);
     }
     $ticketPk = (int) ($input['ticket_pk'] ?? 0);
     $this->authorizeTicketScope($ticketPk);
@@ -146,7 +148,7 @@ final class CommercialApiController
   public function reply(array $input): never
   {
     $this->verify($input);
-    $this->authorize('responder', 'No tienes permiso para responder tickets.');
+    $this->authorize('responder', 'No tienes permiso para responder tareas.');
     $ticketPk = (int) ($input['ticket_pk'] ?? 0);
     $this->authorizeTicketScope($ticketPk);
     $message = trim(wp_kses_post(stripslashes((string) ($input['respuesta'] ?? ''))));
@@ -213,7 +215,7 @@ final class CommercialApiController
   public function postpone(array $input): never
   {
     $this->verify($input);
-    $this->authorize('postergar', 'No tienes permiso para postergar tickets.');
+    $this->authorize('postergar', 'No tienes permiso para postergar tareas.');
     $ticketPk = (int) ($input['ticket_pk'] ?? 0);
     $this->authorizeTicketScope($ticketPk);
     $message = trim(wp_kses_post(stripslashes((string) ($input['observacion'] ?? ''))));
@@ -229,14 +231,14 @@ final class CommercialApiController
     );
     $this->ensureWorkflowSucceeded($result);
     $this->tickets->changeStatus($ticketPk, 'Postergado');
-    JsonResponse::success(['message' => (string) ($result['message'] ?? 'Ticket postergado.'), 'refresh' => true]);
+    JsonResponse::success(['message' => (string) ($result['message'] ?? 'Tarea postergada.'), 'refresh' => true]);
   }
 
   /** @param array<string,mixed> $input */
   public function activate(array $input): never
   {
     $this->verify($input);
-    $this->authorize('activar', 'No tienes permiso para activar tickets.');
+    $this->authorize('activar', 'No tienes permiso para activar tareas.');
     $ticketPk = (int) ($input['ticket_pk'] ?? 0);
     $this->authorizeTicketScope($ticketPk);
     $message = trim(wp_kses_post(stripslashes((string) ($input['motivo'] ?? ''))));
@@ -252,14 +254,14 @@ final class CommercialApiController
     );
     $this->ensureWorkflowSucceeded($result);
     $this->tickets->changeStatus($ticketPk, $status);
-    JsonResponse::success(['message' => (string) ($result['message'] ?? 'Ticket activado.'), 'refresh' => true]);
+    JsonResponse::success(['message' => (string) ($result['message'] ?? 'Tarea activada.'), 'refresh' => true]);
   }
 
   /** @param array<string,mixed> $input */
   public function close(array $input): never
   {
     $this->verify($input);
-    $this->authorize('cerrar', 'No tienes permiso para cerrar tickets.');
+    $this->authorize('cerrar', 'No tienes permiso para cerrar tareas.');
     $ticketPk = (int) ($input['ticket_pk'] ?? 0);
     $this->authorizeTicketScope($ticketPk);
     $message = trim(wp_kses_post(stripslashes((string) ($input['observacion'] ?? ''))));
@@ -270,7 +272,7 @@ final class CommercialApiController
     $result = $this->workflow->closeTicket($ticketPk, $message);
     $this->ensureWorkflowSucceeded($result);
     $this->tickets->changeStatus($ticketPk, $status);
-    JsonResponse::success(['message' => (string) ($result['message'] ?? 'Ticket cerrado.'), 'refresh' => true]);
+    JsonResponse::success(['message' => (string) ($result['message'] ?? 'Tarea cerrada.'), 'refresh' => true]);
   }
 
   /** @param array<string,mixed> $input */
@@ -291,7 +293,7 @@ final class CommercialApiController
   /** @param array<string,mixed> $filters @return array<string,mixed> */
   private function scopeTicketFilters(array $filters): array
   {
-    if ($this->policy->canSeeAllCommercialTickets()) {
+    if ($this->policy->canSeeAllCommercialTickets() && (string) ($filters['tab'] ?? '') !== 'mis_tickets') {
       return $filters;
     }
 
@@ -307,7 +309,7 @@ final class CommercialApiController
 
     $employeeFilter = $this->tickets->currentEmployeeTicketFilter($this->commercialCargos);
     if (!$this->tickets->ticketMatchesEmployeeFilter($ticketPk, $employeeFilter)) {
-      JsonResponse::error('Este ticket no está asignado a tu usuario.', 403);
+      JsonResponse::error('Esta tarea no está asignada a tu usuario.', 403);
     }
   }
 

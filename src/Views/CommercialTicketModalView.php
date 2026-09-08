@@ -20,7 +20,7 @@ final class CommercialTicketModalView
     $pk = (int) ($ticket['_ID'] ?? 0);
     $logicalId = trim((string) ($ticket['id_ticket'] ?? '')) ?: (string) $pk;
     $status = trim((string) ($ticket['estado_comercial'] ?? '')) ?: 'Sin estado';
-    $subject = trim((string) ($ticket['asunto'] ?? '')) ?: 'Ticket comercial';
+    $subject = trim((string) ($ticket['asunto'] ?? '')) ?: 'Tarea comercial';
     $description = trim(wp_strip_all_tags((string) ($ticket['descripcion'] ?? ''), true));
     $requester = trim((string) ($ticket['solicitante'] ?? '')) ?: 'Sin solicitante';
     $assignee = trim((string) ($ticket['nombre_empleado'] ?? $ticket['empleado'] ?? '')) ?: 'Sin asignar';
@@ -32,17 +32,17 @@ final class CommercialTicketModalView
 ?>
   <div class="commercial-case-headline">
     <div>
-      <div class="commercial-case-eyebrow"><span>Ticket #<?php echo esc_html($logicalId); ?></span><span class="commercial-status-badge commercial-status-badge--<?php echo esc_attr($bucket); ?>"><?php echo esc_html($status); ?></span></div>
+      <div class="commercial-case-eyebrow"><span>Tarea #<?php echo esc_html($logicalId); ?></span><span class="commercial-status-badge commercial-status-badge--<?php echo esc_attr($bucket); ?>"><?php echo esc_html($status); ?></span></div>
       <h2 id="commercial-case-title"><?php echo esc_html($subject); ?></h2>
-      <p><?php echo esc_html($description !== '' ? $description : 'Este ticket no tiene una descripción registrada.'); ?></p>
+      <p><?php echo esc_html($description !== '' ? $description : 'Esta tarea no tiene una descripción registrada.'); ?></p>
     </div>
     <?php if ($external !== ''): ?><a class="commercial-secondary-btn commercial-external-link" href="<?php echo esc_url($external); ?>" target="_blank" rel="noopener noreferrer"><i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i> Ver en portal</a><?php endif; ?>
   </div>
 
   <div class="commercial-case-layout">
-    <aside class="commercial-case-sidebar" aria-label="Resumen del ticket">
+    <aside class="commercial-case-sidebar" aria-label="Resumen de la tarea">
       <section class="commercial-case-actions" aria-labelledby="commercial-case-actions-title">
-        <div class="commercial-case-section-title"><div><span>Gestión</span><h3 id="commercial-case-actions-title">Acciones del caso</h3></div></div>
+        <div class="commercial-case-section-title"><div><span>Gestión</span><h3 id="commercial-case-actions-title">Acciones de la tarea</h3></div></div>
         <div class="commercial-case-action-grid">
           <?php if ($policy->canAct('responder')): ?><button type="button" data-commercial-open-workflow="reply"><i class="fas fa-reply" aria-hidden="true"></i><span>Responder</span></button><?php endif; ?>
           <?php if ($policy->canAct('agregar_nota')): ?><button type="button" data-commercial-open-workflow="note"><i class="fas fa-note-sticky" aria-hidden="true"></i><span>Nota interna</span></button><?php endif; ?>
@@ -73,7 +73,7 @@ final class CommercialTicketModalView
     <section class="commercial-case-main">
       <div class="commercial-workflow-stack" data-commercial-workflow-stack hidden>
         <?php if ($policy->canAct('responder')): ?>
-          <?php echo self::messageForm($pk, 'reply', 'Responder al solicitante', 'Escribe una respuesta clara para el cliente.', 'respuesta', 'Escribe la respuesta del ticket…', 'Enviar respuesta', true, false, true); ?>
+          <?php echo self::messageForm($pk, 'reply', 'Responder al solicitante', 'Escribe una respuesta clara para el cliente.', 'respuesta', 'Escribe la respuesta de la tarea…', 'Enviar respuesta', true, false, true); ?>
         <?php endif; ?>
         <?php if ($policy->canAct('agregar_nota')): ?>
           <?php echo self::messageForm($pk, 'note', 'Agregar nota interna', 'Sólo será visible para el equipo.', 'observacion', 'Escribe una nota interna…', 'Guardar nota'); ?>
@@ -82,13 +82,13 @@ final class CommercialTicketModalView
           <?php echo self::messageForm($pk, 'follow_up', 'Registrar seguimiento', 'Deja constancia de la gestión realizada.', 'observacion', 'Describe el seguimiento…', 'Guardar seguimiento', true, false, true); ?>
         <?php endif; ?>
         <?php if ($policy->canAct('postergar')): ?>
-          <?php echo self::messageForm($pk, 'postpone', 'Postergar ticket', 'El caso pasará al estado comercial Postergado.', 'observacion', 'Indica el motivo de la postergación…', 'Postergar ticket', true, true, true); ?>
+          <?php echo self::messageForm($pk, 'postpone', 'Postergar tarea', 'La tarea pasará al estado comercial Postergado.', 'observacion', 'Indica el motivo de la postergación…', 'Postergar tarea', true, true, true); ?>
         <?php endif; ?>
         <?php if ($policy->canAct('activar')): ?>
-          <?php echo self::statusMessageForm($pk, 'activate', 'Activar ticket', 'Selecciona el estado con el que retoma la gestión.', 'motivo', CommercialStatusCatalog::OPEN, 'Nuevo', 'Activar ticket', false, true); ?>
+          <?php echo self::statusMessageForm($pk, 'activate', 'Activar tarea', 'Selecciona el estado con el que retoma la gestión.', 'motivo', CommercialStatusCatalog::OPEN, 'Nuevo', 'Activar tarea', false, true); ?>
         <?php endif; ?>
         <?php if ($policy->canAct('cerrar')): ?>
-          <?php echo self::statusMessageForm($pk, 'close', 'Cerrar ticket', 'Elige el resultado final y registra el motivo.', 'observacion', CommercialStatusCatalog::CLOSED, 'Finalizado', 'Cerrar ticket', true); ?>
+          <?php echo self::statusMessageForm($pk, 'close', 'Cerrar tarea', 'Elige el resultado final y registra el motivo.', 'observacion', CommercialStatusCatalog::CLOSED, 'Finalizado', 'Cerrar tarea', true); ?>
         <?php endif; ?>
         <?php if ($policy->canAct('cambiar_estado')): ?>
           <?php echo self::selectForm($pk, 'status', 'Cambiar estado comercial', 'estado', CommercialStatusCatalog::all(), $status, 'Guardar estado'); ?>
@@ -100,7 +100,7 @@ final class CommercialTicketModalView
 
       <section class="commercial-timeline" aria-labelledby="commercial-timeline-title">
         <div class="commercial-case-section-title commercial-case-section-title--stacked">
-          <div><span>Actividad</span><h3 id="commercial-timeline-title">Historial del caso</h3></div>
+          <div><span>Actividad</span><h3 id="commercial-timeline-title">Historial de la tarea</h3></div>
           <div class="commercial-timeline-counts" aria-label="Resumen del historial">
             <strong><?php echo esc_html((string) count($timeline)); ?> registros</strong>
             <small><?php echo esc_html((string) $timelineCounts['respuesta']); ?> respuestas</small>
@@ -109,7 +109,7 @@ final class CommercialTicketModalView
           </div>
         </div>
         <?php if ($timeline === []): ?>
-          <div class="commercial-timeline-empty"><i class="far fa-comments" aria-hidden="true"></i><p>Aún no hay respuestas, seguimientos o notas para este ticket.</p></div>
+          <div class="commercial-timeline-empty"><i class="far fa-comments" aria-hidden="true"></i><p>Aún no hay respuestas, seguimientos o notas para esta tarea.</p></div>
         <?php else: ?>
           <ol>
             <?php foreach ($timeline as $item):

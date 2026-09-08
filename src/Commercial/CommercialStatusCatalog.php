@@ -57,6 +57,11 @@ final class CommercialStatusCatalog
         'description' => 'Gestiones que ya terminaron o fueron trasladadas.',
         'statuses' => self::CLOSED,
       ],
+      'mis_tickets' => [
+        'label' => 'Mis tareas',
+        'description' => 'Todas las gestiones comerciales asignadas a tu usuario.',
+        'statuses' => self::all(),
+      ],
     ];
   }
 

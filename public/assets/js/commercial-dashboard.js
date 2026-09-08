@@ -33,7 +33,7 @@
   };
 
   function loadingMarkup() {
-    return '<div class="commercial-case-loading"><span></span><span></span><span></span><p>Cargando información del caso…</p></div>';
+    return '<div class="commercial-case-loading"><span></span><span></span><span></span><p>Cargando información de la tarea…</p></div>';
   }
 
   function notify(type, message) {
@@ -277,7 +277,7 @@
       .catch(function (error) {
         if (error.name === "AbortError") return;
         caseContent.removeAttribute("aria-busy");
-        caseContent.innerHTML = '<div class="commercial-case-error"><i class="fas fa-circle-exclamation" aria-hidden="true"></i><h2>No pudimos abrir el caso</h2><p></p><button type="button" class="commercial-primary-btn" data-commercial-retry-case>Reintentar</button></div>';
+        caseContent.innerHTML = '<div class="commercial-case-error"><i class="fas fa-circle-exclamation" aria-hidden="true"></i><h2>No pudimos abrir la tarea</h2><p></p><button type="button" class="commercial-primary-btn" data-commercial-retry-case>Reintentar</button></div>';
         var paragraph = caseContent.querySelector("p");
         if (paragraph) paragraph.textContent = error.message;
       });

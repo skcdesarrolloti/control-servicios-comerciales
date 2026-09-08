@@ -110,7 +110,7 @@ final class CommercialTicketsRepository
   public function detail(int $ticketPk): array
   {
     if ($ticketPk <= 0) {
-      throw new \InvalidArgumentException('Ticket inválido.');
+      throw new \InvalidArgumentException('Tarea inválida.');
     }
 
     $ticket = $this->db->getRow(
@@ -118,7 +118,7 @@ final class CommercialTicketsRepository
       [$ticketPk]
     );
     if (!is_array($ticket)) {
-      throw new \RuntimeException('El ticket comercial no existe.');
+      throw new \RuntimeException('La tarea comercial no existe.');
     }
     $enrichedTickets = $this->enrichPropertyData([$ticket]);
     $ticket = $enrichedTickets[0] ?? $ticket;
@@ -380,7 +380,7 @@ final class CommercialTicketsRepository
   public function changeStatus(int $ticketPk, string $status): void
   {
     if ($ticketPk <= 0 || !CommercialStatusCatalog::isValid($status)) {
-      throw new \InvalidArgumentException('Ticket o estado comercial inválido.');
+      throw new \InvalidArgumentException('Tarea o estado comercial inválido.');
     }
     $ticket = $this->ticket($ticketPk);
     $previous = trim((string) ($ticket['estado_comercial'] ?? ''));
@@ -605,7 +605,7 @@ final class CommercialTicketsRepository
   public function reassign(int $ticketPk, string $employeeId, array $allowedCargos): void
   {
     if ($ticketPk <= 0 || trim($employeeId) === '') {
-      throw new \InvalidArgumentException('Ticket o funcionario inválido.');
+      throw new \InvalidArgumentException('Tarea o funcionario inválido.');
     }
     $employees = $this->activeEmployeesByCargos($allowedCargos);
     $target = null;
@@ -650,7 +650,7 @@ final class CommercialTicketsRepository
       [$ticketPk]
     );
     if (!is_array($row)) {
-      throw new \RuntimeException('El ticket comercial no existe.');
+      throw new \RuntimeException('La tarea comercial no existe.');
     }
     return $row;
   }

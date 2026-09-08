@@ -34,7 +34,7 @@ final class CommercialDashboardView
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Control de Servicios Comerciales</title>
+  <title>Control de Tareas Comerciales</title>
   <link rel="icon" href="<?php echo esc_url(system_image('portal_favicon_url', SCM_DEFAULT_PORTAL_FAVICON_URL)); ?>" sizes="32x32">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap">
@@ -50,7 +50,7 @@ final class CommercialDashboardView
     <div class="commercial-topbar-inner">
       <a class="commercial-brand" href="<?php echo esc_url($baseUrl . '/index.php'); ?>">
         <span class="commercial-logo"><img src="<?php echo esc_url(system_image('portal_logo_url', SCM_DEFAULT_PORTAL_LOGO_URL)); ?>" alt="Su Casa Inmobiliaria"></span>
-        <span class="commercial-brand-title">Control Servicios Comerciales</span>
+        <span class="commercial-brand-title">Control Tareas Comerciales</span>
       </a>
       <div class="commercial-session">
         <form method="post" action="<?php echo esc_url($baseUrl . '/logout.php'); ?>">
@@ -75,7 +75,7 @@ final class CommercialDashboardView
     <section class="commercial-hero">
       <div>
         <span class="commercial-kicker">Gestión centralizada</span>
-        <h1>Tickets comerciales</h1>
+        <h1>Tareas comerciales</h1>
         <p>Consulta la operación por estado comercial, administra responsables y coordina la agenda del equipo.</p>
       </div>
     </section>
@@ -105,7 +105,7 @@ final class CommercialDashboardView
     <div class="commercial-modal commercial-case-modal" id="commercial-case-modal" role="dialog" aria-modal="true" aria-labelledby="commercial-case-title" aria-hidden="true">
       <div class="commercial-modal-card commercial-case-card" role="document">
         <button type="button" class="commercial-modal-close commercial-case-close" data-commercial-close-case aria-label="Cerrar detalle">&times;</button>
-        <div class="commercial-case-content" data-commercial-case-content><div class="commercial-case-loading"><span></span><span></span><span></span><p>Cargando información del caso…</p></div></div>
+        <div class="commercial-case-content" data-commercial-case-content><div class="commercial-case-loading"><span></span><span></span><span></span><p>Cargando información de la tarea…</p></div></div>
       </div>
     </div>
 
@@ -127,7 +127,7 @@ final class CommercialDashboardView
   /** @param array<int,string> $views @param array<string,mixed> $filters @param array<string,int> $tabCounts */
   public static function renderTabs(array $views, string $bucket, array $filters, array $tabCounts, string $baseUrl): string
   {
-    $icons = ['abiertos' => 'fa-inbox', 'postergados' => 'fa-clock-rotate-left', 'cerrados' => 'fa-circle-check', 'calendario' => 'fa-calendar-days'];
+    $icons = ['abiertos' => 'fa-inbox', 'postergados' => 'fa-clock-rotate-left', 'cerrados' => 'fa-circle-check', 'mis_tickets' => 'fa-user-check', 'calendario' => 'fa-calendar-days'];
     $globalParams = self::globalFilterParams($filters);
     ob_start();
 ?>
@@ -135,7 +135,8 @@ final class CommercialDashboardView
       <?php foreach (CommercialAccessPolicy::VIEWS as $viewKey => $label): ?>
         <?php if (!in_array($viewKey, $views, true)) continue; ?>
         <?php $count = (int) ($tabCounts[$viewKey] ?? 0); ?>
-        <a class="commercial-tab<?php echo $viewKey === $bucket ? ' active' : ''; ?>" data-commercial-tab="<?php echo esc_attr($viewKey); ?>" href="<?php echo esc_url(self::url($baseUrl, ['tab' => $viewKey] + $globalParams)); ?>"<?php echo $viewKey === $bucket ? ' aria-current="page"' : ''; ?>>
+        <?php $tabParams = $viewKey === 'mis_tickets' ? [] : $globalParams; ?>
+        <a class="commercial-tab<?php echo $viewKey === $bucket ? ' active' : ''; ?>" data-commercial-tab="<?php echo esc_attr($viewKey); ?>" href="<?php echo esc_url(self::url($baseUrl, ['tab' => $viewKey] + $tabParams)); ?>"<?php echo $viewKey === $bucket ? ' aria-current="page"' : ''; ?>>
           <i class="fas <?php echo esc_attr($icons[$viewKey]); ?>" aria-hidden="true"></i>
           <span><?php echo esc_html($label); ?></span>
           <?php if ($viewKey !== 'calendario'): ?><strong><?php echo esc_html((string) $count); ?></strong><?php endif; ?>
@@ -164,7 +165,7 @@ final class CommercialDashboardView
       }
     }
     if ($selectedEmployeeLabel === '') {
-      $selectedEmployeeLabel = 'Mis tickets';
+      $selectedEmployeeLabel = 'Mis tareas';
     }
     ob_start();
 ?>
@@ -210,7 +211,7 @@ final class CommercialDashboardView
 ?>
     <div class="commercial-section-head">
       <div><span class="commercial-kicker">Estado del embudo</span><h2><?php echo esc_html($bucketDef['label']); ?></h2><p><?php echo esc_html($bucketDef['description']); ?></p></div>
-      <span class="commercial-total"><strong><?php echo esc_html((string) $bucketTotal); ?></strong> tickets</span>
+      <span class="commercial-total"><strong><?php echo esc_html((string) $bucketTotal); ?></strong> tareas</span>
     </div>
 
     <div class="commercial-status-strip" aria-label="Estados de <?php echo esc_attr(mb_strtolower($bucketDef['label'])); ?>">
@@ -228,8 +229,8 @@ final class CommercialDashboardView
       <input type="hidden" name="tab" value="<?php echo esc_attr($bucket); ?>">
       <?php if (!empty($filters['id_empleado'])): ?><input type="hidden" name="id_empleado" value="<?php echo esc_attr((string) $filters['id_empleado']); ?>"><?php endif; ?>
       <?php if (!empty($filters['estado'])): ?><input type="hidden" name="estado" value="<?php echo esc_attr((string) $filters['estado']); ?>"><?php endif; ?>
-      <div class="commercial-field commercial-field--wide"><label for="commercial-search">Buscar</label><input id="commercial-search" type="search" name="busqueda" value="<?php echo esc_attr((string) ($filters['busqueda'] ?? '')); ?>" placeholder="Ticket, asunto, solicitante, inmueble…"></div>
-      <div class="commercial-field"><label for="commercial-ticket-id">ID ticket</label><input id="commercial-ticket-id" type="text" name="ticket_id" value="<?php echo esc_attr((string) ($filters['ticket_id'] ?? '')); ?>" placeholder="Ej: 8604"></div>
+      <div class="commercial-field commercial-field--wide"><label for="commercial-search">Buscar</label><input id="commercial-search" type="search" name="busqueda" value="<?php echo esc_attr((string) ($filters['busqueda'] ?? '')); ?>" placeholder="Tarea, asunto, solicitante, inmueble…"></div>
+      <div class="commercial-field"><label for="commercial-ticket-id">ID tarea</label><input id="commercial-ticket-id" type="text" name="ticket_id" value="<?php echo esc_attr((string) ($filters['ticket_id'] ?? '')); ?>" placeholder="Ej: 8604"></div>
       <?php if ($bucket === 'abiertos'): ?><div class="commercial-field"><label for="commercial-sla-filter">Tiempo de atención</label><select id="commercial-sla-filter" name="sla_filter"><option value="">Todos</option><option value="atrasado"<?php selected((string) ($filters['sla_filter'] ?? ''), 'atrasado'); ?>>Atrasados</option><option value="al_dia"<?php selected((string) ($filters['sla_filter'] ?? ''), 'al_dia'); ?>>Al día</option></select></div><?php endif; ?>
       <?php if (!empty($filters['estado'])): ?><div class="commercial-locked-filter"><span>Estado comercial</span><strong><?php echo esc_html((string) $filters['estado']); ?></strong><a data-commercial-filter-link href="<?php echo esc_url(self::url($baseUrl, ['tab' => $bucket] + array_diff_key($baseFilterParams, ['estado' => true, 'page' => true]))); ?>">Ver todos</a></div><?php endif; ?>
       <div class="commercial-field"><label for="commercial-requester">Solicitante</label><input id="commercial-requester" type="text" name="solicitante" value="<?php echo esc_attr((string) ($filters['solicitante'] ?? '')); ?>" placeholder="Nombre"></div>
@@ -247,7 +248,7 @@ final class CommercialDashboardView
     </form>
 
     <?php if ($rows === []): ?>
-      <div class="commercial-empty"><i class="far fa-folder-open" aria-hidden="true"></i><h3>Sin tickets en esta vista</h3><p>Prueba con otro estado o limpia los filtros actuales.</p></div>
+      <div class="commercial-empty"><i class="far fa-folder-open" aria-hidden="true"></i><h3>Sin tareas en esta vista</h3><p>Prueba con otro estado o limpia los filtros actuales.</p></div>
     <?php else: ?>
       <div class="commercial-ticket-grid">
         <?php foreach ($rows as $row): echo self::renderTicketCard($row, $policy); endforeach; ?>
@@ -264,7 +265,7 @@ final class CommercialDashboardView
     $pk = (int) ($row['_ID'] ?? 0);
     $logicalId = trim((string) ($row['id_ticket'] ?? '')) ?: (string) $pk;
     $status = trim((string) ($row['estado_comercial'] ?? 'Sin estado'));
-    $subject = trim((string) ($row['asunto'] ?? '')) ?: 'Ticket comercial';
+    $subject = trim((string) ($row['asunto'] ?? '')) ?: 'Tarea comercial';
     $description = trim(wp_strip_all_tags((string) ($row['descripcion'] ?? ''), true));
     $assigned = trim((string) ($row['nombre_empleado'] ?? '')) ?: 'Sin asignar';
     $requester = trim((string) ($row['solicitante'] ?? '')) ?: 'Sin solicitante';
@@ -294,7 +295,7 @@ final class CommercialDashboardView
         <div><dt><i class="far fa-clock" aria-hidden="true"></i> Actualizado</dt><dd><?php echo esc_html(self::formatTimestamp($timestamp)); ?></dd></div>
         <?php if ($slaLabel !== ''): ?><div><dt><i class="fas fa-hourglass-half" aria-hidden="true"></i> Atención</dt><dd><?php echo esc_html((string) $attentionDays); ?> días<?php echo $dueDays > 0 ? ' / límite ' . esc_html((string) $dueDays) . ' días' : ''; ?></dd></div><?php endif; ?>
       </dl>
-      <?php if ($canOpen): ?><footer><button class="commercial-primary-btn" type="button" data-commercial-open-case="<?php echo esc_attr((string) $pk); ?>"><span>Ver caso</span><i class="fas fa-arrow-right" aria-hidden="true"></i></button></footer><?php endif; ?>
+      <?php if ($canOpen): ?><footer><button class="commercial-primary-btn" type="button" data-commercial-open-case="<?php echo esc_attr((string) $pk); ?>"><span>Ver tarea</span><i class="fas fa-arrow-right" aria-hidden="true"></i></button></footer><?php endif; ?>
     </article>
 <?php
     return (string) ob_get_clean();
@@ -311,7 +312,7 @@ final class CommercialDashboardView
     $common = ['tab' => $bucket] + array_diff_key(self::filterParams($filters), ['page' => true]);
     ob_start();
 ?>
-    <nav class="commercial-pagination" aria-label="Paginación de tickets">
+    <nav class="commercial-pagination" aria-label="Paginación de tareas">
       <?php if ($page > 1): ?><a data-commercial-filter-link href="<?php echo esc_url(self::url($baseUrl, $common + ['page' => $page - 1])); ?>" aria-label="Página anterior">&lsaquo;</a><?php endif; ?>
       <?php for ($index = $start; $index <= $end; $index++): ?><a data-commercial-filter-link class="<?php echo $index === $page ? 'active' : ''; ?>" href="<?php echo esc_url(self::url($baseUrl, $common + ['page' => $index])); ?>"<?php echo $index === $page ? ' aria-current="page"' : ''; ?>><?php echo $index; ?></a><?php endfor; ?>
       <?php if ($page < $totalPages): ?><a data-commercial-filter-link href="<?php echo esc_url(self::url($baseUrl, $common + ['page' => $page + 1])); ?>" aria-label="Página siguiente">&rsaquo;</a><?php endif; ?>
@@ -335,14 +336,14 @@ final class CommercialDashboardView
     $activeSlaFilter = trim((string) ($filters['sla_filter'] ?? ''));
     ob_start();
 ?>
-    <section class="commercial-sla-summary" aria-label="Control de tickets abiertos atrasados">
+    <section class="commercial-sla-summary" aria-label="Control de tareas abiertas atrasadas">
       <div class="commercial-sla-chart" style="--commercial-sla-ok: <?php echo esc_attr((string) $okPct); ?>%; --commercial-sla-late: <?php echo esc_attr((string) $latePct); ?>%;">
         <span><?php echo esc_html((string) $okPct); ?>%</span>
       </div>
       <div class="commercial-sla-copy">
         <span class="commercial-kicker">Control de atrasados</span>
-        <h3>Tiempo de atención de tickets abiertos</h3>
-        <p><?php echo esc_html((string) $overdue); ?> atrasados de <?php echo esc_html((string) $total); ?> tickets abiertos<?php echo $activeSlaFilter !== '' ? ' · mostrando ' . esc_html((string) $visible) : ''; ?>.</p>
+        <h3>Tiempo de atención de tareas abiertas</h3>
+        <p><?php echo esc_html((string) $overdue); ?> atrasadas de <?php echo esc_html((string) $total); ?> tareas abiertas<?php echo $activeSlaFilter !== '' ? ' · mostrando ' . esc_html((string) $visible) : ''; ?>.</p>
       </div>
       <div class="commercial-sla-kpis">
         <div><span>Al día</span><strong><?php echo esc_html((string) $onTime); ?></strong></div>

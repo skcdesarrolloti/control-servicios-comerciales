@@ -11,20 +11,21 @@ use SCM\Core\Settings;
 final class CommercialAccessPolicy
 {
   public const VIEWS = [
-    'abiertos' => 'Tickets abiertos',
-    'postergados' => 'Tickets postergados',
-    'cerrados' => 'Tickets cerrados',
+    'abiertos' => 'Tareas abiertas',
+    'postergados' => 'Tareas postergadas',
+    'cerrados' => 'Tareas cerradas',
+    'mis_tickets' => 'Mis tareas',
     'calendario' => 'Calendario comercial',
   ];
 
   public const ACTIONS = [
-    'ver_ticket' => 'Ver detalle del ticket',
+    'ver_ticket' => 'Ver detalle de la tarea',
     'responder' => 'Responder al solicitante',
     'agregar_nota' => 'Agregar notas internas',
     'seguimiento' => 'Registrar seguimientos',
-    'postergar' => 'Postergar tickets',
-    'activar' => 'Activar tickets',
-    'cerrar' => 'Cerrar tickets',
+    'postergar' => 'Postergar tareas',
+    'activar' => 'Activar tareas',
+    'cerrar' => 'Cerrar tareas',
     'cambiar_estado' => 'Cambiar estado comercial',
     'reasignar' => 'Reasignar responsable',
   ];
@@ -62,6 +63,9 @@ final class CommercialAccessPolicy
       return false;
     }
     if ($this->canManage()) {
+      return true;
+    }
+    if ($view === 'mis_tickets') {
       return true;
     }
     return in_array($view, $this->allowed('views', array_keys(self::VIEWS)), true);
