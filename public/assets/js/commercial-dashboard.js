@@ -102,7 +102,7 @@
     var suggested = analysis.mensaje_sugerido ? '<div class="commercial-assistant-suggested"><div class="commercial-assistant-suggested-actions"><button type="button" class="commercial-secondary-btn" data-commercial-use-assistant-message><i class="fas fa-reply" aria-hidden="true"></i> Usar en respuesta</button><button type="button" class="commercial-secondary-btn" data-commercial-copy-assistant-message><i class="fas fa-copy" aria-hidden="true"></i> Copiar mensaje</button></div><p>' + escapeHtml(analysis.mensaje_sugerido) + "</p></div>" : '<p class="commercial-assistant-muted">Sin mensaje sugerido.</p>';
     return (
       '<header class="commercial-assistant-result-head">' +
-      '<div><span>Asistente comercial</span><h3>Análisis de la tarea</h3><p>Generado con ' + escapeHtml(analysis.model || "MiniMax") + (analysis.generated_at ? " · " + escapeHtml(analysis.generated_at) : "") + "</p></div>" +
+      '<div><span>Asistente comercial</span><h3 id="commercial-analysis-title">Análisis de la tarea</h3><p>' + escapeHtml(analysis.created_by ? ("Guardado por " + analysis.created_by) : "Generado con " + (analysis.model || "MiniMax")) + (analysis.created_label ? " · " + escapeHtml(analysis.created_label) : (analysis.generated_at ? " · " + escapeHtml(analysis.generated_at) : "")) + "</p></div>" +
       '<button type="button" class="commercial-modal-close commercial-assistant-close" data-commercial-close-assistant aria-label="Cerrar análisis">&times;</button>' +
       "</header>" +
       '<div class="commercial-assistant-summary"><i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i><p>' + summary + "</p></div>" +
@@ -117,6 +117,80 @@
       assistantBlock("Mensaje sugerido para el cliente", suggested, "fa-message") +
       "</div>"
     );
+  }
+
+  function analysisListMarkup(ticketPk, analyses) {
+    analyses = Array.isArray(analyses) ? analyses : [];
+    if (!analyses.length) {
+      return '<div class="commercial-analysis-empty"><i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i><p>Aún no hay análisis guardados.</p></div>';
+    }
+    return "<ol>" + analyses.map(function (analysis) {
+      var json = escapeHtml(JSON.stringify(analysis || {}));
+      var summary = String((analysis && analysis.resumen) || "Análisis guardado");
+      var shortSummary = summary.length > 96 ? summary.slice(0, 95) + "…" : summary;
+      return (
+        "<li>" +
+        '<button type="button" class="commercial-analysis-open" data-commercial-open-analysis data-analysis-json="' + json + '">' +
+        "<span><strong>" + escapeHtml((analysis && (analysis.created_label || analysis.generated_at)) || "Sin fecha") + "</strong>" +
+        "<small>" + escapeHtml(shortSummary) + "</small>" +
+        "<em>" + escapeHtml((analysis && analysis.created_by) || "Sistema") + "</em></span>" +
+        "</button>" +
+        '<button type="button" class="commercial-analysis-delete" data-commercial-delete-analysis data-ticket-pk="' + escapeHtml(ticketPk || currentCasePk || "") + '" data-analysis-id="' + escapeHtml((analysis && analysis.id) || "") + '" aria-label="Eliminar análisis"><i class="fas fa-trash" aria-hidden="true"></i></button>' +
+        "</li>"
+      );
+    }).join("") + "</ol>";
+  }
+
+  function updateAnalysisList(analyses) {
+    if (!caseContent) return;
+    var wrap = caseContent.querySelector("[data-commercial-saved-analyses]");
+    var list = wrap && wrap.querySelector("[data-commercial-analysis-list]");
+    var count = wrap && wrap.querySelector("[data-commercial-analysis-count]");
+    if (!wrap || !list) return;
+    var ticketPk = wrap.getAttribute("data-ticket-pk") || currentCasePk || "";
+    analyses = Array.isArray(analyses) ? analyses : [];
+    list.innerHTML = analysisListMarkup(ticketPk, analyses);
+    if (count) count.textContent = analyses.length + "/3";
+  }
+
+  function analysisModal() {
+    return caseContent ? caseContent.querySelector("[data-commercial-analysis-modal]") : null;
+  }
+
+  function setAnalysisModal(open, html) {
+    var modal = analysisModal();
+    if (!modal) return;
+    var content = modal.querySelector("[data-commercial-analysis-modal-content]");
+    if (typeof html === "string" && content) content.innerHTML = html;
+    modal.hidden = !open;
+    modal.classList.toggle("open", open);
+    if (open) {
+      var close = modal.querySelector("[data-commercial-close-assistant]");
+      if (close) close.focus({ preventScroll: true });
+    }
+  }
+
+  function parseAnalysisButton(button) {
+    try {
+      return JSON.parse(button.getAttribute("data-analysis-json") || "{}");
+    } catch (_error) {
+      return {};
+    }
+  }
+
+  function confirmAnalysisDelete() {
+    if (window.Swal && typeof window.Swal.fire === "function") {
+      return window.Swal.fire({
+        icon: "warning",
+        title: "¿Eliminar análisis?",
+        text: "Se quitará de esta tarea y podrás generar otro si no supera el límite diario.",
+        showCancelButton: true,
+        confirmButtonText: "Eliminar",
+        cancelButtonText: "Cancelar",
+        confirmButtonColor: "#b4232c",
+      }).then(function (result) { return !!result.isConfirmed; });
+    }
+    return Promise.resolve(window.confirm("¿Eliminar este análisis?"));
   }
 
   function documentRowMarkup(accept) {
@@ -457,20 +531,19 @@
   function analyzeCase(button) {
     if (!caseContent) return;
     var ticketPk = button.getAttribute("data-ticket-pk") || currentCasePk || "";
-    var panel = caseContent.querySelector("[data-commercial-assistant-panel]");
-    if (!ticketPk || !panel) return;
+    if (!ticketPk) return;
     var originalText = button.textContent;
     button.disabled = true;
     button.innerHTML = '<i class="fas fa-circle-notch fa-spin" aria-hidden="true"></i><span>Analizando…</span>';
-    panel.hidden = false;
-    panel.innerHTML = assistantLoadingMarkup();
-    panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    setAnalysisModal(true, assistantLoadingMarkup());
     request("commercial_ticket_analyze", { ticket_pk: ticketPk })
       .then(function (response) {
-        panel.innerHTML = assistantAnalysisMarkup(response.analysis || {});
+        updateAnalysisList(response.analyses || []);
+        setAnalysisModal(true, assistantAnalysisMarkup(response.analysis || {}));
+        notify("success", response.message || "Análisis guardado.");
       })
       .catch(function (error) {
-        panel.innerHTML = assistantErrorMarkup(error.message);
+        setAnalysisModal(true, assistantErrorMarkup(error.message));
         notify("error", error.message);
       })
       .finally(function () {
@@ -503,7 +576,30 @@
       textarea.dispatchEvent(new Event("input", { bubbles: true }));
       textarea.focus({ preventScroll: true });
     }
+    setAnalysisModal(false);
     notify("success", "Mensaje sugerido cargado en Responder.");
+  }
+
+  function deleteAnalysis(button) {
+    var ticketPk = button.getAttribute("data-ticket-pk") || currentCasePk || "";
+    var analysisId = button.getAttribute("data-analysis-id") || "";
+    if (!ticketPk || !analysisId) return;
+    confirmAnalysisDelete().then(function (confirmed) {
+      if (!confirmed) return;
+      button.disabled = true;
+      request("commercial_ticket_analysis_delete", { ticket_pk: ticketPk, analysis_id: analysisId })
+        .then(function (response) {
+          updateAnalysisList(response.analyses || []);
+          setAnalysisModal(false);
+          notify("success", response.message || "Análisis eliminado.");
+        })
+        .catch(function (error) {
+          notify("error", error.message);
+        })
+        .finally(function () {
+          if (document.contains(button)) button.disabled = false;
+        });
+    });
   }
 
   root.addEventListener("click", function (event) {
@@ -581,6 +677,10 @@
 
   if (caseModal) {
     caseModal.addEventListener("click", function (event) {
+      if (event.target && event.target.matches && event.target.matches("[data-commercial-analysis-modal]")) {
+        setAnalysisModal(false);
+        return;
+      }
       if (event.target === caseModal || event.target.closest("[data-commercial-close-case]")) {
         showCaseModal(false);
         return;
@@ -596,12 +696,20 @@
         analyzeCase(assistantButton);
         return;
       }
+      var openAnalysis = event.target.closest("[data-commercial-open-analysis]");
+      if (openAnalysis) {
+        event.preventDefault();
+        setAnalysisModal(true, assistantAnalysisMarkup(parseAnalysisButton(openAnalysis)));
+        return;
+      }
+      var deleteAnalysisButton = event.target.closest("[data-commercial-delete-analysis]");
+      if (deleteAnalysisButton) {
+        event.preventDefault();
+        deleteAnalysis(deleteAnalysisButton);
+        return;
+      }
       if (event.target.closest("[data-commercial-close-assistant]")) {
-        var assistantPanel = caseContent && caseContent.querySelector("[data-commercial-assistant-panel]");
-        if (assistantPanel) {
-          assistantPanel.hidden = true;
-          assistantPanel.innerHTML = "";
-        }
+        setAnalysisModal(false);
         return;
       }
       var copyAssistant = event.target.closest("[data-commercial-copy-assistant-message]");
@@ -701,7 +809,9 @@
 
   document.addEventListener("keydown", function (event) {
     if (event.key !== "Escape") return;
-    if (caseModal && caseModal.classList.contains("open")) showCaseModal(false);
+    var modal = analysisModal();
+    if (modal && modal.classList.contains("open")) setAnalysisModal(false);
+    else if (caseModal && caseModal.classList.contains("open")) showCaseModal(false);
     else if (refreshAdvisoryModalRef() && advisoryModal.classList.contains("open")) showAdvisoryModal(false);
     else if (permissionModal && permissionModal.classList.contains("open")) setPermissionModal(false);
   });

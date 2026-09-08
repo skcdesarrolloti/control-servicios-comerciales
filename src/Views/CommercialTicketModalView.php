@@ -10,13 +10,14 @@ use SCM\Commercial\CommercialStatusCatalog;
 final class CommercialTicketModalView
 {
   /**
-   * @param array{ticket:array<string,mixed>,timeline:array<int,array<string,mixed>>} $detail
+   * @param array{ticket:array<string,mixed>,timeline:array<int,array<string,mixed>>,analyses?:array<int,array<string,mixed>>} $detail
    * @param array<int,array<string,string>> $employees
    */
   public static function render(array $detail, CommercialAccessPolicy $policy, array $employees, string $ticketUrl = ''): string
   {
     $ticket = $detail['ticket'];
     $timeline = $detail['timeline'];
+    $analyses = is_array($detail['analyses'] ?? null) ? $detail['analyses'] : [];
     $pk = (int) ($ticket['_ID'] ?? 0);
     $logicalId = trim((string) ($ticket['id_ticket'] ?? '')) ?: (string) $pk;
     $status = trim((string) ($ticket['estado_comercial'] ?? '')) ?: 'Sin estado';
@@ -56,6 +57,8 @@ final class CommercialTicketModalView
         </div>
       </section>
 
+      <?php echo self::renderAnalysesList($pk, $analyses); ?>
+
       <section class="commercial-case-summary">
         <h3>Resumen</h3>
         <dl>
@@ -72,8 +75,6 @@ final class CommercialTicketModalView
     </aside>
 
     <section class="commercial-case-main">
-      <section class="commercial-assistant-panel" data-commercial-assistant-panel aria-live="polite" hidden></section>
-
       <div class="commercial-workflow-stack" data-commercial-workflow-stack hidden>
         <?php if ($policy->canAct('responder')): ?>
           <?php echo self::messageForm($pk, 'reply', 'Responder al solicitante', 'Escribe una respuesta clara para el cliente.', 'respuesta', 'Escribe la respuesta de la tarea…', 'Enviar respuesta', true, false, true); ?>
@@ -140,8 +141,56 @@ final class CommercialTicketModalView
       </section>
     </section>
   </div>
+
+  <div class="commercial-analysis-modal" data-commercial-analysis-modal role="dialog" aria-modal="true" aria-labelledby="commercial-analysis-title" hidden>
+    <div class="commercial-analysis-card" role="document">
+      <div data-commercial-analysis-modal-content></div>
+    </div>
+  </div>
 <?php
     return (string) ob_get_clean();
+  }
+
+  /** @param array<int,array<string,mixed>> $analyses */
+  private static function renderAnalysesList(int $pk, array $analyses): string
+  {
+    ob_start();
+?>
+      <section class="commercial-case-analyses" data-commercial-saved-analyses data-ticket-pk="<?php echo esc_attr((string) $pk); ?>">
+        <div class="commercial-case-section-title">
+          <div><span>Asistente</span><h3>Análisis guardados</h3></div>
+          <strong data-commercial-analysis-count><?php echo esc_html((string) count($analyses)); ?>/3</strong>
+        </div>
+        <div class="commercial-analysis-list" data-commercial-analysis-list>
+          <?php echo self::analysisListItems($pk, $analyses); ?>
+        </div>
+      </section>
+<?php
+    return (string) ob_get_clean();
+  }
+
+  /** @param array<int,array<string,mixed>> $analyses */
+  private static function analysisListItems(int $pk, array $analyses): string
+  {
+    if ($analyses === []) {
+      return '<div class="commercial-analysis-empty"><i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i><p>Aún no hay análisis guardados.</p></div>';
+    }
+
+    $html = '<ol>';
+    foreach ($analyses as $analysis) {
+      $id = (int) ($analysis['id'] ?? 0);
+      $summary = trim((string) ($analysis['resumen'] ?? 'Análisis guardado'));
+      $label = trim((string) ($analysis['created_label'] ?? $analysis['generated_at'] ?? 'Sin fecha'));
+      $author = trim((string) ($analysis['created_by'] ?? 'Sistema'));
+      $json = json_encode($analysis, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE | JSON_PARTIAL_OUTPUT_ON_ERROR);
+      $html .= '<li>'
+        . '<button type="button" class="commercial-analysis-open" data-commercial-open-analysis data-analysis-json="' . esc_attr(is_string($json) ? $json : '{}') . '">'
+        . '<span><strong>' . esc_html($label) . '</strong><small>' . esc_html(mb_substr($summary, 0, 96) . (mb_strlen($summary) > 96 ? '…' : '')) . '</small><em>' . esc_html($author) . '</em></span>'
+        . '</button>'
+        . '<button type="button" class="commercial-analysis-delete" data-commercial-delete-analysis data-ticket-pk="' . esc_attr((string) $pk) . '" data-analysis-id="' . esc_attr((string) $id) . '" aria-label="Eliminar análisis"><i class="fas fa-trash" aria-hidden="true"></i></button>'
+        . '</li>';
+    }
+    return $html . '</ol>';
   }
 
   private static function detailRow(string $label, string $value, string $icon): string

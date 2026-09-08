@@ -6,6 +6,7 @@ namespace SCM\Http\Controller;
 
 use SCM\Commercial\CommercialAccessPolicy;
 use SCM\Commercial\CommercialStatusCatalog;
+use SCM\Commercial\CommercialTaskAnalysisRepository;
 use SCM\Commercial\CommercialTaskAssistant;
 use SCM\Commercial\CommercialTicketsRepository;
 use SCM\Core\Csrf;
@@ -22,6 +23,7 @@ use SCM\Views\CommercialTicketModalView;
 final class CommercialApiController
 {
   private CommercialTicketsRepository $tickets;
+  private CommercialTaskAnalysisRepository $analyses;
   private CommercialAccessPolicy $policy;
   private Csrf $csrf;
   private SeguimientoService $workflow;
@@ -36,6 +38,7 @@ final class CommercialApiController
   public function __construct(Database $db, Settings $settings, Csrf $csrf, array $config)
   {
     $this->tickets = new CommercialTicketsRepository($db);
+    $this->analyses = new CommercialTaskAnalysisRepository($db);
     $this->csrf = $csrf;
     $adminCargos = is_array($config['dashboard_admin_cargos'] ?? null) ? $config['dashboard_admin_cargos'] : ['11', '12', '13', '14'];
     $this->commercialCargos = is_array($config['commercial_employee_cargos'] ?? null) ? array_values(array_map('strval', $config['commercial_employee_cargos'])) : ['1', '6', '9', '10', '11', '12', '13', '14', '17'];
@@ -113,6 +116,12 @@ final class CommercialApiController
     } catch (\InvalidArgumentException | \RuntimeException $exception) {
       JsonResponse::error($exception->getMessage(), 404);
     }
+    try {
+      $detail['analyses'] = $this->analyses->listForTicket($ticketPk);
+    } catch (\Throwable $exception) {
+      error_log('[commercial-analysis:list] ' . $exception->getMessage());
+      $detail['analyses'] = [];
+    }
     JsonResponse::success([
       'html' => CommercialTicketModalView::render(
         $detail,
@@ -132,18 +141,51 @@ final class CommercialApiController
     $this->authorizeTicketScope($ticketPk);
     try {
       $detail = $this->tickets->detail($ticketPk);
+      $todayAnalysis = $this->analyses->todayForTicket($ticketPk);
+      if (is_array($todayAnalysis)) {
+        JsonResponse::success([
+          'analysis' => $todayAnalysis,
+          'analyses' => $this->analyses->listForTicket($ticketPk),
+          'reused' => true,
+          'message' => 'Esta tarea ya tenía un análisis guardado hoy.',
+        ]);
+      }
+      if ($this->analyses->countForTicket($ticketPk) >= 3) {
+        JsonResponse::error('Esta tarea ya tiene 3 análisis guardados. Elimina uno anterior para generar otro.', 422);
+      }
       $assistant = new CommercialTaskAssistant(
         (string) ($this->config['minimax_api_key'] ?? ''),
         (string) ($this->config['minimax_base_url'] ?? 'https://api.minimax.io/v1'),
         (string) ($this->config['minimax_model'] ?? 'MiniMax-M3'),
         (int) ($this->config['minimax_timeout'] ?? 45)
       );
+      $analysis = $this->analyses->save($detail['ticket'], $assistant->analyze($detail));
       JsonResponse::success([
-        'analysis' => $assistant->analyze($detail),
+        'analysis' => $analysis,
+        'analyses' => $this->analyses->listForTicket($ticketPk),
+        'reused' => false,
+        'message' => 'Análisis guardado.',
       ]);
     } catch (\InvalidArgumentException | \RuntimeException $exception) {
       JsonResponse::error($exception->getMessage(), 422);
     }
+  }
+
+  /** @param array<string,mixed> $input */
+  public function deleteAnalysis(array $input): never
+  {
+    $this->verify($input);
+    $this->authorize('ver_ticket', 'No tienes permiso para eliminar análisis de esta tarea.');
+    $ticketPk = (int) ($input['ticket_pk'] ?? 0);
+    $analysisId = (int) ($input['analysis_id'] ?? 0);
+    $this->authorizeTicketScope($ticketPk);
+    if (!$this->analyses->delete($ticketPk, $analysisId)) {
+      JsonResponse::error('No se pudo eliminar el análisis seleccionado.', 404);
+    }
+    JsonResponse::success([
+      'message' => 'Análisis eliminado.',
+      'analyses' => $this->analyses->listForTicket($ticketPk),
+    ]);
   }
 
   /** @param array<string,mixed> $input */

@@ -8,7 +8,7 @@ Panel PHP para consultar y gestionar tickets por `estado_comercial`, administrar
 - Las 23 categorías comerciales definidas en `CommercialStatusCatalog`.
 - Búsqueda por ticket, asunto, solicitante, responsable e inmueble.
 - Cambio de estado y reasignación con registro en el historial del ticket.
-- Análisis con asistente MiniMax desde el popup de cada tarea, usando tarea, inmueble, historial, respuestas, seguimientos y notas.
+- Análisis con asistente MiniMax desde el popup de cada tarea, usando tarea, inmueble, historial, respuestas, seguimientos y notas. Los análisis se guardan de forma compacta, con máximo 3 por tarea y máximo 1 nuevo por día.
 - Permisos de vistas y acciones por cargo, persistidos en `wp_jet_cct_confi_sistema` bajo `control_servicios_comerciales_config`.
 - Guía de estados comerciales.
 - Calendario limitado por defecto a:
@@ -69,6 +69,8 @@ MINIMAX_TIMEOUT=45
 ```
 
 La API key se usa únicamente desde PHP; nunca se expone al navegador.
+
+Los análisis quedan almacenados en `wp_scm_commercial_task_analyses` (respetando el prefijo configurado en `DB_PREFIX`). La tabla se crea automáticamente cuando se usa el asistente por primera vez.
 
 ## Seguridad
 
