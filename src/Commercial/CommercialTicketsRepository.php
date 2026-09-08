@@ -322,18 +322,17 @@ final class CommercialTicketsRepository
   public function currentEmployeeTicketFilter(array $cargoIds = []): string
   {
     $employeeId = trim(Auth::employeeId());
+    if ($employeeId !== '') {
+      return $employeeId;
+    }
+
     $userName = $this->normalizeEmployeeLabel(Auth::user());
     foreach ($this->ticketEmployees($cargoIds) as $employee) {
       $value = trim((string) ($employee['id'] ?? ''));
-      $ids = array_values(array_filter(array_map('trim', explode(',', $value)), static fn(string $id): bool => $id !== ''));
       $name = $this->normalizeEmployeeLabel((string) ($employee['name'] ?? ''));
-      if (($employeeId !== '' && in_array($employeeId, $ids, true)) || ($userName !== '' && $name === $userName)) {
+      if ($userName !== '' && $name === $userName) {
         return $value;
       }
-    }
-
-    if ($employeeId !== '') {
-      return $employeeId;
     }
 
     $userId = Auth::userId();
@@ -396,25 +395,6 @@ final class CommercialTicketsRepository
         $grouped[$key] = ['name' => $name, 'ids' => []];
       }
       $grouped[$key]['ids'][$id] = true;
-    }
-
-    if ($grouped !== []) {
-      $ticketsTable = $this->db->table('jet_cct_tickets');
-      $ticketRows = $this->db->getResults(
-        "SELECT TRIM(COALESCE(t.`id_empleado`, '')) AS id,
-                TRIM(COALESCE(t.`nombre_empleado`, '')) AS name
-           FROM `{$ticketsTable}` t
-          WHERE TRIM(COALESCE(t.`estado_comercial`, '')) <> ''
-            AND TRIM(COALESCE(t.`id_empleado`, '')) <> ''
-            AND TRIM(COALESCE(t.`nombre_empleado`, '')) <> ''"
-      );
-      foreach ($ticketRows as $row) {
-        $id = trim((string) ($row['id'] ?? ''));
-        $key = $this->normalizeEmployeeLabel((string) ($row['name'] ?? ''));
-        if ($id !== '' && isset($grouped[$key])) {
-          $grouped[$key]['ids'][$id] = true;
-        }
-      }
     }
 
     $employees = [];
