@@ -35,4 +35,12 @@ final class CommercialStatusCatalogTest extends TestCase
     self::assertFalse(CommercialStatusCatalog::isValid('Estado inventado'));
     self::assertTrue(CommercialStatusCatalog::isValid('Contactado'));
   }
+
+  public function testCapturedStatusesAreClosedTasks(): void
+  {
+    self::assertSame('cerrados', CommercialStatusCatalog::bucketForStatus('Captado'));
+    self::assertSame('cerrados', CommercialStatusCatalog::bucketForStatus('Recaptado'));
+    self::assertNotContains('Captado', CommercialStatusCatalog::OPEN);
+    self::assertContains('Captado', CommercialStatusCatalog::CLOSED);
+  }
 }

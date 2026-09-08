@@ -233,6 +233,7 @@
     [
       "tab",
       "estado",
+      "mis_bucket",
       "busqueda",
       "id_empleado",
       "ticket_id",

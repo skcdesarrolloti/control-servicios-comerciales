@@ -104,6 +104,7 @@ final class CommercialDashboardController
     $clean = static fn(string $key): string => trim((string) ($input[$key] ?? ''));
     return [
       'estado' => $clean('estado'),
+      'mis_bucket' => $clean('mis_bucket'),
       'busqueda' => $clean('busqueda'),
       'id_empleado' => $clean('id_empleado'),
       'ticket_id' => $clean('ticket_id'),

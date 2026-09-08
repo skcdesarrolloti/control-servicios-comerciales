@@ -18,8 +18,6 @@ final class CommercialStatusCatalog
     'Por publicar',
     'Pendiente colocar aviso',
     'En actividad comercial',
-    'Captado',
-    'Recaptado',
     'En ruta',
     'Retocando',
   ];
@@ -36,6 +34,8 @@ final class CommercialStatusCatalog
     'Finalizado',
     'Duplicado',
     'Entregado',
+    'Captado',
+    'Recaptado',
   ];
 
   /** @return array<string,array{label:string,description:string,statuses:array<int,string>}> */

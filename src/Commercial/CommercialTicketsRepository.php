@@ -31,11 +31,16 @@ final class CommercialTicketsRepository
   public function search(string $bucket, array $filters = []): array
   {
     $table = $this->db->table('jet_cct_tickets');
-    $statuses = CommercialStatusCatalog::statusesForBucket($bucket);
+    $effectiveBucket = $this->effectiveTicketBucket($bucket, $filters);
+    $statuses = CommercialStatusCatalog::statusesForBucket($effectiveBucket);
     $status = trim((string) ($filters['estado'] ?? ''));
-    if ($status !== '' && in_array($status, $statuses, true)) {
+    if ($bucket !== 'mis_tickets' && $status !== '' && in_array($status, $statuses, true)) {
       $statuses = [$status];
     }
+    $navigationFilters = $this->navigationCountFilters($filters);
+    $topicCounts = $this->topicCounts($bucket, $filters);
+    $bucketCounts = $this->bucketCounts($navigationFilters);
+    $bucketTotal = $this->countByStatuses(CommercialStatusCatalog::statusesForBucket($effectiveBucket), $navigationFilters);
 
     $where = ['TRIM(COALESCE(t.`estado_comercial`, \'\')) IN (' . implode(',', array_fill(0, count($statuses), '?')) . ')'];
     $args = $statuses;
@@ -58,7 +63,7 @@ final class CommercialTicketsRepository
         ORDER BY COALESCE(NULLIF(t.`fecha_actualizacion`, 0), NULLIF(t.`fecha`, 0), UNIX_TIMESTAMP(t.`cct_created`)) DESC, t.`_ID` DESC";
     $summary = null;
 
-    if ($bucket === 'abiertos') {
+    if ($effectiveBucket === 'abiertos') {
       $allRows = $this->decorateCommercialSla($this->enrichPropertyData($this->db->getResults($selectSql, $args)));
       $summary = $this->sla->summary($allRows);
       $slaFilter = trim((string) ($filters['sla_filter'] ?? ''));
@@ -101,6 +106,10 @@ final class CommercialTicketsRepository
         'total_pages' => $totalPages,
       ],
       'counts' => $this->statusCounts($filters),
+      'bucket_counts' => $bucketCounts,
+      'bucket_total' => $bucketTotal,
+      'effective_bucket' => $effectiveBucket,
+      'topic_counts' => $topicCounts,
     ];
     if (is_array($summary)) {
       $payload['sla_summary'] = $summary;
@@ -219,6 +228,49 @@ final class CommercialTicketsRepository
       $bucketCounts[$bucket] = array_sum(array_intersect_key($statusCounts, array_flip($definition['statuses'])));
     }
     return $bucketCounts;
+  }
+
+  /** @param array<string,mixed> $filters @return array<string,int> */
+  public function topicCounts(string $bucket, array $filters = []): array
+  {
+    $table = $this->db->table('jet_cct_tickets');
+    $effectiveBucket = $this->effectiveTicketBucket($bucket, $filters);
+    $statuses = CommercialStatusCatalog::statusesForBucket($effectiveBucket);
+    $countFilters = $this->navigationCountFilters($filters);
+    if ($bucket !== 'mis_tickets') {
+      $status = trim((string) ($filters['estado'] ?? ''));
+      if ($status !== '' && in_array($status, $statuses, true)) {
+        $statuses = [$status];
+      }
+    }
+
+    $where = [
+      'TRIM(COALESCE(t.`estado_comercial`, \'\')) IN (' . implode(',', array_fill(0, count($statuses), '?')) . ')',
+      'TRIM(COALESCE(t.`tema_ayuda`, \'\')) <> \'\'',
+    ];
+    $args = $statuses;
+    [$filterWhere, $filterArgs] = $this->ticketFilterClauses($countFilters);
+    $where = array_merge($where, $filterWhere);
+    $args = array_merge($args, $filterArgs);
+
+    $rows = $this->db->getResults(
+      'SELECT TRIM(COALESCE(t.`tema_ayuda`, \'\')) AS tema, COUNT(*) AS total'
+      . " FROM `{$table}` t WHERE " . implode(' AND ', $where)
+      . ' GROUP BY TRIM(COALESCE(t.`tema_ayuda`, \'\'))'
+      . ' HAVING COUNT(*) > 0'
+      . ' ORDER BY total DESC, tema ASC',
+      $args
+    );
+
+    $counts = [];
+    foreach ($rows as $row) {
+      $topic = trim((string) ($row['tema'] ?? ''));
+      $total = (int) ($row['total'] ?? 0);
+      if ($topic !== '' && $total > 0) {
+        $counts[$topic] = $total;
+      }
+    }
+    return $counts;
   }
 
   /**
@@ -926,6 +978,39 @@ final class CommercialTicketsRepository
         ORDER BY value ASC"
     );
     return array_values(array_filter(array_map('strval', $rows), static fn(string $value): bool => trim($value) !== ''));
+  }
+
+  /** @param array<string,mixed> $filters */
+  private function effectiveTicketBucket(string $bucket, array $filters): string
+  {
+    if ($bucket !== 'mis_tickets') {
+      return array_key_exists($bucket, CommercialStatusCatalog::buckets()) ? $bucket : 'abiertos';
+    }
+
+    $myBucket = trim((string) ($filters['mis_bucket'] ?? 'abiertos'));
+    return in_array($myBucket, ['abiertos', 'postergados', 'cerrados'], true) ? $myBucket : 'abiertos';
+  }
+
+  /** @param array<string,mixed> $filters @return array<string,mixed> */
+  private function navigationCountFilters(array $filters): array
+  {
+    unset($filters['estado'], $filters['tema'], $filters['page']);
+    return $filters;
+  }
+
+  /** @param array<int,string> $statuses @param array<string,mixed> $filters */
+  private function countByStatuses(array $statuses, array $filters = []): int
+  {
+    if ($statuses === []) {
+      return 0;
+    }
+    $table = $this->db->table('jet_cct_tickets');
+    $where = ['TRIM(COALESCE(t.`estado_comercial`, \'\')) IN (' . implode(',', array_fill(0, count($statuses), '?')) . ')'];
+    $args = $statuses;
+    [$filterWhere, $filterArgs] = $this->ticketFilterClauses($filters);
+    $where = array_merge($where, $filterWhere);
+    $args = array_merge($args, $filterArgs);
+    return (int) $this->db->getVar("SELECT COUNT(*) FROM `{$table}` t WHERE " . implode(' AND ', $where), $args);
   }
 
   /**

@@ -456,51 +456,71 @@ final class CommercialDashboardView
   /** @param array<string,mixed> $result @param array<string,mixed> $filters @param array<int,array<string,string>> $ticketEmployees @param array<string,mixed> $filterOptions */
   public static function renderTickets(string $bucket, array $result, array $filters, array $ticketEmployees, array $filterOptions, $policy, string $baseUrl): string
   {
-    $bucketDef = CommercialStatusCatalog::buckets()[$bucket] ?? CommercialStatusCatalog::buckets()['abiertos'];
+    $isMyTasks = $bucket === 'mis_tickets';
+    $effectiveBucket = $isMyTasks ? self::myTasksBucket($filters, (string) ($result['effective_bucket'] ?? '')) : $bucket;
+    $bucketDef = CommercialStatusCatalog::buckets()[$effectiveBucket] ?? CommercialStatusCatalog::buckets()['abiertos'];
     $rows = is_array($result['rows'] ?? null) ? $result['rows'] : [];
     $counts = is_array($result['counts'] ?? null) ? $result['counts'] : [];
+    $bucketCounts = is_array($result['bucket_counts'] ?? null) ? $result['bucket_counts'] : [];
+    $topicCounts = is_array($result['topic_counts'] ?? null) ? $result['topic_counts'] : [];
     $pagination = is_array($result['pagination'] ?? null) ? $result['pagination'] : [];
     $slaSummary = is_array($result['sla_summary'] ?? null) ? $result['sla_summary'] : [];
-    $bucketTotal = array_sum(array_intersect_key($counts, array_flip($bucketDef['statuses'])));
+    $bucketTotal = (int) ($result['bucket_total'] ?? array_sum(array_intersect_key($counts, array_flip($bucketDef['statuses']))));
+    $visibleTotal = isset($pagination['total']) ? (int) $pagination['total'] : $bucketTotal;
     $baseFilterParams = self::filterParams($filters);
+    $topicOptions = array_keys($topicCounts);
+    $sectionLabel = $isMyTasks ? 'Mis tareas ' . self::myTaskStageLabel($effectiveBucket) : (string) $bucketDef['label'];
+    $sectionDescription = $isMyTasks
+      ? 'Tus tareas asignadas, separadas por etapa y tema de ayuda.'
+      : (string) $bucketDef['description'];
     ob_start();
 ?>
     <div class="commercial-section-head">
-      <div><span class="commercial-kicker">Estado del embudo</span><h2><?php echo esc_html($bucketDef['label']); ?></h2><p><?php echo esc_html($bucketDef['description']); ?></p></div>
-      <span class="commercial-total"><strong><?php echo esc_html((string) $bucketTotal); ?></strong> tareas</span>
+      <div><span class="commercial-kicker"><?php echo $isMyTasks ? 'Mis tareas por etapa' : 'Estado del embudo'; ?></span><h2><?php echo esc_html($sectionLabel); ?></h2><p><?php echo esc_html($sectionDescription); ?></p></div>
+      <span class="commercial-total"><strong><?php echo esc_html((string) $visibleTotal); ?></strong> tareas</span>
     </div>
 
-    <div class="commercial-status-strip" aria-label="Estados de <?php echo esc_attr(mb_strtolower($bucketDef['label'])); ?>">
-      <a class="commercial-status-chip<?php echo empty($filters['estado']) ? ' active' : ''; ?>" data-commercial-filter-link href="<?php echo esc_url(self::url($baseUrl, ['tab' => $bucket] + array_diff_key($baseFilterParams, ['estado' => true, 'page' => true]))); ?>"><span>Todos</span><strong><?php echo esc_html((string) $bucketTotal); ?></strong></a>
-      <?php foreach ($bucketDef['statuses'] as $status): ?>
-        <a class="commercial-status-chip<?php echo (($filters['estado'] ?? '') === $status) ? ' active' : ''; ?>" data-commercial-filter-link href="<?php echo esc_url(self::url($baseUrl, ['tab' => $bucket, 'estado' => $status] + array_diff_key($baseFilterParams, ['estado' => true, 'page' => true]))); ?>"><span><?php echo esc_html($status); ?></span><strong><?php echo esc_html((string) ($counts[$status] ?? 0)); ?></strong></a>
-      <?php endforeach; ?>
-    </div>
+    <?php if ($isMyTasks): ?>
+      <?php echo self::renderMyTaskSubtabs($effectiveBucket, $bucketCounts, $filters, $baseUrl); ?>
+      <?php echo self::renderTopicStrip($bucket, $effectiveBucket, $filters, $topicCounts, $bucketTotal, $baseUrl); ?>
+    <?php else: ?>
+      <div class="commercial-status-strip" aria-label="Estados de <?php echo esc_attr(mb_strtolower($bucketDef['label'], 'UTF-8')); ?>">
+        <a class="commercial-status-chip<?php echo empty($filters['estado']) ? ' active' : ''; ?>" data-commercial-filter-link href="<?php echo esc_url(self::url($baseUrl, ['tab' => $bucket] + array_diff_key($baseFilterParams, ['estado' => true, 'page' => true]))); ?>"><span>Todos</span><strong><?php echo esc_html((string) $bucketTotal); ?></strong></a>
+        <?php foreach ($bucketDef['statuses'] as $status): ?>
+          <?php $statusCount = (int) ($counts[$status] ?? 0); $statusActive = (($filters['estado'] ?? '') === $status); if ($statusCount <= 0 && !$statusActive) continue; ?>
+          <a class="commercial-status-chip<?php echo $statusActive ? ' active' : ''; ?>" data-commercial-filter-link href="<?php echo esc_url(self::url($baseUrl, ['tab' => $bucket, 'estado' => $status] + array_diff_key($baseFilterParams, ['estado' => true, 'page' => true]))); ?>"><span><?php echo esc_html($status); ?></span><strong><?php echo esc_html((string) $statusCount); ?></strong></a>
+        <?php endforeach; ?>
+      </div>
+    <?php endif; ?>
 
-    <?php if ($bucket === 'abiertos'): ?>
+    <?php if ($effectiveBucket === 'abiertos'): ?>
       <?php echo self::renderSlaSummary($slaSummary, $filters); ?>
     <?php endif; ?>
 
     <form class="commercial-filter-card" data-commercial-filter-form method="get" action="<?php echo esc_url($baseUrl . '/index.php'); ?>">
       <input type="hidden" name="tab" value="<?php echo esc_attr($bucket); ?>">
+      <?php if ($isMyTasks): ?><input type="hidden" name="mis_bucket" value="<?php echo esc_attr($effectiveBucket); ?>"><?php endif; ?>
       <?php if (!empty($filters['id_empleado'])): ?><input type="hidden" name="id_empleado" value="<?php echo esc_attr((string) $filters['id_empleado']); ?>"><?php endif; ?>
-      <?php if (!empty($filters['estado'])): ?><input type="hidden" name="estado" value="<?php echo esc_attr((string) $filters['estado']); ?>"><?php endif; ?>
+      <?php if (!$isMyTasks && !empty($filters['estado'])): ?><input type="hidden" name="estado" value="<?php echo esc_attr((string) $filters['estado']); ?>"><?php endif; ?>
+      <?php if ($isMyTasks && !empty($filters['tema'])): ?><input type="hidden" name="tema" value="<?php echo esc_attr((string) $filters['tema']); ?>"><?php endif; ?>
       <div class="commercial-field commercial-field--wide"><label for="commercial-search">Buscar</label><input id="commercial-search" type="search" name="busqueda" value="<?php echo esc_attr((string) ($filters['busqueda'] ?? '')); ?>" placeholder="Tarea, asunto, solicitante, inmueble…"></div>
       <div class="commercial-field"><label for="commercial-ticket-id">ID tarea</label><input id="commercial-ticket-id" type="text" name="ticket_id" value="<?php echo esc_attr((string) ($filters['ticket_id'] ?? '')); ?>" placeholder="Ej: 8604"></div>
-      <?php if ($bucket === 'abiertos'): ?><div class="commercial-field"><label for="commercial-sla-filter">Tiempo de atención</label><select id="commercial-sla-filter" name="sla_filter"><option value="">Todos</option><option value="atrasado"<?php selected((string) ($filters['sla_filter'] ?? ''), 'atrasado'); ?>>Atrasados</option><option value="al_dia"<?php selected((string) ($filters['sla_filter'] ?? ''), 'al_dia'); ?>>Al día</option></select></div><?php endif; ?>
-      <?php if (!empty($filters['estado'])): ?><div class="commercial-locked-filter"><span>Estado comercial</span><strong><?php echo esc_html((string) $filters['estado']); ?></strong><a data-commercial-filter-link href="<?php echo esc_url(self::url($baseUrl, ['tab' => $bucket] + array_diff_key($baseFilterParams, ['estado' => true, 'page' => true]))); ?>">Ver todos</a></div><?php endif; ?>
+      <?php if ($effectiveBucket === 'abiertos'): ?><div class="commercial-field"><label for="commercial-sla-filter">Tiempo de atención</label><select id="commercial-sla-filter" name="sla_filter"><option value="">Todos</option><option value="atrasado"<?php selected((string) ($filters['sla_filter'] ?? ''), 'atrasado'); ?>>Atrasados</option><option value="al_dia"<?php selected((string) ($filters['sla_filter'] ?? ''), 'al_dia'); ?>>Al día</option></select></div><?php endif; ?>
+      <?php if (!$isMyTasks && !empty($filters['estado'])): ?><div class="commercial-locked-filter"><span>Estado comercial</span><strong><?php echo esc_html((string) $filters['estado']); ?></strong><a data-commercial-filter-link href="<?php echo esc_url(self::url($baseUrl, ['tab' => $bucket] + array_diff_key($baseFilterParams, ['estado' => true, 'page' => true]))); ?>">Ver todos</a></div><?php endif; ?>
+      <?php if ($isMyTasks && !empty($filters['tema'])): ?><div class="commercial-locked-filter"><span>Tema de ayuda</span><strong><?php echo esc_html((string) $filters['tema']); ?></strong><a data-commercial-filter-link href="<?php echo esc_url(self::url($baseUrl, ['tab' => $bucket, 'mis_bucket' => $effectiveBucket] + array_diff_key($baseFilterParams, ['tema' => true, 'estado' => true, 'page' => true]))); ?>">Ver todos</a></div><?php endif; ?>
       <div class="commercial-field"><label for="commercial-requester">Solicitante</label><input id="commercial-requester" type="text" name="solicitante" value="<?php echo esc_attr((string) ($filters['solicitante'] ?? '')); ?>" placeholder="Nombre"></div>
       <div class="commercial-field"><label for="commercial-phone">Celular</label><input id="commercial-phone" type="text" name="celular" value="<?php echo esc_attr((string) ($filters['celular'] ?? '')); ?>" placeholder="Número"></div>
       <div class="commercial-field"><label for="commercial-email">Correo</label><input id="commercial-email" type="text" name="correo" value="<?php echo esc_attr((string) ($filters['correo'] ?? '')); ?>" placeholder="correo@dominio.com"></div>
       <div class="commercial-field"><label for="commercial-property">Inmueble</label><input id="commercial-property" type="text" name="inmueble" value="<?php echo esc_attr((string) ($filters['inmueble'] ?? '')); ?>" placeholder="Código o dirección"></div>
       <div class="commercial-field"><label for="commercial-neighborhood">Barrio</label><?php echo self::selectFromOptions('commercial-neighborhood', 'barrio', $filterOptions['barrios'] ?? [], (string) ($filters['barrio'] ?? '')); ?></div>
-      <div class="commercial-field"><label for="commercial-topic">Tema</label><?php echo self::selectFromOptions('commercial-topic', 'tema', $filterOptions['temas'] ?? [], (string) ($filters['tema'] ?? '')); ?></div>
+      <?php if (!$isMyTasks): ?><div class="commercial-field"><label for="commercial-topic">Tema</label><?php echo self::selectFromOptions('commercial-topic', 'tema', $topicOptions, (string) ($filters['tema'] ?? '')); ?></div><?php endif; ?>
       <div class="commercial-field"><label for="commercial-medium">Medio</label><?php echo self::selectFromOptions('commercial-medium', 'medio', $filterOptions['medios'] ?? [], (string) ($filters['medio'] ?? '')); ?></div>
       <div class="commercial-field"><label for="commercial-priority">Prioridad</label><?php echo self::selectFromOptions('commercial-priority', 'prioridad', $filterOptions['prioridades'] ?? [], (string) ($filters['prioridad'] ?? '')); ?></div>
       <div class="commercial-field"><label for="commercial-follow-up">Seguimiento</label><select id="commercial-follow-up" name="seguimiento"><option value="">Todos</option><option value="Si"<?php selected((string) ($filters['seguimiento'] ?? ''), 'Si'); ?>>Con seguimiento</option><option value="No"<?php selected((string) ($filters['seguimiento'] ?? ''), 'No'); ?>>Sin seguimiento</option></select></div>
       <div class="commercial-field"><label for="commercial-date-from">Fecha desde</label><input id="commercial-date-from" type="date" name="fecha_desde" value="<?php echo esc_attr((string) ($filters['fecha_desde'] ?? '')); ?>"></div>
       <div class="commercial-field"><label for="commercial-date-to">Fecha hasta</label><input id="commercial-date-to" type="date" name="fecha_hasta" value="<?php echo esc_attr((string) ($filters['fecha_hasta'] ?? '')); ?>"></div>
-      <div class="commercial-filter-actions"><button class="commercial-primary-btn" type="submit"><i class="fas fa-filter" aria-hidden="true"></i> Filtrar</button><a class="commercial-secondary-btn" data-commercial-filter-link href="<?php echo esc_url(self::url($baseUrl, ['tab' => $bucket] + self::globalFilterParams($filters))); ?>">Limpiar</a></div>
+      <?php $clearParams = ['tab' => $bucket] + self::globalFilterParams($filters); if ($isMyTasks) { $clearParams['mis_bucket'] = $effectiveBucket; } ?>
+      <div class="commercial-filter-actions"><button class="commercial-primary-btn" type="submit"><i class="fas fa-filter" aria-hidden="true"></i> Filtrar</button><a class="commercial-secondary-btn" data-commercial-filter-link href="<?php echo esc_url(self::url($baseUrl, $clearParams)); ?>">Limpiar</a></div>
     </form>
 
     <?php if ($rows === []): ?>
@@ -511,6 +531,62 @@ final class CommercialDashboardView
       </div>
       <?php echo self::renderPagination($bucket, $filters, $pagination, $baseUrl); ?>
     <?php endif; ?>
+<?php
+    return (string) ob_get_clean();
+  }
+
+  /** @param array<string,int> $bucketCounts @param array<string,mixed> $filters */
+  private static function renderMyTaskSubtabs(string $activeBucket, array $bucketCounts, array $filters, string $baseUrl): string
+  {
+    $baseParams = array_diff_key(self::filterParams($filters), [
+      'estado' => true,
+      'mis_bucket' => true,
+      'page' => true,
+      'tema' => true,
+      'sla_filter' => true,
+    ]);
+    $labels = [
+      'abiertos' => 'Abiertas',
+      'postergados' => 'Postergadas',
+      'cerrados' => 'Cerradas',
+    ];
+    ob_start();
+?>
+    <nav class="commercial-my-subtabs" aria-label="Etapas de mis tareas">
+      <?php foreach ($labels as $subBucket => $label): ?>
+        <?php $count = (int) ($bucketCounts[$subBucket] ?? 0); ?>
+        <a class="commercial-my-subtab<?php echo $activeBucket === $subBucket ? ' active' : ''; ?>" data-commercial-filter-link href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'mis_tickets', 'mis_bucket' => $subBucket] + $baseParams)); ?>"<?php echo $activeBucket === $subBucket ? ' aria-current="page"' : ''; ?>>
+          <span><?php echo esc_html($label); ?></span>
+          <strong><?php echo esc_html((string) $count); ?></strong>
+        </a>
+      <?php endforeach; ?>
+    </nav>
+<?php
+    return (string) ob_get_clean();
+  }
+
+  /** @param array<string,mixed> $filters @param array<string,int> $topicCounts */
+  private static function renderTopicStrip(string $bucket, string $effectiveBucket, array $filters, array $topicCounts, int $total, string $baseUrl): string
+  {
+    $activeTopic = trim((string) ($filters['tema'] ?? ''));
+    if ($topicCounts === [] && $activeTopic === '') {
+      return '';
+    }
+    $baseParams = array_diff_key(self::filterParams($filters), [
+      'estado' => true,
+      'mis_bucket' => true,
+      'page' => true,
+      'tema' => true,
+    ]);
+    ob_start();
+?>
+    <div class="commercial-status-strip commercial-topic-strip" aria-label="Temas de ayuda de mis tareas">
+      <a class="commercial-status-chip commercial-topic-chip<?php echo $activeTopic === '' ? ' active' : ''; ?>" data-commercial-filter-link href="<?php echo esc_url(self::url($baseUrl, ['tab' => $bucket, 'mis_bucket' => $effectiveBucket] + $baseParams)); ?>"><span>Todos los temas</span><strong><?php echo esc_html((string) $total); ?></strong></a>
+      <?php foreach ($topicCounts as $topic => $count): ?>
+        <?php $topic = trim((string) $topic); $count = (int) $count; if ($topic === '' || $count <= 0) continue; ?>
+        <a class="commercial-status-chip commercial-topic-chip<?php echo $activeTopic === $topic ? ' active' : ''; ?>" data-commercial-filter-link href="<?php echo esc_url(self::url($baseUrl, ['tab' => $bucket, 'mis_bucket' => $effectiveBucket, 'tema' => $topic] + $baseParams)); ?>"><span><?php echo esc_html($topic); ?></span><strong><?php echo esc_html((string) $count); ?></strong></a>
+      <?php endforeach; ?>
+    </div>
 <?php
     return (string) ob_get_clean();
   }
@@ -629,7 +705,7 @@ final class CommercialDashboardView
   private static function filterParams(array $filters): array
   {
     $keys = [
-      'estado', 'busqueda', 'id_empleado', 'ticket_id', 'solicitante', 'celular', 'correo',
+      'estado', 'mis_bucket', 'busqueda', 'id_empleado', 'ticket_id', 'solicitante', 'celular', 'correo',
       'inmueble', 'barrio', 'medio', 'prioridad', 'tema', 'seguimiento', 'fecha_desde', 'fecha_hasta',
       'sla_filter', 'page',
     ];
@@ -641,6 +717,22 @@ final class CommercialDashboardView
       }
     }
     return $params;
+  }
+
+  /** @param array<string,mixed> $filters */
+  private static function myTasksBucket(array $filters, string $fallback = ''): string
+  {
+    $bucket = trim($fallback) !== '' ? trim($fallback) : trim((string) ($filters['mis_bucket'] ?? 'abiertos'));
+    return in_array($bucket, ['abiertos', 'postergados', 'cerrados'], true) ? $bucket : 'abiertos';
+  }
+
+  private static function myTaskStageLabel(string $bucket): string
+  {
+    return [
+      'abiertos' => 'abiertas',
+      'postergados' => 'postergadas',
+      'cerrados' => 'cerradas',
+    ][$bucket] ?? 'abiertas';
   }
 
   /** @param array<string,mixed> $filters @return array<string,string> */
