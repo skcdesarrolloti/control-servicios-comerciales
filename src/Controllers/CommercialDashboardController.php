@@ -54,6 +54,9 @@ final class CommercialDashboardController
     $globalCountFilters = $personalTaskScope && $policy->canSeeAllCommercialTickets()
       ? []
       : $this->globalTicketFilters($filters);
+    if ($bucket === 'inicio' && $policy->canSeeAllCommercialTickets()) {
+      $globalCountFilters = [];
+    }
     $tabCounts = $repository->bucketCounts($globalCountFilters);
     $myTabCounts = $repository->bucketCounts(['id_empleado' => $currentEmployeeFilter]);
     $tabCounts['mis_tickets'] = (int) ($myTabCounts['mis_tickets'] ?? 0);

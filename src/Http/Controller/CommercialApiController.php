@@ -61,6 +61,9 @@ final class CommercialApiController
     $globalCountFilters = $personalTaskScope && $this->policy->canSeeAllCommercialTickets()
       ? []
       : $this->globalTicketFilters($filters);
+    if ($bucket === 'inicio' && $this->policy->canSeeAllCommercialTickets()) {
+      $globalCountFilters = [];
+    }
     $tabCounts = $this->tickets->bucketCounts($globalCountFilters);
     $myTabCounts = $this->tickets->bucketCounts(['id_empleado' => $currentEmployeeFilter]);
     $tabCounts['mis_tickets'] = (int) ($myTabCounts['mis_tickets'] ?? 0);
@@ -82,6 +85,7 @@ final class CommercialApiController
         $filters,
         $ticketEmployees,
         $this->tickets->filterOptions(),
+        $tabCounts,
         $this->policy,
         $this->baseUrl
       );
@@ -89,7 +93,6 @@ final class CommercialApiController
     JsonResponse::success([
       'html' => $html,
       'tabs_html' => CommercialDashboardView::renderTabs($visibleViews, $bucket, $filters, $tabCounts, $this->baseUrl),
-      'global_filters_html' => CommercialDashboardView::renderGlobalFilters($filters, $ticketEmployees, $this->baseUrl, !$this->policy->canSeeAllCommercialTickets(), $personalTaskScope),
       'tab' => $bucket,
     ]);
   }

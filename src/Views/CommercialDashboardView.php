@@ -25,8 +25,6 @@ final class CommercialDashboardView
     $ticketEmployees = is_array($data['ticket_employees'] ?? null) ? $data['ticket_employees'] : [];
     $filterOptions = is_array($data['filter_options'] ?? null) ? $data['filter_options'] : [];
     $tabCounts = is_array($data['tab_counts'] ?? null) ? $data['tab_counts'] : [];
-    $employeeFilterLocked = !empty($data['employee_filter_locked']);
-    $personalTaskScope = !empty($data['personal_task_scope']);
     $baseUrl = rtrim((string) ($data['base_url'] ?? ''), '/');
 
     ob_start();
@@ -82,7 +80,6 @@ final class CommercialDashboardView
       </div>
     </section>
 
-    <?php echo self::renderGlobalFilters($filters, $ticketEmployees, $baseUrl, $employeeFilterLocked, $personalTaskScope); ?>
     <?php echo self::renderTabs($views, $bucket, $filters, $tabCounts, $baseUrl); ?>
 
     <?php if ($bucket === 'sin_acceso'): ?>
@@ -94,7 +91,7 @@ final class CommercialDashboardView
         <?php if ($bucket !== 'calendario'): ?>
           <?php echo $bucket === 'inicio'
             ? self::renderHome($homeDashboard, $filters, $policy, $baseUrl)
-            : self::renderTickets($bucket, $result, $filters, $ticketEmployees, $filterOptions, $policy, $baseUrl); ?>
+            : self::renderTickets($bucket, $result, $filters, $ticketEmployees, $filterOptions, $tabCounts, $policy, $baseUrl); ?>
         <?php endif; ?>
       </section>
       <section class="scm-tab-panel commercial-panel<?php echo $bucket === 'calendario' ? ' active' : ''; ?>" id="scm-panel-actividades-administrativas" data-commercial-calendar-panel>
@@ -131,19 +128,27 @@ final class CommercialDashboardView
   /** @param array<int,string> $views @param array<string,mixed> $filters @param array<string,int> $tabCounts */
   public static function renderTabs(array $views, string $bucket, array $filters, array $tabCounts, string $baseUrl): string
   {
-    $icons = ['inicio' => 'fa-chart-pie', 'abiertos' => 'fa-inbox', 'postergados' => 'fa-clock-rotate-left', 'cerrados' => 'fa-circle-check', 'mis_tickets' => 'fa-user-check', 'calendario' => 'fa-calendar-days'];
-    $globalParams = $bucket === 'mis_tickets' ? [] : self::globalFilterParams($filters);
+    $taskViews = ['abiertos', 'postergados', 'cerrados', 'mis_tickets'];
+    $visibleTaskViews = array_values(array_filter($taskViews, static fn(string $view): bool => in_array($view, $views, true)));
+    $activeTop = in_array($bucket, $taskViews, true) ? 'tareas' : $bucket;
+    $items = [];
+    if (in_array('inicio', $views, true)) {
+      $items[] = ['key' => 'inicio', 'label' => 'Inicio', 'tab' => 'inicio', 'icon' => 'fa-chart-pie'];
+    }
+    if ($visibleTaskViews !== []) {
+      $items[] = ['key' => 'tareas', 'label' => 'Tareas', 'tab' => $visibleTaskViews[0], 'icon' => 'fa-list-check'];
+    }
+    if (in_array('calendario', $views, true)) {
+      $items[] = ['key' => 'calendario', 'label' => 'Calendario', 'tab' => 'calendario', 'icon' => 'fa-calendar-days'];
+    }
     ob_start();
 ?>
     <nav class="commercial-tabs" data-commercial-tabs aria-label="Secciones del panel">
-      <?php foreach (CommercialAccessPolicy::VIEWS as $viewKey => $label): ?>
-        <?php if (!in_array($viewKey, $views, true)) continue; ?>
-        <?php $count = (int) ($tabCounts[$viewKey] ?? 0); ?>
-        <?php $tabParams = $viewKey === 'mis_tickets' ? [] : $globalParams; ?>
-        <a class="commercial-tab<?php echo $viewKey === $bucket ? ' active' : ''; ?>" data-commercial-tab="<?php echo esc_attr($viewKey); ?>" href="<?php echo esc_url(self::url($baseUrl, ['tab' => $viewKey] + $tabParams)); ?>"<?php echo $viewKey === $bucket ? ' aria-current="page"' : ''; ?>>
-          <i class="fas <?php echo esc_attr($icons[$viewKey]); ?>" aria-hidden="true"></i>
-          <span><?php echo esc_html($label); ?></span>
-          <?php if (!in_array($viewKey, ['inicio', 'calendario'], true)): ?><strong><?php echo esc_html((string) $count); ?></strong><?php endif; ?>
+      <?php foreach ($items as $item): ?>
+        <?php $isActive = $activeTop === $item['key']; ?>
+        <a class="commercial-tab<?php echo $isActive ? ' active' : ''; ?>" data-commercial-tab="<?php echo esc_attr((string) $item['key']); ?>" href="<?php echo esc_url(self::url($baseUrl, ['tab' => $item['tab']])); ?>"<?php echo $isActive ? ' aria-current="page"' : ''; ?>>
+          <i class="fas <?php echo esc_attr((string) $item['icon']); ?>" aria-hidden="true"></i>
+          <span><?php echo esc_html((string) $item['label']); ?></span>
         </a>
       <?php endforeach; ?>
     </nav>
@@ -176,7 +181,7 @@ final class CommercialDashboardView
     <form class="commercial-global-filter<?php echo $lockedToCurrentEmployee ? ' commercial-global-filter--locked' : ''; ?><?php echo $personalTaskScope ? ' commercial-global-filter--personal' : ''; ?>" data-commercial-global-filter-form method="get" action="<?php echo esc_url($baseUrl . '/index.php'); ?>">
       <input type="hidden" name="tab" value="<?php echo esc_attr($tab); ?>">
       <div>
-        <span class="commercial-kicker"><?php echo $personalTaskScope ? 'Vista personal' : 'Filtro general'; ?></span>
+        <span class="commercial-kicker"><?php echo $personalTaskScope ? 'Vista personal' : 'Filtro de tareas'; ?></span>
         <label for="commercial-global-employee"><?php echo $personalTaskScope ? 'Mis tareas se filtran con tu id_empleado' : 'Funcionario responsable'; ?></label>
       </div>
       <?php if ($personalTaskScope): ?>
@@ -461,8 +466,8 @@ final class CommercialDashboardView
     return (string) ob_get_clean();
   }
 
-  /** @param array<string,mixed> $result @param array<string,mixed> $filters @param array<int,array<string,string>> $ticketEmployees @param array<string,mixed> $filterOptions */
-  public static function renderTickets(string $bucket, array $result, array $filters, array $ticketEmployees, array $filterOptions, $policy, string $baseUrl): string
+  /** @param array<string,mixed> $result @param array<string,mixed> $filters @param array<int,array<string,string>> $ticketEmployees @param array<string,mixed> $filterOptions @param array<string,int> $tabCounts */
+  public static function renderTickets(string $bucket, array $result, array $filters, array $ticketEmployees, array $filterOptions, array $tabCounts, $policy, string $baseUrl): string
   {
     $isMyTasks = $bucket === 'mis_tickets';
     $effectiveBucket = $isMyTasks ? self::myTasksBucket($filters, (string) ($result['effective_bucket'] ?? '')) : $bucket;
@@ -481,8 +486,12 @@ final class CommercialDashboardView
     $sectionDescription = $isMyTasks
       ? 'Tus tareas asignadas, separadas por etapa y tema de ayuda.'
       : (string) $bucketDef['description'];
+    $canSeeAll = $policy instanceof CommercialAccessPolicy && $policy->canSeeAllCommercialTickets();
     ob_start();
 ?>
+    <?php echo self::renderTaskTabs($bucket, $tabCounts, $filters, $policy, $baseUrl); ?>
+    <?php echo self::renderGlobalFilters($filters, $ticketEmployees, $baseUrl, !$canSeeAll, $isMyTasks); ?>
+
     <div class="commercial-section-head">
       <div><span class="commercial-kicker"><?php echo $isMyTasks ? 'Mis tareas por etapa' : 'Estado del embudo'; ?></span><h2><?php echo esc_html($sectionLabel); ?></h2><p><?php echo esc_html($sectionDescription); ?></p></div>
       <span class="commercial-total"><strong><?php echo esc_html((string) $visibleTotal); ?></strong> tareas</span>
@@ -539,6 +548,35 @@ final class CommercialDashboardView
       </div>
       <?php echo self::renderPagination($bucket, $filters, $pagination, $baseUrl); ?>
     <?php endif; ?>
+<?php
+    return (string) ob_get_clean();
+  }
+
+  /** @param array<string,int> $tabCounts @param array<string,mixed> $filters */
+  private static function renderTaskTabs(string $activeBucket, array $tabCounts, array $filters, $policy, string $baseUrl): string
+  {
+    $taskViews = [
+      'abiertos' => 'Abiertas',
+      'postergados' => 'Postergadas',
+      'cerrados' => 'Cerradas',
+      'mis_tickets' => 'Mis tareas',
+    ];
+    $canView = static function (string $view) use ($policy): bool {
+      return !$policy instanceof CommercialAccessPolicy || $policy->canView($view);
+    };
+    $globalParams = $activeBucket === 'mis_tickets' ? [] : self::globalFilterParams($filters);
+    ob_start();
+?>
+    <nav class="commercial-my-subtabs commercial-task-tabs" aria-label="Vistas de tareas comerciales">
+      <?php foreach ($taskViews as $viewKey => $label): ?>
+        <?php if (!$canView($viewKey)) continue; ?>
+        <?php $params = $viewKey === 'mis_tickets' ? ['tab' => $viewKey] : ['tab' => $viewKey] + $globalParams; ?>
+        <a class="commercial-my-subtab commercial-task-tab<?php echo $activeBucket === $viewKey ? ' active' : ''; ?>" data-commercial-filter-link href="<?php echo esc_url(self::url($baseUrl, $params)); ?>"<?php echo $activeBucket === $viewKey ? ' aria-current="page"' : ''; ?>>
+          <span><?php echo esc_html($label); ?></span>
+          <strong><?php echo esc_html((string) ((int) ($tabCounts[$viewKey] ?? 0))); ?></strong>
+        </a>
+      <?php endforeach; ?>
+    </nav>
 <?php
     return (string) ob_get_clean();
   }

@@ -154,9 +154,14 @@
     return active ? active.getAttribute("data-commercial-tab") || "abiertos" : "abiertos";
   }
 
+  function topTabFor(tab) {
+    return ["abiertos", "postergados", "cerrados", "mis_tickets"].indexOf(tab) >= 0 ? "tareas" : tab;
+  }
+
   function setActiveTab(tab) {
+    var topTab = topTabFor(tab);
     root.querySelectorAll("[data-commercial-tab]").forEach(function (link) {
-      var isActive = link.getAttribute("data-commercial-tab") === tab;
+      var isActive = link.getAttribute("data-commercial-tab") === topTab;
       link.classList.toggle("active", isActive);
       if (isActive) link.setAttribute("aria-current", "page");
       else link.removeAttribute("aria-current");
@@ -256,14 +261,12 @@
     return request("commercial_tickets_filter", data, listRequest.signal)
       .then(function (response) {
         ticketsPanel.innerHTML = response.html || "";
+        globalFilter = root.querySelector("[data-commercial-global-filter-form]");
         if (response.tabs_html) {
           if (tabsNav) tabsNav.outerHTML = response.tabs_html;
           tabsNav = root.querySelector("[data-commercial-tabs]");
         }
-        if (response.global_filters_html) {
-          if (globalFilter) globalFilter.outerHTML = response.global_filters_html;
-          globalFilter = root.querySelector("[data-commercial-global-filter-form]");
-        }
+        globalFilter = root.querySelector("[data-commercial-global-filter-form]");
         setVisiblePanel(tab);
         if (options.history !== false) updateHistory(nextUrl, !!options.replace);
         maybeAutoOpenAdvisory();
@@ -431,7 +434,7 @@
     if (globalForm) {
       event.preventDefault();
       var globalUrl = normalizedUrl(globalForm.action);
-      var currentTab = activeTab();
+      var currentTab = (globalForm.querySelector('[name="tab"]') || {}).value || activeTab();
       globalUrl.searchParams.set("tab", currentTab === "calendario" ? "abiertos" : currentTab);
       new FormData(globalForm).forEach(function (value, key) {
         if (key === "tab") return;
