@@ -46,15 +46,19 @@ final class CommercialDashboardController
     $filters = $this->ticketFilters($input);
     $filters['tab'] = $bucket;
     $currentEmployeeFilter = $repository->currentEmployeeTicketFilter($commercialEmployeeCargos);
-    $employeeFilterLocked = $bucket === 'mis_tickets' || !$policy->canSeeAllCommercialTickets();
-    if ($employeeFilterLocked) {
+    $personalTaskScope = $bucket === 'mis_tickets';
+    $employeeFilterLocked = !$policy->canSeeAllCommercialTickets();
+    if ($personalTaskScope || $employeeFilterLocked) {
       $filters['id_empleado'] = $currentEmployeeFilter;
     }
-    $tabCounts = $repository->bucketCounts($this->globalTicketFilters($filters));
+    $globalCountFilters = $personalTaskScope && $policy->canSeeAllCommercialTickets()
+      ? []
+      : $this->globalTicketFilters($filters);
+    $tabCounts = $repository->bucketCounts($globalCountFilters);
     $myTabCounts = $repository->bucketCounts(['id_empleado' => $currentEmployeeFilter]);
     $tabCounts['mis_tickets'] = (int) ($myTabCounts['mis_tickets'] ?? 0);
     $result = in_array($bucket, ['inicio', 'calendario', 'sin_acceso'], true) ? ['rows' => [], 'counts' => $repository->statusCounts($filters), 'pagination' => []] : $repository->search($bucket, $filters);
-    $homeDashboard = $bucket === 'sin_acceso' ? [] : $repository->homeDashboard($this->globalTicketFilters($filters));
+    $homeDashboard = $bucket === 'sin_acceso' ? [] : $repository->homeDashboard($globalCountFilters);
     $calendarEmployees = $repository->activeEmployeesByCargos($calendarCargos);
     $currentCalendarEmployeeId = '';
     foreach ($calendarEmployees as $employee) {
@@ -90,6 +94,7 @@ final class CommercialDashboardController
       'visible_views' => $visibleViews,
       'ticket_employees' => $ticketEmployees,
       'employee_filter_locked' => $employeeFilterLocked,
+      'personal_task_scope' => $personalTaskScope,
       'filter_options' => $repository->filterOptions(),
       'calendar_employees' => $calendarEmployees,
       'runtime' => $runtime,

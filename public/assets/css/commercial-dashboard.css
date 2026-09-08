@@ -184,6 +184,9 @@ button:disabled { cursor: not-allowed; opacity: .52; }
 .commercial-global-filter--locked {
   grid-template-columns: minmax(220px, 1fr) minmax(280px, 440px);
 }
+.commercial-global-filter--personal {
+  grid-template-columns: minmax(260px, 1fr) minmax(320px, 520px);
+}
 .commercial-locked-employee {
   min-height: 44px;
   display: flex;
@@ -209,6 +212,12 @@ button:disabled { cursor: not-allowed; opacity: .52; }
   font-size: 13px;
   font-weight: 900;
   text-align: right;
+}
+.commercial-locked-employee small {
+  color: #59708b;
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
 }
 
 #scm-app .commercial-tabs {

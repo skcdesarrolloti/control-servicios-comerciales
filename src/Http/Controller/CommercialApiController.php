@@ -54,15 +54,20 @@ final class CommercialApiController
     $filters = $this->ticketFilters($input);
     $filters['tab'] = $bucket;
     $filters = $this->scopeTicketFilters($filters);
+    $personalTaskScope = $bucket === 'mis_tickets';
     $ticketEmployees = $this->tickets->ticketEmployees($this->commercialCargos);
     $visibleViews = array_values(array_filter(array_keys(CommercialAccessPolicy::VIEWS), fn(string $view): bool => $this->policy->canView($view)));
-    $tabCounts = $this->tickets->bucketCounts($this->globalTicketFilters($filters));
-    $myTabCounts = $this->tickets->bucketCounts(['id_empleado' => $this->tickets->currentEmployeeTicketFilter($this->commercialCargos)]);
+    $currentEmployeeFilter = $this->tickets->currentEmployeeTicketFilter($this->commercialCargos);
+    $globalCountFilters = $personalTaskScope && $this->policy->canSeeAllCommercialTickets()
+      ? []
+      : $this->globalTicketFilters($filters);
+    $tabCounts = $this->tickets->bucketCounts($globalCountFilters);
+    $myTabCounts = $this->tickets->bucketCounts(['id_empleado' => $currentEmployeeFilter]);
     $tabCounts['mis_tickets'] = (int) ($myTabCounts['mis_tickets'] ?? 0);
     $html = '';
     if ($bucket === 'inicio') {
       $html = CommercialDashboardView::renderHome(
-        $this->tickets->homeDashboard($this->globalTicketFilters($filters)),
+        $this->tickets->homeDashboard($globalCountFilters),
         $filters,
         $this->policy,
         $this->baseUrl
@@ -84,7 +89,7 @@ final class CommercialApiController
     JsonResponse::success([
       'html' => $html,
       'tabs_html' => CommercialDashboardView::renderTabs($visibleViews, $bucket, $filters, $tabCounts, $this->baseUrl),
-      'global_filters_html' => CommercialDashboardView::renderGlobalFilters($filters, $ticketEmployees, $this->baseUrl, $bucket === 'mis_tickets' || !$this->policy->canSeeAllCommercialTickets()),
+      'global_filters_html' => CommercialDashboardView::renderGlobalFilters($filters, $ticketEmployees, $this->baseUrl, !$this->policy->canSeeAllCommercialTickets(), $personalTaskScope),
       'tab' => $bucket,
     ]);
   }

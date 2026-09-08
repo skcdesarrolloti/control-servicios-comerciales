@@ -26,6 +26,7 @@ final class CommercialDashboardView
     $filterOptions = is_array($data['filter_options'] ?? null) ? $data['filter_options'] : [];
     $tabCounts = is_array($data['tab_counts'] ?? null) ? $data['tab_counts'] : [];
     $employeeFilterLocked = !empty($data['employee_filter_locked']);
+    $personalTaskScope = !empty($data['personal_task_scope']);
     $baseUrl = rtrim((string) ($data['base_url'] ?? ''), '/');
 
     ob_start();
@@ -81,7 +82,7 @@ final class CommercialDashboardView
       </div>
     </section>
 
-    <?php echo self::renderGlobalFilters($filters, $ticketEmployees, $baseUrl, $employeeFilterLocked); ?>
+    <?php echo self::renderGlobalFilters($filters, $ticketEmployees, $baseUrl, $employeeFilterLocked, $personalTaskScope); ?>
     <?php echo self::renderTabs($views, $bucket, $filters, $tabCounts, $baseUrl); ?>
 
     <?php if ($bucket === 'sin_acceso'): ?>
@@ -131,7 +132,7 @@ final class CommercialDashboardView
   public static function renderTabs(array $views, string $bucket, array $filters, array $tabCounts, string $baseUrl): string
   {
     $icons = ['inicio' => 'fa-chart-pie', 'abiertos' => 'fa-inbox', 'postergados' => 'fa-clock-rotate-left', 'cerrados' => 'fa-circle-check', 'mis_tickets' => 'fa-user-check', 'calendario' => 'fa-calendar-days'];
-    $globalParams = self::globalFilterParams($filters);
+    $globalParams = $bucket === 'mis_tickets' ? [] : self::globalFilterParams($filters);
     ob_start();
 ?>
     <nav class="commercial-tabs" data-commercial-tabs aria-label="Secciones del panel">
@@ -151,7 +152,7 @@ final class CommercialDashboardView
   }
 
   /** @param array<string,mixed> $filters @param array<int,array<string,string>> $ticketEmployees */
-  public static function renderGlobalFilters(array $filters, array $ticketEmployees, string $baseUrl, bool $lockedToCurrentEmployee = false): string
+  public static function renderGlobalFilters(array $filters, array $ticketEmployees, string $baseUrl, bool $lockedToCurrentEmployee = false, bool $personalTaskScope = false): string
   {
     $selectedEmployee = trim((string) ($filters['id_empleado'] ?? ''));
     $tab = trim((string) ($filters['tab'] ?? 'abiertos'));
@@ -172,13 +173,20 @@ final class CommercialDashboardView
     }
     ob_start();
 ?>
-    <form class="commercial-global-filter<?php echo $lockedToCurrentEmployee ? ' commercial-global-filter--locked' : ''; ?>" data-commercial-global-filter-form method="get" action="<?php echo esc_url($baseUrl . '/index.php'); ?>">
+    <form class="commercial-global-filter<?php echo $lockedToCurrentEmployee ? ' commercial-global-filter--locked' : ''; ?><?php echo $personalTaskScope ? ' commercial-global-filter--personal' : ''; ?>" data-commercial-global-filter-form method="get" action="<?php echo esc_url($baseUrl . '/index.php'); ?>">
       <input type="hidden" name="tab" value="<?php echo esc_attr($tab); ?>">
       <div>
-        <span class="commercial-kicker">Filtro general</span>
-        <label for="commercial-global-employee">Funcionario responsable</label>
+        <span class="commercial-kicker"><?php echo $personalTaskScope ? 'Vista personal' : 'Filtro general'; ?></span>
+        <label for="commercial-global-employee"><?php echo $personalTaskScope ? 'Mis tareas se filtran con tu id_empleado' : 'Funcionario responsable'; ?></label>
       </div>
-      <?php if ($lockedToCurrentEmployee): ?>
+      <?php if ($personalTaskScope): ?>
+        <input type="hidden" id="commercial-global-employee" name="id_empleado" value="<?php echo esc_attr($selectedEmployee); ?>">
+        <div class="commercial-locked-employee" aria-live="polite">
+          <span>Sesión actual</span>
+          <strong><?php echo esc_html($selectedEmployeeLabel); ?></strong>
+          <?php if ($selectedEmployee !== ''): ?><small>ID empleado: <?php echo esc_html($selectedEmployee); ?></small><?php endif; ?>
+        </div>
+      <?php elseif ($lockedToCurrentEmployee): ?>
         <input type="hidden" id="commercial-global-employee" name="id_empleado" value="<?php echo esc_attr($selectedEmployee); ?>">
         <div class="commercial-locked-employee" aria-live="polite">
           <span>Mostrando únicamente</span>

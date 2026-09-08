@@ -53,9 +53,7 @@ final class CommercialAccessPolicy
 
   public function canSeeAllCommercialTickets(): bool
   {
-    $role = $this->normalize(Auth::userRol());
-    return in_array(Auth::userCargo(), $this->adminCargos, true)
-      || in_array($role, ['admin', 'administrador'], true);
+    return $this->canManage();
   }
 
   public function canView(string $view): bool
