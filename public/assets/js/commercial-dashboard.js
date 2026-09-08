@@ -17,6 +17,7 @@
   var globalFilter = root.querySelector("[data-commercial-global-filter-form]");
   var caseModal = document.getElementById("commercial-case-modal");
   var caseContent = caseModal && caseModal.querySelector("[data-commercial-case-content]");
+  var advisoryModal = document.getElementById("commercial-advisory-modal");
   var currentCasePk = "";
   var lastFocused = null;
   var listRequest = null;
@@ -170,6 +171,38 @@
     if (isCalendar) root.dispatchEvent(new CustomEvent("scm:refresh-active-tab"));
   }
 
+  function refreshAdvisoryModalRef() {
+    advisoryModal = document.getElementById("commercial-advisory-modal");
+    return advisoryModal;
+  }
+
+  function showAdvisoryModal(open, trigger) {
+    var modal = refreshAdvisoryModalRef();
+    if (!modal) return;
+    modal.classList.toggle("open", open);
+    modal.setAttribute("aria-hidden", open ? "false" : "true");
+    document.body.classList.toggle("commercial-modal-open", open || !!document.querySelector(".commercial-modal.open"));
+    if (open) {
+      lastFocused = trigger || document.activeElement;
+      var close = modal.querySelector("[data-commercial-close-advisory]");
+      if (close) close.focus({ preventScroll: true });
+    } else if (lastFocused && typeof lastFocused.focus === "function" && document.contains(lastFocused)) {
+      lastFocused.focus({ preventScroll: true });
+    }
+  }
+
+  function maybeAutoOpenAdvisory() {
+    var modal = refreshAdvisoryModalRef();
+    if (!modal || modal.getAttribute("data-auto-open") !== "1") return;
+    var scope = modal.getAttribute("data-scope") || "all";
+    var key = "commercial-advisory-seen:" + scope;
+    try {
+      if (window.sessionStorage && window.sessionStorage.getItem(key) === "1") return;
+      if (window.sessionStorage) window.sessionStorage.setItem(key, "1");
+    } catch (_error) {}
+    window.setTimeout(function () { showAdvisoryModal(true); }, 450);
+  }
+
   function normalizedUrl(value) {
     return new URL(value || window.location.href, window.location.href);
   }
@@ -232,6 +265,7 @@
         }
         setVisiblePanel(tab);
         if (options.history !== false) updateHistory(nextUrl, !!options.replace);
+        maybeAutoOpenAdvisory();
         if (options.focus) {
           var heading = ticketsPanel.querySelector("h2");
           if (heading) {
@@ -359,6 +393,7 @@
     var filterLink = event.target.closest("[data-commercial-filter-link]");
     var globalClear = event.target.closest("[data-commercial-global-clear]");
     var openButton = event.target.closest("[data-commercial-open-case]");
+    var openAdvisory = event.target.closest("[data-commercial-open-advisory]");
     if (tab) {
       event.preventDefault();
       var key = tab.getAttribute("data-commercial-tab") || "abiertos";
@@ -370,6 +405,7 @@
     }
     if (filterLink) {
       event.preventDefault();
+      if (filterLink.closest("[data-commercial-advisory-modal]")) showAdvisoryModal(false);
       loadTickets(filterLink.href, { focus: false });
       return;
     }
@@ -381,6 +417,11 @@
     if (openButton) {
       event.preventDefault();
       openCase(openButton);
+      return;
+    }
+    if (openAdvisory) {
+      event.preventDefault();
+      showAdvisoryModal(true, openAdvisory);
     }
   });
 
@@ -502,9 +543,19 @@
     });
   }
 
+  root.addEventListener("click", function (event) {
+    var modal = refreshAdvisoryModalRef();
+    if (!modal) return;
+    if (event.target === modal || event.target.closest("[data-commercial-close-advisory]")) {
+      event.preventDefault();
+      showAdvisoryModal(false);
+    }
+  });
+
   document.addEventListener("keydown", function (event) {
     if (event.key !== "Escape") return;
     if (caseModal && caseModal.classList.contains("open")) showCaseModal(false);
+    else if (refreshAdvisoryModalRef() && advisoryModal.classList.contains("open")) showAdvisoryModal(false);
     else if (permissionModal && permissionModal.classList.contains("open")) setPermissionModal(false);
   });
   window.addEventListener("popstate", function () {
@@ -514,4 +565,5 @@
     else loadTickets(url.href, { history: false, focus: true });
   });
   if (activeTab() === "calendario") window.setTimeout(function () { setVisiblePanel("calendario"); }, 0);
+  if (activeTab() === "inicio") window.setTimeout(maybeAutoOpenAdvisory, 0);
 })();

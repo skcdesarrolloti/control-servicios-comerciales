@@ -40,7 +40,7 @@ final class CommercialDashboardController
     $policy = new CommercialAccessPolicy($this->settings, $this->db, $adminCargos);
 
     $visibleViews = array_values(array_filter(array_keys(CommercialAccessPolicy::VIEWS), static fn(string $view): bool => $policy->canView($view)));
-    $requested = trim((string) ($input['tab'] ?? 'abiertos'));
+    $requested = trim((string) ($input['tab'] ?? 'inicio'));
     $bucket = $visibleViews === [] ? 'sin_acceso' : (in_array($requested, $visibleViews, true) ? $requested : $visibleViews[0]);
     $ticketEmployees = $repository->ticketEmployees($commercialEmployeeCargos);
     $filters = $this->ticketFilters($input);
@@ -53,7 +53,8 @@ final class CommercialDashboardController
     $tabCounts = $repository->bucketCounts($this->globalTicketFilters($filters));
     $myTabCounts = $repository->bucketCounts(['id_empleado' => $currentEmployeeFilter]);
     $tabCounts['mis_tickets'] = (int) ($myTabCounts['mis_tickets'] ?? 0);
-    $result = in_array($bucket, ['calendario', 'sin_acceso'], true) ? ['rows' => [], 'counts' => $repository->statusCounts($filters), 'pagination' => []] : $repository->search($bucket, $filters);
+    $result = in_array($bucket, ['inicio', 'calendario', 'sin_acceso'], true) ? ['rows' => [], 'counts' => $repository->statusCounts($filters), 'pagination' => []] : $repository->search($bucket, $filters);
+    $homeDashboard = $bucket === 'sin_acceso' ? [] : $repository->homeDashboard($this->globalTicketFilters($filters));
     $calendarEmployees = $repository->activeEmployeesByCargos($calendarCargos);
     $currentCalendarEmployeeId = '';
     foreach ($calendarEmployees as $employee) {
@@ -83,6 +84,7 @@ final class CommercialDashboardController
       'bucket' => $bucket,
       'filters' => $filters,
       'result' => $result,
+      'home_dashboard' => $homeDashboard,
       'tab_counts' => $tabCounts,
       'policy' => $policy,
       'visible_views' => $visibleViews,

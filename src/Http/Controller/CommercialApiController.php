@@ -48,20 +48,30 @@ final class CommercialApiController
   {
     $this->verify($input);
     $bucket = trim((string) ($input['tab'] ?? 'abiertos'));
-    if (!array_key_exists($bucket, CommercialStatusCatalog::buckets()) || !$this->policy->canView($bucket)) {
+    if (!array_key_exists($bucket, CommercialAccessPolicy::VIEWS) || !$this->policy->canView($bucket)) {
       JsonResponse::error('No tienes permiso para consultar esta vista.', 403);
     }
     $filters = $this->ticketFilters($input);
     $filters['tab'] = $bucket;
     $filters = $this->scopeTicketFilters($filters);
     $ticketEmployees = $this->tickets->ticketEmployees($this->commercialCargos);
-    $result = $this->tickets->search($bucket, $filters);
     $visibleViews = array_values(array_filter(array_keys(CommercialAccessPolicy::VIEWS), fn(string $view): bool => $this->policy->canView($view)));
     $tabCounts = $this->tickets->bucketCounts($this->globalTicketFilters($filters));
     $myTabCounts = $this->tickets->bucketCounts(['id_empleado' => $this->tickets->currentEmployeeTicketFilter($this->commercialCargos)]);
     $tabCounts['mis_tickets'] = (int) ($myTabCounts['mis_tickets'] ?? 0);
-    JsonResponse::success([
-      'html' => CommercialDashboardView::renderTickets(
+    $html = '';
+    if ($bucket === 'inicio') {
+      $html = CommercialDashboardView::renderHome(
+        $this->tickets->homeDashboard($this->globalTicketFilters($filters)),
+        $filters,
+        $this->policy,
+        $this->baseUrl
+      );
+    } elseif ($bucket === 'calendario') {
+      $html = '';
+    } else {
+      $result = $this->tickets->search($bucket, $filters);
+      $html = CommercialDashboardView::renderTickets(
         $bucket,
         $result,
         $filters,
@@ -69,7 +79,10 @@ final class CommercialApiController
         $this->tickets->filterOptions(),
         $this->policy,
         $this->baseUrl
-      ),
+      );
+    }
+    JsonResponse::success([
+      'html' => $html,
       'tabs_html' => CommercialDashboardView::renderTabs($visibleViews, $bucket, $filters, $tabCounts, $this->baseUrl),
       'global_filters_html' => CommercialDashboardView::renderGlobalFilters($filters, $ticketEmployees, $this->baseUrl, $bucket === 'mis_tickets' || !$this->policy->canSeeAllCommercialTickets()),
       'tab' => $bucket,

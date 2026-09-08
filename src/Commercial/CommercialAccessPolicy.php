@@ -11,6 +11,7 @@ use SCM\Core\Settings;
 final class CommercialAccessPolicy
 {
   public const VIEWS = [
+    'inicio' => 'Inicio',
     'abiertos' => 'Tareas abiertas',
     'postergados' => 'Tareas postergadas',
     'cerrados' => 'Tareas cerradas',
