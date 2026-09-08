@@ -67,10 +67,25 @@
     return "<ul>" + items.map(function (item) { return "<li>" + escapeHtml(item) + "</li>"; }).join("") + "</ul>";
   }
 
-  function assistantBlock(title, content, icon) {
+  function assistantText(value) {
+    if (value === null || typeof value === "undefined") return "";
+    if (Array.isArray(value)) {
+      return value.map(assistantText).filter(Boolean).join(" · ");
+    }
+    if (typeof value === "object") {
+      return Object.keys(value).map(function (key) {
+        var text = assistantText(value[key]);
+        return text ? key + ": " + text : "";
+      }).filter(Boolean).join(" · ");
+    }
+    var text = String(value || "").trim();
+    return text.toLowerCase() === "array" ? "" : text;
+  }
+
+  function assistantBlock(title, content) {
     return (
       '<section class="commercial-assistant-block">' +
-      '<h4><i class="fas ' + escapeHtml(icon || "fa-circle-info") + '" aria-hidden="true"></i>' + escapeHtml(title) + "</h4>" +
+      "<h4>" + escapeHtml(title) + "</h4>" +
       content +
       "</section>"
     );
@@ -79,7 +94,7 @@
   function assistantLoadingMarkup() {
     return (
       '<div class="commercial-assistant-loading">' +
-      '<i class="fas fa-circle-notch fa-spin" aria-hidden="true"></i>' +
+      '<span class="commercial-assistant-spinner" aria-hidden="true"></span>' +
       '<div><h3>Analizando tarea con MiniMax…</h3><p>Estoy revisando datos de la tarea, inmueble, historial, respuestas, seguimientos y notas.</p></div>' +
       "</div>"
     );
@@ -88,7 +103,6 @@
   function assistantErrorMarkup(message) {
     return (
       '<div class="commercial-assistant-error">' +
-      '<i class="fas fa-triangle-exclamation" aria-hidden="true"></i>' +
       '<div><h3>No se pudo analizar la tarea</h3><p>' + escapeHtml(message || "Inténtalo nuevamente.") + "</p></div>" +
       "</div>"
     );
@@ -97,24 +111,26 @@
   function assistantAnalysisMarkup(analysis) {
     analysis = analysis || {};
     var summary = escapeHtml(analysis.resumen || "Sin resumen generado.");
-    var client = analysis.cliente ? '<p>' + escapeHtml(analysis.cliente) + "</p>" : "";
-    var currentStatus = analysis.estado_actual ? '<p>' + escapeHtml(analysis.estado_actual) + "</p>" : "";
-    var suggested = analysis.mensaje_sugerido ? '<div class="commercial-assistant-suggested"><div class="commercial-assistant-suggested-actions"><button type="button" class="commercial-secondary-btn" data-commercial-use-assistant-message><i class="fas fa-reply" aria-hidden="true"></i> Usar en respuesta</button><button type="button" class="commercial-secondary-btn" data-commercial-copy-assistant-message><i class="fas fa-copy" aria-hidden="true"></i> Copiar mensaje</button></div><p>' + escapeHtml(analysis.mensaje_sugerido) + "</p></div>" : '<p class="commercial-assistant-muted">Sin mensaje sugerido.</p>';
+    var clientText = assistantText(analysis.cliente);
+    var statusText = assistantText(analysis.estado_actual);
+    var client = clientText ? '<p>' + escapeHtml(clientText) + "</p>" : "";
+    var currentStatus = statusText ? '<p>' + escapeHtml(statusText) + "</p>" : "";
+    var suggested = analysis.mensaje_sugerido ? '<div class="commercial-assistant-suggested"><div class="commercial-assistant-suggested-actions"><button type="button" class="commercial-secondary-btn" data-commercial-use-assistant-message>Usar en respuesta</button><button type="button" class="commercial-secondary-btn" data-commercial-copy-assistant-message>Copiar mensaje</button></div><p>' + escapeHtml(analysis.mensaje_sugerido) + "</p></div>" : '<p class="commercial-assistant-muted">Sin mensaje sugerido.</p>';
     return (
       '<header class="commercial-assistant-result-head">' +
       '<div><span>Asistente comercial</span><h3 id="commercial-analysis-title">Análisis de la tarea</h3><p>' + escapeHtml(analysis.created_by ? ("Guardado por " + analysis.created_by) : "Generado con " + (analysis.model || "MiniMax")) + (analysis.created_label ? " · " + escapeHtml(analysis.created_label) : (analysis.generated_at ? " · " + escapeHtml(analysis.generated_at) : "")) + "</p></div>" +
       '<button type="button" class="commercial-modal-close commercial-assistant-close" data-commercial-close-assistant aria-label="Cerrar análisis">&times;</button>' +
       "</header>" +
-      '<div class="commercial-assistant-summary"><i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i><p>' + summary + "</p></div>" +
+      '<div class="commercial-assistant-summary"><strong>IA</strong><p>' + summary + "</p></div>" +
       '<div class="commercial-assistant-grid">' +
-      (client ? assistantBlock("Cliente", client, "fa-user") : "") +
-      (currentStatus ? assistantBlock("Estado actual", currentStatus, "fa-clipboard-check") : "") +
-      assistantBlock("Riesgos", assistantList(analysis.riesgos), "fa-triangle-exclamation") +
-      assistantBlock("Oportunidades", assistantList(analysis.oportunidades), "fa-bullseye") +
-      assistantBlock("Recomendaciones", assistantList(analysis.recomendaciones), "fa-lightbulb") +
-      assistantBlock("Próximos pasos", assistantList(analysis.proximos_pasos), "fa-list-check") +
-      assistantBlock("Datos faltantes", assistantList(analysis.datos_faltantes), "fa-circle-question") +
-      assistantBlock("Mensaje sugerido para el cliente", suggested, "fa-message") +
+      (client ? assistantBlock("Cliente", client) : "") +
+      (currentStatus ? assistantBlock("Estado actual", currentStatus) : "") +
+      assistantBlock("Riesgos", assistantList(analysis.riesgos)) +
+      assistantBlock("Oportunidades", assistantList(analysis.oportunidades)) +
+      assistantBlock("Recomendaciones", assistantList(analysis.recomendaciones)) +
+      assistantBlock("Próximos pasos", assistantList(analysis.proximos_pasos)) +
+      assistantBlock("Datos faltantes", assistantList(analysis.datos_faltantes)) +
+      assistantBlock("Mensaje sugerido para el cliente", suggested) +
       "</div>"
     );
   }
@@ -122,7 +138,7 @@
   function analysisListMarkup(ticketPk, analyses) {
     analyses = Array.isArray(analyses) ? analyses : [];
     if (!analyses.length) {
-      return '<div class="commercial-analysis-empty"><i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i><p>Aún no hay análisis guardados.</p></div>';
+      return '<div class="commercial-analysis-empty"><p>Aún no hay análisis guardados.</p></div>';
     }
     return "<ol>" + analyses.map(function (analysis) {
       var json = escapeHtml(JSON.stringify(analysis || {}));
@@ -135,7 +151,7 @@
         "<small>" + escapeHtml(shortSummary) + "</small>" +
         "<em>" + escapeHtml((analysis && analysis.created_by) || "Sistema") + "</em></span>" +
         "</button>" +
-        '<button type="button" class="commercial-analysis-delete" data-commercial-delete-analysis data-ticket-pk="' + escapeHtml(ticketPk || currentCasePk || "") + '" data-analysis-id="' + escapeHtml((analysis && analysis.id) || "") + '" aria-label="Eliminar análisis"><i class="fas fa-trash" aria-hidden="true"></i></button>' +
+        '<button type="button" class="commercial-analysis-delete" data-commercial-delete-analysis data-ticket-pk="' + escapeHtml(ticketPk || currentCasePk || "") + '" data-analysis-id="' + escapeHtml((analysis && analysis.id) || "") + '" aria-label="Eliminar análisis">Eliminar</button>' +
         "</li>"
       );
     }).join("") + "</ol>";

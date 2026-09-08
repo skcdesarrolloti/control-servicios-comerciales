@@ -280,8 +280,8 @@ final class CommercialTaskAssistant
 
     return [
       'resumen' => $this->text($decoded['resumen'] ?? 'No fue posible generar un resumen claro.', 1600),
-      'cliente' => $this->text($decoded['cliente'] ?? '', 900),
-      'estado_actual' => $this->text($decoded['estado_actual'] ?? '', 900),
+      'cliente' => $this->textValue($decoded['cliente'] ?? '', 900),
+      'estado_actual' => $this->textValue($decoded['estado_actual'] ?? '', 900),
       'riesgos' => $this->normalizeList($decoded['riesgos'] ?? []),
       'oportunidades' => $this->normalizeList($decoded['oportunidades'] ?? []),
       'recomendaciones' => $this->normalizeList($decoded['recomendaciones'] ?? []),
@@ -310,6 +310,30 @@ final class CommercialTaskAssistant
       return json_decode(substr($clean, $start, $end - $start + 1), true);
     }
     return null;
+  }
+
+  /** @param mixed $value */
+  private function textValue($value, int $limit): string
+  {
+    if (is_array($value)) {
+      $parts = [];
+      foreach ($value as $key => $item) {
+        if (is_array($item)) {
+          $nested = $this->textValue($item, $limit);
+          if ($nested !== '') {
+            $parts[] = is_string($key) ? ($key . ': ' . $nested) : $nested;
+          }
+          continue;
+        }
+        $text = $this->text($item, $limit);
+        if ($text !== '') {
+          $parts[] = is_string($key) ? ($key . ': ' . $text) : $text;
+        }
+      }
+      return $this->text(implode(' · ', $parts), $limit);
+    }
+
+    return $this->text($value, $limit);
   }
 
   /**

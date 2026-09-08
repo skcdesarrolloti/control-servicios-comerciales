@@ -173,7 +173,7 @@ final class CommercialTicketModalView
   private static function analysisListItems(int $pk, array $analyses): string
   {
     if ($analyses === []) {
-      return '<div class="commercial-analysis-empty"><i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i><p>Aún no hay análisis guardados.</p></div>';
+      return '<div class="commercial-analysis-empty"><p>Aún no hay análisis guardados.</p></div>';
     }
 
     $html = '<ol>';
@@ -187,7 +187,7 @@ final class CommercialTicketModalView
         . '<button type="button" class="commercial-analysis-open" data-commercial-open-analysis data-analysis-json="' . esc_attr(is_string($json) ? $json : '{}') . '">'
         . '<span><strong>' . esc_html($label) . '</strong><small>' . esc_html(mb_substr($summary, 0, 96) . (mb_strlen($summary) > 96 ? '…' : '')) . '</small><em>' . esc_html($author) . '</em></span>'
         . '</button>'
-        . '<button type="button" class="commercial-analysis-delete" data-commercial-delete-analysis data-ticket-pk="' . esc_attr((string) $pk) . '" data-analysis-id="' . esc_attr((string) $id) . '" aria-label="Eliminar análisis"><i class="fas fa-trash" aria-hidden="true"></i></button>'
+        . '<button type="button" class="commercial-analysis-delete" data-commercial-delete-analysis data-ticket-pk="' . esc_attr((string) $pk) . '" data-analysis-id="' . esc_attr((string) $id) . '" aria-label="Eliminar análisis">Eliminar</button>'
         . '</li>';
     }
     return $html . '</ol>';

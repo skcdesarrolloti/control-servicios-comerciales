@@ -162,6 +162,8 @@ final class CommercialTaskAnalysisRepository
     $payload['created_by_employee_id'] = trim((string) ($row['created_by_employee_id'] ?? ''));
     $payload['model'] = trim((string) ($row['model'] ?? $payload['model'] ?? ''));
     $payload['resumen'] = trim((string) ($payload['resumen'] ?? $row['summary'] ?? ''));
+    $payload['cliente'] = $this->cleanSavedTextValue($payload['cliente'] ?? '');
+    $payload['estado_actual'] = $this->cleanSavedTextValue($payload['estado_actual'] ?? '');
 
     return $payload;
   }
@@ -171,8 +173,8 @@ final class CommercialTaskAnalysisRepository
   {
     return [
       'resumen' => $this->text($analysis['resumen'] ?? '', 1200),
-      'cliente' => $this->text($analysis['cliente'] ?? '', 700),
-      'estado_actual' => $this->text($analysis['estado_actual'] ?? '', 700),
+      'cliente' => $this->textValue($analysis['cliente'] ?? '', 700),
+      'estado_actual' => $this->textValue($analysis['estado_actual'] ?? '', 700),
       'riesgos' => $this->list($analysis['riesgos'] ?? []),
       'oportunidades' => $this->list($analysis['oportunidades'] ?? []),
       'recomendaciones' => $this->list($analysis['recomendaciones'] ?? []),
@@ -189,6 +191,30 @@ final class CommercialTaskAnalysisRepository
   {
     $text = trim(preg_replace('/\s+/u', ' ', strip_tags((string) $value)) ?? '');
     return mb_strlen($text) > $limit ? mb_substr($text, 0, $limit - 1) . '…' : $text;
+  }
+
+  /** @param mixed $value */
+  private function textValue($value, int $limit): string
+  {
+    if (is_array($value)) {
+      $parts = [];
+      foreach ($value as $key => $item) {
+        $text = is_array($item) ? $this->textValue($item, $limit) : $this->text($item, $limit);
+        if ($text !== '') {
+          $parts[] = is_string($key) ? ($key . ': ' . $text) : $text;
+        }
+      }
+      return $this->text(implode(' · ', $parts), $limit);
+    }
+
+    return $this->text($value, $limit);
+  }
+
+  /** @param mixed $value */
+  private function cleanSavedTextValue($value): string
+  {
+    $text = $this->textValue($value, 900);
+    return strcasecmp($text, 'Array') === 0 ? '' : $text;
   }
 
   /** @param mixed $value @return array<int,string> */
