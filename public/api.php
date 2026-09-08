@@ -11,10 +11,14 @@ set_time_limit(60);
 ini_set('memory_limit', '256M');
 
 $respondError = static function (string $message, int $status): void {
+  while (ob_get_level() > 0) {
+    ob_end_clean();
+  }
+
   http_response_code($status);
   echo json_encode(
     ['success' => false, 'data' => ['message' => $message]],
-    JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+    JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE | JSON_PARTIAL_OUTPUT_ON_ERROR
   );
   exit;
 };
@@ -31,6 +35,7 @@ $controller = new \SCM\Http\Controller\CommercialApiController($scmDb, $scmSetti
 $router = new \SCM\Http\Api\CommercialActionRouter($controller);
 
 session_write_close();
+ob_start();
 
 try {
   if (!$router->dispatch($action, $_POST)) {

@@ -195,9 +195,14 @@
       signal: signal,
       headers: { "X-Requested-With": "XMLHttpRequest" },
     }).then(function (response) {
-      return response.json().catch(function () {
-        throw new Error("El servidor devolvió una respuesta no válida.");
-      }).then(function (json) {
+      return response.text().then(function (text) {
+        var json = null;
+        try {
+          json = text ? JSON.parse(text) : null;
+        } catch (_error) {
+          var clean = String(text || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+          throw new Error(clean ? clean.slice(0, 220) : "El servidor devolvió una respuesta vacía.");
+        }
         if (!response.ok || !json || !json.success) {
           throw new Error((json && json.data && json.data.message) || "La operación no pudo completarse.");
         }
