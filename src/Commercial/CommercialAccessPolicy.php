@@ -49,6 +49,13 @@ final class CommercialAccessPolicy
       || in_array($role, ['admin', 'administrador', 'gerencia', 'desarrollo'], true);
   }
 
+  public function canSeeAllCommercialTickets(): bool
+  {
+    $role = $this->normalize(Auth::userRol());
+    return in_array(Auth::userCargo(), $this->adminCargos, true)
+      || in_array($role, ['admin', 'administrador'], true);
+  }
+
   public function canView(string $view): bool
   {
     if (!array_key_exists($view, self::VIEWS)) {

@@ -42,8 +42,13 @@ final class CommercialDashboardController
     $visibleViews = array_values(array_filter(array_keys(CommercialAccessPolicy::VIEWS), static fn(string $view): bool => $policy->canView($view)));
     $requested = trim((string) ($input['tab'] ?? 'abiertos'));
     $bucket = $visibleViews === [] ? 'sin_acceso' : (in_array($requested, $visibleViews, true) ? $requested : $visibleViews[0]);
+    $ticketEmployees = $repository->ticketEmployees($commercialEmployeeCargos);
     $filters = $this->ticketFilters($input);
     $filters['tab'] = $bucket;
+    $employeeFilterLocked = !$policy->canSeeAllCommercialTickets();
+    if ($employeeFilterLocked) {
+      $filters['id_empleado'] = $repository->currentEmployeeTicketFilter($commercialEmployeeCargos);
+    }
     $tabCounts = $repository->bucketCounts($this->globalTicketFilters($filters));
     $result = in_array($bucket, ['calendario', 'sin_acceso'], true) ? ['rows' => [], 'counts' => $repository->statusCounts($filters), 'pagination' => []] : $repository->search($bucket, $filters);
     $calendarEmployees = $repository->activeEmployeesByCargos($calendarCargos);
@@ -78,7 +83,8 @@ final class CommercialDashboardController
       'tab_counts' => $tabCounts,
       'policy' => $policy,
       'visible_views' => $visibleViews,
-      'ticket_employees' => $repository->ticketEmployees($commercialEmployeeCargos),
+      'ticket_employees' => $ticketEmployees,
+      'employee_filter_locked' => $employeeFilterLocked,
       'filter_options' => $repository->filterOptions(),
       'calendar_employees' => $calendarEmployees,
       'runtime' => $runtime,

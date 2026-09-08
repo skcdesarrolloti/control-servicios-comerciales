@@ -53,6 +53,8 @@ final class CommercialApiController
     }
     $filters = $this->ticketFilters($input);
     $filters['tab'] = $bucket;
+    $filters = $this->scopeTicketFilters($filters);
+    $ticketEmployees = $this->tickets->ticketEmployees($this->commercialCargos);
     $result = $this->tickets->search($bucket, $filters);
     $visibleViews = array_values(array_filter(array_keys(CommercialAccessPolicy::VIEWS), fn(string $view): bool => $this->policy->canView($view)));
     $tabCounts = $this->tickets->bucketCounts($this->globalTicketFilters($filters));
@@ -61,13 +63,13 @@ final class CommercialApiController
         $bucket,
         $result,
         $filters,
-        $this->tickets->ticketEmployees($this->commercialCargos),
+        $ticketEmployees,
         $this->tickets->filterOptions(),
         $this->policy,
         $this->baseUrl
       ),
       'tabs_html' => CommercialDashboardView::renderTabs($visibleViews, $bucket, $filters, $tabCounts, $this->baseUrl),
-      'global_filters_html' => CommercialDashboardView::renderGlobalFilters($filters, $this->tickets->ticketEmployees($this->commercialCargos), $this->baseUrl),
+      'global_filters_html' => CommercialDashboardView::renderGlobalFilters($filters, $ticketEmployees, $this->baseUrl, !$this->policy->canSeeAllCommercialTickets()),
       'tab' => $bucket,
     ]);
   }
@@ -77,8 +79,10 @@ final class CommercialApiController
   {
     $this->verify($input);
     $this->authorize('ver_ticket', 'No tienes permiso para ver este ticket.');
+    $ticketPk = (int) ($input['ticket_pk'] ?? 0);
+    $this->authorizeTicketScope($ticketPk);
     try {
-      $detail = $this->tickets->detail((int) ($input['ticket_pk'] ?? 0));
+      $detail = $this->tickets->detail($ticketPk);
     } catch (\InvalidArgumentException | \RuntimeException $exception) {
       JsonResponse::error($exception->getMessage(), 404);
     }
@@ -99,8 +103,10 @@ final class CommercialApiController
     if (!$this->policy->canAct('cambiar_estado')) {
       JsonResponse::error('No tienes permiso para cambiar estados comerciales.', 403);
     }
+    $ticketPk = (int) ($input['ticket_pk'] ?? 0);
+    $this->authorizeTicketScope($ticketPk);
     try {
-      $this->tickets->changeStatus((int) ($input['ticket_pk'] ?? 0), trim((string) ($input['estado'] ?? '')));
+      $this->tickets->changeStatus($ticketPk, trim((string) ($input['estado'] ?? '')));
     } catch (\InvalidArgumentException $exception) {
       JsonResponse::error($exception->getMessage(), 422);
     }
@@ -114,8 +120,10 @@ final class CommercialApiController
     if (!$this->policy->canAct('reasignar')) {
       JsonResponse::error('No tienes permiso para reasignar tickets.', 403);
     }
+    $ticketPk = (int) ($input['ticket_pk'] ?? 0);
+    $this->authorizeTicketScope($ticketPk);
     try {
-      $this->tickets->reassign((int) ($input['ticket_pk'] ?? 0), trim((string) ($input['id_empleado'] ?? '')), $this->commercialCargos);
+      $this->tickets->reassign($ticketPk, trim((string) ($input['id_empleado'] ?? '')), $this->commercialCargos);
     } catch (\InvalidArgumentException $exception) {
       JsonResponse::error($exception->getMessage(), 422);
     }
@@ -139,12 +147,14 @@ final class CommercialApiController
   {
     $this->verify($input);
     $this->authorize('responder', 'No tienes permiso para responder tickets.');
+    $ticketPk = (int) ($input['ticket_pk'] ?? 0);
+    $this->authorizeTicketScope($ticketPk);
     $message = trim(wp_kses_post(stripslashes((string) ($input['respuesta'] ?? ''))));
     if ($message === '') {
       JsonResponse::error('La respuesta no puede estar vacía.', 422);
     }
     $result = $this->workflow->saveTicketResponse(
-      (int) ($input['ticket_pk'] ?? 0),
+      $ticketPk,
       $message,
       '__keep__',
       false,
@@ -160,12 +170,14 @@ final class CommercialApiController
   {
     $this->verify($input);
     $this->authorize('agregar_nota', 'No tienes permiso para agregar notas.');
+    $ticketPk = (int) ($input['ticket_pk'] ?? 0);
+    $this->authorizeTicketScope($ticketPk);
     $message = trim(wp_kses_post(stripslashes((string) ($input['observacion'] ?? ''))));
     if ($message === '') {
       JsonResponse::error('La nota no puede estar vacía.', 422);
     }
     $this->workflowResponse(
-      $this->workflow->saveNote((int) ($input['ticket_pk'] ?? 0), $message),
+      $this->workflow->saveNote($ticketPk, $message),
       'Nota guardada.'
     );
   }
@@ -175,13 +187,15 @@ final class CommercialApiController
   {
     $this->verify($input);
     $this->authorize('seguimiento', 'No tienes permiso para registrar seguimientos.');
+    $ticketPk = (int) ($input['ticket_pk'] ?? 0);
+    $this->authorizeTicketScope($ticketPk);
     $message = trim(wp_kses_post(stripslashes((string) ($input['observacion'] ?? ''))));
     if ($message === '') {
       JsonResponse::error('El seguimiento no puede estar vacío.', 422);
     }
     $this->workflowResponse(
       $this->workflow->save(
-        (int) ($input['ticket_pk'] ?? 0),
+        $ticketPk,
         $message,
         '__keep__',
         '__keep__',
@@ -201,6 +215,7 @@ final class CommercialApiController
     $this->verify($input);
     $this->authorize('postergar', 'No tienes permiso para postergar tickets.');
     $ticketPk = (int) ($input['ticket_pk'] ?? 0);
+    $this->authorizeTicketScope($ticketPk);
     $message = trim(wp_kses_post(stripslashes((string) ($input['observacion'] ?? ''))));
     if ($message === '') {
       JsonResponse::error('El motivo de postergación es obligatorio.', 422);
@@ -223,6 +238,7 @@ final class CommercialApiController
     $this->verify($input);
     $this->authorize('activar', 'No tienes permiso para activar tickets.');
     $ticketPk = (int) ($input['ticket_pk'] ?? 0);
+    $this->authorizeTicketScope($ticketPk);
     $message = trim(wp_kses_post(stripslashes((string) ($input['motivo'] ?? ''))));
     $status = trim((string) ($input['estado'] ?? 'Nuevo'));
     if ($message === '' || !in_array($status, CommercialStatusCatalog::OPEN, true)) {
@@ -245,6 +261,7 @@ final class CommercialApiController
     $this->verify($input);
     $this->authorize('cerrar', 'No tienes permiso para cerrar tickets.');
     $ticketPk = (int) ($input['ticket_pk'] ?? 0);
+    $this->authorizeTicketScope($ticketPk);
     $message = trim(wp_kses_post(stripslashes((string) ($input['observacion'] ?? ''))));
     $status = trim((string) ($input['estado'] ?? 'Finalizado'));
     if ($message === '' || !in_array($status, CommercialStatusCatalog::CLOSED, true)) {
@@ -268,6 +285,29 @@ final class CommercialApiController
   {
     if (!$this->policy->canAct($action)) {
       JsonResponse::error($message, 403);
+    }
+  }
+
+  /** @param array<string,mixed> $filters @return array<string,mixed> */
+  private function scopeTicketFilters(array $filters): array
+  {
+    if ($this->policy->canSeeAllCommercialTickets()) {
+      return $filters;
+    }
+
+    $filters['id_empleado'] = $this->tickets->currentEmployeeTicketFilter($this->commercialCargos);
+    return $filters;
+  }
+
+  private function authorizeTicketScope(int $ticketPk): void
+  {
+    if ($this->policy->canSeeAllCommercialTickets()) {
+      return;
+    }
+
+    $employeeFilter = $this->tickets->currentEmployeeTicketFilter($this->commercialCargos);
+    if (!$this->tickets->ticketMatchesEmployeeFilter($ticketPk, $employeeFilter)) {
+      JsonResponse::error('Este ticket no está asignado a tu usuario.', 403);
     }
   }
 

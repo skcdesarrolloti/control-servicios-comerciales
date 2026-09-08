@@ -24,6 +24,7 @@ final class CommercialDashboardView
     $ticketEmployees = is_array($data['ticket_employees'] ?? null) ? $data['ticket_employees'] : [];
     $filterOptions = is_array($data['filter_options'] ?? null) ? $data['filter_options'] : [];
     $tabCounts = is_array($data['tab_counts'] ?? null) ? $data['tab_counts'] : [];
+    $employeeFilterLocked = !empty($data['employee_filter_locked']);
     $baseUrl = rtrim((string) ($data['base_url'] ?? ''), '/');
 
     ob_start();
@@ -79,7 +80,7 @@ final class CommercialDashboardView
       </div>
     </section>
 
-    <?php echo self::renderGlobalFilters($filters, $ticketEmployees, $baseUrl); ?>
+    <?php echo self::renderGlobalFilters($filters, $ticketEmployees, $baseUrl, $employeeFilterLocked); ?>
     <?php echo self::renderTabs($views, $bucket, $filters, $tabCounts, $baseUrl); ?>
 
     <?php if ($bucket === 'sin_acceso'): ?>
@@ -146,30 +147,50 @@ final class CommercialDashboardView
   }
 
   /** @param array<string,mixed> $filters @param array<int,array<string,string>> $ticketEmployees */
-  public static function renderGlobalFilters(array $filters, array $ticketEmployees, string $baseUrl): string
+  public static function renderGlobalFilters(array $filters, array $ticketEmployees, string $baseUrl, bool $lockedToCurrentEmployee = false): string
   {
     $selectedEmployee = trim((string) ($filters['id_empleado'] ?? ''));
     $tab = trim((string) ($filters['tab'] ?? 'abiertos'));
     if ($tab === '') {
       $tab = 'abiertos';
     }
+    $selectedEmployeeLabel = trim(Auth::user());
+    foreach ($ticketEmployees as $employee) {
+      $employeeValue = (string) ($employee['id'] ?? '');
+      $employeeIds = array_values(array_filter(array_map('trim', explode(',', $employeeValue)), static fn(string $id): bool => $id !== ''));
+      if ($selectedEmployee === $employeeValue || in_array($selectedEmployee, $employeeIds, true)) {
+        $selectedEmployeeLabel = (string) ($employee['name'] ?? $selectedEmployeeLabel);
+        break;
+      }
+    }
+    if ($selectedEmployeeLabel === '') {
+      $selectedEmployeeLabel = 'Mis tickets';
+    }
     ob_start();
 ?>
-    <form class="commercial-global-filter" data-commercial-global-filter-form method="get" action="<?php echo esc_url($baseUrl . '/index.php'); ?>">
+    <form class="commercial-global-filter<?php echo $lockedToCurrentEmployee ? ' commercial-global-filter--locked' : ''; ?>" data-commercial-global-filter-form method="get" action="<?php echo esc_url($baseUrl . '/index.php'); ?>">
       <input type="hidden" name="tab" value="<?php echo esc_attr($tab); ?>">
       <div>
         <span class="commercial-kicker">Filtro general</span>
         <label for="commercial-global-employee">Funcionario responsable</label>
       </div>
-      <select id="commercial-global-employee" name="id_empleado">
-        <option value="">Todos los funcionarios</option>
-        <?php foreach ($ticketEmployees as $employee): ?>
-          <?php $employeeValue = (string) ($employee['id'] ?? ''); $employeeIds = array_values(array_filter(array_map('trim', explode(',', $employeeValue)), static fn(string $id): bool => $id !== '')); ?>
-          <option value="<?php echo esc_attr($employeeValue); ?>"<?php echo ($selectedEmployee === $employeeValue || in_array($selectedEmployee, $employeeIds, true)) ? ' selected' : ''; ?>><?php echo esc_html((string) ($employee['name'] ?? '')); ?></option>
-        <?php endforeach; ?>
-      </select>
-      <button class="commercial-primary-btn" type="submit">Actualizar</button>
-      <?php if ($selectedEmployee !== ''): ?><a class="commercial-secondary-btn" data-commercial-global-clear href="<?php echo esc_url(self::url($baseUrl, ['tab' => $tab])); ?>">Limpiar</a><?php endif; ?>
+      <?php if ($lockedToCurrentEmployee): ?>
+        <input type="hidden" id="commercial-global-employee" name="id_empleado" value="<?php echo esc_attr($selectedEmployee); ?>">
+        <div class="commercial-locked-employee" aria-live="polite">
+          <span>Mostrando únicamente</span>
+          <strong><?php echo esc_html($selectedEmployeeLabel); ?></strong>
+        </div>
+      <?php else: ?>
+        <select id="commercial-global-employee" name="id_empleado">
+          <option value="">Todos los funcionarios</option>
+          <?php foreach ($ticketEmployees as $employee): ?>
+            <?php $employeeValue = (string) ($employee['id'] ?? ''); $employeeIds = array_values(array_filter(array_map('trim', explode(',', $employeeValue)), static fn(string $id): bool => $id !== '')); ?>
+            <option value="<?php echo esc_attr($employeeValue); ?>"<?php echo ($selectedEmployee === $employeeValue || in_array($selectedEmployee, $employeeIds, true)) ? ' selected' : ''; ?>><?php echo esc_html((string) ($employee['name'] ?? '')); ?></option>
+          <?php endforeach; ?>
+        </select>
+        <button class="commercial-primary-btn" type="submit">Actualizar</button>
+        <?php if ($selectedEmployee !== ''): ?><a class="commercial-secondary-btn" data-commercial-global-clear href="<?php echo esc_url(self::url($baseUrl, ['tab' => $tab])); ?>">Limpiar</a><?php endif; ?>
+      <?php endif; ?>
     </form>
 <?php
     return (string) ob_get_clean();

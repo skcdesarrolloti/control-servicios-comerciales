@@ -216,6 +216,42 @@ final class CommercialTicketsRepository
     return $bucketCounts;
   }
 
+  /** @param array<int,string> $cargoIds */
+  public function currentEmployeeTicketFilter(array $cargoIds = []): string
+  {
+    $employeeId = trim(Auth::employeeId());
+    $userName = $this->normalizeEmployeeLabel(Auth::user());
+    foreach ($this->ticketEmployees($cargoIds) as $employee) {
+      $value = trim((string) ($employee['id'] ?? ''));
+      $ids = array_values(array_filter(array_map('trim', explode(',', $value)), static fn(string $id): bool => $id !== ''));
+      $name = $this->normalizeEmployeeLabel((string) ($employee['name'] ?? ''));
+      if (($employeeId !== '' && in_array($employeeId, $ids, true)) || ($userName !== '' && $name === $userName)) {
+        return $value;
+      }
+    }
+
+    if ($employeeId !== '') {
+      return $employeeId;
+    }
+
+    $userId = Auth::userId();
+    return $userId > 0 ? (string) $userId : '';
+  }
+
+  public function ticketMatchesEmployeeFilter(int $ticketPk, string $employeeFilter): bool
+  {
+    $employeeFilter = trim($employeeFilter);
+    if ($ticketPk <= 0 || $employeeFilter === '') {
+      return false;
+    }
+
+    [$filterWhere, $filterArgs] = $this->ticketFilterClauses(['id_empleado' => $employeeFilter]);
+    $where = array_merge(['t.`_ID` = ?'], $filterWhere);
+    $args = array_merge([$ticketPk], $filterArgs);
+    $table = $this->db->table('jet_cct_tickets');
+    return (int) $this->db->getVar("SELECT COUNT(*) FROM `{$table}` t WHERE " . implode(' AND ', $where), $args) > 0;
+  }
+
   /** @param array<int,string> $cargoIds @return array<int,array{id:string,name:string}> */
   public function ticketEmployees(array $cargoIds = []): array
   {
