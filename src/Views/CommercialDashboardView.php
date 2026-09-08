@@ -72,14 +72,6 @@ final class CommercialDashboardView
       </div>
     </section>
 
-    <section class="commercial-hero">
-      <div>
-        <span class="commercial-kicker">Gestión centralizada</span>
-        <h1>Tareas comerciales</h1>
-        <p>Consulta la operación por estado comercial, administra responsables y coordina la agenda del equipo.</p>
-      </div>
-    </section>
-
     <?php echo self::renderTabs($views, $bucket, $filters, $tabCounts, $baseUrl); ?>
 
     <?php if ($bucket === 'sin_acceso'): ?>
