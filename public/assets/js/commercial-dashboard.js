@@ -18,6 +18,7 @@
   var caseModal = document.getElementById("commercial-case-modal");
   var caseContent = caseModal && caseModal.querySelector("[data-commercial-case-content]");
   var advisoryModal = null;
+  var advisoryQueueActive = false;
   var currentCasePk = "";
   var lastFocused = null;
   var listRequest = null;
@@ -344,7 +345,7 @@
     return refreshAdvisoryModalRef();
   }
 
-  function showAdvisoryModal(open, trigger) {
+  function showAdvisoryModal(open, trigger, continueQueue) {
     var modal = open
       ? (trigger && trigger.matches && trigger.matches("[data-commercial-advisory-modal]") ? trigger : advisoryModalForTrigger(trigger))
       : (trigger && trigger.matches && trigger.matches("[data-commercial-advisory-modal]") ? trigger : refreshAdvisoryModalRef());
@@ -361,20 +362,38 @@
     modal.setAttribute("aria-hidden", open ? "false" : "true");
     document.body.classList.toggle("commercial-modal-open", open || !!document.querySelector(".commercial-modal.open"));
     if (open) {
-      lastFocused = trigger || document.activeElement;
+      advisoryQueueActive = !!(trigger && trigger.matches && trigger.matches("[data-commercial-advisory-modal]") && trigger.getAttribute("data-auto-open") === "1");
+      lastFocused = trigger && trigger.matches && trigger.matches("[data-commercial-advisory-modal]") ? document.activeElement : (trigger || document.activeElement);
       var close = modal.querySelector("[data-commercial-close-advisory]");
       if (close) close.focus({ preventScroll: true });
     } else if (lastFocused && typeof lastFocused.focus === "function" && document.contains(lastFocused)) {
       lastFocused.focus({ preventScroll: true });
     }
+    if (!open && continueQueue) {
+      window.setTimeout(function () { openNextAdvisoryModal(modal); }, 220);
+    } else if (!open) {
+      advisoryQueueActive = false;
+    }
   }
 
   function maybeAutoOpenAdvisory() {
-    var modal = root.querySelector('[data-commercial-advisory-modal][data-auto-open="1"]');
-    if (!modal || modal.getAttribute("data-auto-open") !== "1") return;
-    if (modal.getAttribute("data-opened") === "1") return;
-    modal.setAttribute("data-opened", "1");
-    window.setTimeout(function () { showAdvisoryModal(true, modal); }, 450);
+    if (activeTab() !== "inicio") return;
+    if (root.querySelector(".commercial-modal.open")) return;
+    window.setTimeout(function () { openNextAdvisoryModal(null); }, 450);
+  }
+
+  function openNextAdvisoryModal(current) {
+    if (activeTab() !== "inicio") return;
+    var modals = Array.prototype.slice.call(root.querySelectorAll('[data-commercial-advisory-modal][data-auto-open="1"]'));
+    if (!modals.length) return;
+    var start = current ? modals.indexOf(current) : -1;
+    for (var index = start + 1; index < modals.length; index += 1) {
+      if (modals[index].getAttribute("data-opened") === "1") continue;
+      modals[index].setAttribute("data-opened", "1");
+      showAdvisoryModal(true, modals[index]);
+      return;
+    }
+    advisoryQueueActive = false;
   }
 
   function normalizedUrl(value) {
@@ -1072,7 +1091,7 @@
     if (!modal) return;
     if (event.target === modal || event.target.closest("[data-commercial-close-advisory]")) {
       event.preventDefault();
-      showAdvisoryModal(false, modal);
+      showAdvisoryModal(false, modal, advisoryQueueActive);
     }
   });
 
@@ -1083,7 +1102,7 @@
     else if (document.getElementById("commercial-property-modal") && document.getElementById("commercial-property-modal").classList.contains("open")) setStandaloneModal(document.getElementById("commercial-property-modal"), false);
     else if (document.getElementById("commercial-sign-detail-modal") && document.getElementById("commercial-sign-detail-modal").classList.contains("open")) setStandaloneModal(document.getElementById("commercial-sign-detail-modal"), false);
     else if (caseModal && caseModal.classList.contains("open")) showCaseModal(false);
-    else if (refreshAdvisoryModalRef() && advisoryModal.classList.contains("open")) showAdvisoryModal(false, advisoryModal);
+    else if (refreshAdvisoryModalRef() && advisoryModal.classList.contains("open")) showAdvisoryModal(false, advisoryModal, advisoryQueueActive);
     else if (permissionModal && permissionModal.classList.contains("open")) setPermissionModal(false);
   });
   window.addEventListener("popstate", function () {
