@@ -82,7 +82,7 @@ final class CommercialDashboardView
       <section class="scm-tab-panel commercial-panel<?php echo $bucket !== 'calendario' ? ' active' : ''; ?>" id="commercial-tickets-panel" data-commercial-tickets-panel aria-live="polite">
         <?php if ($bucket !== 'calendario'): ?>
           <?php echo $bucket === 'inicio'
-            ? self::renderHome($homeDashboard, $filters, $policy, $baseUrl)
+            ? self::renderHome($homeDashboard, $filters, $policy, $baseUrl, $ticketEmployees, $filterOptions)
             : self::renderTickets($bucket, $result, $filters, $ticketEmployees, $filterOptions, $tabCounts, $policy, $baseUrl); ?>
         <?php endif; ?>
       </section>
@@ -206,7 +206,7 @@ final class CommercialDashboardView
   }
 
   /** @param array<string,mixed> $dashboard @param array<string,mixed> $filters */
-  public static function renderHome(array $dashboard, array $filters, $policy, string $baseUrl): string
+  public static function renderHome(array $dashboard, array $filters, $policy, string $baseUrl, array $ticketEmployees = [], array $filterOptions = []): string
   {
     $bucketCounts = is_array($dashboard['bucket_counts'] ?? null) ? $dashboard['bucket_counts'] : [];
     $statusCounts = is_array($dashboard['status_counts'] ?? null) ? $dashboard['status_counts'] : [];
@@ -378,6 +378,7 @@ final class CommercialDashboardView
         </article>
       </div>
 
+      <?php echo self::renderHomeControlPanels($filters, $ticketEmployees, $filterOptions, $policy); ?>
       <?php echo self::renderHomeAdvisoryModal($alerts, $signs, $properties, $filters, $baseUrl); ?>
     </section>
 <?php
@@ -489,6 +490,188 @@ final class CommercialDashboardView
     </div>
 <?php
     return (string) ob_get_clean();
+  }
+
+  /** @param array<string,mixed> $filters @param array<int,array<string,string>> $ticketEmployees @param array<string,mixed> $filterOptions */
+  private static function renderHomeControlPanels(array $filters, array $ticketEmployees, array $filterOptions, $policy): string
+  {
+    $canSeeAll = $policy instanceof CommercialAccessPolicy && $policy->canSeeAllCommercialTickets();
+    $selectedEmployee = trim((string) ($filters['id_empleado'] ?? ''));
+    $barrios = is_array($filterOptions['barrios'] ?? null) ? $filterOptions['barrios'] : [];
+    $tipos = is_array($filterOptions['tipos_inmueble'] ?? null) ? $filterOptions['tipos_inmueble'] : [];
+    $rutas = is_array($filterOptions['rutas_avisos'] ?? null) ? $filterOptions['rutas_avisos'] : [];
+    ob_start();
+?>
+    <section class="commercial-home-control-shell" data-commercial-home-controls>
+      <header>
+        <div>
+          <span class="commercial-kicker">Controles independientes</span>
+          <h2>Actualizaciones y avisos</h2>
+          <p>Estas funciones no dependen de las tareas: salen directo de inmuebles publicados y estado de avisos.</p>
+        </div>
+        <div class="commercial-home-control-tabs" role="tablist" aria-label="Controles operativos">
+          <button type="button" class="active" data-commercial-home-control-tab="updates">Actualizar inmuebles</button>
+          <button type="button" data-commercial-home-control-tab="signs">Avisos en fachada</button>
+        </div>
+      </header>
+
+      <article class="commercial-home-control-panel active" id="commercial-property-updates-panel" data-commercial-home-control-panel="updates">
+        <div class="commercial-control-title">
+          <div><h3>Panel para actualizar inmuebles</h3><p>Filtra inmuebles públicos por vencimiento de actualización y abre la ficha técnica sin salir del dashboard.</p></div>
+          <span data-commercial-property-total>0 inmuebles</span>
+        </div>
+        <form class="commercial-control-filters" data-commercial-property-control>
+          <label><span>Código</span><input type="text" name="codigo" placeholder="Ej: 90480"></label>
+          <label><span>Gestión</span><select name="gestion"><option value="">Todas</option><option value="Arriendo">Arriendo</option><option value="Venta">Venta</option><option value="Arriendo/Venta">Arriendo/Venta</option></select></label>
+          <?php if ($canSeeAll): ?><label><span>Funcionario</span><?php echo self::selectEmployeeOptions('commercial-property-employee', 'id_empleado', $ticketEmployees, $selectedEmployee); ?></label><?php endif; ?>
+          <label><span>Estado</span><select name="estado_actualizacion"><option value="">Todos</option><option value="Vencido">Vencidos</option><option value="Alerta">Alerta</option><option value="OK">Al día</option></select></label>
+          <div><button class="commercial-primary-btn" type="submit">Filtrar</button><button class="commercial-secondary-btn" type="button" data-commercial-control-clear>Limpiar</button></div>
+        </form>
+        <div class="commercial-control-statline" data-commercial-property-stats>Al día: 0 · Alerta: 0 · Vencidos: 0</div>
+        <div class="commercial-control-table-wrap">
+          <table class="commercial-control-table">
+            <thead><tr><th>Código</th><?php if ($canSeeAll): ?><th>Funcionario</th><?php endif; ?><th>Gestión</th><th>Estado</th><th>Tiempo</th><th>Acciones</th></tr></thead>
+            <tbody data-commercial-property-rows><tr><td colspan="<?php echo $canSeeAll ? '6' : '5'; ?>">Cargando inmuebles…</td></tr></tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="commercial-home-control-panel" id="commercial-signs-panel" data-commercial-home-control-panel="signs">
+        <div class="commercial-control-title">
+          <div><h3>Panel de avisos en fachada</h3><p>Controla retoques, avisos nuevos y rutas por barrio o ruta.</p></div>
+          <span data-commercial-sign-total>0 avisos</span>
+        </div>
+        <div class="commercial-sign-mode-tabs" role="tablist" aria-label="Modos de avisos">
+          <button class="active" type="button" data-commercial-sign-tab="maintenance">Retoque de avisos</button>
+          <button type="button" data-commercial-sign-tab="new">Avisos nuevos</button>
+          <?php if ($canSeeAll): ?><button type="button" data-commercial-sign-tab="routes_neighborhood">Rutas x barrio</button><button type="button" data-commercial-sign-tab="routes_route">Rutas x ruta</button><?php endif; ?>
+        </div>
+        <form class="commercial-control-filters" data-commercial-sign-control data-mode="maintenance">
+          <label><span>Código</span><input type="text" name="codigo" placeholder="Ej: 90480"></label>
+          <label><span>Gestión</span><select name="gestion"><option value="">Todas</option><option value="Arriendo">Arriendo</option><option value="Venta">Venta</option><option value="Arriendo/Venta">Arriendo/Venta</option></select></label>
+          <label><span>Tipo</span><?php echo self::selectFromOptions('commercial-sign-type', 'tipo', $tipos, ''); ?></label>
+          <label><span>Barrio</span><?php echo self::selectFromOptions('commercial-sign-neighborhood', 'barrio', $barrios, ''); ?></label>
+          <label><span>Ruta</span><?php echo self::selectFromOptions('commercial-sign-route', 'ruta', $rutas, ''); ?></label>
+          <?php if ($canSeeAll): ?><label><span>Funcionario</span><?php echo self::selectEmployeeOptions('commercial-sign-employee', 'id_empleado', $ticketEmployees, $selectedEmployee); ?></label><?php endif; ?>
+          <label><span>Estado</span><select name="estado_aviso"><option value="">Todos</option><option value="Vencido">Vencido</option><option value="Alerta">Alerta</option><option value="OK">Al día</option><option value="Atrasado">Nuevo atrasado</option><option value="A Tiempo">Nuevo al día</option></select></label>
+          <div><button class="commercial-primary-btn" type="submit">Filtrar</button><button class="commercial-secondary-btn" type="button" data-commercial-control-clear>Limpiar</button></div>
+        </form>
+        <div class="commercial-control-table-wrap">
+          <div data-commercial-sign-rows class="commercial-control-table-state">Cargando avisos…</div>
+        </div>
+      </article>
+    </section>
+
+    <div class="commercial-modal commercial-property-modal" id="commercial-property-modal" aria-hidden="true" role="dialog" aria-modal="true">
+      <div class="commercial-modal-card commercial-property-card" role="document">
+        <button type="button" class="commercial-modal-close" data-commercial-close-property aria-label="Cerrar ficha">&times;</button>
+        <div data-commercial-property-modal-content></div>
+      </div>
+    </div>
+    <div class="commercial-modal commercial-sign-detail-modal" id="commercial-sign-detail-modal" aria-hidden="true" role="dialog" aria-modal="true">
+      <div class="commercial-modal-card commercial-sign-detail-card" role="document">
+        <button type="button" class="commercial-modal-close" data-commercial-close-sign-detail aria-label="Cerrar detalle">&times;</button>
+        <div data-commercial-sign-detail-content></div>
+      </div>
+    </div>
+<?php
+    return (string) ob_get_clean();
+  }
+
+  /** @param array<int,array<string,mixed>> $rows */
+  public static function renderPropertyUpdateRows(array $rows, bool $showEmployee): string
+  {
+    if ($rows === []) {
+      return '<tr><td colspan="' . ($showEmployee ? '6' : '5') . '" class="commercial-control-empty-cell">Sin inmuebles para este filtro.</td></tr>';
+    }
+    $html = '';
+    foreach ($rows as $row) {
+      $status = (string) ($row['estado'] ?? 'OK');
+      $tone = self::controlTone($status);
+      $detail = esc_attr((string) json_encode($row['detalle'] ?? [], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP));
+      $html .= '<tr><td><strong>' . esc_html((string) ($row['codigo'] ?? '')) . '</strong></td>';
+      if ($showEmployee) {
+        $html .= '<td>' . esc_html((string) ($row['funcionario'] ?? '')) . '</td>';
+      }
+      $html .= '<td>' . esc_html((string) ($row['gestion'] ?? '')) . '</td>';
+      $html .= '<td><span class="commercial-control-badge commercial-control-badge--' . esc_attr($tone) . '">' . esc_html($status) . '</span></td>';
+      $html .= '<td><strong>' . esc_html((string) ($row['dias'] ?? 0)) . ' / ' . esc_html((string) ($row['max'] ?? 0)) . '</strong> días</td>';
+      $html .= '<td><div class="commercial-control-actions">';
+      if (trim((string) ($row['url_actualizar'] ?? '')) !== '') {
+        $html .= '<a class="commercial-control-btn commercial-control-btn--primary" href="' . esc_url((string) $row['url_actualizar']) . '" target="_blank" rel="noopener">Actualizar</a>';
+      }
+      $html .= '<button class="commercial-control-btn" type="button" data-commercial-property-info="' . $detail . '">Ficha técnica</button>';
+      if ($showEmployee && trim((string) ($row['url_despublicar'] ?? '')) !== '') {
+        $html .= '<a class="commercial-control-btn commercial-control-btn--danger" href="' . esc_url((string) $row['url_despublicar']) . '" target="_blank" rel="noopener">Despublicar</a>';
+      }
+      $html .= '</div></td></tr>';
+    }
+    return $html;
+  }
+
+  /** @param array<int,array<string,mixed>> $rows */
+  public static function renderSignControlRows(array $rows, string $mode): string
+  {
+    if ($rows === []) {
+      return '<div class="commercial-control-empty-cell">Sin avisos para este filtro.</div>';
+    }
+    if (in_array($mode, ['routes_neighborhood', 'routes_route'], true)) {
+      $groupKey = $mode === 'routes_route' ? 'ruta' : 'barrio';
+      $groups = [];
+      foreach ($rows as $row) {
+        $key = mb_strtoupper(trim((string) ($row[$groupKey] ?? '')), 'UTF-8') ?: ($mode === 'routes_route' ? 'SIN RUTA' : 'SIN BARRIO');
+        $groups[$key][] = $row;
+      }
+      ksort($groups, SORT_NATURAL | SORT_FLAG_CASE);
+      $html = '<div class="commercial-route-groups">';
+      foreach ($groups as $group => $items) {
+        $tableId = 'commercial-route-' . md5((string) $group);
+        $html .= '<details class="commercial-route-group"><summary><strong>' . esc_html((string) $group) . '</strong><span>' . count($items) . ' avisos</span><button type="button" data-commercial-copy-table="' . esc_attr($tableId) . '">Copiar tabla</button></summary>';
+        $html .= '<div class="commercial-control-table-wrap"><table id="' . esc_attr($tableId) . '" class="commercial-control-table"><thead><tr><th>' . ($mode === 'routes_route' ? 'Barrio' : 'Ruta') . '</th><th>Dirección</th><th>Punto ref.</th><th>Cód.</th><th>Funcionario</th><th>Celular</th><th>Tipo</th><th>Maps</th></tr></thead><tbody>';
+        foreach ($items as $row) {
+          $html .= self::renderSignRouteRow($row, $mode);
+        }
+        $html .= '</tbody></table></div></details>';
+      }
+      return $html . '</div>';
+    }
+
+    $headers = $mode === 'new'
+      ? '<tr><th>Código</th><th>Funcionario</th><th>Barrio</th><th>Captación</th><th>Gestión</th><th>Días / Max</th><th>Estado</th><th>Maps</th></tr>'
+      : '<tr><th>Código</th><th>Funcionario</th><th>Barrio</th><th>Gestión</th><th>Estado</th><th>Días</th><th>Maps</th><th>Acción</th></tr>';
+    $html = '<table class="commercial-control-table"><thead>' . $headers . '</thead><tbody>';
+    foreach ($rows as $row) {
+      $status = (string) ($row['estado'] ?? 'OK');
+      $tone = self::controlTone($status);
+      $maps = trim((string) ($row['maps_url'] ?? '')) !== '' ? '<a href="' . esc_url((string) $row['maps_url']) . '" target="_blank" rel="noopener">Ver mapa</a>' : '—';
+      $detail = esc_attr((string) json_encode($row, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP));
+      if ($mode === 'new') {
+        $html .= '<tr><td><strong>' . esc_html((string) ($row['codigo'] ?? '')) . '</strong></td><td>' . esc_html((string) ($row['funcionario'] ?? '')) . '</td><td>' . esc_html((string) ($row['barrio'] ?? '')) . '</td><td>' . esc_html((string) ($row['fecha'] ?? '')) . '</td><td>' . esc_html((string) ($row['gestion'] ?? '')) . '</td><td><strong>' . esc_html((string) ($row['dias'] ?? 0)) . ' / ' . esc_html((string) ($row['max'] ?? 0)) . '</strong> días</td><td><span class="commercial-control-badge commercial-control-badge--' . esc_attr($tone) . '">' . esc_html($status) . '</span></td><td>' . $maps . '</td></tr>';
+      } else {
+        $html .= '<tr><td><strong>' . esc_html((string) ($row['codigo'] ?? '')) . '</strong></td><td>' . esc_html((string) ($row['funcionario'] ?? '')) . '</td><td>' . esc_html((string) ($row['barrio'] ?? '')) . '</td><td>' . esc_html((string) ($row['gestion'] ?? '')) . '</td><td><span class="commercial-control-badge commercial-control-badge--' . esc_attr($tone) . '">' . esc_html($status) . '</span></td><td><strong>' . esc_html((string) ($row['dias'] ?? 0)) . ' / ' . esc_html((string) ($row['max'] ?? 0)) . '</strong></td><td>' . $maps . '</td><td><button class="commercial-control-btn" type="button" data-commercial-sign-detail="' . $detail . '">Ver detalle</button></td></tr>';
+      }
+    }
+    return $html . '</tbody></table>';
+  }
+
+  /** @param array<string,mixed> $row */
+  private static function renderSignRouteRow(array $row, string $mode): string
+  {
+    $first = $mode === 'routes_route' ? (string) ($row['barrio'] ?? '') : (string) ($row['ruta'] ?? '');
+    $maps = trim((string) ($row['maps_url'] ?? '')) !== '' ? '<a href="' . esc_url((string) $row['maps_url']) . '" target="_blank" rel="noopener">Ver mapa</a>' : '—';
+    return '<tr><td>' . esc_html($first) . '</td><td>' . esc_html((string) ($row['direccion'] ?? '')) . '</td><td>' . esc_html((string) ($row['punto_referencia'] ?? '')) . '</td><td><strong>' . esc_html((string) ($row['codigo'] ?? '')) . '</strong></td><td>' . esc_html((string) ($row['funcionario'] ?? '')) . '</td><td>' . esc_html((string) ($row['celular_funcionario'] ?? '')) . '</td><td>' . esc_html((string) ($row['tipo'] ?? '')) . '</td><td>' . $maps . '</td></tr>';
+  }
+
+  private static function controlTone(string $status): string
+  {
+    $normalized = mb_strtolower($status, 'UTF-8');
+    if (str_contains($normalized, 'venc') || str_contains($normalized, 'atras')) {
+      return 'danger';
+    }
+    if (str_contains($normalized, 'alert')) {
+      return 'warning';
+    }
+    return 'success';
   }
 
   /** @param array<string,mixed> $result @param array<string,mixed> $filters @param array<int,array<string,string>> $ticketEmployees @param array<string,mixed> $filterOptions @param array<string,int> $tabCounts */

@@ -80,7 +80,9 @@ final class CommercialApiController
         $this->tickets->homeDashboard($globalCountFilters),
         $filters,
         $this->policy,
-        $this->baseUrl
+        $this->baseUrl,
+        $ticketEmployees,
+        $this->tickets->filterOptions()
       );
     } elseif ($bucket === 'calendario') {
       $html = '';
@@ -232,6 +234,45 @@ final class CommercialApiController
     $permissions = $input['permissions'] ?? [];
     $this->policy->save(is_array($permissions) ? $permissions : []);
     JsonResponse::success(['message' => 'Configuración guardada.']);
+  }
+
+  /** @param array<string,mixed> $input */
+  public function propertyUpdates(array $input): never
+  {
+    $this->verify($input);
+    if (!$this->policy->canView('inicio')) {
+      JsonResponse::error('No tienes permiso para consultar actualizaciones de inmuebles.', 403);
+    }
+    $filters = $this->propertyControlFilters($input);
+    if (!$this->policy->canSeeAllCommercialTickets()) {
+      $filters['id_empleado'] = $this->tickets->currentEmployeeTicketFilter($this->commercialCargos);
+    }
+    $result = $this->tickets->propertyUpdateControl($filters, $this->policy->canSeeAllCommercialTickets());
+    JsonResponse::success([
+      'html' => CommercialDashboardView::renderPropertyUpdateRows($result['rows'], $this->policy->canSeeAllCommercialTickets()),
+      'total' => (int) ($result['total'] ?? 0),
+      'stats' => $result['stats'] ?? [],
+    ]);
+  }
+
+  /** @param array<string,mixed> $input */
+  public function signsControl(array $input): never
+  {
+    $this->verify($input);
+    if (!$this->policy->canView('inicio')) {
+      JsonResponse::error('No tienes permiso para consultar avisos.', 403);
+    }
+    $filters = $this->propertyControlFilters($input);
+    if (!$this->policy->canSeeAllCommercialTickets()) {
+      $filters['id_empleado'] = $this->tickets->currentEmployeeTicketFilter($this->commercialCargos);
+    }
+    $mode = sanitize_key((string) ($input['mode'] ?? 'maintenance'));
+    $result = $this->tickets->signControl($mode, $filters, $this->policy->canSeeAllCommercialTickets());
+    JsonResponse::success([
+      'html' => CommercialDashboardView::renderSignControlRows($result['rows'], (string) ($result['mode'] ?? $mode)),
+      'total' => (int) ($result['total'] ?? 0),
+      'mode' => (string) ($result['mode'] ?? $mode),
+    ]);
   }
 
   /** @param array<string,mixed> $input */
@@ -428,11 +469,32 @@ final class CommercialApiController
       'prioridad' => $clean('prioridad'),
       'tema' => $clean('tema'),
       'seguimiento' => $clean('seguimiento'),
+      'encargado_seguimiento' => $clean('encargado_seguimiento'),
+      'fecha_seguimiento_desde' => $clean('fecha_seguimiento_desde'),
+      'fecha_seguimiento_hasta' => $clean('fecha_seguimiento_hasta'),
+      'sin_actualizar' => $clean('sin_actualizar'),
+      'estado_administrativo' => $clean('estado_administrativo'),
       'fecha_desde' => $clean('fecha_desde'),
       'fecha_hasta' => $clean('fecha_hasta'),
       'sla_filter' => $clean('sla_filter'),
       'page' => max(1, (int) ($input['page'] ?? 1)),
       'per_page' => 24,
+    ];
+  }
+
+  /** @param array<string,mixed> $input @return array<string,mixed> */
+  private function propertyControlFilters(array $input): array
+  {
+    $clean = static fn(string $key): string => trim((string) ($input[$key] ?? ''));
+    return [
+      'codigo' => $clean('codigo'),
+      'gestion' => $clean('gestion'),
+      'tipo' => $clean('tipo'),
+      'barrio' => $clean('barrio'),
+      'ruta' => $clean('ruta'),
+      'id_empleado' => $clean('id_empleado'),
+      'estado_actualizacion' => $clean('estado_actualizacion'),
+      'estado_aviso' => $clean('estado_aviso'),
     ];
   }
 

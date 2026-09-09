@@ -32,6 +32,8 @@ final class CommercialActionRouter
       'commercial_ticket_activate' => 'activate',
       'commercial_ticket_close' => 'close',
       'commercial_permissions_save' => 'savePermissions',
+      'commercial_property_updates' => 'propertyUpdates',
+      'commercial_signs_control' => 'signsControl',
     ][$action] ?? null;
     if ($method === null) {
       return false;

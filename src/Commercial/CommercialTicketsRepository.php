@@ -420,7 +420,68 @@ final class CommercialTicketsRepository
       'barrios' => $this->neighborhoodOptions(),
       'encargados_seguimiento' => $this->followUpEmployeeOptions(),
       'estados_administrativos' => $this->distinctTicketValues('estado_administrativo'),
+      'tipos_inmueble' => $this->distinctPropertyValues('tipo_inmueble'),
+      'rutas_avisos' => $this->distinctPropertyValues('ruta'),
     ];
+  }
+
+  /**
+   * @param array<string,mixed> $filters
+   * @return array{rows:array<int,array<string,mixed>>,stats:array<string,int>,total:int}
+   */
+  public function propertyUpdateControl(array $filters, bool $canSeeAll): array
+  {
+    $rows = $this->propertyControlRows($filters, $canSeeAll, 'updates');
+    $wantedState = trim((string) ($filters['estado_actualizacion'] ?? ''));
+    $stats = ['ok' => 0, 'alerta' => 0, 'vencido' => 0];
+    $final = [];
+
+    foreach ($rows as $row) {
+      $state = $this->propertyUpdateState($row);
+      $status = (string) ($state['status'] ?? 'ok');
+      $label = $status === 'vencido' ? 'Vencido' : ($status === 'alerta' ? 'Alerta' : 'OK');
+      $stats[$status] = ($stats[$status] ?? 0) + 1;
+      if ($wantedState !== '' && $wantedState !== $label) {
+        continue;
+      }
+      $final[] = $this->normalizePropertyControlRow($row, $label, $state);
+    }
+
+    return ['rows' => $final, 'stats' => $stats, 'total' => count($final)];
+  }
+
+  /**
+   * @param array<string,mixed> $filters
+   * @return array{rows:array<int,array<string,mixed>>,total:int,mode:string}
+   */
+  public function signControl(string $mode, array $filters, bool $canSeeAll): array
+  {
+    $mode = in_array($mode, ['maintenance', 'new', 'routes_neighborhood', 'routes_route'], true) ? $mode : 'maintenance';
+    $rows = $this->propertyControlRows($filters, $canSeeAll, $mode);
+    $wantedState = trim((string) ($filters['estado_aviso'] ?? ''));
+    $final = [];
+
+    foreach ($rows as $row) {
+      $state = $mode === 'new' ? $this->signInstallationState($row) : $this->signState($row);
+      $label = (string) ($state['estado'] ?? $state['label'] ?? 'OK');
+      if ($label === 'Retoque vencido') {
+        $label = 'Vencido';
+      } elseif ($label === 'Retoque por vencer') {
+        $label = 'Alerta';
+      } elseif ($label === 'Aviso al día') {
+        $label = 'OK';
+      } elseif ($label === 'Aviso nuevo atrasado') {
+        $label = 'Atrasado';
+      } elseif ($label === 'Aviso nuevo al día') {
+        $label = 'A Tiempo';
+      }
+      if ($wantedState !== '' && $wantedState !== $label) {
+        continue;
+      }
+      $final[] = $this->normalizePropertyControlRow($row, $label, $state);
+    }
+
+    return ['rows' => $final, 'total' => count($final), 'mode' => $mode];
   }
 
   /** @param array<int,string> $cargoIds @return array<int,array<string,string>> */
@@ -839,14 +900,171 @@ final class CommercialTicketsRepository
     $push('danger', 'Tareas atrasadas', 'Prioriza las gestiones abiertas que ya superaron el tiempo permitido.', $this->homeUrl(['tab' => 'abiertos', 'sla_filter' => 'atrasado'], $filters), 'Ver atrasadas', (int) ($slaSummary['atrasados'] ?? 0));
     $push('warning', 'Sin seguimiento', 'Hay tareas abiertas sin seguimiento registrado.', $this->homeUrl(['tab' => 'abiertos', 'seguimiento' => 'No'], $filters), 'Hacer seguimiento', (int) ($updateHealth['sin_seguimiento'] ?? 0));
     $push('warning', 'Seguimientos vencidos', 'Tienes seguimientos programados para hoy o fechas anteriores.', $this->homeUrl(['tab' => 'abiertos'], $filters), 'Revisar agenda', (int) ($updateHealth['seguimientos_vencidos'] ?? 0));
-    $push('danger', 'Actualizaciones vencidas', 'Hay inmuebles publicados que superaron el tiempo máximo sin actualización.', $this->homeUrl(['tab' => 'abiertos', 'tema' => 'Actualización'], $filters), 'Actualizar inmuebles', (int) ($properties['actualizacion_vencida'] ?? 0));
-    $push('warning', 'Actualizaciones por vencer', 'Algunos inmuebles ya entraron en la ventana de alerta de actualización.', $this->homeUrl(['tab' => 'abiertos', 'tema' => 'Actualización'], $filters), 'Revisar alerta', (int) ($properties['actualizacion_alerta'] ?? 0));
-    $push('danger', 'Avisos vencidos', 'Hay inmuebles con aviso nuevo pendiente o retoque vencido.', $this->homeUrl(['tab' => 'abiertos', 'estado' => 'Pendiente colocar aviso'], $filters), 'Ver avisos', (int) ($signs['instalacion_atrasada'] ?? 0) + (int) ($signs['retoque_vencido'] ?? 0));
-    $push('warning', 'Avisos por vencer', 'Algunos avisos están entrando en ventana de retoque.', $this->homeUrl(['tab' => 'abiertos', 'estado' => 'Retocando'], $filters), 'Planear ruta', (int) ($signs['retoque_alerta'] ?? 0));
+    $push('danger', 'Actualizaciones vencidas', 'Hay inmuebles publicados que superaron el tiempo máximo sin actualización.', '#commercial-property-updates-panel', 'Abrir panel', (int) ($properties['actualizacion_vencida'] ?? 0));
+    $push('warning', 'Actualizaciones por vencer', 'Algunos inmuebles ya entraron en la ventana de alerta de actualización.', '#commercial-property-updates-panel', 'Abrir panel', (int) ($properties['actualizacion_alerta'] ?? 0));
+    $push('danger', 'Avisos vencidos', 'Hay inmuebles con aviso nuevo pendiente o retoque vencido.', '#commercial-signs-panel', 'Abrir avisos', (int) ($signs['instalacion_atrasada'] ?? 0) + (int) ($signs['retoque_vencido'] ?? 0));
+    $push('warning', 'Avisos por vencer', 'Algunos avisos están entrando en ventana de retoque.', '#commercial-signs-panel', 'Abrir avisos', (int) ($signs['retoque_alerta'] ?? 0));
     $push('warning', 'Precaptaciones sin tarea', 'Hay precaptaciones que todavía no tienen tarea asociada.', $this->homeUrl(['tab' => 'abiertos', 'estado' => 'Prospectado'], $filters), 'Convertir', (int) ($precaptations['sin_tarea'] ?? 0));
     $push('warning', 'Cotizaciones sin tarea', 'Existen cotizaciones comerciales sin tarea asociada para seguimiento.', $this->homeUrl(['tab' => 'abiertos', 'estado' => 'En cierre'], $filters), 'Revisar', (int) ($quotes['sin_tarea'] ?? 0));
 
     return array_slice($alerts, 0, 8);
+  }
+
+  /**
+   * @param array<string,mixed> $filters
+   * @return array<int,array<string,mixed>>
+   */
+  private function propertyControlRows(array $filters, bool $canSeeAll, string $mode): array
+  {
+    $table = $this->db->table('jet_cct_inmuebles');
+    if (!$this->schema->tableExists($table) || !$this->schema->columnExists($table, 'estado')) {
+      return [];
+    }
+
+    $where = ["LOWER(TRIM(COALESCE(i.`estado`, ''))) IN ('publico', 'publicado')"];
+    $args = [];
+
+    if (in_array($mode, ['maintenance', 'new', 'routes_neighborhood', 'routes_route'], true)) {
+      if (!$this->schema->columnExists($table, 'desea_aviso')) {
+        return [];
+      }
+      $where[] = "LOWER(TRIM(COALESCE(i.`desea_aviso`, ''))) LIKE '%si%'";
+      if ($mode === 'maintenance' && $this->schema->columnExists($table, 'presenta_aviso')) {
+        $where[] = "(i.`presenta_aviso` IS NULL OR LOWER(TRIM(i.`presenta_aviso`)) NOT LIKE '%no%')";
+      }
+      if ($mode === 'new' && $this->schema->columnExists($table, 'presenta_aviso')) {
+        $where[] = "(i.`presenta_aviso` IS NULL OR TRIM(i.`presenta_aviso`) = '' OR LOWER(TRIM(i.`presenta_aviso`)) LIKE '%no%')";
+      }
+    }
+
+    $employee = trim((string) ($filters['id_empleado'] ?? ''));
+    if (!$canSeeAll) {
+      $employee = $this->currentEmployeeTicketFilter();
+    }
+    if ($employee !== '') {
+      [$employeeWhere, $employeeArgs] = $this->propertyEmployeeWhere(['id_empleado' => $employee], 'i');
+      $where = array_merge($where, $employeeWhere);
+      $args = array_merge($args, $employeeArgs);
+    }
+
+    $textFilters = [
+      'codigo' => 'codigo',
+      'tipo' => 'tipo_inmueble',
+      'barrio' => 'barrio',
+      'ruta' => 'ruta',
+    ];
+    foreach ($textFilters as $filterKey => $column) {
+      $value = trim((string) ($filters[$filterKey] ?? ''));
+      if ($value === '' || !$this->schema->columnExists($table, $column)) {
+        continue;
+      }
+      if ($filterKey === 'codigo') {
+        $where[] = "CAST(i.`{$column}` AS CHAR) LIKE ?";
+        $args[] = '%' . $this->db->escapeLike($value) . '%';
+      } else {
+        $where[] = "TRIM(COALESCE(i.`{$column}`, '')) = ?";
+        $args[] = $value;
+      }
+    }
+
+    $business = trim((string) ($filters['gestion'] ?? ''));
+    if ($business !== '' && $this->schema->columnExists($table, 'tipo_negocio')) {
+      if ($business === 'Arriendo') {
+        $where[] = "LOWER(COALESCE(i.`tipo_negocio`, '')) LIKE '%arriendo%' AND LOWER(COALESCE(i.`tipo_negocio`, '')) NOT LIKE '%venta%'";
+      } elseif ($business === 'Venta') {
+        $where[] = "LOWER(COALESCE(i.`tipo_negocio`, '')) LIKE '%venta%' AND LOWER(COALESCE(i.`tipo_negocio`, '')) NOT LIKE '%arriendo%'";
+      } elseif (in_array($business, ['Arriendo/Venta', 'Arriendo y Venta'], true)) {
+        $where[] = "LOWER(COALESCE(i.`tipo_negocio`, '')) LIKE '%arriendo%' AND LOWER(COALESCE(i.`tipo_negocio`, '')) LIKE '%venta%'";
+      }
+    }
+
+    $funcionarios = $this->db->table('jet_cct_funcionarios');
+    $canJoinEmployees = $this->schema->tableExists($funcionarios)
+      && $this->schema->columnExists($table, 'id_funcionario')
+      && $this->schema->columnExists($funcionarios, 'id_empleado');
+    $employeeJoin = $canJoinEmployees
+      ? "LEFT JOIN `{$funcionarios}` f ON TRIM(COALESCE(f.`id_empleado`, '')) = TRIM(COALESCE(i.`id_funcionario`, ''))"
+      : '';
+    $employeeNameExpr = $canJoinEmployees && $this->schema->columnExists($funcionarios, 'nombre') ? "f.`nombre`" : "''";
+    $employeePhoneExpr = $canJoinEmployees && $this->schema->columnExists($funcionarios, 'celular') ? "f.`celular`" : "''";
+    $employeeBranchExpr = $canJoinEmployees && $this->schema->columnExists($funcionarios, 'id_sucursal') ? "f.`id_sucursal`" : "''";
+    $orderParts = [];
+    foreach (['barrio', 'ruta', 'codigo'] as $column) {
+      if ($this->schema->columnExists($table, $column)) {
+        $orderParts[] = "i.`{$column}` ASC";
+      }
+    }
+    $order = $orderParts !== [] ? implode(', ', $orderParts) : 'i.`_ID` DESC';
+
+    return $this->db->getResults(
+      "SELECT i.*, {$employeeNameExpr} AS nfunc, {$employeePhoneExpr} AS fcel, {$employeeBranchExpr} AS func_sucursal
+         FROM `{$table}` i
+         {$employeeJoin}
+        WHERE " . implode(' AND ', $where) . "
+        ORDER BY {$order}",
+      $args
+    );
+  }
+
+  /**
+   * @param array<string,mixed> $row
+   * @param array<string,mixed> $state
+   * @return array<string,mixed>
+   */
+  private function normalizePropertyControlRow(array $row, string $statusLabel, array $state): array
+  {
+    $code = trim((string) ($row['codigo'] ?? $row['_ID'] ?? ''));
+    if ($code === '') {
+      $code = trim((string) ($row['_ID'] ?? ''));
+    }
+    $days = (int) ($state['days'] ?? $state['dias'] ?? 0);
+    $max = (int) ($state['max'] ?? 0);
+    $reference = trim((string) ($state['fecha_mostrar'] ?? $state['fecha_captacion'] ?? ''));
+    if ($reference === '') {
+      $reference = isset($state['origen']) ? (string) $state['origen'] : '';
+    }
+
+    return [
+      '_ID' => (string) ($row['_ID'] ?? ''),
+      'codigo' => $code,
+      'funcionario' => trim((string) ($row['nfunc'] ?? $row['funcionario'] ?? $row['id_funcionario'] ?? '')),
+      'id_funcionario' => trim((string) ($row['id_funcionario'] ?? '')),
+      'tipo' => trim((string) ($row['tipo_inmueble'] ?? '')),
+      'gestion' => trim((string) ($row['tipo_negocio'] ?? '')),
+      'estado' => $statusLabel,
+      'dias' => $days,
+      'max' => $max,
+      'fecha' => $reference,
+      'origen' => trim((string) ($state['origen'] ?? '')),
+      'barrio' => trim((string) ($row['barrio'] ?? '')),
+      'ruta' => trim((string) ($row['ruta'] ?? '')),
+      'direccion' => trim((string) ($row['direccion'] ?? '')),
+      'punto_referencia' => trim((string) ($row['punto_referencia'] ?? '')),
+      'maps_url' => trim((string) ($row['ubicacion_google_maps'] ?? '')),
+      'celular_funcionario' => trim((string) ($row['fcel'] ?? '')),
+      'url_actualizar' => $this->propertyUpdateUrl($row),
+      'url_despublicar' => $this->propertyUnpublishUrl($row),
+      'detalle' => [
+        'codigo' => $code,
+        'prop_nombre' => trim((string) ($row['propietario'] ?? '')) ?: 'No registrado',
+        'prop_email' => trim((string) ($row['email_propietario'] ?? $row['email-propietario'] ?? '')) ?: 'No registrado',
+        'prop_cel' => trim((string) ($row['celular_propietario'] ?? $row['celular-propietario'] ?? '')) ?: 'No registrado',
+        'llaves_ubi' => trim((string) ($row['ubicacion_llaves'] ?? $row['ubicacion-llaves'] ?? '')) ?: 'Consultar CRM',
+        'llaves_contacto' => trim((string) ($row['contacto_llaves'] ?? $row['contacto-llaves'] ?? '')) ?: 'Consultar CRM',
+        'llaves_tel' => trim((string) ($row['telefono_llaves'] ?? $row['telefono-llaves'] ?? '')) ?: 'Consultar CRM',
+        'llaves_donde' => trim((string) ($row['en_donde'] ?? $row['en-donde'] ?? '')) ?: 'Consultar CRM',
+        'tipo_inmueble' => trim((string) ($row['tipo_inmueble'] ?? '')) ?: '-',
+        'val_arr' => $this->formatCop($row['precio_arriendo'] ?? ''),
+        'val_ven' => $this->formatCop($row['precio_venta'] ?? ''),
+        'val_adm' => $this->formatCop($row['precio_admin'] ?? ''),
+        'area_priv' => trim((string) ($row['area_privada'] ?? '')) ?: '-',
+        'area_cons' => trim((string) ($row['area_construida'] ?? '')) ?: '-',
+        'habs' => trim((string) ($row['habitaciones'] ?? '')) ?: '-',
+        'banos' => trim((string) ($row['banos'] ?? $row['baños'] ?? '')) ?: '-',
+        'barrio' => trim((string) ($row['barrio'] ?? '')) ?: '-',
+        'dir_full' => trim((string) ($row['direccion'] ?? '')) ?: '-',
+      ],
+    ];
   }
 
   /** @param array<string,mixed> $filters @return array<string,mixed> */
@@ -979,6 +1197,28 @@ final class CommercialTicketsRepository
     return ['status' => 'ok', 'label' => 'Aviso al día', 'days' => max(0, $days)];
   }
 
+  /** @param array<string,mixed> $row @return array{estado:string,dias:int,max:int,fecha_captacion:string,label:string} */
+  private function signInstallationState(array $row): array
+  {
+    $captured = $this->parseMixedTimestamp($row['fecha_captacion'] ?? null);
+    if ($captured <= 0) {
+      $captured = $this->parseMixedTimestamp($row['cct_created'] ?? null);
+    }
+    if ($captured <= 0) {
+      $captured = time();
+    }
+    $limit = $this->systemConfigInt('dias-atraso-aviso-nuevo', 5);
+    $days = (int) floor((time() - $captured) / 86400);
+    $late = $days > $limit;
+    return [
+      'estado' => $late ? 'Atrasado' : 'A Tiempo',
+      'label' => $late ? 'Aviso nuevo atrasado' : 'Aviso nuevo al día',
+      'dias' => max(0, $days),
+      'max' => $limit,
+      'fecha_captacion' => date('d/m/Y', $captured),
+    ];
+  }
+
   private function signRetouchLimit(string $businessType): int
   {
     $type = mb_strtolower($businessType, 'UTF-8');
@@ -1049,6 +1289,60 @@ final class CommercialTicketsRepository
     ];
 
     return 'https://sucasainmobiliaria.com.co/mi-cuenta/actualizar-inmueble/?' . http_build_query(array_filter($params, static fn(string $value): bool => $value !== ''));
+  }
+
+  /** @param array<string,mixed> $row */
+  private function propertyUnpublishUrl(array $row): string
+  {
+    $code = trim((string) ($row['codigo'] ?? $row['_ID'] ?? ''));
+    if ($code === '') {
+      return '';
+    }
+
+    $params = [
+      'id_inmueble' => $code,
+      'id_empleado' => trim((string) ($row['id_funcionario'] ?? '')),
+      'id_propietario' => trim((string) ($row['id_propietario'] ?? '')),
+    ];
+
+    return 'https://sucasainmobiliaria.com.co/mi-cuenta/despublicar-inmueble/?' . http_build_query(array_filter($params, static fn(string $value): bool => $value !== ''));
+  }
+
+  /** @param mixed $value */
+  private function formatCop($value): string
+  {
+    if ($value === null || $value === '') {
+      return '-';
+    }
+    $raw = trim((string) $value);
+    if ($raw === '') {
+      return '-';
+    }
+    $numeric = preg_replace('/[^\d,.\-]/', '', $raw) ?? '';
+    if ($numeric === '') {
+      return '-';
+    }
+    $lastDot = strrpos($numeric, '.');
+    $lastComma = strrpos($numeric, ',');
+    $separator = max($lastDot === false ? -1 : $lastDot, $lastComma === false ? -1 : $lastComma);
+    if ($separator >= 0) {
+      $decimals = strlen($numeric) - $separator - 1;
+      if ($decimals > 0 && $decimals <= 2) {
+        if ($numeric[$separator] === ',') {
+          $numeric = str_replace('.', '', $numeric);
+          $numeric = str_replace(',', '.', $numeric);
+        } else {
+          $numeric = str_replace(',', '', $numeric);
+        }
+      } else {
+        $numeric = preg_replace('/[^\d\-]/', '', $numeric) ?? '';
+      }
+    }
+    $amount = (float) $numeric;
+    if ($amount <= 0) {
+      return '-';
+    }
+    return '$ ' . number_format($amount, 0, ',', '.');
   }
 
   private function systemConfigInt(string $key, int $default): int
@@ -1134,6 +1428,26 @@ final class CommercialTicketsRepository
          FROM `{$table}`
         WHERE TRIM(COALESCE(`{$column}`, '')) <> ''
         ORDER BY value ASC"
+    );
+    return array_values(array_filter(array_map('strval', $rows), static fn(string $value): bool => trim($value) !== ''));
+  }
+
+  /** @return array<int,string> */
+  private function distinctPropertyValues(string $column): array
+  {
+    if (!in_array($column, ['tipo_inmueble', 'ruta', 'barrio'], true)) {
+      return [];
+    }
+    $table = $this->db->table('jet_cct_inmuebles');
+    if (!$this->schema->columnExists($table, $column)) {
+      return [];
+    }
+    $rows = $this->db->getCol(
+      "SELECT DISTINCT TRIM(COALESCE(`{$column}`, '')) AS value
+         FROM `{$table}`
+        WHERE TRIM(COALESCE(`{$column}`, '')) <> ''
+        ORDER BY value ASC
+        LIMIT 700"
     );
     return array_values(array_filter(array_map('strval', $rows), static fn(string $value): bool => trim($value) !== ''));
   }

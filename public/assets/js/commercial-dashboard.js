@@ -403,6 +403,11 @@
       "prioridad",
       "tema",
       "seguimiento",
+      "encargado_seguimiento",
+      "fecha_seguimiento_desde",
+      "fecha_seguimiento_hasta",
+      "sin_actualizar",
+      "estado_administrativo",
       "fecha_desde",
       "fecha_hasta",
       "sla_filter",
@@ -422,6 +427,7 @@
         setVisiblePanel(tab);
         if (options.history !== false) updateHistory(nextUrl, !!options.replace);
         maybeAutoOpenAdvisory();
+        initHomeControls();
         if (options.focus) {
           var heading = ticketsPanel.querySelector("h2");
           if (heading) {
@@ -544,6 +550,112 @@
       });
   }
 
+  function homeControlPanel(name) {
+    return root.querySelector('[data-commercial-home-control-panel="' + name + '"]');
+  }
+
+  function setStandaloneModal(modal, open) {
+    if (!modal) return;
+    modal.classList.toggle("open", open);
+    modal.setAttribute("aria-hidden", open ? "false" : "true");
+    document.body.classList.toggle("commercial-modal-open", open || !!document.querySelector(".commercial-modal.open"));
+  }
+
+  function safeJsonFromAttr(element, attr) {
+    try {
+      return JSON.parse(element.getAttribute(attr) || "{}");
+    } catch (_error) {
+      return {};
+    }
+  }
+
+  function propertyInfoMarkup(info) {
+    info = info || {};
+    function row(label, value) {
+      return "<div><span>" + escapeHtml(label) + "</span><strong>" + escapeHtml(value || "-") + "</strong></div>";
+    }
+    return (
+      '<header class="commercial-property-modal-head"><span>Ficha técnica</span><h2>Inmueble ' + escapeHtml(info.codigo || "") + "</h2></header>" +
+      '<div class="commercial-property-modal-grid">' +
+      '<section><h3>Resumen del inmueble</h3>' +
+      row("Arriendo", info.val_arr) + row("Venta", info.val_ven) + row("Administración", info.val_adm) +
+      row("Tipo", info.tipo_inmueble) + row("Barrio", info.barrio) + row("Dirección", info.dir_full) +
+      row("Área privada", (info.area_priv || "-") + " m²") + row("Área construida", (info.area_cons || "-") + " m²") + row("Hab / Baños", (info.habs || "-") + " / " + (info.banos || "-")) +
+      "</section>" +
+      '<section><h3>Propietario</h3>' +
+      row("Nombre", info.prop_nombre) + row("Email", info.prop_email) + row("Celular", info.prop_cel) +
+      "</section>" +
+      '<section><h3>Gestión de llaves</h3>' +
+      row("Ubicación", info.llaves_ubi) + row("En dónde", info.llaves_donde) + row("Contacto", info.llaves_contacto) + row("Teléfono", info.llaves_tel) +
+      "</section>" +
+      "</div>"
+    );
+  }
+
+  function signDetailMarkup(row) {
+    row = row || {};
+    var maps = row.maps_url ? '<a class="commercial-control-btn commercial-control-btn--primary" target="_blank" rel="noopener" href="' + escapeHtml(row.maps_url) + '">Ver en Google Maps</a>' : "";
+    return (
+      '<header class="commercial-property-modal-head"><span>Detalle del aviso</span><h2>Inmueble ' + escapeHtml(row.codigo || "") + "</h2></header>" +
+      '<div class="commercial-sign-detail-grid">' +
+      "<div><span>Funcionario</span><strong>" + escapeHtml(row.funcionario || "-") + "</strong></div>" +
+      "<div><span>Tipo</span><strong>" + escapeHtml(row.tipo || "-") + "</strong></div>" +
+      "<div><span>Gestión</span><strong>" + escapeHtml(row.gestion || "-") + "</strong></div>" +
+      "<div><span>Estado</span><strong>" + escapeHtml(row.estado || "-") + "</strong></div>" +
+      "<div><span>Días</span><strong>" + escapeHtml((row.dias || 0) + " / " + (row.max || 0)) + "</strong></div>" +
+      "<div><span>Fecha base</span><strong>" + escapeHtml(row.fecha || "-") + "</strong></div>" +
+      "<div><span>Barrio</span><strong>" + escapeHtml(row.barrio || "-") + "</strong></div>" +
+      "<div><span>Ruta</span><strong>" + escapeHtml(row.ruta || "-") + "</strong></div>" +
+      "</div>" +
+      (maps ? '<footer class="commercial-control-actions">' + maps + "</footer>" : "")
+    );
+  }
+
+  function loadPropertyUpdates() {
+    var form = root.querySelector("[data-commercial-property-control]");
+    var rows = root.querySelector("[data-commercial-property-rows]");
+    var total = root.querySelector("[data-commercial-property-total]");
+    var stats = root.querySelector("[data-commercial-property-stats]");
+    if (!form || !rows) return;
+    rows.innerHTML = '<tr><td colspan="6" class="commercial-control-empty-cell">Cargando inmuebles…</td></tr>';
+    request("commercial_property_updates", new FormData(form))
+      .then(function (response) {
+        rows.innerHTML = response.html || "";
+        if (total) total.textContent = (response.total || 0) + " inmuebles";
+        if (stats) {
+          var s = response.stats || {};
+          stats.textContent = "Al día: " + (s.ok || 0) + " · Alerta: " + (s.alerta || 0) + " · Vencidos: " + (s.vencido || 0);
+        }
+      })
+      .catch(function (error) {
+        rows.innerHTML = '<tr><td colspan="6" class="commercial-control-empty-cell">' + escapeHtml(error.message) + "</td></tr>";
+      });
+  }
+
+  function loadSignsControl() {
+    var form = root.querySelector("[data-commercial-sign-control]");
+    var rows = root.querySelector("[data-commercial-sign-rows]");
+    var total = root.querySelector("[data-commercial-sign-total]");
+    if (!form || !rows) return;
+    var data = new FormData(form);
+    data.set("mode", form.getAttribute("data-mode") || "maintenance");
+    rows.innerHTML = '<div class="commercial-control-table-state">Cargando avisos…</div>';
+    request("commercial_signs_control", data)
+      .then(function (response) {
+        rows.innerHTML = response.html || "";
+        if (total) total.textContent = (response.total || 0) + " avisos";
+      })
+      .catch(function (error) {
+        rows.innerHTML = '<div class="commercial-control-empty-cell">' + escapeHtml(error.message) + "</div>";
+      });
+  }
+
+  function initHomeControls() {
+    if (!root.querySelector("[data-commercial-home-controls]")) return;
+    loadPropertyUpdates();
+    loadSignsControl();
+  }
+
   function analyzeCase(button) {
     if (!caseContent) return;
     var ticketPk = button.getAttribute("data-ticket-pk") || currentCasePk || "";
@@ -624,6 +736,88 @@
     var globalClear = event.target.closest("[data-commercial-global-clear]");
     var openButton = event.target.closest("[data-commercial-open-case]");
     var openAdvisory = event.target.closest("[data-commercial-open-advisory]");
+    var controlTab = event.target.closest("[data-commercial-home-control-tab]");
+    var signTab = event.target.closest("[data-commercial-sign-tab]");
+    var controlClear = event.target.closest("[data-commercial-control-clear]");
+    var propertyInfo = event.target.closest("[data-commercial-property-info]");
+    var signDetail = event.target.closest("[data-commercial-sign-detail]");
+    var closeProperty = event.target.closest("[data-commercial-close-property]");
+    var closeSignDetail = event.target.closest("[data-commercial-close-sign-detail]");
+    var copyTable = event.target.closest("[data-commercial-copy-table]");
+    if (event.target && event.target.matches && event.target.matches("#commercial-property-modal")) {
+      setStandaloneModal(event.target, false);
+      return;
+    }
+    if (event.target && event.target.matches && event.target.matches("#commercial-sign-detail-modal")) {
+      setStandaloneModal(event.target, false);
+      return;
+    }
+    if (controlTab) {
+      event.preventDefault();
+      var panelName = controlTab.getAttribute("data-commercial-home-control-tab") || "updates";
+      root.querySelectorAll("[data-commercial-home-control-tab]").forEach(function (button) { button.classList.toggle("active", button === controlTab); });
+      root.querySelectorAll("[data-commercial-home-control-panel]").forEach(function (panel) { panel.classList.toggle("active", panel.getAttribute("data-commercial-home-control-panel") === panelName); });
+      if (panelName === "updates") loadPropertyUpdates();
+      if (panelName === "signs") loadSignsControl();
+      return;
+    }
+    if (signTab) {
+      event.preventDefault();
+      var mode = signTab.getAttribute("data-commercial-sign-tab") || "maintenance";
+      root.querySelectorAll("[data-commercial-sign-tab]").forEach(function (button) { button.classList.toggle("active", button === signTab); });
+      var signForm = root.querySelector("[data-commercial-sign-control]");
+      if (signForm) signForm.setAttribute("data-mode", mode);
+      loadSignsControl();
+      return;
+    }
+    if (controlClear) {
+      event.preventDefault();
+      var controlForm = controlClear.closest("form");
+      if (controlForm) {
+        Array.prototype.forEach.call(controlForm.elements, function (field) {
+          if (!field.name) return;
+          if (field.tagName === "SELECT") field.selectedIndex = 0;
+          else if (field.type !== "hidden") field.value = "";
+        });
+        if (controlForm.matches("[data-commercial-property-control]")) loadPropertyUpdates();
+        if (controlForm.matches("[data-commercial-sign-control]")) loadSignsControl();
+      }
+      return;
+    }
+    if (propertyInfo) {
+      event.preventDefault();
+      var propertyModal = document.getElementById("commercial-property-modal");
+      var propertyContent = propertyModal && propertyModal.querySelector("[data-commercial-property-modal-content]");
+      if (propertyContent) propertyContent.innerHTML = propertyInfoMarkup(safeJsonFromAttr(propertyInfo, "data-commercial-property-info"));
+      setStandaloneModal(propertyModal, true);
+      return;
+    }
+    if (signDetail) {
+      event.preventDefault();
+      var signModal = document.getElementById("commercial-sign-detail-modal");
+      var signContent = signModal && signModal.querySelector("[data-commercial-sign-detail-content]");
+      if (signContent) signContent.innerHTML = signDetailMarkup(safeJsonFromAttr(signDetail, "data-commercial-sign-detail"));
+      setStandaloneModal(signModal, true);
+      return;
+    }
+    if (closeProperty) {
+      event.preventDefault();
+      setStandaloneModal(document.getElementById("commercial-property-modal"), false);
+      return;
+    }
+    if (closeSignDetail) {
+      event.preventDefault();
+      setStandaloneModal(document.getElementById("commercial-sign-detail-modal"), false);
+      return;
+    }
+    if (copyTable) {
+      event.preventDefault();
+      var table = document.getElementById(copyTable.getAttribute("data-commercial-copy-table") || "");
+      if (table && navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(table.innerText || "").then(function () { notify("success", "Tabla copiada."); });
+      }
+      return;
+    }
     if (tab) {
       event.preventDefault();
       var key = tab.getAttribute("data-commercial-tab") || "abiertos";
@@ -636,6 +830,20 @@
     if (filterLink) {
       event.preventDefault();
       if (filterLink.closest("[data-commercial-advisory-modal]")) showAdvisoryModal(false);
+      var rawHref = filterLink.getAttribute("href") || "";
+      if (rawHref.charAt(0) === "#") {
+        var target = document.querySelector(rawHref);
+        if (rawHref === "#commercial-signs-panel") {
+          var signsTab = root.querySelector('[data-commercial-home-control-tab="signs"]');
+          if (signsTab) signsTab.click();
+        } else if (rawHref === "#commercial-property-updates-panel") {
+          var updatesTab = root.querySelector('[data-commercial-home-control-tab="updates"]');
+          if (updatesTab) updatesTab.click();
+        }
+        target = document.querySelector(rawHref);
+        if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+        return;
+      }
       loadTickets(filterLink.href, { focus: false });
       return;
     }
@@ -656,6 +864,18 @@
   });
 
   root.addEventListener("submit", function (event) {
+    var propertyControlForm = event.target.closest("[data-commercial-property-control]");
+    if (propertyControlForm) {
+      event.preventDefault();
+      loadPropertyUpdates();
+      return;
+    }
+    var signControlForm = event.target.closest("[data-commercial-sign-control]");
+    if (signControlForm) {
+      event.preventDefault();
+      loadSignsControl();
+      return;
+    }
     var globalForm = event.target.closest("[data-commercial-global-filter-form]");
     if (globalForm) {
       event.preventDefault();
@@ -827,6 +1047,8 @@
     if (event.key !== "Escape") return;
     var modal = analysisModal();
     if (modal && modal.classList.contains("open")) setAnalysisModal(false);
+    else if (document.getElementById("commercial-property-modal") && document.getElementById("commercial-property-modal").classList.contains("open")) setStandaloneModal(document.getElementById("commercial-property-modal"), false);
+    else if (document.getElementById("commercial-sign-detail-modal") && document.getElementById("commercial-sign-detail-modal").classList.contains("open")) setStandaloneModal(document.getElementById("commercial-sign-detail-modal"), false);
     else if (caseModal && caseModal.classList.contains("open")) showCaseModal(false);
     else if (refreshAdvisoryModalRef() && advisoryModal.classList.contains("open")) showAdvisoryModal(false);
     else if (permissionModal && permissionModal.classList.contains("open")) setPermissionModal(false);
@@ -838,5 +1060,8 @@
     else loadTickets(url.href, { history: false, focus: true });
   });
   if (activeTab() === "calendario") window.setTimeout(function () { setVisiblePanel("calendario"); }, 0);
-  if (activeTab() === "inicio") window.setTimeout(maybeAutoOpenAdvisory, 0);
+  if (activeTab() === "inicio") window.setTimeout(function () {
+    maybeAutoOpenAdvisory();
+    initHomeControls();
+  }, 0);
 })();
