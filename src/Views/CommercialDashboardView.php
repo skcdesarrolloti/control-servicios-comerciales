@@ -334,7 +334,6 @@ final class CommercialDashboardView
           <footer>
             <?php echo self::renderHomeStatus('Pendientes', $newSignPending, 'warning'); ?>
             <?php echo self::renderHomeStatus('Atrasados', $newSignLate, 'danger'); ?>
-            <?php echo self::renderHomeStatus('A tiempo', $newSignOnTime, 'success'); ?>
           </footer>
         </article>
       </div>
@@ -444,7 +443,6 @@ final class CommercialDashboardView
     $newSignStats = [
       ['label' => 'Pendientes', 'value' => $newSignPending, 'tone' => 'warning'],
       ['label' => 'Atrasados', 'value' => $newSignLate, 'tone' => 'danger'],
-      ['label' => 'A tiempo', 'value' => max(0, $newSignPending - $newSignLate), 'tone' => 'success'],
     ];
 
     $renderStats = static function (array $stats): string {
@@ -466,7 +464,6 @@ final class CommercialDashboardView
       ob_start();
 ?>
       <section class="commercial-advisory-signs commercial-advisory-updates">
-        <h3>Inmuebles pendientes</h3>
         <?php if ($items === []): ?>
           <div class="commercial-home-ok commercial-home-ok--large">No hay inmuebles críticos para este control.</div>
         <?php else: ?>
@@ -490,7 +487,6 @@ final class CommercialDashboardView
       ob_start();
 ?>
       <section class="commercial-advisory-signs">
-        <h3>Inmuebles relacionados</h3>
         <?php if ($items === []): ?>
           <div class="commercial-home-ok commercial-home-ok--large"><?php echo esc_html($emptyMessage); ?></div>
         <?php else: ?>
