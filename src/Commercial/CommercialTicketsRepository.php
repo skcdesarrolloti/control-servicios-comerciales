@@ -410,7 +410,7 @@ final class CommercialTicketsRepository
     return $employees;
   }
 
-  /** @return array{medios:array<int,string>,prioridades:array<int,string>,temas:array<int,string>,barrios:array<int,string>} */
+  /** @return array{medios:array<int,string>,prioridades:array<int,string>,temas:array<int,string>,barrios:array<int,string>,encargados_seguimiento:array<int,array{id:string,name:string}>,estados_administrativos:array<int,string>} */
   public function filterOptions(): array
   {
     return [
@@ -418,6 +418,8 @@ final class CommercialTicketsRepository
       'prioridades' => $this->distinctTicketValues('prioridad'),
       'temas' => $this->distinctTicketValues('tema_ayuda'),
       'barrios' => $this->neighborhoodOptions(),
+      'encargados_seguimiento' => $this->followUpEmployeeOptions(),
+      'estados_administrativos' => $this->distinctTicketValues('estado_administrativo'),
     ];
   }
 
@@ -614,36 +616,128 @@ final class CommercialTicketsRepository
   {
     $table = $this->db->table('jet_cct_inmuebles');
     if (!$this->schema->tableExists($table)) {
-      return ['available' => false, 'total' => 0, 'publicos' => 0, 'captados_hoy' => 0, 'publicados_hoy' => 0, 'actualizados_hoy' => 0, 'sin_actualizar' => 0];
+      return [
+        'available' => false,
+        'total' => 0,
+        'publicos' => 0,
+        'captados_hoy' => 0,
+        'publicados_hoy' => 0,
+        'actualizados_hoy' => 0,
+        'sin_actualizar' => 0,
+        'actualizacion_ok' => 0,
+        'actualizacion_alerta' => 0,
+        'actualizacion_vencida' => 0,
+        'items' => [],
+      ];
     }
 
     [$where, $args] = $this->propertyEmployeeWhere($filters, 'i');
     $where = $where ?: ['1=1'];
     $todayStart = strtotime(date('Y-m-d 00:00:00')) ?: time();
-    $staleLimit = time() - (30 * 86400);
-    $row = $this->db->getRow(
-      "SELECT
-          COUNT(1) AS total,
-          SUM(CASE WHEN LOWER(TRIM(COALESCE(i.`estado`, ''))) IN ('publico', 'publicado') THEN 1 ELSE 0 END) AS publicos,
-          SUM(CASE WHEN COALESCE(NULLIF(i.`fecha_captacion`, 0), 0) >= ? THEN 1 ELSE 0 END) AS captados_hoy,
-          SUM(CASE WHEN COALESCE(NULLIF(i.`fecha_publicacion`, 0), 0) >= ? THEN 1 ELSE 0 END) AS publicados_hoy,
-          SUM(CASE WHEN COALESCE(NULLIF(i.`fecha_actualizacion`, 0), UNIX_TIMESTAMP(i.`cct_modified`), 0) >= ? THEN 1 ELSE 0 END) AS actualizados_hoy,
-          SUM(CASE WHEN LOWER(TRIM(COALESCE(i.`estado`, ''))) IN ('publico', 'publicado') AND COALESCE(NULLIF(i.`fecha_actualizacion`, 0), UNIX_TIMESTAMP(i.`cct_modified`), 0) > 0 AND COALESCE(NULLIF(i.`fecha_actualizacion`, 0), UNIX_TIMESTAMP(i.`cct_modified`), 0) < ? THEN 1 ELSE 0 END) AS sin_actualizar
+    $funcionarios = $this->db->table('jet_cct_funcionarios');
+    $propertyTextColumn = function (string $column) use ($table): string {
+      return $this->schema->columnExists($table, $column) ? "i.`{$column}`" : "''";
+    };
+    $propertyDateColumn = function (string $column) use ($table): string {
+      return $this->schema->columnExists($table, $column) ? "i.`{$column}`" : '0';
+    };
+    $canJoinEmployees = $this->schema->tableExists($funcionarios)
+      && $this->schema->columnExists($table, 'id_funcionario')
+      && $this->schema->columnExists($funcionarios, 'id_empleado');
+    $employeeJoin = $canJoinEmployees
+      ? "LEFT JOIN `{$funcionarios}` f ON TRIM(COALESCE(f.`id_empleado`, '')) = TRIM(COALESCE(i.`id_funcionario`, ''))"
+      : '';
+    $employeeNameExpr = $canJoinEmployees && $this->schema->columnExists($funcionarios, 'nombre')
+      ? "f.`nombre`"
+      : $propertyTextColumn('funcionario');
+    $employeeBranchExpr = $canJoinEmployees && $this->schema->columnExists($funcionarios, 'id_sucursal')
+      ? "f.`id_sucursal`"
+      : "''";
+    $rows = $this->db->getResults(
+      "SELECT i.`_ID`, {$propertyTextColumn('codigo')} AS codigo, {$propertyTextColumn('estado')} AS estado,
+              {$propertyTextColumn('tipo_negocio')} AS tipo_negocio, {$propertyTextColumn('tipo_inmueble')} AS tipo_inmueble,
+              {$propertyTextColumn('barrio')} AS barrio, {$propertyTextColumn('direccion')} AS direccion,
+              {$propertyTextColumn('id_funcionario')} AS id_funcionario, {$propertyTextColumn('id_propietario')} AS id_propietario,
+              {$propertyDateColumn('fecha_captacion')} AS fecha_captacion, {$propertyDateColumn('fecha_publicacion')} AS fecha_publicacion,
+              {$propertyDateColumn('fecha_actualizacion')} AS fecha_actualizacion, {$propertyDateColumn('cct_created')} AS cct_created,
+              {$propertyDateColumn('cct_modified')} AS cct_modified, {$employeeNameExpr} AS funcionario, {$employeeBranchExpr} AS func_sucursal
          FROM `{$table}` i
+         {$employeeJoin}
         WHERE " . implode(' AND ', $where),
-      array_merge([$todayStart, $todayStart, $todayStart, $staleLimit], $args)
-    ) ?: [];
+      $args
+    );
 
-    return [
+    $summary = [
       'available' => true,
-      'total' => (int) ($row['total'] ?? 0),
-      'publicos' => (int) ($row['publicos'] ?? 0),
-      'captados_hoy' => (int) ($row['captados_hoy'] ?? 0),
-      'publicados_hoy' => (int) ($row['publicados_hoy'] ?? 0),
-      'actualizados_hoy' => (int) ($row['actualizados_hoy'] ?? 0),
-      'sin_actualizar' => (int) ($row['sin_actualizar'] ?? 0),
-      'dias_limite' => 30,
+      'total' => count($rows),
+      'publicos' => 0,
+      'captados_hoy' => 0,
+      'publicados_hoy' => 0,
+      'actualizados_hoy' => 0,
+      'sin_actualizar' => 0,
+      'actualizacion_ok' => 0,
+      'actualizacion_alerta' => 0,
+      'actualizacion_vencida' => 0,
+      'items' => [],
+      'dias_limite_arriendo' => 90,
+      'dias_limite_venta' => 120,
+      'dias_limite_mixto' => 110,
     ];
+
+    foreach ($rows as $row) {
+      $isPublic = in_array(mb_strtolower(trim((string) ($row['estado'] ?? '')), 'UTF-8'), ['publico', 'publicado'], true);
+      $captured = $this->parseMixedTimestamp($row['fecha_captacion'] ?? null);
+      $published = $this->parseMixedTimestamp($row['fecha_publicacion'] ?? null);
+      $updated = $this->parseMixedTimestamp($row['fecha_actualizacion'] ?? null);
+      if ($updated <= 0) {
+        $updated = $this->parseMixedTimestamp($row['cct_modified'] ?? null);
+      }
+
+      if ($isPublic) {
+        $summary['publicos']++;
+      }
+      if ($captured >= $todayStart) {
+        $summary['captados_hoy']++;
+      }
+      if ($published >= $todayStart) {
+        $summary['publicados_hoy']++;
+      }
+      if ($updated >= $todayStart) {
+        $summary['actualizados_hoy']++;
+      }
+      if (!$isPublic) {
+        continue;
+      }
+
+      $state = $this->propertyUpdateState($row);
+      $status = (string) ($state['status'] ?? 'ok');
+      if ($status === 'vencido') {
+        $summary['actualizacion_vencida']++;
+        $summary['sin_actualizar']++;
+      } elseif ($status === 'alerta') {
+        $summary['actualizacion_alerta']++;
+        $summary['sin_actualizar']++;
+      } else {
+        $summary['actualizacion_ok']++;
+      }
+
+      if ($status !== 'ok' && count($summary['items']) < 8) {
+        $code = trim((string) ($row['codigo'] ?? $row['_ID'] ?? ''));
+        $summary['items'][] = [
+          'codigo' => $code !== '' ? $code : (string) ($row['_ID'] ?? ''),
+          'estado' => $status === 'vencido' ? 'Vencido' : 'Alerta',
+          'dias' => (int) ($state['days'] ?? 0),
+          'max' => (int) ($state['max'] ?? 0),
+          'min' => (int) ($state['min'] ?? 0),
+          'barrio' => trim((string) ($row['barrio'] ?? '')),
+          'tipo_negocio' => trim((string) ($row['tipo_negocio'] ?? '')),
+          'funcionario' => trim((string) ($row['funcionario'] ?? $row['id_funcionario'] ?? '')),
+          'url' => $this->propertyUpdateUrl($row),
+        ];
+      }
+    }
+
+    return $summary;
   }
 
   /** @param array<string,mixed> $filters @return array<string,mixed> */
@@ -745,9 +839,10 @@ final class CommercialTicketsRepository
     $push('danger', 'Tareas atrasadas', 'Prioriza las gestiones abiertas que ya superaron el tiempo permitido.', $this->homeUrl(['tab' => 'abiertos', 'sla_filter' => 'atrasado'], $filters), 'Ver atrasadas', (int) ($slaSummary['atrasados'] ?? 0));
     $push('warning', 'Sin seguimiento', 'Hay tareas abiertas sin seguimiento registrado.', $this->homeUrl(['tab' => 'abiertos', 'seguimiento' => 'No'], $filters), 'Hacer seguimiento', (int) ($updateHealth['sin_seguimiento'] ?? 0));
     $push('warning', 'Seguimientos vencidos', 'Tienes seguimientos programados para hoy o fechas anteriores.', $this->homeUrl(['tab' => 'abiertos'], $filters), 'Revisar agenda', (int) ($updateHealth['seguimientos_vencidos'] ?? 0));
+    $push('danger', 'Actualizaciones vencidas', 'Hay inmuebles publicados que superaron el tiempo máximo sin actualización.', $this->homeUrl(['tab' => 'abiertos', 'tema' => 'Actualización'], $filters), 'Actualizar inmuebles', (int) ($properties['actualizacion_vencida'] ?? 0));
+    $push('warning', 'Actualizaciones por vencer', 'Algunos inmuebles ya entraron en la ventana de alerta de actualización.', $this->homeUrl(['tab' => 'abiertos', 'tema' => 'Actualización'], $filters), 'Revisar alerta', (int) ($properties['actualizacion_alerta'] ?? 0));
     $push('danger', 'Avisos vencidos', 'Hay inmuebles con aviso nuevo pendiente o retoque vencido.', $this->homeUrl(['tab' => 'abiertos', 'estado' => 'Pendiente colocar aviso'], $filters), 'Ver avisos', (int) ($signs['instalacion_atrasada'] ?? 0) + (int) ($signs['retoque_vencido'] ?? 0));
     $push('warning', 'Avisos por vencer', 'Algunos avisos están entrando en ventana de retoque.', $this->homeUrl(['tab' => 'abiertos', 'estado' => 'Retocando'], $filters), 'Planear ruta', (int) ($signs['retoque_alerta'] ?? 0));
-    $push('warning', 'Inmuebles sin actualizar', 'Revisa inmuebles publicados con más días sin actualización.', $this->homeUrl(['tab' => 'abiertos', 'estado' => 'En actividad comercial'], $filters), 'Actualizar', (int) ($properties['sin_actualizar'] ?? 0));
     $push('warning', 'Precaptaciones sin tarea', 'Hay precaptaciones que todavía no tienen tarea asociada.', $this->homeUrl(['tab' => 'abiertos', 'estado' => 'Prospectado'], $filters), 'Convertir', (int) ($precaptations['sin_tarea'] ?? 0));
     $push('warning', 'Cotizaciones sin tarea', 'Existen cotizaciones comerciales sin tarea asociada para seguimiento.', $this->homeUrl(['tab' => 'abiertos', 'estado' => 'En cierre'], $filters), 'Revisar', (int) ($quotes['sin_tarea'] ?? 0));
 
@@ -814,19 +909,41 @@ final class CommercialTicketsRepository
       return [[], []];
     }
 
+    $properties = $this->db->table('jet_cct_inmuebles');
     $funcionarios = $this->db->table('jet_cct_funcionarios');
     $inList = implode(',', array_fill(0, count($ids), '?'));
-    $where = "(TRIM(COALESCE({$alias}.`id_funcionario`, '')) IN ({$inList})
-      OR EXISTS (
-        SELECT 1 FROM `{$funcionarios}` fe
-         WHERE TRIM(COALESCE(fe.`id_empleado`, '')) IN ({$inList})
-           AND (
-             CAST(fe.`_ID` AS CHAR) = TRIM(COALESCE({$alias}.`id_funcionario`, ''))
-             OR TRIM(COALESCE(fe.`nombre`, '')) = TRIM(COALESCE({$alias}.`funcionario`, ''))
-           )
-      ))";
+    $pieces = [];
+    $args = [];
 
-    return [[$where], array_merge($ids, $ids)];
+    if ($this->schema->columnExists($properties, 'id_funcionario')) {
+      $pieces[] = "TRIM(COALESCE({$alias}.`id_funcionario`, '')) IN ({$inList})";
+      array_push($args, ...$ids);
+    }
+
+    if ($this->schema->tableExists($funcionarios)) {
+      $employeeFilterColumn = $this->schema->columnExists($funcionarios, 'id_empleado') ? 'id_empleado' : ($this->schema->columnExists($funcionarios, '_ID') ? '_ID' : '');
+      $matchParts = [];
+      if ($this->schema->columnExists($funcionarios, '_ID') && $this->schema->columnExists($properties, 'id_funcionario')) {
+        $matchParts[] = "CAST(fe.`_ID` AS CHAR) = TRIM(COALESCE({$alias}.`id_funcionario`, ''))";
+      }
+      if ($this->schema->columnExists($funcionarios, 'nombre') && $this->schema->columnExists($properties, 'funcionario')) {
+        $matchParts[] = "TRIM(COALESCE(fe.`nombre`, '')) = TRIM(COALESCE({$alias}.`funcionario`, ''))";
+      }
+      if ($employeeFilterColumn !== '' && $matchParts !== []) {
+        $pieces[] = "EXISTS (
+          SELECT 1 FROM `{$funcionarios}` fe
+           WHERE TRIM(COALESCE(fe.`{$employeeFilterColumn}`, '')) IN ({$inList})
+             AND (" . implode(' OR ', $matchParts) . ')
+        )';
+        array_push($args, ...$ids);
+      }
+    }
+
+    if ($pieces === []) {
+      return [[], []];
+    }
+
+    return [['(' . implode(' OR ', $pieces) . ')'], $args];
   }
 
   /** @param array<string,mixed> $row @return array<string,mixed> */
@@ -874,6 +991,64 @@ final class CommercialTicketsRepository
       return $this->systemConfigInt('dia-retoque-venta', 60);
     }
     return $this->systemConfigInt('dia-retoque-arriendo-venta', 70);
+  }
+
+  /** @param array<string,mixed> $row @return array{status:string,label:string,days:int,max:int,min:int} */
+  private function propertyUpdateState(array $row): array
+  {
+    $reference = $this->parseMixedTimestamp($row['fecha_actualizacion'] ?? null);
+    if ($reference <= 0) {
+      $reference = $this->parseMixedTimestamp($row['fecha_publicacion'] ?? null);
+    }
+    if ($reference <= 0) {
+      $reference = $this->parseMixedTimestamp($row['cct_modified'] ?? null);
+    }
+    if ($reference <= 0) {
+      $reference = $this->parseMixedTimestamp($row['cct_created'] ?? null);
+    }
+
+    [$min, $max] = $this->propertyUpdateLimits((string) ($row['tipo_negocio'] ?? ''));
+    $days = $reference > 0 ? (int) floor((time() - $reference) / 86400) : 0;
+    if ($days >= $max) {
+      return ['status' => 'vencido', 'label' => 'Actualización vencida', 'days' => max(0, $days), 'max' => $max, 'min' => $min];
+    }
+    if ($days >= $min) {
+      return ['status' => 'alerta', 'label' => 'Actualización en alerta', 'days' => max(0, $days), 'max' => $max, 'min' => $min];
+    }
+    return ['status' => 'ok', 'label' => 'Actualización al día', 'days' => max(0, $days), 'max' => $max, 'min' => $min];
+  }
+
+  /** @return array{0:int,1:int} */
+  private function propertyUpdateLimits(string $businessType): array
+  {
+    $type = mb_strtolower($businessType, 'UTF-8');
+    $hasSale = str_contains($type, 'venta');
+    $hasRent = str_contains($type, 'arriendo');
+    if ($hasSale && !$hasRent) {
+      return [110, 120];
+    }
+    if ($hasSale && $hasRent) {
+      return [100, 110];
+    }
+    return [80, 90];
+  }
+
+  /** @param array<string,mixed> $row */
+  private function propertyUpdateUrl(array $row): string
+  {
+    $code = trim((string) ($row['codigo'] ?? $row['_ID'] ?? ''));
+    if ($code === '') {
+      return '';
+    }
+
+    $params = [
+      'id_inmueble' => $code,
+      'id_empleado' => trim((string) ($row['id_funcionario'] ?? '')),
+      'id_propietario' => trim((string) ($row['id_propietario'] ?? '')),
+      'id_sucursal' => trim((string) ($row['func_sucursal'] ?? '')) ?: '1',
+    ];
+
+    return 'https://sucasainmobiliaria.com.co/mi-cuenta/actualizar-inmueble/?' . http_build_query(array_filter($params, static fn(string $value): bool => $value !== ''));
   }
 
   private function systemConfigInt(string $key, int $default): int
@@ -947,10 +1122,13 @@ final class CommercialTicketsRepository
   /** @return array<int,string> */
   private function distinctTicketValues(string $column): array
   {
-    if (!in_array($column, ['medio', 'prioridad', 'tema_ayuda'], true)) {
+    if (!in_array($column, ['medio', 'prioridad', 'tema_ayuda', 'estado_administrativo'], true)) {
       return [];
     }
     $table = $this->db->table('jet_cct_tickets');
+    if (!$this->schema->columnExists($table, $column)) {
+      return [];
+    }
     $rows = $this->db->getCol(
       "SELECT DISTINCT TRIM(COALESCE(`{$column}`, '')) AS value
          FROM `{$table}`
@@ -958,6 +1136,72 @@ final class CommercialTicketsRepository
         ORDER BY value ASC"
     );
     return array_values(array_filter(array_map('strval', $rows), static fn(string $value): bool => trim($value) !== ''));
+  }
+
+  /** @return array<int,array{id:string,name:string}> */
+  private function followUpEmployeeOptions(): array
+  {
+    $tickets = $this->db->table('jet_cct_tickets');
+    if (!$this->schema->columnExists($tickets, 'id_encargado_seguimiento')) {
+      return [];
+    }
+
+    $funcionarios = $this->db->table('jet_cct_funcionarios');
+    $canJoinByEmployee = $this->schema->tableExists($funcionarios)
+      && $this->schema->columnExists($funcionarios, 'id_empleado')
+      && $this->schema->columnExists($funcionarios, 'nombre');
+    $canJoinByAuthor = $this->schema->tableExists($funcionarios)
+      && $this->schema->columnExists($funcionarios, 'cct_author_id')
+      && $this->schema->columnExists($funcionarios, 'nombre');
+    $activeEmployeeCondition = $this->schema->columnExists($funcionarios, 'activo')
+      ? "AND TRIM(COALESCE(f_by_emp.`activo`, 'Si')) = 'Si'"
+      : '';
+    $activeAuthorCondition = $this->schema->columnExists($funcionarios, 'activo')
+      ? "AND TRIM(COALESCE(f_by_author.`activo`, 'Si')) = 'Si'"
+      : '';
+    $employeeJoin = $canJoinByEmployee
+      ? "LEFT JOIN `{$funcionarios}` f_by_emp
+           ON TRIM(COALESCE(f_by_emp.`id_empleado`, '')) = ids.id
+          {$activeEmployeeCondition}"
+      : '';
+    $authorJoin = $canJoinByAuthor
+      ? "LEFT JOIN `{$funcionarios}` f_by_author
+           ON CAST(f_by_author.`cct_author_id` AS CHAR) = ids.id
+          {$activeAuthorCondition}"
+      : '';
+    $nameCandidates = [];
+    if ($canJoinByEmployee) {
+      $nameCandidates[] = "NULLIF(TRIM(f_by_emp.`nombre`), '')";
+    }
+    if ($canJoinByAuthor) {
+      $nameCandidates[] = "NULLIF(TRIM(f_by_author.`nombre`), '')";
+    }
+    $nameExpr = 'COALESCE(' . implode(', ', array_merge($nameCandidates, ["CONCAT('ID ', ids.id)"])) . ')';
+    $rows = $this->db->getResults(
+      "SELECT ids.id,
+              {$nameExpr} AS name
+         FROM (
+           SELECT DISTINCT TRIM(COALESCE(t.`id_encargado_seguimiento`, '')) AS id
+             FROM `{$tickets}` t
+            WHERE TRIM(COALESCE(t.`id_encargado_seguimiento`, '')) <> ''
+         ) ids
+         {$employeeJoin}
+         {$authorJoin}
+        ORDER BY name ASC"
+    );
+
+    $options = [];
+    foreach ($rows as $row) {
+      $id = trim((string) ($row['id'] ?? ''));
+      if ($id === '') {
+        continue;
+      }
+      $options[$id] = [
+        'id' => $id,
+        'name' => trim((string) ($row['name'] ?? 'ID ' . $id)) ?: 'ID ' . $id,
+      ];
+    }
+    return array_values($options);
   }
 
   /** @param array<string,mixed> $filters */
@@ -1070,9 +1314,10 @@ final class CommercialTicketsRepository
       'medio' => 'medio',
       'prioridad' => 'prioridad',
       'tema' => 'tema_ayuda',
+      'estado_administrativo' => 'estado_administrativo',
     ] as $filterKey => $column) {
       $value = trim((string) ($filters[$filterKey] ?? ''));
-      if ($value === '') {
+      if ($value === '' || !$this->schema->columnExists($this->db->table('jet_cct_tickets'), $column)) {
         continue;
       }
       $where[] = "TRIM(COALESCE(t.`{$column}`, '')) = ?";
@@ -1086,6 +1331,29 @@ final class CommercialTicketsRepository
       } else {
         $where[] = "(t.`tuvo_seguimiento` IS NULL OR LOWER(TRIM(t.`tuvo_seguimiento`)) <> 'si')";
       }
+    }
+
+    $followUpOwner = trim((string) ($filters['encargado_seguimiento'] ?? ''));
+    if ($followUpOwner !== '' && $this->schema->columnExists($this->db->table('jet_cct_tickets'), 'id_encargado_seguimiento')) {
+      $where[] = "TRIM(COALESCE(t.`id_encargado_seguimiento`, '')) = ?";
+      $args[] = $followUpOwner;
+    }
+
+    foreach ([['fecha_seguimiento_desde', false, '>='], ['fecha_seguimiento_hasta', true, '<=']] as [$filterKey, $endOfDay, $operator]) {
+      $timestamp = $this->dateFilterTimestamp(trim((string) ($filters[$filterKey] ?? '')), (bool) $endOfDay);
+      if ($timestamp <= 0 || !$this->schema->columnExists($this->db->table('jet_cct_tickets'), 'fecha_seguimiento')) {
+        continue;
+      }
+      $where[] = "COALESCE(NULLIF(t.`fecha_seguimiento`, 0), 0) {$operator} ?";
+      $args[] = $timestamp;
+    }
+
+    $staleDays = (int) ($filters['sin_actualizar'] ?? 0);
+    if ($staleDays > 0) {
+      $staleDays = min(120, max(1, $staleDays));
+      $updatedExpr = "COALESCE(NULLIF(t.`fecha_actualizacion`, 0), NULLIF(t.`fecha`, 0), UNIX_TIMESTAMP(t.`cct_modified`), UNIX_TIMESTAMP(t.`cct_created`), 0)";
+      $where[] = "{$updatedExpr} > 0 AND {$updatedExpr} <= ?";
+      $args[] = time() - ($staleDays * 86400);
     }
 
     foreach ([['fecha_desde', false, '>='], ['fecha_hasta', true, '<=']] as [$filterKey, $endOfDay, $operator]) {

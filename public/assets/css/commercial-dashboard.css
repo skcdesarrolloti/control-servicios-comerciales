@@ -686,6 +686,7 @@ button:disabled { cursor: not-allowed; opacity: .52; }
 }
 .commercial-home-mini.is-muted { opacity: .58; }
 .commercial-home-status-list { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
+.commercial-home-status-list--compact { margin-top: 12px; }
 .commercial-home-status--success { background: #edf9f2; border-color: #c9ead8; }
 .commercial-home-status--success strong { color: var(--commercial-success); }
 .commercial-home-status--warning { background: #fff7ed; border-color: #f2d5ad; }
@@ -709,6 +710,31 @@ button:disabled { cursor: not-allowed; opacity: .52; }
 .commercial-advisory-signs strong { color: #173352; font-size: 12px; }
 .commercial-home-sign-list span,
 .commercial-advisory-signs span { color: #6a5a43; font-size: 10px; line-height: 1.45; }
+#scm-app .commercial-home-update-list a,
+#scm-app .commercial-advisory-updates a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: max-content;
+  min-height: 30px;
+  margin-top: 4px;
+  padding: 6px 11px;
+  border: 1px solid #b8cbe3;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--commercial-primary);
+  font-size: 10px;
+  font-weight: 900;
+  text-decoration: none !important;
+  box-shadow: 0 5px 12px rgba(30,94,168,.08);
+}
+#scm-app .commercial-home-update-list a:hover,
+#scm-app .commercial-advisory-updates a:hover {
+  border-color: var(--commercial-primary);
+  background: #eef5ff;
+  color: #113d74;
+  text-decoration: none !important;
+}
 .commercial-home-lower { display: grid; grid-template-columns: minmax(360px,.78fr) minmax(520px,1.22fr); gap: 14px; }
 .commercial-home-alerts ul { margin-top: 0; }
 .commercial-home-alert {

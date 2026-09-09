@@ -219,6 +219,7 @@ final class CommercialDashboardView
     $signs = is_array($dashboard['signs'] ?? null) ? $dashboard['signs'] : [];
     $alerts = is_array($dashboard['alerts'] ?? null) ? $dashboard['alerts'] : [];
     $priorityTasks = is_array($dashboard['priority_tasks'] ?? null) ? $dashboard['priority_tasks'] : [];
+    $propertyUpdateItems = is_array($properties['items'] ?? null) ? $properties['items'] : [];
     $onTime = (int) ($sla['al_dia'] ?? 0);
     $overdue = (int) ($sla['atrasados'] ?? 0);
     $openTotal = (int) ($sla['total'] ?? ($bucketCounts['abiertos'] ?? 0));
@@ -282,13 +283,30 @@ final class CommercialDashboardView
         </article>
 
         <article class="commercial-home-card">
-          <header><span class="commercial-kicker">Inmuebles</span><h3>Portafolio y publicación</h3></header>
+          <header><span class="commercial-kicker">Actualizaciones</span><h3>Inmuebles publicados</h3></header>
           <div class="commercial-home-mini-grid">
             <?php echo self::renderHomeMini('Inmuebles', (int) ($properties['total'] ?? 0), !empty($properties['available'])); ?>
             <?php echo self::renderHomeMini('Públicos', (int) ($properties['publicos'] ?? 0), !empty($properties['available'])); ?>
             <?php echo self::renderHomeMini('Captados hoy', (int) ($properties['captados_hoy'] ?? 0), !empty($properties['available'])); ?>
-            <?php echo self::renderHomeMini('Sin actualizar', (int) ($properties['sin_actualizar'] ?? 0), !empty($properties['available'])); ?>
+            <?php echo self::renderHomeMini('Actualizados hoy', (int) ($properties['actualizados_hoy'] ?? 0), !empty($properties['available'])); ?>
           </div>
+          <div class="commercial-home-status-list commercial-home-status-list--compact">
+            <?php echo self::renderHomeStatus('Al día', (int) ($properties['actualizacion_ok'] ?? 0), 'success'); ?>
+            <?php echo self::renderHomeStatus('Alerta', (int) ($properties['actualizacion_alerta'] ?? 0), 'warning'); ?>
+            <?php echo self::renderHomeStatus('Vencidos', (int) ($properties['actualizacion_vencida'] ?? 0), 'danger'); ?>
+            <?php echo self::renderHomeStatus('Pendientes', (int) ($properties['sin_actualizar'] ?? 0), 'warning'); ?>
+          </div>
+          <?php if ($propertyUpdateItems !== []): ?>
+            <ul class="commercial-home-sign-list commercial-home-update-list">
+              <?php foreach ($propertyUpdateItems as $item): ?>
+                <li>
+                  <strong><?php echo esc_html((string) ($item['codigo'] ?? 'Sin código')); ?> · <?php echo esc_html((string) ($item['estado'] ?? 'Alerta')); ?></strong>
+                  <span><?php echo esc_html((string) ($item['dias'] ?? 0)); ?> / <?php echo esc_html((string) ($item['max'] ?? 0)); ?> días<?php echo trim((string) ($item['barrio'] ?? '')) !== '' ? ' · ' . esc_html((string) ($item['barrio'] ?? '')) : ''; ?></span>
+                  <?php if (trim((string) ($item['url'] ?? '')) !== ''): ?><a href="<?php echo esc_url((string) $item['url']); ?>" target="_blank" rel="noopener">Actualizar</a><?php endif; ?>
+                </li>
+              <?php endforeach; ?>
+            </ul>
+          <?php endif; ?>
         </article>
 
         <article class="commercial-home-card commercial-home-card--signs">
@@ -360,7 +378,7 @@ final class CommercialDashboardView
         </article>
       </div>
 
-      <?php echo self::renderHomeAdvisoryModal($alerts, $signs, $filters, $baseUrl); ?>
+      <?php echo self::renderHomeAdvisoryModal($alerts, $signs, $properties, $filters, $baseUrl); ?>
     </section>
 <?php
     return (string) ob_get_clean();
@@ -410,10 +428,11 @@ final class CommercialDashboardView
     return (string) ob_get_clean();
   }
 
-  /** @param array<int,array<string,mixed>> $alerts @param array<string,mixed> $signs @param array<string,mixed> $filters */
-  private static function renderHomeAdvisoryModal(array $alerts, array $signs, array $filters, string $baseUrl): string
+  /** @param array<int,array<string,mixed>> $alerts @param array<string,mixed> $signs @param array<string,mixed> $properties @param array<string,mixed> $filters */
+  private static function renderHomeAdvisoryModal(array $alerts, array $signs, array $properties, array $filters, string $baseUrl): string
   {
     $signItems = is_array($signs['items'] ?? null) ? $signs['items'] : [];
+    $propertyItems = is_array($properties['items'] ?? null) ? $properties['items'] : [];
     $autoOpen = $alerts !== [] ? '1' : '0';
     ob_start();
 ?>
@@ -436,6 +455,20 @@ final class CommercialDashboardView
                 </a>
               <?php endforeach; ?>
             </div>
+          <?php endif; ?>
+          <?php if ($propertyItems !== []): ?>
+            <section class="commercial-advisory-signs commercial-advisory-updates">
+              <h3>Inmuebles pendientes por actualización</h3>
+              <ul>
+                <?php foreach ($propertyItems as $item): ?>
+                  <li>
+                    <strong><?php echo esc_html((string) ($item['codigo'] ?? 'Sin código')); ?> · <?php echo esc_html((string) ($item['estado'] ?? 'Alerta')); ?></strong>
+                    <span><?php echo esc_html((string) ($item['dias'] ?? 0)); ?> / <?php echo esc_html((string) ($item['max'] ?? 0)); ?> días<?php echo trim((string) ($item['barrio'] ?? '')) !== '' ? ' · ' . esc_html((string) ($item['barrio'] ?? '')) : ''; ?></span>
+                    <?php if (trim((string) ($item['url'] ?? '')) !== ''): ?><a href="<?php echo esc_url((string) $item['url']); ?>" target="_blank" rel="noopener">Ir a actualizar</a><?php endif; ?>
+                  </li>
+                <?php endforeach; ?>
+              </ul>
+            </section>
           <?php endif; ?>
           <?php if ($signItems !== []): ?>
             <section class="commercial-advisory-signs">
@@ -526,6 +559,11 @@ final class CommercialDashboardView
       <div class="commercial-field"><label for="commercial-medium">Medio</label><?php echo self::selectFromOptions('commercial-medium', 'medio', $filterOptions['medios'] ?? [], (string) ($filters['medio'] ?? '')); ?></div>
       <div class="commercial-field"><label for="commercial-priority">Prioridad</label><?php echo self::selectFromOptions('commercial-priority', 'prioridad', $filterOptions['prioridades'] ?? [], (string) ($filters['prioridad'] ?? '')); ?></div>
       <div class="commercial-field"><label for="commercial-follow-up">Seguimiento</label><select id="commercial-follow-up" name="seguimiento"><option value="">Todos</option><option value="Si"<?php selected((string) ($filters['seguimiento'] ?? ''), 'Si'); ?>>Con seguimiento</option><option value="No"<?php selected((string) ($filters['seguimiento'] ?? ''), 'No'); ?>>Sin seguimiento</option></select></div>
+      <?php if (!empty($filterOptions['encargados_seguimiento'])): ?><div class="commercial-field"><label for="commercial-follow-up-owner">Encargado seguimiento</label><?php echo self::selectEmployeeOptions('commercial-follow-up-owner', 'encargado_seguimiento', $filterOptions['encargados_seguimiento'], (string) ($filters['encargado_seguimiento'] ?? '')); ?></div><?php endif; ?>
+      <div class="commercial-field"><label for="commercial-stale">Sin actualizar desde gestión</label><select id="commercial-stale" name="sin_actualizar"><option value="">Todos</option><option value="3"<?php selected((string) ($filters['sin_actualizar'] ?? ''), '3'); ?>>+3 días</option><option value="7"<?php selected((string) ($filters['sin_actualizar'] ?? ''), '7'); ?>>+7 días</option><option value="15"<?php selected((string) ($filters['sin_actualizar'] ?? ''), '15'); ?>>+15 días</option><option value="30"<?php selected((string) ($filters['sin_actualizar'] ?? ''), '30'); ?>>+30 días</option></select></div>
+      <?php if (!empty($filterOptions['estados_administrativos'])): ?><div class="commercial-field"><label for="commercial-admin-status">Estado administrativo</label><?php echo self::selectFromOptions('commercial-admin-status', 'estado_administrativo', $filterOptions['estados_administrativos'], (string) ($filters['estado_administrativo'] ?? '')); ?></div><?php endif; ?>
+      <div class="commercial-field"><label for="commercial-follow-up-from">Seg. desde</label><input id="commercial-follow-up-from" type="date" name="fecha_seguimiento_desde" value="<?php echo esc_attr((string) ($filters['fecha_seguimiento_desde'] ?? '')); ?>"></div>
+      <div class="commercial-field"><label for="commercial-follow-up-to">Seg. hasta</label><input id="commercial-follow-up-to" type="date" name="fecha_seguimiento_hasta" value="<?php echo esc_attr((string) ($filters['fecha_seguimiento_hasta'] ?? '')); ?>"></div>
       <div class="commercial-field"><label for="commercial-date-from">Fecha desde</label><input id="commercial-date-from" type="date" name="fecha_desde" value="<?php echo esc_attr((string) ($filters['fecha_desde'] ?? '')); ?>"></div>
       <div class="commercial-field"><label for="commercial-date-to">Fecha hasta</label><input id="commercial-date-to" type="date" name="fecha_hasta" value="<?php echo esc_attr((string) ($filters['fecha_hasta'] ?? '')); ?>"></div>
       <?php $clearParams = ['tab' => $bucket] + self::globalFilterParams($filters); if ($isMyTasks) { $clearParams['mis_bucket'] = $effectiveBucket; } ?>
@@ -739,13 +777,29 @@ final class CommercialDashboardView
     return $html . '</select>';
   }
 
+  /** @param array<int,array<string,string>> $options */
+  private static function selectEmployeeOptions(string $id, string $name, array $options, string $selected): string
+  {
+    $html = '<select id="' . esc_attr($id) . '" name="' . esc_attr($name) . '"><option value="">Todos</option>';
+    foreach ($options as $option) {
+      $value = trim((string) ($option['id'] ?? ''));
+      $label = trim((string) ($option['name'] ?? $value));
+      if ($value === '' || $label === '') {
+        continue;
+      }
+      $html .= '<option value="' . esc_attr($value) . '"' . selected($selected, $value, false) . '>' . esc_html($label) . '</option>';
+    }
+    return $html . '</select>';
+  }
+
   /** @param array<string,mixed> $filters @return array<string,string> */
   private static function filterParams(array $filters): array
   {
     $keys = [
       'estado', 'mis_bucket', 'busqueda', 'id_empleado', 'ticket_id', 'solicitante', 'celular', 'correo',
       'inmueble', 'barrio', 'medio', 'prioridad', 'tema', 'seguimiento', 'fecha_desde', 'fecha_hasta',
-      'sla_filter', 'page',
+      'encargado_seguimiento', 'fecha_seguimiento_desde', 'fecha_seguimiento_hasta', 'sin_actualizar',
+      'estado_administrativo', 'sla_filter', 'page',
     ];
     $params = [];
     foreach ($keys as $key) {

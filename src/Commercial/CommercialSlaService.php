@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SCM\Commercial;
 
 use SCM\Core\Database;
+use SCM\Support\ColombiaBusinessCalendar;
 
 final class CommercialSlaService
 {
@@ -24,7 +25,7 @@ final class CommercialSlaService
   public function decorateTicket(array $ticket): array
   {
     $timestamp = $this->attentionTimestamp($ticket);
-    $days = $timestamp > 0 ? max(0, (int) floor((time() - $timestamp) / 86400)) : 0;
+    $days = $timestamp > 0 ? ColombiaBusinessCalendar::elapsedDays($timestamp) : 0;
     $state = $this->calculate($this->topicForTicket($ticket), $days);
 
     $ticket['scm_attention_days'] = $days;
@@ -81,18 +82,15 @@ final class CommercialSlaService
   private function attentionTimestamp(array $ticket): int
   {
     foreach (['cct_modified', 'cct_created'] as $column) {
-      $value = trim((string) ($ticket[$column] ?? ''));
-      if ($value !== '' && strpos($value, '0000') === false) {
-        $timestamp = strtotime($value);
-        if ($timestamp !== false) {
-          return $timestamp;
-        }
+      $timestamp = ColombiaBusinessCalendar::timestamp($ticket[$column] ?? null);
+      if ($timestamp !== null && $timestamp > 0) {
+        return $timestamp;
       }
     }
 
     foreach (['fecha_actualizacion', 'fecha'] as $column) {
-      $timestamp = (int) ($ticket[$column] ?? 0);
-      if ($timestamp > 0) {
+      $timestamp = ColombiaBusinessCalendar::timestamp($ticket[$column] ?? null);
+      if ($timestamp !== null && $timestamp > 0) {
         return $timestamp;
       }
     }
