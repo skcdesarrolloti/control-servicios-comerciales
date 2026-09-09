@@ -351,12 +351,8 @@
   function maybeAutoOpenAdvisory() {
     var modal = refreshAdvisoryModalRef();
     if (!modal || modal.getAttribute("data-auto-open") !== "1") return;
-    var scope = modal.getAttribute("data-scope") || "all";
-    var key = "commercial-advisory-seen:" + scope;
-    try {
-      if (window.sessionStorage && window.sessionStorage.getItem(key) === "1") return;
-      if (window.sessionStorage) window.sessionStorage.setItem(key, "1");
-    } catch (_error) {}
+    if (modal.getAttribute("data-opened") === "1") return;
+    modal.setAttribute("data-opened", "1");
     window.setTimeout(function () { showAdvisoryModal(true); }, 450);
   }
 
@@ -601,19 +597,29 @@
   function signDetailMarkup(row) {
     row = row || {};
     var maps = row.maps_url ? '<a class="commercial-control-btn commercial-control-btn--primary" target="_blank" rel="noopener" href="' + escapeHtml(row.maps_url) + '">Ver en Google Maps</a>' : "";
+    var property = row.property_url ? '<a class="commercial-control-btn" target="_blank" rel="noopener" href="' + escapeHtml(row.property_url) + '">Ver inmueble</a>' : "";
+    var stateClass = /venc|atras/i.test(row.estado || "") ? "danger" : (/alert/i.test(row.estado || "") ? "warning" : "success");
+    function rowItem(label, value) {
+      return "<div><span>" + escapeHtml(label) + "</span><strong>" + escapeHtml(value || "-") + "</strong></div>";
+    }
     return (
-      '<header class="commercial-property-modal-head"><span>Detalle del aviso</span><h2>Inmueble ' + escapeHtml(row.codigo || "") + "</h2></header>" +
+      '<header class="commercial-property-modal-head commercial-sign-modal-head"><span>Detalle del aviso</span><h2>Inmueble ' + escapeHtml(row.codigo || "") + "</h2></header>" +
+      '<section class="commercial-sign-detail-summary commercial-sign-detail-summary--' + stateClass + '">' +
+      '<div><span>Estado actual</span><strong>' + escapeHtml(row.estado || "-") + '</strong></div>' +
+      '<p>' + escapeHtml((row.dias || 0) + " de " + (row.max || 0) + " días · " + (row.origen || "fecha base") + (row.fecha ? " · " + row.fecha : "")) + '</p>' +
+      '</section>' +
       '<div class="commercial-sign-detail-grid">' +
-      "<div><span>Funcionario</span><strong>" + escapeHtml(row.funcionario || "-") + "</strong></div>" +
-      "<div><span>Tipo</span><strong>" + escapeHtml(row.tipo || "-") + "</strong></div>" +
-      "<div><span>Gestión</span><strong>" + escapeHtml(row.gestion || "-") + "</strong></div>" +
-      "<div><span>Estado</span><strong>" + escapeHtml(row.estado || "-") + "</strong></div>" +
-      "<div><span>Días</span><strong>" + escapeHtml((row.dias || 0) + " / " + (row.max || 0)) + "</strong></div>" +
-      "<div><span>Fecha base</span><strong>" + escapeHtml(row.fecha || "-") + "</strong></div>" +
-      "<div><span>Barrio</span><strong>" + escapeHtml(row.barrio || "-") + "</strong></div>" +
-      "<div><span>Ruta</span><strong>" + escapeHtml(row.ruta || "-") + "</strong></div>" +
+      rowItem("Funcionario", row.funcionario) +
+      rowItem("Celular funcionario", row.celular_funcionario) +
+      rowItem("Tipo", row.tipo) +
+      rowItem("Gestión", row.gestion) +
+      rowItem("Fecha base", row.fecha) +
+      rowItem("Barrio", row.barrio) +
+      rowItem("Ruta", row.ruta) +
+      rowItem("Dirección", row.direccion) +
+      rowItem("Punto de referencia", row.punto_referencia) +
       "</div>" +
-      (maps ? '<footer class="commercial-control-actions">' + maps + "</footer>" : "")
+      (maps || property ? '<footer class="commercial-control-actions">' + maps + property + "</footer>" : "")
     );
   }
 

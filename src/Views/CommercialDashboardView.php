@@ -222,22 +222,27 @@ final class CommercialDashboardView
   /** @param array<string,mixed> $dashboard @param array<string,mixed> $filters */
   public static function renderHome(array $dashboard, array $filters, $policy, string $baseUrl, array $ticketEmployees = [], array $filterOptions = []): string
   {
-    $bucketCounts = is_array($dashboard['bucket_counts'] ?? null) ? $dashboard['bucket_counts'] : [];
-    $statusCounts = is_array($dashboard['status_counts'] ?? null) ? $dashboard['status_counts'] : [];
-    $sla = is_array($dashboard['sla_summary'] ?? null) ? $dashboard['sla_summary'] : [];
-    $pulse = is_array($dashboard['ticket_pulse'] ?? null) ? $dashboard['ticket_pulse'] : [];
     $update = is_array($dashboard['update_health'] ?? null) ? $dashboard['update_health'] : [];
-    $quotes = is_array($dashboard['quotes'] ?? null) ? $dashboard['quotes'] : [];
-    $precaps = is_array($dashboard['precaptations'] ?? null) ? $dashboard['precaptations'] : [];
     $properties = is_array($dashboard['properties'] ?? null) ? $dashboard['properties'] : [];
     $signs = is_array($dashboard['signs'] ?? null) ? $dashboard['signs'] : [];
     $alerts = is_array($dashboard['alerts'] ?? null) ? $dashboard['alerts'] : [];
-    $priorityTasks = is_array($dashboard['priority_tasks'] ?? null) ? $dashboard['priority_tasks'] : [];
-    $propertyUpdateItems = is_array($properties['items'] ?? null) ? $properties['items'] : [];
-    $onTime = (int) ($sla['al_dia'] ?? 0);
-    $overdue = (int) ($sla['atrasados'] ?? 0);
-    $openTotal = (int) ($sla['total'] ?? ($bucketCounts['abiertos'] ?? 0));
-    $okPct = (int) ($sla['porcentaje_cumplimiento'] ?? 0);
+    $propertyPublic = (int) ($properties['publicos'] ?? 0);
+    $propertyOk = (int) ($properties['actualizacion_ok'] ?? 0);
+    $propertyAlert = (int) ($properties['actualizacion_alerta'] ?? 0);
+    $propertyExpired = (int) ($properties['actualizacion_vencida'] ?? 0);
+    $propertyPending = $propertyAlert + $propertyExpired;
+    $propertyPct = self::percent($propertyOk, $propertyPublic);
+    $taskUpdatePct = max(0, min(100, (int) ($update['porcentaje_actualizadas'] ?? 0)));
+    $signRetouchOk = (int) ($signs['retoque_ok'] ?? 0);
+    $signRetouchAlert = (int) ($signs['retoque_alerta'] ?? 0);
+    $signRetouchExpired = (int) ($signs['retoque_vencido'] ?? 0);
+    $signRetouchTotal = $signRetouchOk + $signRetouchAlert + $signRetouchExpired;
+    $signRetouchPct = self::percent($signRetouchOk, $signRetouchTotal);
+    $newSignPending = (int) ($signs['instalacion_pendiente'] ?? 0);
+    $newSignLate = (int) ($signs['instalacion_atrasada'] ?? 0);
+    $newSignOnTime = max(0, $newSignPending - $newSignLate);
+    $newSignPct = self::percent($newSignOnTime, $newSignPending);
+    $criticalTotal = $propertyPending + $signRetouchAlert + $signRetouchExpired + $newSignLate;
     $scopeLabel = trim((string) ($filters['id_empleado'] ?? '')) !== '' ? 'Filtrado por funcionario' : 'Equipo comercial completo';
     $today = date('d/m/Y');
     ob_start();
@@ -246,149 +251,86 @@ final class CommercialDashboardView
       <div class="commercial-section-head commercial-home-head">
         <div>
           <span class="commercial-kicker">Inicio operativo</span>
-          <h2>Resumen comercial de hoy</h2>
-          <p><?php echo esc_html($scopeLabel); ?> · <?php echo esc_html($today); ?> · métricas cruzadas de tareas, inmuebles, avisos, cotizaciones y precaptaciones.</p>
+          <h2>Control rápido de alertas</h2>
+          <p><?php echo esc_html($scopeLabel); ?> · <?php echo esc_html($today); ?> · solo indicadores de actualización, retoque de avisos y avisos nuevos pendientes.</p>
         </div>
-        <?php if ($alerts !== []): ?><button class="commercial-secondary-btn commercial-home-alert-btn" type="button" data-commercial-open-advisory><span><?php echo esc_html((string) count($alerts)); ?></span> avisos para revisar</button><?php endif; ?>
+        <button class="commercial-secondary-btn commercial-home-alert-btn" type="button" data-commercial-open-advisory><span><?php echo esc_html((string) $criticalTotal); ?></span> ver popup de avisos</button>
       </div>
 
-      <div class="commercial-home-hero">
-        <article class="commercial-home-focus">
-          <div class="commercial-sla-chart commercial-home-ring" style="--commercial-sla-ok: <?php echo esc_attr((string) $okPct); ?>%; --commercial-sla-late: <?php echo esc_attr((string) max(0, 100 - $okPct)); ?>%;">
-            <span><?php echo esc_html((string) $okPct); ?>%</span>
+      <div class="commercial-home-control-dashboard">
+        <article class="commercial-home-control-card commercial-home-control-card--primary">
+          <div class="commercial-sla-chart commercial-home-ring" style="--commercial-sla-ok: <?php echo esc_attr((string) $taskUpdatePct); ?>%; --commercial-sla-late: <?php echo esc_attr((string) max(0, 100 - $taskUpdatePct)); ?>%;">
+            <span><?php echo esc_html((string) $taskUpdatePct); ?>%</span>
           </div>
           <div>
-            <span class="commercial-kicker">Tiempo de atención</span>
-            <h3><?php echo esc_html((string) $onTime); ?> al día · <?php echo esc_html((string) $overdue); ?> atrasadas</h3>
-            <p>De <?php echo esc_html((string) $openTotal); ?> tareas abiertas. Esta es la prioridad principal del día.</p>
-            <div class="commercial-home-actions">
-              <a class="commercial-primary-btn" data-commercial-filter-link href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'abiertos', 'sla_filter' => 'atrasado'] + self::globalFilterParams($filters))); ?>">Ver atrasadas</a>
-              <a class="commercial-secondary-btn" data-commercial-filter-link href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'abiertos'] + self::globalFilterParams($filters))); ?>">Ver abiertas</a>
-            </div>
+            <span class="commercial-kicker">Actualización</span>
+            <h3>Tareas actualizadas</h3>
+            <p><?php echo esc_html((string) ((int) ($update['sin_actualizar'] ?? 0))); ?> tareas abiertas sin actualizar +3 días.</p>
           </div>
-        </article>
-        <div class="commercial-home-kpis">
-          <?php echo self::renderHomeKpi('Abiertas', (int) ($bucketCounts['abiertos'] ?? 0), 'Activas por gestionar', 'primary'); ?>
-          <?php echo self::renderHomeKpi('Postergadas', (int) ($bucketCounts['postergados'] ?? 0), 'Pausadas para retomar', 'warning'); ?>
-          <?php echo self::renderHomeKpi('Cerradas', (int) ($bucketCounts['cerrados'] ?? 0), 'Gestiones terminadas', 'success'); ?>
-          <?php echo self::renderHomeKpi('Creadas hoy', (int) ($pulse['creadas_hoy'] ?? 0), 'Ingresaron hoy', 'neutral'); ?>
-        </div>
-      </div>
-
-      <div class="commercial-home-grid">
-        <article class="commercial-home-card">
-          <header><span class="commercial-kicker">Producción comercial</span><h3>Movimiento del día</h3></header>
-          <div class="commercial-home-mini-grid">
-            <?php echo self::renderHomeMini('Actualizadas hoy', (int) ($pulse['actualizadas_hoy'] ?? 0)); ?>
-            <?php echo self::renderHomeMini('Cotizaciones hoy', (int) ($quotes['hoy'] ?? 0), !empty($quotes['available'])); ?>
-            <?php echo self::renderHomeMini('Precaptaciones hoy', (int) ($precaps['hoy'] ?? 0), !empty($precaps['available'])); ?>
-            <?php echo self::renderHomeMini('Publicados hoy', (int) ($properties['publicados_hoy'] ?? 0), !empty($properties['available'])); ?>
-          </div>
-        </article>
-
-        <article class="commercial-home-card">
-          <header><span class="commercial-kicker">Actualización</span><h3>Estado de gestión</h3></header>
-          <?php echo self::renderHomeMeter('Tareas actualizadas', (int) ($update['porcentaje_actualizadas'] ?? 0), (int) ($update['sin_actualizar'] ?? 0) . ' sin actualizar +3 días'); ?>
-          <div class="commercial-home-status-list">
+          <footer>
             <?php echo self::renderHomeStatus('Con seguimiento', (int) ($update['con_seguimiento'] ?? 0), 'success'); ?>
             <?php echo self::renderHomeStatus('Sin seguimiento', (int) ($update['sin_seguimiento'] ?? 0), 'warning'); ?>
-            <?php echo self::renderHomeStatus('Seguimientos vencidos', (int) ($update['seguimientos_vencidos'] ?? 0), 'danger'); ?>
-          </div>
+          </footer>
         </article>
 
-        <article class="commercial-home-card">
-          <header><span class="commercial-kicker">Actualizaciones</span><h3>Inmuebles publicados</h3></header>
-          <div class="commercial-home-mini-grid">
-            <?php echo self::renderHomeMini('Inmuebles', (int) ($properties['total'] ?? 0), !empty($properties['available'])); ?>
-            <?php echo self::renderHomeMini('Públicos', (int) ($properties['publicos'] ?? 0), !empty($properties['available'])); ?>
-            <?php echo self::renderHomeMini('Captados hoy', (int) ($properties['captados_hoy'] ?? 0), !empty($properties['available'])); ?>
-            <?php echo self::renderHomeMini('Actualizados hoy', (int) ($properties['actualizados_hoy'] ?? 0), !empty($properties['available'])); ?>
+        <article class="commercial-home-control-card">
+          <div class="commercial-sla-chart commercial-home-ring" style="--commercial-sla-ok: <?php echo esc_attr((string) $propertyPct); ?>%; --commercial-sla-late: <?php echo esc_attr((string) max(0, 100 - $propertyPct)); ?>%;">
+            <span><?php echo esc_html((string) $propertyPct); ?>%</span>
           </div>
-          <div class="commercial-home-status-list commercial-home-status-list--compact">
-            <?php echo self::renderHomeStatus('Al día', (int) ($properties['actualizacion_ok'] ?? 0), 'success'); ?>
-            <?php echo self::renderHomeStatus('Alerta', (int) ($properties['actualizacion_alerta'] ?? 0), 'warning'); ?>
-            <?php echo self::renderHomeStatus('Vencidos', (int) ($properties['actualizacion_vencida'] ?? 0), 'danger'); ?>
-            <?php echo self::renderHomeStatus('Pendientes', (int) ($properties['sin_actualizar'] ?? 0), 'warning'); ?>
-          </div>
-          <?php if ($propertyUpdateItems !== []): ?>
-            <ul class="commercial-home-sign-list commercial-home-update-list">
-              <?php foreach ($propertyUpdateItems as $item): ?>
-                <li>
-                  <strong><?php echo esc_html((string) ($item['codigo'] ?? 'Sin código')); ?> · <?php echo esc_html((string) ($item['estado'] ?? 'Alerta')); ?></strong>
-                  <span><?php echo esc_html((string) ($item['dias'] ?? 0)); ?> / <?php echo esc_html((string) ($item['max'] ?? 0)); ?> días<?php echo trim((string) ($item['barrio'] ?? '')) !== '' ? ' · ' . esc_html((string) ($item['barrio'] ?? '')) : ''; ?></span>
-                  <?php if (trim((string) ($item['url'] ?? '')) !== ''): ?><a href="<?php echo esc_url((string) $item['url']); ?>" target="_blank" rel="noopener">Actualizar</a><?php endif; ?>
-                </li>
-              <?php endforeach; ?>
-            </ul>
-          <?php endif; ?>
-        </article>
-
-        <article class="commercial-home-card commercial-home-card--signs">
-          <header><span class="commercial-kicker">Avisos</span><h3>Fachada y retoques</h3></header>
-          <div class="commercial-home-status-list">
-            <?php echo self::renderHomeStatus('Al día', (int) ($signs['ok'] ?? 0), 'success'); ?>
-            <?php echo self::renderHomeStatus('Nuevos atrasados', (int) ($signs['instalacion_atrasada'] ?? 0), 'danger'); ?>
-            <?php echo self::renderHomeStatus('Retoque vencido', (int) ($signs['retoque_vencido'] ?? 0), 'danger'); ?>
-            <?php echo self::renderHomeStatus('Por vencer', (int) ($signs['retoque_alerta'] ?? 0), 'warning'); ?>
-          </div>
-          <?php $signItems = is_array($signs['items'] ?? null) ? $signs['items'] : []; ?>
-          <?php if ($signItems !== []): ?>
-            <ul class="commercial-home-sign-list">
-              <?php foreach ($signItems as $item): ?>
-                <li><strong><?php echo esc_html((string) ($item['codigo'] ?? 'Sin código')); ?></strong><span><?php echo esc_html((string) ($item['label'] ?? 'Aviso pendiente')); ?> · <?php echo esc_html((string) ($item['days'] ?? 0)); ?> días<?php echo trim((string) ($item['barrio'] ?? '')) !== '' ? ' · ' . esc_html((string) ($item['barrio'] ?? '')) : ''; ?></span></li>
-              <?php endforeach; ?>
-            </ul>
-          <?php endif; ?>
-        </article>
-
-        <article class="commercial-home-card">
-          <header><span class="commercial-kicker">Cotizaciones</span><h3>Comerciales</h3></header>
-          <div class="commercial-home-mini-grid">
-            <?php echo self::renderHomeMini('Total', (int) ($quotes['total'] ?? 0), !empty($quotes['available'])); ?>
-            <?php echo self::renderHomeMini('Del mes', (int) ($quotes['mes'] ?? 0), !empty($quotes['available'])); ?>
-            <?php echo self::renderHomeMini('Hoy', (int) ($quotes['hoy'] ?? 0), !empty($quotes['available'])); ?>
-            <?php echo self::renderHomeMini('Sin tarea', (int) ($quotes['sin_tarea'] ?? 0), !empty($quotes['available'])); ?>
-          </div>
-        </article>
-
-        <article class="commercial-home-card">
-          <header><span class="commercial-kicker">Precaptaciones</span><h3>Prospección</h3></header>
-          <div class="commercial-home-mini-grid">
-            <?php echo self::renderHomeMini('Total', (int) ($precaps['total'] ?? 0), !empty($precaps['available'])); ?>
-            <?php echo self::renderHomeMini('Del mes', (int) ($precaps['mes'] ?? 0), !empty($precaps['available'])); ?>
-            <?php echo self::renderHomeMini('Contactadas', (int) ($precaps['contactadas'] ?? 0), !empty($precaps['available'])); ?>
-            <?php echo self::renderHomeMini('Sin tarea', (int) ($precaps['sin_tarea'] ?? 0), !empty($precaps['available'])); ?>
-          </div>
-        </article>
-      </div>
-
-      <div class="commercial-home-lower">
-        <article class="commercial-home-card commercial-home-alerts">
-          <header><span class="commercial-kicker">Avisos del sistema</span><h3>Qué revisar primero</h3></header>
-          <?php if ($alerts === []): ?>
-            <div class="commercial-home-ok">No hay alertas críticas para este filtro. Bonito silencio, de esos que sí ayudan.</div>
-          <?php else: ?>
-            <ul>
-              <?php foreach ($alerts as $alert): ?>
-                <li class="commercial-home-alert commercial-home-alert--<?php echo esc_attr((string) ($alert['type'] ?? 'warning')); ?>">
-                  <strong><?php echo esc_html((string) ($alert['title'] ?? 'Aviso')); ?> <span><?php echo esc_html((string) ($alert['count'] ?? 0)); ?></span></strong>
-                  <p><?php echo esc_html((string) ($alert['message'] ?? '')); ?></p>
-                  <a data-commercial-filter-link href="<?php echo esc_url((string) ($alert['href'] ?? '#')); ?>"><?php echo esc_html((string) ($alert['cta'] ?? 'Revisar')); ?></a>
-                </li>
-              <?php endforeach; ?>
-            </ul>
-          <?php endif; ?>
-        </article>
-
-        <article class="commercial-home-card commercial-home-priority">
-          <header><span class="commercial-kicker">Prioridad ahora</span><h3>Tareas abiertas más urgentes</h3></header>
-          <?php if ($priorityTasks === []): ?>
-            <div class="commercial-home-ok">No hay tareas abiertas para este filtro.</div>
-          <?php else: ?>
-            <div class="commercial-home-priority-list">
-              <?php foreach ($priorityTasks as $row): echo self::renderHomePriorityTask($row, $policy); endforeach; ?>
+          <div>
+            <span class="commercial-kicker">Actualizaciones</span>
+            <h3>Inmuebles publicados</h3>
+            <p><?php echo esc_html((string) $propertyPending); ?> inmuebles requieren revisión de actualización.</p>
+            <div class="commercial-home-actions">
+              <a class="commercial-primary-btn" data-commercial-filter-link href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'actualizaciones', 'estado_actualizacion' => 'Vencido'] + self::globalFilterParams($filters))); ?>">Ver vencidos</a>
+              <a class="commercial-secondary-btn" data-commercial-filter-link href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'actualizaciones'] + self::globalFilterParams($filters))); ?>">Abrir módulo</a>
             </div>
-          <?php endif; ?>
+          </div>
+          <footer>
+            <?php echo self::renderHomeStatus('Al día', $propertyOk, 'success'); ?>
+            <?php echo self::renderHomeStatus('Alerta', $propertyAlert, 'warning'); ?>
+            <?php echo self::renderHomeStatus('Vencidos', $propertyExpired, 'danger'); ?>
+          </footer>
+        </article>
+
+        <article class="commercial-home-control-card">
+          <div class="commercial-sla-chart commercial-home-ring" style="--commercial-sla-ok: <?php echo esc_attr((string) $signRetouchPct); ?>%; --commercial-sla-late: <?php echo esc_attr((string) max(0, 100 - $signRetouchPct)); ?>%;">
+            <span><?php echo esc_html((string) $signRetouchPct); ?>%</span>
+          </div>
+          <div>
+            <span class="commercial-kicker">Avisos</span>
+            <h3>Retoque de avisos</h3>
+            <p><?php echo esc_html((string) ($signRetouchAlert + $signRetouchExpired)); ?> avisos con retoque en alerta o vencido.</p>
+            <div class="commercial-home-actions">
+              <a class="commercial-primary-btn" data-commercial-filter-link href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'avisos', 'estado_aviso' => 'Vencido'] + self::globalFilterParams($filters))); ?>">Ver vencidos</a>
+              <a class="commercial-secondary-btn" data-commercial-filter-link href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'avisos', 'estado_aviso' => 'Alerta'] + self::globalFilterParams($filters))); ?>">Ver alertas</a>
+            </div>
+          </div>
+          <footer>
+            <?php echo self::renderHomeStatus('Al día', $signRetouchOk, 'success'); ?>
+            <?php echo self::renderHomeStatus('Por vencer', $signRetouchAlert, 'warning'); ?>
+            <?php echo self::renderHomeStatus('Vencidos', $signRetouchExpired, 'danger'); ?>
+          </footer>
+        </article>
+
+        <article class="commercial-home-control-card commercial-home-control-card--warning">
+          <div class="commercial-sla-chart commercial-home-ring" style="--commercial-sla-ok: <?php echo esc_attr((string) $newSignPct); ?>%; --commercial-sla-late: <?php echo esc_attr((string) max(0, 100 - $newSignPct)); ?>%;">
+            <span><?php echo esc_html((string) $newSignPct); ?>%</span>
+          </div>
+          <div>
+            <span class="commercial-kicker">Avisos nuevos</span>
+            <h3>Pendientes por instalar</h3>
+            <p><?php echo esc_html((string) $newSignPending); ?> inmuebles públicos piden aviso y aún están en control de instalación.</p>
+            <div class="commercial-home-actions">
+              <a class="commercial-primary-btn" data-commercial-filter-link href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'avisos', 'estado_aviso' => 'Atrasado'] + self::globalFilterParams($filters))); ?>">Ver atrasados</a>
+              <a class="commercial-secondary-btn" data-commercial-filter-link href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'avisos'] + self::globalFilterParams($filters))); ?>">Abrir avisos</a>
+            </div>
+          </div>
+          <footer>
+            <?php echo self::renderHomeStatus('Pendientes', $newSignPending, 'warning'); ?>
+            <?php echo self::renderHomeStatus('Atrasados', $newSignLate, 'danger'); ?>
+            <?php echo self::renderHomeStatus('A tiempo', $newSignOnTime, 'success'); ?>
+          </footer>
         </article>
       </div>
 
@@ -401,6 +343,14 @@ final class CommercialDashboardView
   private static function renderHomeKpi(string $label, int $value, string $description, string $tone = 'neutral'): string
   {
     return '<div class="commercial-home-kpi commercial-home-kpi--' . esc_attr($tone) . '"><span>' . esc_html($label) . '</span><strong>' . esc_html((string) $value) . '</strong><small>' . esc_html($description) . '</small></div>';
+  }
+
+  private static function percent(int $part, int $total): int
+  {
+    if ($total <= 0) {
+      return 0;
+    }
+    return max(0, min(100, (int) round(($part / $total) * 100)));
   }
 
   private static function renderHomeMini(string $label, int $value, bool $available = true): string
@@ -453,7 +403,7 @@ final class CommercialDashboardView
     <div class="commercial-modal commercial-advisory-modal" id="commercial-advisory-modal" role="dialog" aria-modal="true" aria-labelledby="commercial-advisory-title" aria-hidden="true" data-commercial-advisory-modal data-auto-open="<?php echo esc_attr($autoOpen); ?>" data-scope="<?php echo esc_attr(md5((string) ($filters['id_empleado'] ?? 'all') . date('Y-m-d'))); ?>">
       <div class="commercial-modal-card commercial-advisory-card" role="document">
         <header>
-          <div><span class="commercial-kicker">Asistente comercial</span><h2 id="commercial-advisory-title">Avisos para arrancar el día</h2><p>Estas alertas salen de tareas abiertas, seguimiento, inmuebles y estado de avisos.</p></div>
+          <div><span class="commercial-kicker">Alertas administrativas</span><h2 id="commercial-advisory-title">Avisos para arrancar el día</h2><p>Resumen rápido de actualizaciones, avisos pendientes y controles críticos del panel.</p></div>
           <button type="button" class="commercial-modal-close" data-commercial-close-advisory aria-label="Cerrar avisos">&times;</button>
         </header>
         <div class="commercial-advisory-body">
@@ -497,7 +447,8 @@ final class CommercialDashboardView
         </div>
         <footer>
           <button type="button" class="commercial-secondary-btn" data-commercial-close-advisory>Cerrar</button>
-          <a class="commercial-primary-btn" data-commercial-filter-link href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'abiertos'] + self::globalFilterParams($filters))); ?>">Ir a tareas abiertas</a>
+          <a class="commercial-secondary-btn" data-commercial-filter-link href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'actualizaciones'] + self::globalFilterParams($filters))); ?>">Ir a actualizaciones</a>
+          <a class="commercial-primary-btn" data-commercial-filter-link href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'avisos'] + self::globalFilterParams($filters))); ?>">Ir a avisos</a>
         </footer>
       </div>
     </div>
@@ -533,6 +484,7 @@ final class CommercialDashboardView
     $selectedUpdateState = trim((string) ($filters['estado_actualizacion'] ?? ''));
     $selectedSignState = trim((string) ($filters['estado_aviso'] ?? ''));
     $isUpdates = $activePanel === 'updates';
+    $signMode = in_array($selectedSignState, ['Atrasado', 'A Tiempo'], true) ? 'new' : 'maintenance';
     $pageTitle = $isUpdates ? 'Actualizaciones de inmuebles' : 'Avisos en fachada';
     $pageDescription = $isUpdates
       ? 'Control completo de inmuebles públicos que están al día, en alerta o vencidos por actualización.'
@@ -575,11 +527,11 @@ final class CommercialDashboardView
           <span data-commercial-sign-total>0 avisos</span>
         </div>
         <div class="commercial-sign-mode-tabs" role="tablist" aria-label="Modos de avisos">
-          <button class="active" type="button" data-commercial-sign-tab="maintenance">Retoque de avisos</button>
-          <button type="button" data-commercial-sign-tab="new">Avisos nuevos</button>
+          <button class="<?php echo $signMode === 'maintenance' ? 'active' : ''; ?>" type="button" data-commercial-sign-tab="maintenance">Retoque de avisos</button>
+          <button class="<?php echo $signMode === 'new' ? 'active' : ''; ?>" type="button" data-commercial-sign-tab="new">Avisos nuevos</button>
           <?php if ($canSeeAll): ?><button type="button" data-commercial-sign-tab="routes_neighborhood">Rutas x barrio</button><button type="button" data-commercial-sign-tab="routes_route">Rutas x ruta</button><?php endif; ?>
         </div>
-        <form class="commercial-control-filters" data-commercial-sign-control data-mode="maintenance">
+        <form class="commercial-control-filters" data-commercial-sign-control data-mode="<?php echo esc_attr($signMode); ?>">
           <label><span>Código</span><input type="text" name="codigo" placeholder="Ej: 90480" value="<?php echo esc_attr($selectedCode); ?>"></label>
           <label><span>Gestión</span><?php echo self::selectBusinessOptions('commercial-sign-business', 'gestion', $selectedBusiness); ?></label>
           <label><span>Tipo</span><?php echo self::selectFromOptions('commercial-sign-type', 'tipo', $tipos, $selectedType); ?></label>
@@ -670,7 +622,7 @@ final class CommercialDashboardView
     }
 
     $headers = $mode === 'new'
-      ? '<tr><th>Código</th><th>Funcionario</th><th>Barrio</th><th>Captación</th><th>Gestión</th><th>Días / Max</th><th>Estado</th><th>Maps</th></tr>'
+      ? '<tr><th>Código</th><th>Funcionario</th><th>Barrio</th><th>Captación</th><th>Gestión</th><th>Días / Max</th><th>Estado</th><th>Maps</th><th>Acción</th></tr>'
       : '<tr><th>Código</th><th>Funcionario</th><th>Barrio</th><th>Gestión</th><th>Estado</th><th>Días</th><th>Maps</th><th>Acción</th></tr>';
     $html = '<table class="commercial-control-table"><thead>' . $headers . '</thead><tbody>';
     foreach ($rows as $row) {
@@ -679,7 +631,7 @@ final class CommercialDashboardView
       $maps = trim((string) ($row['maps_url'] ?? '')) !== '' ? '<a href="' . esc_url((string) $row['maps_url']) . '" target="_blank" rel="noopener">Ver mapa</a>' : '—';
       $detail = esc_attr((string) json_encode($row, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP));
       if ($mode === 'new') {
-        $html .= '<tr><td><strong>' . esc_html((string) ($row['codigo'] ?? '')) . '</strong></td><td>' . esc_html((string) ($row['funcionario'] ?? '')) . '</td><td>' . esc_html((string) ($row['barrio'] ?? '')) . '</td><td>' . esc_html((string) ($row['fecha'] ?? '')) . '</td><td>' . esc_html((string) ($row['gestion'] ?? '')) . '</td><td><strong>' . esc_html((string) ($row['dias'] ?? 0)) . ' / ' . esc_html((string) ($row['max'] ?? 0)) . '</strong> días</td><td><span class="commercial-control-badge commercial-control-badge--' . esc_attr($tone) . '">' . esc_html($status) . '</span></td><td>' . $maps . '</td></tr>';
+        $html .= '<tr><td><strong>' . esc_html((string) ($row['codigo'] ?? '')) . '</strong></td><td>' . esc_html((string) ($row['funcionario'] ?? '')) . '</td><td>' . esc_html((string) ($row['barrio'] ?? '')) . '</td><td>' . esc_html((string) ($row['fecha'] ?? '')) . '</td><td>' . esc_html((string) ($row['gestion'] ?? '')) . '</td><td><strong>' . esc_html((string) ($row['dias'] ?? 0)) . ' / ' . esc_html((string) ($row['max'] ?? 0)) . '</strong> días</td><td><span class="commercial-control-badge commercial-control-badge--' . esc_attr($tone) . '">' . esc_html($status) . '</span></td><td>' . $maps . '</td><td><button class="commercial-control-btn" type="button" data-commercial-sign-detail="' . $detail . '">Ver detalle</button></td></tr>';
       } else {
         $html .= '<tr><td><strong>' . esc_html((string) ($row['codigo'] ?? '')) . '</strong></td><td>' . esc_html((string) ($row['funcionario'] ?? '')) . '</td><td>' . esc_html((string) ($row['barrio'] ?? '')) . '</td><td>' . esc_html((string) ($row['gestion'] ?? '')) . '</td><td><span class="commercial-control-badge commercial-control-badge--' . esc_attr($tone) . '">' . esc_html($status) . '</span></td><td><strong>' . esc_html((string) ($row['dias'] ?? 0)) . ' / ' . esc_html((string) ($row['max'] ?? 0)) . '</strong></td><td>' . $maps . '</td><td><button class="commercial-control-btn" type="button" data-commercial-sign-detail="' . $detail . '">Ver detalle</button></td></tr>';
       }

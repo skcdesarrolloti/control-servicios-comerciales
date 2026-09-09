@@ -806,7 +806,17 @@ final class CommercialTicketsRepository
   {
     $table = $this->db->table('jet_cct_inmuebles');
     if (!$this->schema->tableExists($table) || !$this->schema->columnExists($table, 'desea_aviso')) {
-      return ['available' => false, 'total' => 0, 'ok' => 0, 'instalacion_atrasada' => 0, 'retoque_vencido' => 0, 'retoque_alerta' => 0, 'items' => []];
+      return [
+        'available' => false,
+        'total' => 0,
+        'ok' => 0,
+        'instalacion_pendiente' => 0,
+        'instalacion_atrasada' => 0,
+        'retoque_ok' => 0,
+        'retoque_vencido' => 0,
+        'retoque_alerta' => 0,
+        'items' => [],
+      ];
     }
 
     [$employeeWhere, $employeeArgs] = $this->propertyEmployeeWhere($filters, 'i');
@@ -827,7 +837,9 @@ final class CommercialTicketsRepository
       'available' => true,
       'total' => count($rows),
       'ok' => 0,
+      'instalacion_pendiente' => 0,
       'instalacion_atrasada' => 0,
+      'retoque_ok' => 0,
       'retoque_vencido' => 0,
       'retoque_alerta' => 0,
       'items' => [],
@@ -835,8 +847,12 @@ final class CommercialTicketsRepository
     ];
 
     foreach ($rows as $row) {
+      $hasSign = str_contains(mb_strtolower(trim((string) ($row['presenta_aviso'] ?? '')), 'UTF-8'), 'si');
       $state = $this->signState($row);
       $status = (string) ($state['status'] ?? 'ok');
+      if (!$hasSign) {
+        $summary['instalacion_pendiente']++;
+      }
       if ($status === 'instalacion_atrasada') {
         $summary['instalacion_atrasada']++;
       } elseif ($status === 'retoque_vencido') {
@@ -845,6 +861,9 @@ final class CommercialTicketsRepository
         $summary['retoque_alerta']++;
       } else {
         $summary['ok']++;
+        if ($hasSign) {
+          $summary['retoque_ok']++;
+        }
       }
       if ($status !== 'ok' && count($summary['items']) < 5) {
         $summary['items'][] = [
@@ -902,8 +921,9 @@ final class CommercialTicketsRepository
     $push('warning', 'Seguimientos vencidos', 'Tienes seguimientos programados para hoy o fechas anteriores.', $this->homeUrl(['tab' => 'abiertos'], $filters), 'Revisar agenda', (int) ($updateHealth['seguimientos_vencidos'] ?? 0));
     $push('danger', 'Actualizaciones vencidas', 'Hay inmuebles publicados que superaron el tiempo máximo sin actualización.', $this->homeUrl(['tab' => 'actualizaciones', 'estado_actualizacion' => 'Vencido'], $filters), 'Abrir panel', (int) ($properties['actualizacion_vencida'] ?? 0));
     $push('warning', 'Actualizaciones por vencer', 'Algunos inmuebles ya entraron en la ventana de alerta de actualización.', $this->homeUrl(['tab' => 'actualizaciones', 'estado_actualizacion' => 'Alerta'], $filters), 'Abrir panel', (int) ($properties['actualizacion_alerta'] ?? 0));
-    $push('danger', 'Avisos vencidos', 'Hay inmuebles con aviso nuevo pendiente o retoque vencido.', $this->homeUrl(['tab' => 'avisos', 'estado_aviso' => 'Vencido'], $filters), 'Abrir avisos', (int) ($signs['instalacion_atrasada'] ?? 0) + (int) ($signs['retoque_vencido'] ?? 0));
-    $push('warning', 'Avisos por vencer', 'Algunos avisos están entrando en ventana de retoque.', $this->homeUrl(['tab' => 'avisos', 'estado_aviso' => 'Alerta'], $filters), 'Abrir avisos', (int) ($signs['retoque_alerta'] ?? 0));
+    $push('danger', 'Retoques de aviso vencidos', 'Hay inmuebles con aviso instalado que ya necesitan retoque.', $this->homeUrl(['tab' => 'avisos', 'estado_aviso' => 'Vencido'], $filters), 'Abrir retoques', (int) ($signs['retoque_vencido'] ?? 0));
+    $push('warning', 'Retoques de aviso por vencer', 'Algunos avisos están entrando en ventana de retoque.', $this->homeUrl(['tab' => 'avisos', 'estado_aviso' => 'Alerta'], $filters), 'Abrir avisos', (int) ($signs['retoque_alerta'] ?? 0));
+    $push('danger', 'Avisos nuevos atrasados', 'Hay inmuebles que pidieron aviso y siguen pendientes por instalación.', $this->homeUrl(['tab' => 'avisos', 'estado_aviso' => 'Atrasado'], $filters), 'Abrir nuevos', (int) ($signs['instalacion_atrasada'] ?? 0));
     $push('warning', 'Precaptaciones sin tarea', 'Hay precaptaciones que todavía no tienen tarea asociada.', $this->homeUrl(['tab' => 'abiertos', 'estado' => 'Prospectado'], $filters), 'Convertir', (int) ($precaptations['sin_tarea'] ?? 0));
     $push('warning', 'Cotizaciones sin tarea', 'Existen cotizaciones comerciales sin tarea asociada para seguimiento.', $this->homeUrl(['tab' => 'abiertos', 'estado' => 'En cierre'], $filters), 'Revisar', (int) ($quotes['sin_tarea'] ?? 0));
 
@@ -930,7 +950,7 @@ final class CommercialTicketsRepository
       }
       $where[] = "LOWER(TRIM(COALESCE(i.`desea_aviso`, ''))) LIKE '%si%'";
       if ($mode === 'maintenance' && $this->schema->columnExists($table, 'presenta_aviso')) {
-        $where[] = "(i.`presenta_aviso` IS NULL OR LOWER(TRIM(i.`presenta_aviso`)) NOT LIKE '%no%')";
+        $where[] = "LOWER(TRIM(COALESCE(i.`presenta_aviso`, ''))) LIKE '%si%'";
       }
       if ($mode === 'new' && $this->schema->columnExists($table, 'presenta_aviso')) {
         $where[] = "(i.`presenta_aviso` IS NULL OR TRIM(i.`presenta_aviso`) = '' OR LOWER(TRIM(i.`presenta_aviso`)) LIKE '%no%')";
@@ -1042,6 +1062,7 @@ final class CommercialTicketsRepository
       'punto_referencia' => trim((string) ($row['punto_referencia'] ?? '')),
       'maps_url' => trim((string) ($row['ubicacion_google_maps'] ?? '')),
       'celular_funcionario' => trim((string) ($row['fcel'] ?? '')),
+      'property_url' => $code !== '' ? 'https://sucasainmobiliaria.com.co/inmuebles/inmueble/' . rawurlencode($code) : '',
       'url_actualizar' => $this->propertyUpdateUrl($row),
       'url_despublicar' => $this->propertyUnpublishUrl($row),
       'detalle' => [
