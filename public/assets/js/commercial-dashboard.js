@@ -408,6 +408,12 @@
       "fecha_seguimiento_hasta",
       "sin_actualizar",
       "estado_administrativo",
+      "codigo",
+      "gestion",
+      "tipo",
+      "ruta",
+      "estado_actualizacion",
+      "estado_aviso",
       "fecha_desde",
       "fecha_hasta",
       "sla_filter",
@@ -652,8 +658,8 @@
 
   function initHomeControls() {
     if (!root.querySelector("[data-commercial-home-controls]")) return;
-    loadPropertyUpdates();
-    loadSignsControl();
+    if (homeControlPanel("updates") && homeControlPanel("updates").classList.contains("active")) loadPropertyUpdates();
+    if (homeControlPanel("signs") && homeControlPanel("signs").classList.contains("active")) loadSignsControl();
   }
 
   function analyzeCase(button) {
@@ -1060,8 +1066,6 @@
     else loadTickets(url.href, { history: false, focus: true });
   });
   if (activeTab() === "calendario") window.setTimeout(function () { setVisiblePanel("calendario"); }, 0);
-  if (activeTab() === "inicio") window.setTimeout(function () {
-    maybeAutoOpenAdvisory();
-    initHomeControls();
-  }, 0);
+  if (activeTab() === "inicio") window.setTimeout(maybeAutoOpenAdvisory, 0);
+  if (root.querySelector("[data-commercial-home-controls]")) window.setTimeout(initHomeControls, 0);
 })();

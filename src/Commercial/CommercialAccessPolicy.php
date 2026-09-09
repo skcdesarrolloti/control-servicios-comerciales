@@ -12,6 +12,8 @@ final class CommercialAccessPolicy
 {
   public const VIEWS = [
     'inicio' => 'Inicio',
+    'actualizaciones' => 'Actualizaciones de inmuebles',
+    'avisos' => 'Avisos en fachada',
     'abiertos' => 'Tareas abiertas',
     'postergados' => 'Tareas postergadas',
     'cerrados' => 'Tareas cerradas',

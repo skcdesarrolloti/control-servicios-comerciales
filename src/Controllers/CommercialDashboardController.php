@@ -60,7 +60,7 @@ final class CommercialDashboardController
     $tabCounts = $repository->bucketCounts($globalCountFilters);
     $myTabCounts = $repository->bucketCounts(['id_empleado' => $currentEmployeeFilter]);
     $tabCounts['mis_tickets'] = (int) ($myTabCounts['mis_tickets'] ?? 0);
-    $result = in_array($bucket, ['inicio', 'calendario', 'sin_acceso'], true) ? ['rows' => [], 'counts' => $repository->statusCounts($filters), 'pagination' => []] : $repository->search($bucket, $filters);
+    $result = in_array($bucket, ['inicio', 'actualizaciones', 'avisos', 'calendario', 'sin_acceso'], true) ? ['rows' => [], 'counts' => $repository->statusCounts($filters), 'pagination' => []] : $repository->search($bucket, $filters);
     $homeDashboard = $bucket === 'sin_acceso' ? [] : $repository->homeDashboard($globalCountFilters);
     $calendarEmployees = $repository->activeEmployeesByCargos($calendarCargos);
     $currentCalendarEmployeeId = '';
@@ -130,6 +130,12 @@ final class CommercialDashboardController
       'fecha_seguimiento_hasta' => $clean('fecha_seguimiento_hasta'),
       'sin_actualizar' => $clean('sin_actualizar'),
       'estado_administrativo' => $clean('estado_administrativo'),
+      'codigo' => $clean('codigo'),
+      'gestion' => $clean('gestion'),
+      'tipo' => $clean('tipo'),
+      'ruta' => $clean('ruta'),
+      'estado_actualizacion' => $clean('estado_actualizacion'),
+      'estado_aviso' => $clean('estado_aviso'),
       'fecha_desde' => $clean('fecha_desde'),
       'fecha_hasta' => $clean('fecha_hasta'),
       'sla_filter' => $clean('sla_filter'),

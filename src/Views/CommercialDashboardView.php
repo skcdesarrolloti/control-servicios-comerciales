@@ -34,7 +34,7 @@ final class CommercialDashboardView
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Control de Tareas Comerciales</title>
+  <title>Panel de Control - Servicios Comerciales</title>
   <link rel="icon" href="<?php echo esc_url(system_image('portal_favicon_url', SCM_DEFAULT_PORTAL_FAVICON_URL)); ?>" sizes="32x32">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap">
@@ -50,7 +50,7 @@ final class CommercialDashboardView
     <div class="commercial-topbar-inner">
       <a class="commercial-brand" href="<?php echo esc_url($baseUrl . '/index.php'); ?>">
         <span class="commercial-logo"><img src="<?php echo esc_url(system_image('portal_logo_url', SCM_DEFAULT_PORTAL_LOGO_URL)); ?>" alt="Su Casa Inmobiliaria"></span>
-        <span class="commercial-brand-title">Control Tareas Comerciales</span>
+        <span class="commercial-brand-title">Panel de Control - Servicios Comerciales</span>
       </a>
       <div class="commercial-session">
         <form method="post" action="<?php echo esc_url($baseUrl . '/logout.php'); ?>">
@@ -81,9 +81,17 @@ final class CommercialDashboardView
     <?php else: ?>
       <section class="scm-tab-panel commercial-panel<?php echo $bucket !== 'calendario' ? ' active' : ''; ?>" id="commercial-tickets-panel" data-commercial-tickets-panel aria-live="polite">
         <?php if ($bucket !== 'calendario'): ?>
-          <?php echo $bucket === 'inicio'
-            ? self::renderHome($homeDashboard, $filters, $policy, $baseUrl, $ticketEmployees, $filterOptions)
-            : self::renderTickets($bucket, $result, $filters, $ticketEmployees, $filterOptions, $tabCounts, $policy, $baseUrl); ?>
+          <?php
+            if ($bucket === 'inicio') {
+              echo self::renderHome($homeDashboard, $filters, $policy, $baseUrl, $ticketEmployees, $filterOptions);
+            } elseif ($bucket === 'actualizaciones') {
+              echo self::renderPropertyUpdatesPage($filters, $ticketEmployees, $filterOptions, $policy);
+            } elseif ($bucket === 'avisos') {
+              echo self::renderSignsPage($filters, $ticketEmployees, $filterOptions, $policy);
+            } else {
+              echo self::renderTickets($bucket, $result, $filters, $ticketEmployees, $filterOptions, $tabCounts, $policy, $baseUrl);
+            }
+          ?>
         <?php endif; ?>
       </section>
       <section class="scm-tab-panel commercial-panel<?php echo $bucket === 'calendario' ? ' active' : ''; ?>" id="scm-panel-actividades-administrativas" data-commercial-calendar-panel>
@@ -126,6 +134,12 @@ final class CommercialDashboardView
     $items = [];
     if (in_array('inicio', $views, true)) {
       $items[] = ['key' => 'inicio', 'label' => 'Inicio', 'tab' => 'inicio', 'icon' => 'fa-chart-pie'];
+    }
+    if (in_array('actualizaciones', $views, true)) {
+      $items[] = ['key' => 'actualizaciones', 'label' => 'Actualizaciones', 'tab' => 'actualizaciones', 'icon' => 'fa-rotate'];
+    }
+    if (in_array('avisos', $views, true)) {
+      $items[] = ['key' => 'avisos', 'label' => 'Avisos', 'tab' => 'avisos', 'icon' => 'fa-sign-hanging'];
     }
     if ($visibleTaskViews !== []) {
       $items[] = ['key' => 'tareas', 'label' => 'Tareas', 'tab' => $visibleTaskViews[0], 'icon' => 'fa-list-check'];
@@ -378,7 +392,6 @@ final class CommercialDashboardView
         </article>
       </div>
 
-      <?php echo self::renderHomeControlPanels($filters, $ticketEmployees, $filterOptions, $policy); ?>
       <?php echo self::renderHomeAdvisoryModal($alerts, $signs, $properties, $filters, $baseUrl); ?>
     </section>
 <?php
@@ -493,38 +506,58 @@ final class CommercialDashboardView
   }
 
   /** @param array<string,mixed> $filters @param array<int,array<string,string>> $ticketEmployees @param array<string,mixed> $filterOptions */
-  private static function renderHomeControlPanels(array $filters, array $ticketEmployees, array $filterOptions, $policy): string
+  public static function renderPropertyUpdatesPage(array $filters, array $ticketEmployees, array $filterOptions, $policy): string
+  {
+    return self::renderOperationalControls($filters, $ticketEmployees, $filterOptions, $policy, 'updates');
+  }
+
+  /** @param array<string,mixed> $filters @param array<int,array<string,string>> $ticketEmployees @param array<string,mixed> $filterOptions */
+  public static function renderSignsPage(array $filters, array $ticketEmployees, array $filterOptions, $policy): string
+  {
+    return self::renderOperationalControls($filters, $ticketEmployees, $filterOptions, $policy, 'signs');
+  }
+
+  /** @param array<string,mixed> $filters @param array<int,array<string,string>> $ticketEmployees @param array<string,mixed> $filterOptions */
+  private static function renderOperationalControls(array $filters, array $ticketEmployees, array $filterOptions, $policy, string $activePanel): string
   {
     $canSeeAll = $policy instanceof CommercialAccessPolicy && $policy->canSeeAllCommercialTickets();
     $selectedEmployee = trim((string) ($filters['id_empleado'] ?? ''));
     $barrios = is_array($filterOptions['barrios'] ?? null) ? $filterOptions['barrios'] : [];
     $tipos = is_array($filterOptions['tipos_inmueble'] ?? null) ? $filterOptions['tipos_inmueble'] : [];
     $rutas = is_array($filterOptions['rutas_avisos'] ?? null) ? $filterOptions['rutas_avisos'] : [];
+    $selectedCode = trim((string) ($filters['codigo'] ?? ''));
+    $selectedBusiness = trim((string) ($filters['gestion'] ?? ''));
+    $selectedType = trim((string) ($filters['tipo'] ?? ''));
+    $selectedNeighborhood = trim((string) ($filters['barrio'] ?? ''));
+    $selectedRoute = trim((string) ($filters['ruta'] ?? ''));
+    $selectedUpdateState = trim((string) ($filters['estado_actualizacion'] ?? ''));
+    $selectedSignState = trim((string) ($filters['estado_aviso'] ?? ''));
+    $isUpdates = $activePanel === 'updates';
+    $pageTitle = $isUpdates ? 'Actualizaciones de inmuebles' : 'Avisos en fachada';
+    $pageDescription = $isUpdates
+      ? 'Control completo de inmuebles públicos que están al día, en alerta o vencidos por actualización.'
+      : 'Control completo de avisos nuevos, retoques y rutas operativas por barrio o ruta.';
     ob_start();
 ?>
     <section class="commercial-home-control-shell" data-commercial-home-controls>
       <header>
         <div>
-          <span class="commercial-kicker">Controles independientes</span>
-          <h2>Actualizaciones y avisos</h2>
-          <p>Estas funciones no dependen de las tareas: salen directo de inmuebles publicados y estado de avisos.</p>
-        </div>
-        <div class="commercial-home-control-tabs" role="tablist" aria-label="Controles operativos">
-          <button type="button" class="active" data-commercial-home-control-tab="updates">Actualizar inmuebles</button>
-          <button type="button" data-commercial-home-control-tab="signs">Avisos en fachada</button>
+          <span class="commercial-kicker">Módulo operativo</span>
+          <h2><?php echo esc_html($pageTitle); ?></h2>
+          <p><?php echo esc_html($pageDescription); ?></p>
         </div>
       </header>
 
-      <article class="commercial-home-control-panel active" id="commercial-property-updates-panel" data-commercial-home-control-panel="updates">
+      <article class="commercial-home-control-panel<?php echo $isUpdates ? ' active' : ''; ?>" id="commercial-property-updates-panel" data-commercial-home-control-panel="updates">
         <div class="commercial-control-title">
           <div><h3>Panel para actualizar inmuebles</h3><p>Filtra inmuebles públicos por vencimiento de actualización y abre la ficha técnica sin salir del dashboard.</p></div>
           <span data-commercial-property-total>0 inmuebles</span>
         </div>
         <form class="commercial-control-filters" data-commercial-property-control>
-          <label><span>Código</span><input type="text" name="codigo" placeholder="Ej: 90480"></label>
-          <label><span>Gestión</span><select name="gestion"><option value="">Todas</option><option value="Arriendo">Arriendo</option><option value="Venta">Venta</option><option value="Arriendo/Venta">Arriendo/Venta</option></select></label>
+          <label><span>Código</span><input type="text" name="codigo" placeholder="Ej: 90480" value="<?php echo esc_attr($selectedCode); ?>"></label>
+          <label><span>Gestión</span><?php echo self::selectBusinessOptions('commercial-property-business', 'gestion', $selectedBusiness); ?></label>
           <?php if ($canSeeAll): ?><label><span>Funcionario</span><?php echo self::selectEmployeeOptions('commercial-property-employee', 'id_empleado', $ticketEmployees, $selectedEmployee); ?></label><?php endif; ?>
-          <label><span>Estado</span><select name="estado_actualizacion"><option value="">Todos</option><option value="Vencido">Vencidos</option><option value="Alerta">Alerta</option><option value="OK">Al día</option></select></label>
+          <label><span>Estado</span><select name="estado_actualizacion"><option value="">Todos</option><option value="Vencido"<?php selected($selectedUpdateState, 'Vencido'); ?>>Vencidos</option><option value="Alerta"<?php selected($selectedUpdateState, 'Alerta'); ?>>Alerta</option><option value="OK"<?php selected($selectedUpdateState, 'OK'); ?>>Al día</option></select></label>
           <div><button class="commercial-primary-btn" type="submit">Filtrar</button><button class="commercial-secondary-btn" type="button" data-commercial-control-clear>Limpiar</button></div>
         </form>
         <div class="commercial-control-statline" data-commercial-property-stats>Al día: 0 · Alerta: 0 · Vencidos: 0</div>
@@ -536,7 +569,7 @@ final class CommercialDashboardView
         </div>
       </article>
 
-      <article class="commercial-home-control-panel" id="commercial-signs-panel" data-commercial-home-control-panel="signs">
+      <article class="commercial-home-control-panel<?php echo !$isUpdates ? ' active' : ''; ?>" id="commercial-signs-panel" data-commercial-home-control-panel="signs">
         <div class="commercial-control-title">
           <div><h3>Panel de avisos en fachada</h3><p>Controla retoques, avisos nuevos y rutas por barrio o ruta.</p></div>
           <span data-commercial-sign-total>0 avisos</span>
@@ -547,13 +580,13 @@ final class CommercialDashboardView
           <?php if ($canSeeAll): ?><button type="button" data-commercial-sign-tab="routes_neighborhood">Rutas x barrio</button><button type="button" data-commercial-sign-tab="routes_route">Rutas x ruta</button><?php endif; ?>
         </div>
         <form class="commercial-control-filters" data-commercial-sign-control data-mode="maintenance">
-          <label><span>Código</span><input type="text" name="codigo" placeholder="Ej: 90480"></label>
-          <label><span>Gestión</span><select name="gestion"><option value="">Todas</option><option value="Arriendo">Arriendo</option><option value="Venta">Venta</option><option value="Arriendo/Venta">Arriendo/Venta</option></select></label>
-          <label><span>Tipo</span><?php echo self::selectFromOptions('commercial-sign-type', 'tipo', $tipos, ''); ?></label>
-          <label><span>Barrio</span><?php echo self::selectFromOptions('commercial-sign-neighborhood', 'barrio', $barrios, ''); ?></label>
-          <label><span>Ruta</span><?php echo self::selectFromOptions('commercial-sign-route', 'ruta', $rutas, ''); ?></label>
+          <label><span>Código</span><input type="text" name="codigo" placeholder="Ej: 90480" value="<?php echo esc_attr($selectedCode); ?>"></label>
+          <label><span>Gestión</span><?php echo self::selectBusinessOptions('commercial-sign-business', 'gestion', $selectedBusiness); ?></label>
+          <label><span>Tipo</span><?php echo self::selectFromOptions('commercial-sign-type', 'tipo', $tipos, $selectedType); ?></label>
+          <label><span>Barrio</span><?php echo self::selectFromOptions('commercial-sign-neighborhood', 'barrio', $barrios, $selectedNeighborhood); ?></label>
+          <label><span>Ruta</span><?php echo self::selectFromOptions('commercial-sign-route', 'ruta', $rutas, $selectedRoute); ?></label>
           <?php if ($canSeeAll): ?><label><span>Funcionario</span><?php echo self::selectEmployeeOptions('commercial-sign-employee', 'id_empleado', $ticketEmployees, $selectedEmployee); ?></label><?php endif; ?>
-          <label><span>Estado</span><select name="estado_aviso"><option value="">Todos</option><option value="Vencido">Vencido</option><option value="Alerta">Alerta</option><option value="OK">Al día</option><option value="Atrasado">Nuevo atrasado</option><option value="A Tiempo">Nuevo al día</option></select></label>
+          <label><span>Estado</span><select name="estado_aviso"><option value="">Todos</option><option value="Vencido"<?php selected($selectedSignState, 'Vencido'); ?>>Vencido</option><option value="Alerta"<?php selected($selectedSignState, 'Alerta'); ?>>Alerta</option><option value="OK"<?php selected($selectedSignState, 'OK'); ?>>Al día</option><option value="Atrasado"<?php selected($selectedSignState, 'Atrasado'); ?>>Nuevo atrasado</option><option value="A Tiempo"<?php selected($selectedSignState, 'A Tiempo'); ?>>Nuevo al día</option></select></label>
           <div><button class="commercial-primary-btn" type="submit">Filtrar</button><button class="commercial-secondary-btn" type="button" data-commercial-control-clear>Limpiar</button></div>
         </form>
         <div class="commercial-control-table-wrap">
@@ -955,6 +988,16 @@ final class CommercialDashboardView
       if ($value === '') {
         continue;
       }
+      $html .= '<option value="' . esc_attr($value) . '"' . selected($selected, $value, false) . '>' . esc_html($value) . '</option>';
+    }
+    return $html . '</select>';
+  }
+
+  private static function selectBusinessOptions(string $id, string $name, string $selected): string
+  {
+    $options = ['Arriendo', 'Venta', 'Arriendo/Venta'];
+    $html = '<select id="' . esc_attr($id) . '" name="' . esc_attr($name) . '"><option value="">Todas</option>';
+    foreach ($options as $value) {
       $html .= '<option value="' . esc_attr($value) . '"' . selected($selected, $value, false) . '>' . esc_html($value) . '</option>';
     }
     return $html . '</select>';

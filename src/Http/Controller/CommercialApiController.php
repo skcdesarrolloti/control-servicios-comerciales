@@ -84,6 +84,20 @@ final class CommercialApiController
         $ticketEmployees,
         $this->tickets->filterOptions()
       );
+    } elseif ($bucket === 'actualizaciones') {
+      $html = CommercialDashboardView::renderPropertyUpdatesPage(
+        $filters,
+        $ticketEmployees,
+        $this->tickets->filterOptions(),
+        $this->policy
+      );
+    } elseif ($bucket === 'avisos') {
+      $html = CommercialDashboardView::renderSignsPage(
+        $filters,
+        $ticketEmployees,
+        $this->tickets->filterOptions(),
+        $this->policy
+      );
     } elseif ($bucket === 'calendario') {
       $html = '';
     } else {
@@ -474,6 +488,12 @@ final class CommercialApiController
       'fecha_seguimiento_hasta' => $clean('fecha_seguimiento_hasta'),
       'sin_actualizar' => $clean('sin_actualizar'),
       'estado_administrativo' => $clean('estado_administrativo'),
+      'codigo' => $clean('codigo'),
+      'gestion' => $clean('gestion'),
+      'tipo' => $clean('tipo'),
+      'ruta' => $clean('ruta'),
+      'estado_actualizacion' => $clean('estado_actualizacion'),
+      'estado_aviso' => $clean('estado_aviso'),
       'fecha_desde' => $clean('fecha_desde'),
       'fecha_hasta' => $clean('fecha_hasta'),
       'sla_filter' => $clean('sla_filter'),
