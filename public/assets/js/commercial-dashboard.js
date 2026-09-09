@@ -17,7 +17,7 @@
   var globalFilter = root.querySelector("[data-commercial-global-filter-form]");
   var caseModal = document.getElementById("commercial-case-modal");
   var caseContent = caseModal && caseModal.querySelector("[data-commercial-case-content]");
-  var advisoryModal = document.getElementById("commercial-advisory-modal");
+  var advisoryModal = null;
   var currentCasePk = "";
   var lastFocused = null;
   var listRequest = null;
@@ -329,13 +329,34 @@
   }
 
   function refreshAdvisoryModalRef() {
-    advisoryModal = document.getElementById("commercial-advisory-modal");
+    advisoryModal = root.querySelector("[data-commercial-advisory-modal].open") || root.querySelector("[data-commercial-advisory-modal]");
     return advisoryModal;
   }
 
+  function advisoryModalForTrigger(trigger) {
+    var key = trigger && trigger.getAttribute ? (trigger.getAttribute("data-commercial-open-advisory") || "") : "";
+    if (key) {
+      var modals = root.querySelectorAll("[data-commercial-advisory-modal]");
+      for (var index = 0; index < modals.length; index += 1) {
+        if (modals[index].getAttribute("data-commercial-advisory-modal") === key) return modals[index];
+      }
+    }
+    return refreshAdvisoryModalRef();
+  }
+
   function showAdvisoryModal(open, trigger) {
-    var modal = refreshAdvisoryModalRef();
+    var modal = open
+      ? (trigger && trigger.matches && trigger.matches("[data-commercial-advisory-modal]") ? trigger : advisoryModalForTrigger(trigger))
+      : (trigger && trigger.matches && trigger.matches("[data-commercial-advisory-modal]") ? trigger : refreshAdvisoryModalRef());
     if (!modal) return;
+    if (open) {
+      root.querySelectorAll("[data-commercial-advisory-modal].open").forEach(function (item) {
+        if (item !== modal) {
+          item.classList.remove("open");
+          item.setAttribute("aria-hidden", "true");
+        }
+      });
+    }
     modal.classList.toggle("open", open);
     modal.setAttribute("aria-hidden", open ? "false" : "true");
     document.body.classList.toggle("commercial-modal-open", open || !!document.querySelector(".commercial-modal.open"));
@@ -349,11 +370,11 @@
   }
 
   function maybeAutoOpenAdvisory() {
-    var modal = refreshAdvisoryModalRef();
+    var modal = root.querySelector('[data-commercial-advisory-modal][data-auto-open="1"]');
     if (!modal || modal.getAttribute("data-auto-open") !== "1") return;
     if (modal.getAttribute("data-opened") === "1") return;
     modal.setAttribute("data-opened", "1");
-    window.setTimeout(function () { showAdvisoryModal(true); }, 450);
+    window.setTimeout(function () { showAdvisoryModal(true, modal); }, 450);
   }
 
   function normalizedUrl(value) {
@@ -1047,11 +1068,11 @@
   }
 
   root.addEventListener("click", function (event) {
-    var modal = refreshAdvisoryModalRef();
+    var modal = event.target.closest("[data-commercial-advisory-modal]");
     if (!modal) return;
     if (event.target === modal || event.target.closest("[data-commercial-close-advisory]")) {
       event.preventDefault();
-      showAdvisoryModal(false);
+      showAdvisoryModal(false, modal);
     }
   });
 
@@ -1062,7 +1083,7 @@
     else if (document.getElementById("commercial-property-modal") && document.getElementById("commercial-property-modal").classList.contains("open")) setStandaloneModal(document.getElementById("commercial-property-modal"), false);
     else if (document.getElementById("commercial-sign-detail-modal") && document.getElementById("commercial-sign-detail-modal").classList.contains("open")) setStandaloneModal(document.getElementById("commercial-sign-detail-modal"), false);
     else if (caseModal && caseModal.classList.contains("open")) showCaseModal(false);
-    else if (refreshAdvisoryModalRef() && advisoryModal.classList.contains("open")) showAdvisoryModal(false);
+    else if (refreshAdvisoryModalRef() && advisoryModal.classList.contains("open")) showAdvisoryModal(false, advisoryModal);
     else if (permissionModal && permissionModal.classList.contains("open")) setPermissionModal(false);
   });
   window.addEventListener("popstate", function () {
