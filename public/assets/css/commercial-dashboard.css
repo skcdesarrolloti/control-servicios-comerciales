@@ -870,6 +870,36 @@ button:disabled { cursor: not-allowed; opacity: .52; }
 .commercial-advisory-mini-stat strong { display: block; margin-top: 3px; color: #111827; font-size: 18px; font-weight: 950; }
 .commercial-advisory-mini-stat--success strong { color: #15803d; }
 .commercial-advisory-mini-stat--danger strong { color: #dc2626; }
+.commercial-advisory-single-count {
+  display: grid;
+  place-items: center;
+  gap: 5px;
+  min-height: 220px;
+  padding: 32px 24px;
+  border: 2px solid #facc15;
+  border-radius: 22px;
+  background: radial-gradient(circle at 50% 0%, #fff7d6 0%, #fff 62%);
+  color: #92400e;
+  text-align: center;
+}
+.commercial-advisory-single-count--amber { border-color: #f59e0b; background: radial-gradient(circle at 50% 0%, #ffedd5 0%, #fff 64%); color: #9a3412; }
+.commercial-advisory-single-count--blue { border-color: #93c5fd; background: radial-gradient(circle at 50% 0%, #dbeafe 0%, #fff 64%); color: #1d4ed8; }
+.commercial-advisory-single-count span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 950;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.commercial-advisory-single-count strong {
+  color: currentColor;
+  font-size: clamp(64px, 9vw, 108px);
+  line-height: .9;
+  font-weight: 950;
+  font-variant-numeric: tabular-nums;
+}
+.commercial-advisory-single-count small { color: #0f172a; font-size: 20px; font-weight: 950; text-transform: uppercase; }
+.commercial-advisory-single-count p { max-width: 360px; margin: 8px 0 0; color: #475569; font-size: 14px; line-height: 1.45; font-weight: 800; }
 .commercial-advisory-signs { margin-top: 16px; }
 .commercial-advisory-signs h3 { margin: 0; font-size: 14px; }
 .commercial-advisory-signs li { border-color: #fed7aa; background: #fff7ed; }

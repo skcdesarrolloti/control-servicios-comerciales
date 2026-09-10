@@ -399,23 +399,7 @@ final class CommercialDashboardView
   /** @param array<int,array<string,mixed>> $alerts @param array<string,mixed> $signs @param array<string,mixed> $properties @param array<string,mixed> $filters */
   private static function renderHomeAdvisoryModal(array $alerts, array $signs, array $properties, array $filters, string $baseUrl, array $update = [], array $slaSummary = []): string
   {
-    unset($alerts);
-    $signItems = is_array($signs['items'] ?? null) ? $signs['items'] : [];
-    $propertyItems = is_array($properties['items'] ?? null) ? $properties['items'] : [];
-    $retouchItems = [];
-    $newSignItems = [];
-    foreach ($signItems as $item) {
-      if (!is_array($item)) {
-        continue;
-      }
-      $label = strtolower((string) ($item['label'] ?? ''));
-      if (str_contains($label, 'retoque')) {
-        $retouchItems[] = $item;
-      }
-      if (str_contains($label, 'aviso nuevo') || str_contains($label, 'instal')) {
-        $newSignItems[] = $item;
-      }
-    }
+    unset($alerts, $update);
     $globalParams = self::globalFilterParams($filters);
     $taskTotal = (int) ($slaSummary['total'] ?? 0);
     $taskOnTime = (int) ($slaSummary['al_dia'] ?? 0);
@@ -427,83 +411,9 @@ final class CommercialDashboardView
       ['label' => 'Atraso', 'value' => $taskLatePct . '%', 'tone' => 'danger'],
       ['label' => 'Atrasadas', 'value' => $taskOverdue, 'tone' => 'danger'],
     ];
-    $propertyStats = [
-      ['label' => 'Al día', 'value' => (int) ($properties['actualizacion_ok'] ?? 0), 'tone' => 'success'],
-      ['label' => 'Por vencer', 'value' => (int) ($properties['actualizacion_alerta'] ?? 0), 'tone' => 'warning'],
-      ['label' => 'Vencidos', 'value' => (int) ($properties['actualizacion_vencida'] ?? 0), 'tone' => 'danger'],
-      ['label' => 'Publicados', 'value' => (int) ($properties['publicos'] ?? 0), 'tone' => 'neutral'],
-    ];
-    $retouchStats = [
-      ['label' => 'Al día', 'value' => (int) ($signs['retoque_ok'] ?? 0), 'tone' => 'success'],
-      ['label' => 'Por vencer', 'value' => (int) ($signs['retoque_alerta'] ?? 0), 'tone' => 'warning'],
-      ['label' => 'Vencidos', 'value' => (int) ($signs['retoque_vencido'] ?? 0), 'tone' => 'danger'],
-    ];
+    $propertyPending = (int) ($properties['actualizacion_alerta'] ?? 0) + (int) ($properties['actualizacion_vencida'] ?? 0);
+    $retouchPending = (int) ($signs['retoque_alerta'] ?? 0) + (int) ($signs['retoque_vencido'] ?? 0);
     $newSignPending = (int) ($signs['instalacion_pendiente'] ?? 0);
-    $newSignLate = (int) ($signs['instalacion_atrasada'] ?? 0);
-    $newSignStats = [
-      ['label' => 'Pendientes', 'value' => $newSignPending, 'tone' => 'warning'],
-      ['label' => 'Atrasados', 'value' => $newSignLate, 'tone' => 'danger'],
-    ];
-
-    $renderStats = static function (array $stats): string {
-      ob_start();
-?>
-      <div class="commercial-advisory-alert-grid">
-        <?php foreach ($stats as $stat): ?>
-          <div class="commercial-advisory-alert commercial-advisory-alert--<?php echo esc_attr((string) ($stat['tone'] ?? 'neutral')); ?>">
-            <span><?php echo esc_html((string) ($stat['value'] ?? 0)); ?></span>
-            <strong><?php echo esc_html((string) ($stat['label'] ?? 'Indicador')); ?></strong>
-          </div>
-        <?php endforeach; ?>
-      </div>
-<?php
-      return (string) ob_get_clean();
-    };
-
-    $renderPropertyItems = static function (array $items): string {
-      ob_start();
-?>
-      <section class="commercial-advisory-signs commercial-advisory-updates">
-        <?php if ($items === []): ?>
-          <div class="commercial-home-ok commercial-home-ok--large">No hay inmuebles críticos para este control.</div>
-        <?php else: ?>
-          <ul>
-            <?php foreach ($items as $item): ?>
-              <?php if (!is_array($item)) continue; ?>
-              <li>
-                <strong><?php echo esc_html((string) ($item['codigo'] ?? 'Sin código')); ?> · <?php echo esc_html((string) ($item['estado'] ?? 'Alerta')); ?></strong>
-                <span><?php echo esc_html((string) ($item['dias'] ?? 0)); ?> / <?php echo esc_html((string) ($item['max'] ?? 0)); ?> días<?php echo trim((string) ($item['barrio'] ?? '')) !== '' ? ' · ' . esc_html((string) ($item['barrio'] ?? '')) : ''; ?></span>
-                <?php if (trim((string) ($item['url'] ?? '')) !== ''): ?><a href="<?php echo esc_url((string) $item['url']); ?>" target="_blank" rel="noopener">Ir a actualizar</a><?php endif; ?>
-              </li>
-            <?php endforeach; ?>
-          </ul>
-        <?php endif; ?>
-      </section>
-<?php
-      return (string) ob_get_clean();
-    };
-
-    $renderSignItems = static function (array $items, string $emptyMessage): string {
-      ob_start();
-?>
-      <section class="commercial-advisory-signs">
-        <?php if ($items === []): ?>
-          <div class="commercial-home-ok commercial-home-ok--large"><?php echo esc_html($emptyMessage); ?></div>
-        <?php else: ?>
-          <ul>
-            <?php foreach ($items as $item): ?>
-              <?php if (!is_array($item)) continue; ?>
-              <li>
-                <strong><?php echo esc_html((string) ($item['codigo'] ?? 'Sin código')); ?></strong>
-                <span><?php echo esc_html((string) ($item['label'] ?? 'Aviso pendiente')); ?> · <?php echo esc_html((string) ($item['days'] ?? 0)); ?> días<?php echo trim((string) ($item['barrio'] ?? '')) !== '' ? ' · ' . esc_html((string) ($item['barrio'] ?? '')) : ''; ?></span>
-              </li>
-            <?php endforeach; ?>
-          </ul>
-        <?php endif; ?>
-      </section>
-<?php
-      return (string) ob_get_clean();
-    };
 
     $renderTaskAlert = static function (array $stats, int $overdue, int $total, int $compliance): string {
       ob_start();
@@ -532,16 +442,30 @@ final class CommercialDashboardView
     };
 
     $taskBody = $renderTaskAlert($taskStats, $taskOverdue, $taskTotal, $taskCompliance);
-    $propertyBody = $renderStats($propertyStats) . $renderPropertyItems($propertyItems);
-    $retouchBody = $renderStats($retouchStats) . $renderSignItems($retouchItems, 'No hay retoques críticos para este filtro.');
-    $newSignBody = $renderStats($newSignStats) . $renderSignItems($newSignItems, 'No hay avisos nuevos pendientes para este filtro.');
+    $propertyBody = self::renderAdvisorySingleCount($propertyPending, 'inmuebles', 'Requieren actualización.', 'warning');
+    $retouchBody = self::renderAdvisorySingleCount($retouchPending, 'avisos', 'Necesitan retoque.', 'amber');
+    $newSignBody = self::renderAdvisorySingleCount($newSignPending, 'avisos', 'Pendientes por instalar.', 'blue');
 
     ob_start();
 ?>
     <?php echo self::renderAdvisoryModalShell('task_updates', 'Política de atención', 'Tareas atrasadas', 'Resumen de cumplimiento del tiempo de atención configurado.', $taskBody, '<a class="commercial-primary-btn" data-commercial-filter-link href="' . esc_url(self::url($baseUrl, ['tab' => 'abiertos', 'sla_filter' => 'atrasado'] + $globalParams)) . '">Gestionar ahora</a>', 'danger', $taskOverdue > 0); ?>
-    <?php echo self::renderAdvisoryModalShell('property_updates', 'Atención requerida', 'Inmuebles pendientes por actualización', 'Tienes inmuebles publicados que entraron en alerta o vencimiento de actualización.', $propertyBody, '<a class="commercial-secondary-btn" data-commercial-filter-link href="' . esc_url(self::url($baseUrl, ['tab' => 'actualizaciones', 'estado_actualizacion' => 'Alerta'] + $globalParams)) . '">Ver por vencer</a><a class="commercial-primary-btn" data-commercial-filter-link href="' . esc_url(self::url($baseUrl, ['tab' => 'actualizaciones', 'estado_actualizacion' => 'Vencido'] + $globalParams)) . '">Solucionar pendientes</a>', 'warning', ((int) ($properties['actualizacion_alerta'] ?? 0) + (int) ($properties['actualizacion_vencida'] ?? 0)) > 0); ?>
-    <?php echo self::renderAdvisoryModalShell('sign_retouch', 'Estado de avisos', 'Retoques de avisos pendientes', 'Avisos instalados que ya requieren revisión o están entrando en ventana de retoque.', $retouchBody, '<a class="commercial-secondary-btn" data-commercial-filter-link href="' . esc_url(self::url($baseUrl, ['tab' => 'avisos', 'estado_aviso' => 'Alerta'] + $globalParams)) . '">Ver por vencer</a><a class="commercial-primary-btn" data-commercial-filter-link href="' . esc_url(self::url($baseUrl, ['tab' => 'avisos', 'estado_aviso' => 'Vencido'] + $globalParams)) . '">Gestionar retoques</a>', 'amber', ((int) ($signs['retoque_alerta'] ?? 0) + (int) ($signs['retoque_vencido'] ?? 0)) > 0); ?>
-    <?php echo self::renderAdvisoryModalShell('sign_new', 'Avisos nuevos', 'Pendientes por instalar', 'Inmuebles públicos que pidieron aviso y todavía no aparecen como colocados.', $newSignBody, '<a class="commercial-secondary-btn" data-commercial-filter-link href="' . esc_url(self::url($baseUrl, ['tab' => 'avisos', 'estado_aviso' => 'Atrasado'] + $globalParams)) . '">Ver atrasados</a><a class="commercial-primary-btn" data-commercial-filter-link href="' . esc_url(self::url($baseUrl, ['tab' => 'avisos'] + $globalParams)) . '">Gestionar avisos</a>', 'blue', $newSignPending > 0); ?>
+    <?php echo self::renderAdvisoryModalShell('property_updates', 'Atención requerida', 'Inmuebles pendientes por actualización', 'Tienes inmuebles publicados que entraron en alerta o vencimiento de actualización.', $propertyBody, '<a class="commercial-primary-btn" data-commercial-filter-link href="' . esc_url(self::url($baseUrl, ['tab' => 'actualizaciones'] + $globalParams)) . '">Gestionar</a>', 'warning', $propertyPending > 0); ?>
+    <?php echo self::renderAdvisoryModalShell('sign_retouch', 'Estado de avisos', 'Retoques de avisos pendientes', 'Avisos instalados que ya requieren revisión o están entrando en ventana de retoque.', $retouchBody, '<a class="commercial-primary-btn" data-commercial-filter-link href="' . esc_url(self::url($baseUrl, ['tab' => 'avisos'] + $globalParams)) . '">Gestionar</a>', 'amber', $retouchPending > 0); ?>
+    <?php echo self::renderAdvisoryModalShell('sign_new', 'Avisos nuevos', 'Pendientes por instalar', 'Inmuebles públicos que pidieron aviso y todavía no aparecen como colocados.', $newSignBody, '<a class="commercial-primary-btn" data-commercial-filter-link href="' . esc_url(self::url($baseUrl, ['tab' => 'avisos'] + $globalParams)) . '">Gestionar</a>', 'blue', $newSignPending > 0); ?>
+<?php
+    return (string) ob_get_clean();
+  }
+
+  private static function renderAdvisorySingleCount(int $count, string $unit, string $caption, string $tone): string
+  {
+    ob_start();
+?>
+    <div class="commercial-advisory-single-count commercial-advisory-single-count--<?php echo esc_attr($tone); ?>">
+      <span>Cantidad</span>
+      <strong><?php echo esc_html((string) $count); ?></strong>
+      <small><?php echo esc_html($unit); ?></small>
+      <p><?php echo esc_html($caption); ?></p>
+    </div>
 <?php
     return (string) ob_get_clean();
   }
