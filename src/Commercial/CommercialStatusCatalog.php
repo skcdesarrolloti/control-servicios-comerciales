@@ -9,6 +9,7 @@ final class CommercialStatusCatalog
   public const OPEN = [
     'Nuevo',
     'Contactado',
+    'Prospectación',
     'Prospectado',
     'En busqueda',
     'Mostrando',
@@ -28,6 +29,7 @@ final class CommercialStatusCatalog
   ];
 
   public const CLOSED = [
+    'Cerrado',
     'Desistido',
     'Rechazado',
     'Trasladado',
@@ -36,6 +38,7 @@ final class CommercialStatusCatalog
     'Entregado',
     'Captado',
     'Recaptado',
+    'Vendido',
   ];
 
   /** @return array<string,array{label:string,description:string,statuses:array<int,string>}> */
@@ -99,6 +102,7 @@ final class CommercialStatusCatalog
     return [
       'Nuevo' => 'Solicitud comercial recién creada y pendiente de primera gestión.',
       'Contactado' => 'Ya se estableció el primer contacto con el cliente o propietario.',
+      'Prospectación' => 'La oportunidad está en proceso de prospectarse comercialmente.',
       'Prospectado' => 'La oportunidad fue validada como prospecto comercial.',
       'En busqueda' => 'Se están buscando inmuebles u opciones que cumplan la necesidad.',
       'Mostrando' => 'La oportunidad está en etapa de visitas o demostraciones.',
@@ -114,12 +118,14 @@ final class CommercialStatusCatalog
       'Retocando' => 'El material del inmueble está en edición o ajuste antes de publicar.',
       'Aplazado' => 'La gestión se movió temporalmente a una fecha posterior.',
       'Postergado' => 'La oportunidad permanece pausada hasta una nueva gestión.',
+      'Cerrado' => 'La tarea fue cerrada operativamente.',
       'Desistido' => 'El interesado o propietario decidió no continuar.',
       'Rechazado' => 'La oportunidad no fue aceptada después de su evaluación.',
       'Trasladado' => 'La responsabilidad fue transferida a otro proceso o responsable.',
       'Finalizado' => 'La gestión concluyó y no requiere más acciones.',
       'Duplicado' => 'El registro corresponde a una oportunidad ya existente.',
       'Entregado' => 'El inmueble o resultado comprometido fue entregado.',
+      'Vendido' => 'La oportunidad terminó con venta o cierre comercial equivalente.',
     ];
   }
 }

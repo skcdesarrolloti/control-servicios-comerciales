@@ -210,10 +210,23 @@ final class CommercialTicketsRepository
     $where = array_merge($where, $filterWhere);
     $args = array_merge($args, $filterArgs);
 
-    $adminPostponedExpr = $this->adminPostponedExpression();
-    $statusExpr = $bucket === 'postergados' && $adminPostponedExpr !== ''
-      ? "CASE WHEN {$adminPostponedExpr} THEN 'Postergado' ELSE TRIM(COALESCE(t.`estado_comercial`, '')) END"
-      : "TRIM(COALESCE(t.`estado_comercial`, ''))";
+    $statusExpr = "TRIM(COALESCE(t.`estado_comercial`, ''))";
+    if ($bucket === 'postergados') {
+      $commercialPostponedExpr = $this->commercialStatusLiteralExpression(CommercialStatusCatalog::POSTPONED);
+      $postponedExpressions = array_filter([
+        $this->adminPostponedExpression(),
+        $this->generalStatusExpression(['postergado']),
+      ]);
+      if ($postponedExpressions !== []) {
+        $statusExpr = 'CASE WHEN (' . implode(' OR ', $postponedExpressions) . ") AND NOT ({$commercialPostponedExpr}) THEN 'Postergado' ELSE {$statusExpr} END";
+      }
+    } elseif ($bucket === 'cerrados') {
+      $generalClosedExpr = $this->generalStatusExpression(['cerrado']);
+      if ($generalClosedExpr !== '') {
+        $commercialClosedExpr = $this->commercialStatusLiteralExpression(CommercialStatusCatalog::CLOSED);
+        $statusExpr = "CASE WHEN {$generalClosedExpr} AND NOT ({$commercialClosedExpr}) THEN 'Cerrado' ELSE {$statusExpr} END";
+      }
+    }
     $rows = $this->db->getResults(
       "SELECT {$statusExpr} AS estado, COUNT(*) AS total"
       . " FROM `{$table}` t WHERE " . implode(' AND ', $where)
@@ -1589,14 +1602,40 @@ final class CommercialTicketsRepository
   /** @return array{0:array<int,string>,1:array<int,mixed>} */
   private function bucketWhere(string $bucket): array
   {
+    if ($bucket === 'mis_tickets') {
+      $generalKnown = $this->generalStatusExpression(['nuevo', 'en proceso', 'postergado', 'cerrado']);
+      $parts = [
+        'TRIM(COALESCE(t.`estado_comercial`, \'\')) IN (' . implode(',', array_fill(0, count(CommercialStatusCatalog::all()), '?')) . ')',
+      ];
+      if ($generalKnown !== '') {
+        $parts[] = $generalKnown;
+      }
+      return [['(' . implode(' OR ', $parts) . ')'], CommercialStatusCatalog::all()];
+    }
+
     if ($bucket === 'postergados') {
       [$closedWhere, $closedArgs] = $this->commercialStatusWhere(CommercialStatusCatalog::CLOSED);
       $adminPostponed = $this->adminPostponedExpression();
+      $generalPostponed = $this->generalStatusExpression(['postergado']);
+      $generalClosed = $this->generalStatusExpression(['cerrado']);
+      $postponedParts = [
+        'TRIM(COALESCE(t.`estado_comercial`, \'\')) IN (' . implode(',', array_fill(0, count(CommercialStatusCatalog::POSTPONED), '?')) . ')',
+      ];
       if ($adminPostponed !== '') {
+        $postponedParts[] = $adminPostponed;
+      }
+      if ($generalPostponed !== '') {
+        $postponedParts[] = $generalPostponed;
+      }
+      $notClosed = ['NOT (' . implode(' AND ', $closedWhere) . ')'];
+      if ($generalClosed !== '') {
+        $notClosed[] = "NOT ({$generalClosed})";
+      }
+      if (count($postponedParts) > 1) {
         return [
           [
-            '(TRIM(COALESCE(t.`estado_comercial`, \'\')) IN (' . implode(',', array_fill(0, count(CommercialStatusCatalog::POSTPONED), '?')) . ") OR {$adminPostponed})",
-            'NOT (' . implode(' AND ', $closedWhere) . ')',
+            '(' . implode(' OR ', $postponedParts) . ')',
+            ...$notClosed,
           ],
           array_merge(CommercialStatusCatalog::POSTPONED, $closedArgs),
         ];
@@ -1609,6 +1648,15 @@ final class CommercialTicketsRepository
       $adminPostponed = $this->adminPostponedExpression();
       if ($adminPostponed !== '') {
         $where[] = "NOT ({$adminPostponed})";
+      }
+      $generalPaused = $this->generalStatusExpression(['cerrado', 'postergado']);
+      if ($generalPaused !== '') {
+        $where[] = "NOT ({$generalPaused})";
+      }
+    } elseif ($bucket === 'cerrados') {
+      $generalClosed = $this->generalStatusExpression(['cerrado']);
+      if ($generalClosed !== '') {
+        $where = ['(' . implode(' AND ', $where) . " OR {$generalClosed})"];
       }
     }
     return [$where, $args];
@@ -1626,6 +1674,16 @@ final class CommercialTicketsRepository
     ];
   }
 
+  /** @param array<int,string> $statuses */
+  private function commercialStatusLiteralExpression(array $statuses): string
+  {
+    if ($statuses === []) {
+      return '1 = 0';
+    }
+    $quoted = array_map(static fn(string $status): string => "'" . str_replace("'", "''", trim($status)) . "'", $statuses);
+    return "TRIM(COALESCE(t.`estado_comercial`, '')) IN (" . implode(',', $quoted) . ')';
+  }
+
   private function adminPostponedExpression(): string
   {
     $table = $this->db->table('jet_cct_tickets');
@@ -1633,6 +1691,24 @@ final class CommercialTicketsRepository
       return '';
     }
     return "LOWER(TRIM(COALESCE(t.`estado_administrativo`, ''))) IN ('postergado','aplazado')";
+  }
+
+  /** @param array<int,string> $states */
+  private function generalStatusExpression(array $states): string
+  {
+    $table = $this->db->table('jet_cct_tickets');
+    if (!$this->schema->columnExists($table, 'estado')) {
+      return '';
+    }
+    $states = array_values(array_unique(array_filter(array_map(
+      static fn(string $state): string => mb_strtolower(trim($state), 'UTF-8'),
+      $states
+    ), static fn(string $state): bool => $state !== '')));
+    if ($states === []) {
+      return '';
+    }
+    $quoted = array_map(static fn(string $state): string => "'" . str_replace("'", "''", $state) . "'", $states);
+    return "LOWER(TRIM(COALESCE(t.`estado`, ''))) IN (" . implode(',', $quoted) . ')';
   }
 
   /** @param array<int,string> $left @param array<int,string> $right */
