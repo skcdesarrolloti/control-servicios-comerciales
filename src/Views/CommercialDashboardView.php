@@ -240,12 +240,13 @@ final class CommercialDashboardView
     $signRetouchOk = (int) ($signs['retoque_ok'] ?? 0);
     $signRetouchAlert = (int) ($signs['retoque_alerta'] ?? 0);
     $signRetouchExpired = (int) ($signs['retoque_vencido'] ?? 0);
-    $signRetouchTotal = $signRetouchOk + $signRetouchAlert + $signRetouchExpired;
-    $signRetouchPct = self::percent($signRetouchOk, $signRetouchTotal);
     $newSignPending = (int) ($signs['instalacion_pendiente'] ?? 0);
     $newSignLate = (int) ($signs['instalacion_atrasada'] ?? 0);
     $newSignOnTime = max(0, $newSignPending - $newSignLate);
-    $newSignPct = self::percent($newSignOnTime, $newSignPending);
+    $signPending = $signRetouchAlert + $signRetouchExpired + $newSignLate;
+    $signOk = (int) ($signs['ok'] ?? ($signRetouchOk + $newSignOnTime));
+    $signTotal = (int) ($signs['total'] ?? ($signOk + $signPending));
+    $signStatusPct = self::percent($signOk, $signTotal);
     $scopeLabel = trim((string) ($filters['id_empleado'] ?? '')) !== '' ? 'Filtrado por funcionario' : 'Equipo comercial completo';
     $today = date('d/m/Y');
     ob_start();
@@ -299,42 +300,23 @@ final class CommercialDashboardView
           </footer>
         </article>
 
-        <article class="commercial-home-control-card">
-          <div class="commercial-sla-chart commercial-home-ring" style="--commercial-sla-ok: <?php echo esc_attr((string) $signRetouchPct); ?>%; --commercial-sla-late: <?php echo esc_attr((string) max(0, 100 - $signRetouchPct)); ?>%;">
-            <span><?php echo esc_html((string) $signRetouchPct); ?>%</span>
+        <article class="commercial-home-control-card commercial-home-control-card--warning">
+          <div class="commercial-sla-chart commercial-home-ring" style="--commercial-sla-ok: <?php echo esc_attr((string) $signStatusPct); ?>%; --commercial-sla-late: <?php echo esc_attr((string) max(0, 100 - $signStatusPct)); ?>%;">
+            <span><?php echo esc_html((string) $signStatusPct); ?>%</span>
           </div>
           <div>
             <span class="commercial-kicker">Avisos</span>
-            <h3>Retoque de avisos</h3>
-            <p><?php echo esc_html((string) ($signRetouchAlert + $signRetouchExpired)); ?> avisos con retoque en alerta o vencido.</p>
+            <h3>Estado de avisos en fachada</h3>
+            <p><?php echo esc_html((string) $signPending); ?> pendientes activos entre retoques vencidos, avisos por vencer y avisos nuevos sin colocar.</p>
             <div class="commercial-home-actions">
-              <button class="commercial-primary-btn" type="button" data-commercial-open-advisory="sign_retouch">Ver popup</button>
-              <a class="commercial-secondary-btn" data-commercial-filter-link href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'avisos', 'estado_aviso' => 'Vencido'] + self::globalFilterParams($filters))); ?>">Ver vencidos</a>
+              <button class="commercial-primary-btn" type="button" data-commercial-open-advisory="sign_status">Ver popup</button>
+              <a class="commercial-secondary-btn" data-commercial-filter-link href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'avisos'] + self::globalFilterParams($filters))); ?>">Abrir módulo</a>
             </div>
           </div>
           <footer>
-            <?php echo self::renderHomeStatus('Al día', $signRetouchOk, 'success'); ?>
+            <?php echo self::renderHomeStatus('Retoque vencido', $signRetouchExpired, 'danger'); ?>
             <?php echo self::renderHomeStatus('Por vencer', $signRetouchAlert, 'warning'); ?>
-            <?php echo self::renderHomeStatus('Vencidos', $signRetouchExpired, 'danger'); ?>
-          </footer>
-        </article>
-
-        <article class="commercial-home-control-card commercial-home-control-card--warning">
-          <div class="commercial-sla-chart commercial-home-ring" style="--commercial-sla-ok: <?php echo esc_attr((string) $newSignPct); ?>%; --commercial-sla-late: <?php echo esc_attr((string) max(0, 100 - $newSignPct)); ?>%;">
-            <span><?php echo esc_html((string) $newSignPct); ?>%</span>
-          </div>
-          <div>
-            <span class="commercial-kicker">Avisos nuevos</span>
-            <h3>Pendientes por instalar</h3>
-            <p><?php echo esc_html((string) $newSignPending); ?> inmuebles públicos piden aviso y aún están en control de instalación.</p>
-            <div class="commercial-home-actions">
-              <button class="commercial-primary-btn" type="button" data-commercial-open-advisory="sign_new">Ver popup</button>
-              <a class="commercial-secondary-btn" data-commercial-filter-link href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'avisos'] + self::globalFilterParams($filters))); ?>">Abrir avisos</a>
-            </div>
-          </div>
-          <footer>
-            <?php echo self::renderHomeStatus('Pendientes', $newSignPending, 'warning'); ?>
-            <?php echo self::renderHomeStatus('Atrasados', $newSignLate, 'danger'); ?>
+            <?php echo self::renderHomeStatus('Nuevos sin colocar', $newSignLate, 'danger'); ?>
           </footer>
         </article>
       </div>
@@ -423,8 +405,6 @@ final class CommercialDashboardView
     $installPending = (int) ($signs['instalacion_pendiente'] ?? 0);
     $installLate = (int) ($signs['instalacion_atrasada'] ?? 0);
     $installOnTime = max(0, $installPending - $installLate);
-    $retouchPending = $retouchAlert + $retouchExpired;
-    $newSignPending = $installLate;
     $signPending = $retouchExpired + $retouchAlert + $installLate;
     $signOk = (int) ($signs['ok'] ?? ($retouchOk + $installOnTime));
     $signTotal = (int) ($signs['total'] ?? ($signOk + $signPending));
@@ -461,17 +441,14 @@ final class CommercialDashboardView
 
     $taskBody = $renderTaskAlert($taskStats, $taskOverdue, $taskTotal, $taskCompliance);
     $propertyBody = self::renderPropertyAdvisorySummary($propertyOk, $propertyAlert, $propertyExpired, $propertyPublic, $userName);
-    $retouchBody = self::renderSignsAdvisorySummary($retouchExpired, $retouchAlert, $installLate, $signOk, $signTotal, 'retouch');
-    $newSignBody = self::renderSignsAdvisorySummary($retouchExpired, $retouchAlert, $installLate, $signOk, $signTotal, 'install');
+    $signBody = self::renderSignsAdvisorySummary($retouchExpired, $retouchAlert, $installLate, $signOk, $signTotal);
     $propertyState = $propertyExpired > 0 ? 'Vencido' : 'Alerta';
-    $retouchState = $retouchExpired > 0 ? 'Vencido' : 'Alerta';
 
     ob_start();
 ?>
     <?php echo self::renderAdvisoryModalShell('task_updates', 'Política de atención', 'Tareas atrasadas', 'Resumen de cumplimiento del tiempo de atención configurado.', $taskBody, '<a class="commercial-primary-btn" data-commercial-filter-link href="' . esc_url(self::url($baseUrl, ['tab' => 'abiertos', 'sla_filter' => 'atrasado'] + $globalParams)) . '">Gestionar ahora</a>', 'danger', $taskOverdue > 0); ?>
     <?php echo self::renderAdvisoryModalShell('property_updates', 'Atención requerida', 'Inmuebles pendientes por actualización', 'Tienes inmuebles publicados que entraron en alerta o vencimiento de actualización.', $propertyBody, '<a class="commercial-primary-btn" data-commercial-filter-link href="' . esc_url(self::url($baseUrl, ['tab' => 'actualizaciones', 'estado_actualizacion' => $propertyState] + $globalParams)) . '">Gestionar</a>', 'warning', $propertyPending > 0); ?>
-    <?php echo self::renderAdvisoryModalShell('sign_retouch', 'Estado de avisos', 'Retoques de avisos pendientes', 'Avisos instalados que ya requieren revisión o están entrando en ventana de retoque.', $retouchBody, '<a class="commercial-primary-btn" data-commercial-filter-link href="' . esc_url(self::url($baseUrl, ['tab' => 'avisos', 'estado_aviso' => $retouchState] + $globalParams)) . '">Gestionar</a>', 'amber', $retouchPending > 0); ?>
-    <?php echo self::renderAdvisoryModalShell('sign_new', 'Avisos nuevos', 'Pendientes por instalar', 'Inmuebles públicos que pidieron aviso y todavía no aparecen como colocados.', $newSignBody, '<a class="commercial-primary-btn" data-commercial-filter-link href="' . esc_url(self::url($baseUrl, ['tab' => 'avisos', 'estado_aviso' => 'Atrasado'] + $globalParams)) . '">Gestionar</a>', 'blue', $newSignPending > 0); ?>
+    <?php echo self::renderAdvisoryModalShell('sign_status', 'Estado de avisos', 'Estado actual de avisos en fachada', 'Retoques vencidos, avisos por vencer y avisos nuevos sin colocar en una sola revisión.', $signBody, '<a class="commercial-primary-btn" data-commercial-filter-link href="' . esc_url(self::url($baseUrl, ['tab' => 'avisos'] + $globalParams)) . '">Gestionar</a>', 'amber', $signPending > 0); ?>
 <?php
     return (string) ob_get_clean();
   }
@@ -494,16 +471,16 @@ final class CommercialDashboardView
     return (string) ob_get_clean();
   }
 
-  private static function renderSignsAdvisorySummary(int $retouchExpired, int $retouchAlert, int $installLate, int $ok, int $total, string $highlight = ''): string
+  private static function renderSignsAdvisorySummary(int $retouchExpired, int $retouchAlert, int $installLate, int $ok, int $total): string
   {
     $pending = $retouchExpired + $retouchAlert + $installLate;
     ob_start();
 ?>
     <div class="commercial-advisory-dashboard commercial-advisory-dashboard--signs">
       <div class="commercial-advisory-metric-grid">
-        <?php echo self::renderAdvisoryMetric('danger', $retouchExpired, 'Inmuebles con retoque avisos vencidos', 'Avisos instalados que ya necesitan retoque.', '', $highlight === 'retouch' && $retouchExpired > 0); ?>
-        <?php echo self::renderAdvisoryMetric('warning', $retouchAlert, 'Inmuebles con avisos por vencer', 'Avisos entrando en ventana de retoque.', '', $highlight === 'retouch' && $retouchExpired <= 0 && $retouchAlert > 0); ?>
-        <?php echo self::renderAdvisoryMetric('blue', $installLate, 'Inmuebles sin avisos nuevos colocados', 'Solicitaron aviso y ya están atrasados.', '', $highlight === 'install' && $installLate > 0); ?>
+        <?php echo self::renderAdvisoryMetric('danger', $retouchExpired, 'Inmuebles con retoque avisos vencidos', 'Avisos instalados que ya necesitan retoque.'); ?>
+        <?php echo self::renderAdvisoryMetric('warning', $retouchAlert, 'Inmuebles con avisos por vencer', 'Avisos entrando en ventana de retoque.'); ?>
+        <?php echo self::renderAdvisoryMetric('blue', $installLate, 'Inmuebles sin avisos nuevos colocados', 'Solicitaron aviso y ya están atrasados.'); ?>
       </div>
       <div class="commercial-advisory-footnote">Total base analizada: <?php echo esc_html((string) $total); ?> (Pendientes: <?php echo esc_html((string) $pending); ?> | Al día: <?php echo esc_html((string) $ok); ?>)</div>
     </div>
