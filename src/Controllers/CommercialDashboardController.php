@@ -36,7 +36,8 @@ final class CommercialDashboardController
     $repository = new CommercialTicketsRepository($this->db);
     $adminCargos = is_array($this->config['dashboard_admin_cargos'] ?? null) ? $this->config['dashboard_admin_cargos'] : ['11', '12', '13', '14'];
     $calendarCargos = is_array($this->config['calendar_allowed_cargos'] ?? null) ? $this->config['calendar_allowed_cargos'] : ['9', '10', '17'];
-    $commercialEmployeeCargos = is_array($this->config['commercial_employee_cargos'] ?? null) ? $this->config['commercial_employee_cargos'] : ['1', '6', '9', '10', '11', '12', '13', '14', '17'];
+    $defaultCommercialEmployeeCargos = is_array($this->config['commercial_employee_cargos'] ?? null) ? $this->config['commercial_employee_cargos'] : ['1', '6', '9', '10', '11', '12', '13', '14', '17'];
+    $commercialEmployeeCargos = $this->configuredCargoIds('commercial_employee_cargos', $defaultCommercialEmployeeCargos);
     $policy = new CommercialAccessPolicy($this->settings, $this->db, $adminCargos);
 
     $visibleViews = array_values(array_filter(array_keys(CommercialAccessPolicy::VIEWS), static fn(string $view): bool => $policy->canView($view)));
@@ -96,6 +97,7 @@ final class CommercialDashboardController
       'policy' => $policy,
       'visible_views' => $visibleViews,
       'ticket_employees' => $ticketEmployees,
+      'commercial_employee_cargos' => $commercialEmployeeCargos,
       'employee_filter_locked' => $employeeFilterLocked,
       'personal_task_scope' => $personalTaskScope,
       'filter_options' => $repository->filterOptions(),
@@ -150,5 +152,16 @@ final class CommercialDashboardController
     return [
       'id_empleado' => trim((string) ($filters['id_empleado'] ?? '')),
     ];
+  }
+
+  /** @param array<int,string|int> $defaults @return array<int,string> */
+  private function configuredCargoIds(string $key, array $defaults): array
+  {
+    $raw = $this->settings->get($key, null);
+    $source = is_array($raw) && $raw !== [] ? $raw : $defaults;
+    return array_values(array_unique(array_filter(array_map(
+      static fn($id): string => trim((string) $id),
+      $source
+    ), static fn(string $id): bool => $id !== '')));
   }
 }

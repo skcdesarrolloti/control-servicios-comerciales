@@ -597,13 +597,29 @@ button:disabled { cursor: not-allowed; opacity: .52; }
 .commercial-guide-group--postergados .commercial-status-dot { background: var(--commercial-accent); }
 .commercial-guide-group--cerrados .commercial-status-dot { background: var(--commercial-success); }
 
+.commercial-permission-intro { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; padding: 18px 18px 0; }
+.commercial-permission-intro > div { padding: 14px 16px; border: 1px solid #c7d8ef; border-radius: 14px; background: #f6faff; }
+.commercial-permission-intro strong { display: block; margin: 0 0 4px; color: #143660; font-size: 12px; }
+.commercial-permission-intro span { display: block; color: #49627f; font-size: 11px; line-height: 1.45; }
 .commercial-permissions-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; padding: 18px; }
-.commercial-permission-card { display: grid; grid-template-columns: 1fr 1.3fr; gap: 15px; padding: 14px; border: 1px solid var(--commercial-line); border-radius: 11px; }
+.commercial-permission-card { display: grid; grid-template-columns: 1fr 1.3fr; gap: 15px; padding: 14px; border: 1px solid var(--commercial-line); border-radius: 14px; background: #fff; }
 .commercial-permission-card legend { padding: 0 6px; color: #1e3350; font-weight: 700; }
 .commercial-permission-card legend small { display: block; color: #74839a; font-size: 9px; font-weight: 500; }
 .commercial-permission-card strong { display: block; margin-bottom: 7px; color: #52647b; font-size: 10px; text-transform: uppercase; }
 .commercial-permission-card label { display: flex; align-items: flex-start; gap: 7px; min-height: 34px; color: #2d4059; font-size: 10px; }
 .commercial-permission-card input { flex: 0 0 auto; width: 18px; height: 18px; }
+.commercial-permission-master { grid-column: 1/-1; min-height: auto !important; padding: 12px; border: 1px solid #c8dcf5; border-radius: 12px; background: #f5f9ff; }
+.commercial-permission-master.is-checked { border-color: #1f5fae; background: linear-gradient(135deg,#eef6ff 0%,#fff7ee 100%); }
+.commercial-permission-master span { display: block; }
+.commercial-permission-master strong { margin-bottom: 2px !important; color: #16477f !important; font-size: 11px !important; }
+.commercial-permission-master small { display: block; color: #49627f; font-size: 10px; line-height: 1.35; }
+.commercial-permission-wide { margin: 0 18px 18px; padding: 18px; border: 1px solid #c7d8ef; border-radius: 16px; background: linear-gradient(180deg,#ffffff 0%,#f7fbff 100%); }
+.commercial-permission-wide-head h3 { margin: 4px 0 4px; color: #172943; font-size: 17px; }
+.commercial-permission-wide-head p { margin: 0 0 14px; color: #52647b; font-size: 11px; line-height: 1.5; }
+.commercial-permission-cargo-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 9px; }
+.commercial-permission-cargo-grid label { display: flex; align-items: flex-start; gap: 8px; min-height: 52px; padding: 10px; border: 1px solid #d8e4f2; border-radius: 12px; background: #fff; color: #263c57; font-size: 11px; font-weight: 700; }
+.commercial-permission-cargo-grid input { flex: 0 0 auto; width: 18px; height: 18px; }
+.commercial-permission-cargo-grid small { display: block; margin-top: 2px; color: #718197; font-size: 9px; font-weight: 600; }
 .commercial-permissions-card form > footer { position: sticky; bottom: 0; display: flex; align-items: center; justify-content: flex-end; gap: 9px; padding: 14px 18px; border-top: 1px solid var(--commercial-line); background: #fff; }
 .commercial-permissions-card form > footer span { margin-right: auto; color: var(--commercial-success); font-size: 11px; }
 
@@ -1187,7 +1203,7 @@ button:disabled { cursor: not-allowed; opacity: .52; }
   #scm-app .commercial-tabs { position: static; margin-bottom: 18px; }
   .commercial-tab { padding-inline: 13px; }
   .commercial-section-head { align-items: flex-start; flex-direction: column; }
-  .commercial-ticket-grid, .commercial-filter-card, .commercial-guide-grid, .commercial-permissions-grid, .commercial-permission-card, .commercial-home-grid, .commercial-home-focus, .commercial-home-control-dashboard, .commercial-advisory-alert-grid { grid-template-columns: 1fr; }
+  .commercial-ticket-grid, .commercial-filter-card, .commercial-guide-grid, .commercial-permission-intro, .commercial-permissions-grid, .commercial-permission-card, .commercial-permission-cargo-grid, .commercial-home-grid, .commercial-home-focus, .commercial-home-control-dashboard, .commercial-advisory-alert-grid { grid-template-columns: 1fr; }
   .commercial-analysis-modal { padding: 0; }
   .commercial-analysis-card { width: 100%; max-height: 100dvh; min-height: 100dvh; border-radius: 0; }
   .commercial-assistant-grid { grid-template-columns: 1fr; }

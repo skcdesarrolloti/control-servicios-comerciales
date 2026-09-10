@@ -36,21 +36,19 @@ final class CommercialAccessPolicy
   private Settings $settings;
   private Database $db;
   /** @var array<int,string> */
-  private array $adminCargos;
+  private array $defaultAdminCargos;
 
   /** @param array<int,string> $adminCargos */
   public function __construct(Settings $settings, Database $db, array $adminCargos)
   {
     $this->settings = $settings;
     $this->db = $db;
-    $this->adminCargos = array_values(array_filter(array_map('strval', $adminCargos)));
+    $this->defaultAdminCargos = $this->sanitizeCargoIds($adminCargos);
   }
 
   public function canManage(): bool
   {
-    $role = $this->normalize(Auth::userRol());
-    return in_array(Auth::userCargo(), $this->adminCargos, true)
-      || in_array($role, ['admin', 'administrador', 'gerencia', 'desarrollo'], true);
+    return in_array(Auth::userCargo(), $this->adminCargoIds(), true);
   }
 
   public function canSeeAllCommercialTickets(): bool
@@ -90,13 +88,32 @@ final class CommercialAccessPolicy
     return is_array($raw) ? $this->sanitize($raw) : [];
   }
 
-  /** @param array<string,mixed> $raw */
-  public function save(array $raw): void
+  /** @return array<int,string> */
+  public function adminCargoIds(): array
+  {
+    $raw = $this->settings->get('commercial_admin_cargos', null);
+    if (is_array($raw)) {
+      $ids = $this->sanitizeCargoIds($raw);
+      if ($ids !== []) {
+        return $ids;
+      }
+    }
+    return $this->defaultAdminCargos;
+  }
+
+  /** @param array<string,mixed> $raw @param array<int|string,mixed> $adminCargos */
+  public function save(array $raw, array $adminCargos): void
   {
     if (!$this->canManage()) {
       throw new \RuntimeException('No tienes permisos para cambiar esta configuración.');
     }
+    $adminCargoIds = $this->sanitizeCargoIds($adminCargos);
+    if ($adminCargoIds === []) {
+      throw new \InvalidArgumentException('Selecciona al menos un cargo con acceso total para no dejar el panel sin administradores.');
+    }
     $this->settings->set('commercial_permissions', $this->sanitize($raw), Auth::userId());
+    $this->settings->set('commercial_admin_cargos', $adminCargoIds, Auth::userId());
+    $this->settings->refresh();
   }
 
   /** @return array<int,array{id:string,name:string,total:int}> */
@@ -151,9 +168,13 @@ final class CommercialAccessPolicy
     return $out;
   }
 
-  private function normalize(string $value): string
+  /** @param array<int|string,mixed> $ids @return array<int,string> */
+  private function sanitizeCargoIds(array $ids): array
   {
-    $value = trim(mb_strtolower($value, 'UTF-8'));
-    return strtr($value, ['á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u']);
+    return array_values(array_unique(array_filter(array_map(
+      static fn($id): string => trim((string) $id),
+      $ids
+    ), static fn(string $id): bool => $id !== '')));
   }
+
 }

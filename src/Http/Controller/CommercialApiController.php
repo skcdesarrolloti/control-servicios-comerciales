@@ -9,6 +9,7 @@ use SCM\Commercial\CommercialStatusCatalog;
 use SCM\Commercial\CommercialTaskAnalysisRepository;
 use SCM\Commercial\CommercialTaskAssistant;
 use SCM\Commercial\CommercialTicketsRepository;
+use SCM\Core\Auth;
 use SCM\Core\Csrf;
 use SCM\Core\Database;
 use SCM\Core\Settings;
@@ -25,6 +26,7 @@ final class CommercialApiController
   private CommercialTicketsRepository $tickets;
   private CommercialTaskAnalysisRepository $analyses;
   private CommercialAccessPolicy $policy;
+  private Settings $settings;
   private Csrf $csrf;
   private SeguimientoService $workflow;
   private string $baseUrl;
@@ -39,9 +41,11 @@ final class CommercialApiController
   {
     $this->tickets = new CommercialTicketsRepository($db);
     $this->analyses = new CommercialTaskAnalysisRepository($db);
+    $this->settings = $settings;
     $this->csrf = $csrf;
     $adminCargos = is_array($config['dashboard_admin_cargos'] ?? null) ? $config['dashboard_admin_cargos'] : ['11', '12', '13', '14'];
-    $this->commercialCargos = is_array($config['commercial_employee_cargos'] ?? null) ? array_values(array_map('strval', $config['commercial_employee_cargos'])) : ['1', '6', '9', '10', '11', '12', '13', '14', '17'];
+    $defaultCommercialCargos = is_array($config['commercial_employee_cargos'] ?? null) ? $config['commercial_employee_cargos'] : ['1', '6', '9', '10', '11', '12', '13', '14', '17'];
+    $this->commercialCargos = $this->configuredCargoIds('commercial_employee_cargos', $defaultCommercialCargos);
     $this->policy = new CommercialAccessPolicy($settings, $db, $adminCargos);
     $this->workflow = new SeguimientoService($db, new SchemaInspector($db));
     $this->workflow->setQueue(new EmailQueue($db));
@@ -246,8 +250,20 @@ final class CommercialApiController
       JsonResponse::error('No tienes permiso para cambiar esta configuración.', 403);
     }
     $permissions = $input['permissions'] ?? [];
-    $this->policy->save(is_array($permissions) ? $permissions : []);
-    JsonResponse::success(['message' => 'Configuración guardada.']);
+    $adminCargos = $input['admin_cargos'] ?? [];
+    $employeeCargoIds = $input['employee_cargo_ids'] ?? [];
+    $visibleCargoIds = $this->sanitizeCargoIds(is_array($employeeCargoIds) ? $employeeCargoIds : []);
+    if ($visibleCargoIds === []) {
+      JsonResponse::error('Selecciona al menos un cargo operativo visible.', 422);
+    }
+    try {
+      $this->policy->save(is_array($permissions) ? $permissions : [], is_array($adminCargos) ? $adminCargos : []);
+      $this->settings->set('commercial_employee_cargos', $visibleCargoIds, Auth::userId());
+      $this->settings->refresh();
+    } catch (\InvalidArgumentException | \RuntimeException $exception) {
+      JsonResponse::error($exception->getMessage(), 422);
+    }
+    JsonResponse::success(['message' => 'Permisos y cargos visibles guardados.']);
   }
 
   /** @param array<string,mixed> $input */
@@ -524,6 +540,23 @@ final class CommercialApiController
     return [
       'id_empleado' => trim((string) ($filters['id_empleado'] ?? '')),
     ];
+  }
+
+  /** @param array<int,string|int> $defaults @return array<int,string> */
+  private function configuredCargoIds(string $key, array $defaults): array
+  {
+    $raw = $this->settings->get($key, null);
+    $source = is_array($raw) && $raw !== [] ? $raw : $defaults;
+    return $this->sanitizeCargoIds($source);
+  }
+
+  /** @param array<int|string,mixed> $ids @return array<int,string> */
+  private function sanitizeCargoIds(array $ids): array
+  {
+    return array_values(array_unique(array_filter(array_map(
+      static fn($id): string => trim((string) $id),
+      $ids
+    ), static fn(string $id): bool => $id !== '')));
   }
 
   /** @return array<int,string> */

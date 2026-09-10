@@ -23,6 +23,7 @@ final class CommercialDashboardView
     $views = is_array($data['visible_views'] ?? null) ? $data['visible_views'] : [];
     $calendarEmployees = is_array($data['calendar_employees'] ?? null) ? $data['calendar_employees'] : [];
     $ticketEmployees = is_array($data['ticket_employees'] ?? null) ? $data['ticket_employees'] : [];
+    $commercialEmployeeCargos = is_array($data['commercial_employee_cargos'] ?? null) ? array_values(array_map('strval', $data['commercial_employee_cargos'])) : [];
     $filterOptions = is_array($data['filter_options'] ?? null) ? $data['filter_options'] : [];
     $tabCounts = is_array($data['tab_counts'] ?? null) ? $data['tab_counts'] : [];
     $baseUrl = rtrim((string) ($data['base_url'] ?? ''), '/');
@@ -112,7 +113,7 @@ final class CommercialDashboardView
 
     <?php echo CommercialGuideView::render(); ?>
     <?php if ($policy instanceof CommercialAccessPolicy && $policy->canManage()): ?>
-      <?php echo self::renderPermissions($policy); ?>
+      <?php echo self::renderPermissions($policy, $commercialEmployeeCargos); ?>
     <?php endif; ?>
   </main>
 
@@ -1087,20 +1088,61 @@ final class CommercialDashboardView
     return (string) ob_get_clean();
   }
 
-  private static function renderPermissions(CommercialAccessPolicy $policy): string
+  /** @param array<int,string> $employeeCargoIds */
+  private static function renderPermissions(CommercialAccessPolicy $policy, array $employeeCargoIds = []): string
   {
     $permissions = $policy->permissions();
+    $cargos = $policy->cargoOptions();
+    $adminCargoIds = array_flip($policy->adminCargoIds());
+    $employeeCargoSet = array_flip(array_values(array_unique(array_filter(array_map(
+      static fn($id): string => trim((string) $id),
+      $employeeCargoIds
+    ), static fn(string $id): bool => $id !== ''))));
     ob_start();
 ?>
     <div class="commercial-modal" id="commercial-permissions-modal" role="dialog" aria-modal="true" aria-labelledby="commercial-permissions-title" aria-hidden="true">
       <div class="commercial-modal-card commercial-permissions-card">
         <header><div><span class="commercial-kicker">Configuración</span><h2 id="commercial-permissions-title">Visibilidad y acciones por cargo</h2><p>Los permisos se validan tanto en la interfaz como en el servidor.</p></div><button type="button" class="commercial-modal-close" data-commercial-close-permissions aria-label="Cerrar">&times;</button></header>
         <form id="commercial-permissions-form">
+          <div class="commercial-permission-intro">
+            <div>
+              <strong>Acceso total</strong>
+              <span>Marca aquí los cargos que pueden ver todo el panel, administrar permisos y operar todas las tareas.</span>
+            </div>
+            <div>
+              <strong>Funcionarios operativos</strong>
+              <span>Define qué cargos aparecen en filtros, reasignación y búsquedas de responsables comerciales.</span>
+            </div>
+          </div>
           <div class="commercial-permissions-grid">
-            <?php foreach ($policy->cargoOptions() as $cargo): $current = $permissions[$cargo['id']] ?? ['views' => array_keys(CommercialAccessPolicy::VIEWS), 'actions' => array_keys(CommercialAccessPolicy::ACTIONS)]; ?>
-              <fieldset class="commercial-permission-card" data-cargo="<?php echo esc_attr($cargo['id']); ?>"><legend><?php echo esc_html($cargo['name']); ?> <small>ID <?php echo esc_html($cargo['id']); ?> · <?php echo esc_html((string) $cargo['total']); ?> activos</small></legend><input type="hidden" name="permissions[<?php echo esc_attr($cargo['id']); ?>][configured]" value="1"><div><strong>Vistas</strong><?php foreach (CommercialAccessPolicy::VIEWS as $key => $label): ?><label><input type="checkbox" name="permissions[<?php echo esc_attr($cargo['id']); ?>][views][]" value="<?php echo esc_attr($key); ?>"<?php checked(in_array($key, $current['views'], true)); ?>> <?php echo esc_html($label); ?></label><?php endforeach; ?></div><div><strong>Acciones</strong><?php foreach (CommercialAccessPolicy::ACTIONS as $key => $label): ?><label><input type="checkbox" name="permissions[<?php echo esc_attr($cargo['id']); ?>][actions][]" value="<?php echo esc_attr($key); ?>"<?php checked(in_array($key, $current['actions'], true)); ?>> <?php echo esc_html($label); ?></label><?php endforeach; ?></div></fieldset>
+            <?php foreach ($cargos as $cargo): $current = $permissions[$cargo['id']] ?? ['views' => array_keys(CommercialAccessPolicy::VIEWS), 'actions' => array_keys(CommercialAccessPolicy::ACTIONS)]; ?>
+              <fieldset class="commercial-permission-card" data-cargo="<?php echo esc_attr($cargo['id']); ?>">
+                <legend><?php echo esc_html($cargo['name']); ?> <small>ID <?php echo esc_html($cargo['id']); ?> · <?php echo esc_html((string) $cargo['total']); ?> activos</small></legend>
+                <label class="commercial-permission-master<?php echo isset($adminCargoIds[$cargo['id']]) ? ' is-checked' : ''; ?>">
+                  <input type="checkbox" name="admin_cargos[]" value="<?php echo esc_attr($cargo['id']); ?>"<?php checked(isset($adminCargoIds[$cargo['id']])); ?>>
+                  <span><strong>Acceso total</strong><small>Puede administrar permisos y ver todas las tareas del equipo.</small></span>
+                </label>
+                <input type="hidden" name="permissions[<?php echo esc_attr($cargo['id']); ?>][configured]" value="1">
+                <div><strong>Vistas</strong><?php foreach (CommercialAccessPolicy::VIEWS as $key => $label): ?><label><input type="checkbox" name="permissions[<?php echo esc_attr($cargo['id']); ?>][views][]" value="<?php echo esc_attr($key); ?>"<?php checked(in_array($key, $current['views'], true)); ?>> <?php echo esc_html($label); ?></label><?php endforeach; ?></div>
+                <div><strong>Acciones</strong><?php foreach (CommercialAccessPolicy::ACTIONS as $key => $label): ?><label><input type="checkbox" name="permissions[<?php echo esc_attr($cargo['id']); ?>][actions][]" value="<?php echo esc_attr($key); ?>"<?php checked(in_array($key, $current['actions'], true)); ?>> <?php echo esc_html($label); ?></label><?php endforeach; ?></div>
+              </fieldset>
             <?php endforeach; ?>
           </div>
+          <section class="commercial-permission-wide">
+            <div class="commercial-permission-wide-head">
+              <span class="commercial-kicker">Funcionarios operativos</span>
+              <h3>Cargos visibles en filtros y reasignación</h3>
+              <p>Solo los funcionarios activos con estos cargos aparecen como responsables comerciales. Esto también ayuda a enlazar correctamente la sesión con el id_empleado.</p>
+            </div>
+            <div class="commercial-permission-cargo-grid">
+              <?php foreach ($cargos as $cargo): ?>
+                <label>
+                  <input type="checkbox" name="employee_cargo_ids[]" value="<?php echo esc_attr($cargo['id']); ?>"<?php checked(isset($employeeCargoSet[$cargo['id']])); ?>>
+                  <span><?php echo esc_html($cargo['name']); ?><small>ID <?php echo esc_html($cargo['id']); ?></small></span>
+                </label>
+              <?php endforeach; ?>
+            </div>
+          </section>
           <footer><span data-commercial-permissions-message aria-live="polite"></span><button type="button" class="commercial-secondary-btn" data-commercial-close-permissions>Cancelar</button><button type="submit" class="commercial-primary-btn">Guardar configuración</button></footer>
         </form>
       </div>

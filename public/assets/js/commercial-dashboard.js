@@ -1067,6 +1067,12 @@
     });
   }
   if (permissionForm) {
+    permissionForm.addEventListener("change", function (event) {
+      var master = event.target.closest(".commercial-permission-master");
+      if (master && event.target.matches('input[name="admin_cargos[]"]')) {
+        master.classList.toggle("is-checked", event.target.checked);
+      }
+    });
     permissionForm.addEventListener("submit", function (event) {
       event.preventDefault();
       var submit = permissionForm.querySelector('button[type="submit"]');
@@ -1076,7 +1082,7 @@
       request("commercial_permissions_save", new FormData(permissionForm))
         .then(function (response) {
           if (message) message.textContent = response.message || "Configuración guardada.";
-          notify("success", "Visibilidad y acciones actualizadas.");
+          notify("success", "Permisos y cargos visibles actualizados.");
         })
         .catch(function (error) {
           if (message) message.textContent = error.message;
