@@ -88,6 +88,27 @@ final class CommercialDashboardView
     .commercial-modal-open {
       overflow: hidden;
     }
+    /* Dropdowns y Submenús de Navegación */
+    [data-commercial-dropdown-menu] {
+      display: none;
+    }
+    [data-commercial-dropdown-menu].is-open,
+    .group\/nav:hover > [data-commercial-dropdown-menu],
+    [data-commercial-dropdown]:hover > [data-commercial-dropdown-menu] {
+      display: block !important;
+    }
+    [data-commercial-subflyout] {
+      display: none;
+    }
+    [data-commercial-subflyout].is-open,
+    .group\/sub:hover > [data-commercial-subflyout],
+    [data-commercial-subgroup]:hover > [data-commercial-subflyout] {
+      display: block !important;
+    }
+    .group\/nav:hover [data-commercial-dropdown-trigger] .material-symbols-outlined,
+    [data-commercial-dropdown].is-open [data-commercial-dropdown-trigger] .material-symbols-outlined {
+      transform: rotate(180deg);
+    }
     .sicv-ai-icon-rotate {
       animation: sicv-guardian-search 1.15s ease-in-out infinite;
     }
@@ -303,8 +324,8 @@ final class CommercialDashboardView
 <body class="bg-background font-body-md text-on-surface antialiased">
   <div id="scm-app" class="scm-wrap w-full bg-background min-h-screen flex flex-col" data-scm-runtime="<?php echo esc_attr((string) $runtimeJson); ?>">
   <!-- Header Principal -->
-  <header class="fixed top-0 left-0 right-0 z-50 bg-inverse-surface shadow-[0_1px_8px_rgba(0,0,0,0.06)]">
-    <div class="h-28 w-full">
+  <header class="fixed top-0 left-0 right-0 z-50 bg-inverse-surface shadow-[0_1px_8px_rgba(0,0,0,0.06)] overflow-visible">
+    <div class="h-28 w-full overflow-visible">
       <!-- Top Row: Identidad, Búsqueda y Acciones Rápidas -->
       <div class="h-16 px-margin flex items-center justify-between">
         <div class="flex items-center gap-space-md">
@@ -317,10 +338,12 @@ final class CommercialDashboardView
               <span class="hidden xl:inline ml-space-xs font-label-sm text-label-sm text-secondary-fixed opacity-80 uppercase">Servicios Comerciales</span>
             </div>
           </a>
-          <div class="hidden md:flex items-center ml-space-lg bg-surface-container-lowest/10 rounded-xl px-space-md py-space-xs focus-within:bg-surface-container-lowest/20 transition-all">
-            <span class="material-symbols-outlined text-secondary-fixed text-[18px] mr-space-xs">search</span>
-            <input type="text" id="quick-search-nav" placeholder="Buscar cartera o ID..." class="bg-transparent border-none outline-none font-body-sm text-body-sm text-secondary-fixed placeholder:text-secondary-fixed/70 mr-space-md w-36 lg:w-48 focus:w-64 transition-all">
-            <kbd class="font-label-sm text-label-sm bg-surface-container-lowest/15 text-secondary-fixed px-space-xs rounded">⌘K</kbd>
+          <div class="hidden md:flex items-center ml-space-lg bg-surface-container-lowest/10 rounded-xl px-space-md py-space-xs focus-within:bg-surface-container-lowest/20 transition-all border border-white/5 focus-within:border-white/20">
+            <button type="button" id="quick-search-btn" class="flex items-center text-secondary-fixed hover:text-white transition-colors mr-space-xs cursor-pointer" title="Buscar">
+              <span class="material-symbols-outlined text-[18px]">search</span>
+            </button>
+            <input type="text" id="quick-search-nav" value="<?php echo esc_attr((string) ($filters['busqueda'] ?? '')); ?>" placeholder="Buscar tarea, cliente, correo o celular..." class="bg-transparent border-none outline-none font-body-sm text-body-sm text-on-primary placeholder:text-secondary-fixed/70 mr-space-xs w-48 sm:w-64 lg:w-72 focus:w-80 transition-all">
+            <kbd class="font-label-sm text-label-sm bg-surface-container-lowest/15 text-secondary-fixed px-space-xs py-0.5 rounded font-mono text-[11px] border border-white/10" id="quick-search-kbd">Ctrl+K</kbd>
           </div>
         </div>
 
@@ -429,7 +452,7 @@ final class CommercialDashboardView
       </div>
 
       <!-- Second Row: Navegación de Pestañas con Dropdowns -->
-      <div class="h-12 bg-surface-container-lowest shadow-[0_1px_8px_rgba(0,0,0,0.04)] px-margin flex items-center justify-between">
+      <div class="h-12 bg-surface-container-lowest shadow-[0_1px_8px_rgba(0,0,0,0.04)] px-margin flex items-center justify-between overflow-visible relative z-30">
         <?php echo self::renderTabs($views, $bucket, $filters, $tabCounts, $baseUrl, $topicHierarchy); ?>
         <div class="hidden md:flex items-center gap-space-xs font-label-sm text-label-sm text-on-surface-variant">
           <span class="w-2 h-2 rounded-full bg-primary-container animate-pulse"></span>
@@ -534,7 +557,7 @@ final class CommercialDashboardView
 
     ob_start();
 ?>
-    <nav class="flex items-center gap-space-xs lg:gap-space-sm overflow-x-auto py-space-xs" data-commercial-tabs data-active-classes="<?php echo esc_attr($activeClasses); ?>" aria-label="Navegación principal">
+    <nav class="flex items-center gap-space-xs lg:gap-space-sm overflow-visible py-space-xs" data-commercial-tabs data-active-classes="<?php echo esc_attr($activeClasses); ?>" aria-label="Navegación principal">
       <!-- Pestaña Inicio -->
       <?php if (in_array('inicio', $views, true)): ?>
         <a class="px-space-md py-space-xs transition-colors whitespace-nowrap font-label-md text-label-md <?php echo $bucket === 'inicio' ? $activeClasses : $inactiveClasses; ?>" data-commercial-tab="inicio" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'inicio'])); ?>"<?php echo $bucket === 'inicio' ? ' aria-current="page"' : ''; ?>>
@@ -544,7 +567,7 @@ final class CommercialDashboardView
 
       <!-- Dropdown Gestión de Tareas (Con despliegue por tema y por estado comercial) -->
       <div class="relative group/nav" data-commercial-dropdown="tareas">
-        <button type="button" class="flex items-center gap-space-xs px-space-md py-space-xs font-label-md text-label-md <?php echo $isTaskActive ? $activeClasses : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-dropdown-trigger="tareas">
+        <button type="button" class="flex items-center gap-space-xs px-space-md py-space-xs font-label-md text-label-md <?php echo $isTaskActive ? $activeClasses : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-dropdown-trigger="tareas" aria-expanded="false">
           <span>Gestión de Tareas</span>
           <span class="material-symbols-outlined text-[16px] group-hover/nav:rotate-180 transition-transform">expand_more</span>
         </button>
@@ -603,7 +626,7 @@ final class CommercialDashboardView
                   $topicTotal = (int) ($th['total'] ?? 0);
                   $statuses = (array) ($th['statuses'] ?? []);
                 ?>
-                <div class="relative group/sub">
+                <div class="relative group/sub" data-commercial-subgroup>
                   <div class="flex items-center justify-between px-3 py-1.5 rounded-xl text-body-sm hover:bg-surface-container-low transition-colors">
                     <a class="flex-1 font-medium text-on-surface hover:text-primary transition-colors flex items-center justify-between" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'abiertos', 'tema' => $topicName])); ?>">
                       <span class="truncate max-w-[170px]" title="<?php echo esc_attr($topicName); ?>"><?php echo esc_html($topicName); ?></span>
@@ -616,7 +639,7 @@ final class CommercialDashboardView
 
                   <!-- Flyout Submenu a la derecha con Estados Comerciales del Tema -->
                   <?php if (!empty($statuses)): ?>
-                    <div class="absolute left-full top-0 ml-1 hidden group-hover/sub:block bg-surface-container-lowest shadow-[0_12px_32px_rgba(0,0,0,0.18)] rounded-xl py-space-xs min-w-[210px] max-w-[260px] border border-outline-variant/30 z-50 p-1 space-y-0.5">
+                    <div class="absolute left-full top-0 ml-1 hidden group-hover/sub:block bg-surface-container-lowest shadow-[0_12px_32px_rgba(0,0,0,0.18)] rounded-xl py-space-xs min-w-[210px] max-w-[260px] border border-outline-variant/30 z-50 p-1 space-y-0.5" data-commercial-subflyout>
                       <div class="px-3 py-1 border-b border-surface-container pb-1 mb-1">
                         <span class="font-label-sm uppercase font-semibold text-secondary block truncate"><?php echo esc_html($topicName); ?></span>
                         <a href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'abiertos', 'tema' => $topicName])); ?>" class="text-[11px] text-primary hover:underline font-semibold block mt-0.5">Ver todos (<?php echo esc_html((string) $topicTotal); ?>)</a>
@@ -641,7 +664,7 @@ final class CommercialDashboardView
       <!-- Dropdown Calendario Comercial (Mi calendario, Calendario equipo, Vencimientos) -->
       <?php if (in_array('calendario', $views, true)): ?>
         <div class="relative group/nav" data-commercial-dropdown="calendario">
-          <button type="button" class="flex items-center gap-space-xs px-space-md py-space-xs font-label-md text-label-md <?php echo $bucket === 'calendario' ? $activeClasses : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-dropdown-trigger="calendario">
+          <button type="button" class="flex items-center gap-space-xs px-space-md py-space-xs font-label-md text-label-md <?php echo $bucket === 'calendario' ? $activeClasses : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-dropdown-trigger="calendario" aria-expanded="false">
             <span class="material-symbols-outlined text-[16px]">calendar_month</span>
             <span>Calendario</span>
             <span class="material-symbols-outlined text-[16px] group-hover/nav:rotate-180 transition-transform">expand_more</span>
@@ -675,11 +698,11 @@ final class CommercialDashboardView
       <!-- Dropdown Actualizaciones de Inmuebles -->
       <?php if (in_array('actualizaciones', $views, true)): ?>
         <div class="relative group/nav" data-commercial-dropdown="actualizaciones">
-          <button type="button" class="flex items-center gap-space-xs px-space-md py-space-xs font-label-md text-label-md <?php echo $bucket === 'actualizaciones' ? $activeClasses : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-dropdown-trigger="actualizaciones">
+          <button type="button" class="flex items-center gap-space-xs px-space-md py-space-xs font-label-md text-label-md <?php echo $bucket === 'actualizaciones' ? $activeClasses : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-dropdown-trigger="actualizaciones" aria-expanded="false">
             <span>Actualizaciones de Inmuebles</span>
             <span class="material-symbols-outlined text-[16px] group-hover/nav:rotate-180 transition-transform">expand_more</span>
           </button>
-          <div class="absolute left-0 top-full hidden group-hover/nav:block bg-surface-container-lowest shadow-[0_8px_24px_rgba(0,0,0,0.12)] rounded-xl py-space-xs min-w-[230px] z-50 border border-outline-variant/30">
+          <div class="absolute left-0 top-full hidden group-hover/nav:block bg-surface-container-lowest shadow-[0_8px_24px_rgba(0,0,0,0.12)] rounded-xl py-space-xs min-w-[230px] z-50 border border-outline-variant/30 text-on-surface" data-commercial-dropdown-menu="actualizaciones">
             <a class="flex items-center justify-between px-space-md py-space-sm font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="actualizaciones" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'actualizaciones', 'estado_actualizacion' => 'OK'])); ?>">
               <span>Al Día</span>
               <span class="font-label-sm text-label-sm bg-surface-container px-space-xs py-0.5 rounded text-on-surface">Activo</span>
@@ -699,11 +722,11 @@ final class CommercialDashboardView
       <!-- Dropdown Avisos en Fachada -->
       <?php if (in_array('avisos', $views, true)): ?>
         <div class="relative group/nav" data-commercial-dropdown="avisos">
-          <button type="button" class="flex items-center gap-space-xs px-space-md py-space-xs font-label-md text-label-md <?php echo $bucket === 'avisos' ? $activeClasses : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-dropdown-trigger="avisos">
+          <button type="button" class="flex items-center gap-space-xs px-space-md py-space-xs font-label-md text-label-md <?php echo $bucket === 'avisos' ? $activeClasses : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-dropdown-trigger="avisos" aria-expanded="false">
             <span>Avisos en Fachada</span>
             <span class="material-symbols-outlined text-[16px] group-hover/nav:rotate-180 transition-transform">expand_more</span>
           </button>
-          <div class="absolute left-0 top-full hidden group-hover/nav:block bg-surface-container-lowest shadow-[0_8px_24px_rgba(0,0,0,0.12)] rounded-xl py-space-xs min-w-[240px] z-50 border border-outline-variant/30">
+          <div class="absolute left-0 top-full hidden group-hover/nav:block bg-surface-container-lowest shadow-[0_8px_24px_rgba(0,0,0,0.12)] rounded-xl py-space-xs min-w-[240px] z-50 border border-outline-variant/30 text-on-surface" data-commercial-dropdown-menu="avisos">
             <a class="flex items-center justify-between px-space-md py-space-sm font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="avisos" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'avisos', 'estado_aviso' => 'Vencido'])); ?>">
               <span>Retoques Vencidos</span>
               <span class="font-label-sm text-label-sm bg-error-container text-on-error-container px-space-xs py-0.5 rounded font-semibold">Vencidos</span>
@@ -1068,7 +1091,7 @@ final class CommercialDashboardView
     string $effectiveBucket = ''
   ): string {
     $activeFilterKeys = array_filter(
-      ['busqueda', 'ticket_id', 'id_empleado', 'medio', 'barrio', 'sla_filter', 'solicitante', 'celular', 'fecha_desde', 'fecha_hasta'],
+      ['busqueda', 'ticket_id', 'id_empleado', 'medio', 'barrio', 'sla_filter', 'solicitante', 'celular', 'correo', 'fecha_desde', 'fecha_hasta'],
       static fn(string $k): bool => trim((string) ($filters[$k] ?? '')) !== ''
     );
     $activeCount = count($activeFilterKeys);
@@ -1162,10 +1185,14 @@ final class CommercialDashboardView
           </div>
 
           <!-- Campos Avanzados (Desplegables) -->
-          <div id="advanced-filters-panel" class="hidden grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-space-sm pt-space-md border-t border-surface-container mt-space-md">
+          <div id="advanced-filters-panel" class="hidden grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-space-sm pt-space-md border-t border-surface-container mt-space-md">
             <div class="space-y-1">
               <label class="block font-label-sm text-label-sm text-secondary font-medium">Solicitante</label>
               <input class="w-full px-3 py-2 bg-surface-container-low rounded-xl font-body-sm text-body-sm text-on-surface outline-none" placeholder="Nombre cliente" type="text" name="solicitante" value="<?php echo esc_attr((string) ($filters['solicitante'] ?? '')); ?>">
+            </div>
+            <div class="space-y-1">
+              <label class="block font-label-sm text-label-sm text-secondary font-medium">Correo</label>
+              <input class="w-full px-3 py-2 bg-surface-container-low rounded-xl font-body-sm text-body-sm text-on-surface outline-none" placeholder="correo@ejemplo.com" type="text" name="correo" value="<?php echo esc_attr((string) ($filters['correo'] ?? '')); ?>">
             </div>
             <div class="space-y-1">
               <label class="block font-label-sm text-label-sm text-secondary font-medium">Celular</label>

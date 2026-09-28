@@ -1884,8 +1884,41 @@ final class CommercialTicketsRepository
     $search = trim((string) ($filters['busqueda'] ?? ''));
     if ($search !== '') {
       $like = '%' . $this->db->escapeLike($search) . '%';
-      $where[] = "(CAST(t.`_ID` AS CHAR) LIKE ? OR t.`id_ticket` LIKE ? OR t.`asunto` LIKE ? OR t.`descripcion` LIKE ? OR t.`solicitante` LIKE ? OR t.`correo_solicitante` LIKE ? OR t.`celular_solicitante` LIKE ? OR t.`nombre_empleado` LIKE ? OR t.`inmueble` LIKE ? OR t.`id_inmueble` LIKE ? OR t.`direccion` LIKE ? OR t.`barrio` LIKE ? OR t.`tema_ayuda` LIKE ? OR t.`medio` LIKE ? OR t.`prioridad` LIKE ?)";
-      array_push($args, $like, $like, $like, $like, $like, $like, $like, $like, $like, $like, $like, $like, $like, $like, $like);
+      $searchClauses = [
+        "CAST(t.`_ID` AS CHAR) LIKE ?",
+        "t.`id_ticket` LIKE ?",
+        "t.`asunto` LIKE ?",
+        "t.`descripcion` LIKE ?",
+        "t.`solicitante` LIKE ?",
+        "t.`correo_solicitante` LIKE ?",
+        "t.`celular_solicitante` LIKE ?",
+        "t.`nombre_empleado` LIKE ?",
+        "t.`correo_empleado` LIKE ?",
+        "t.`inmueble` LIKE ?",
+        "t.`id_inmueble` LIKE ?",
+        "t.`direccion` LIKE ?",
+        "t.`barrio` LIKE ?",
+        "t.`tema_ayuda` LIKE ?",
+        "t.`medio` LIKE ?",
+        "t.`prioridad` LIKE ?",
+      ];
+      $searchArgs = array_fill(0, count($searchClauses), $like);
+
+      $searchDigits = preg_replace('/[^0-9]/', '', $search);
+      if ($searchDigits !== '' && strlen($searchDigits) >= 4) {
+        $cleanPhoneSql = "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(t.`celular_solicitante`, ''), ' ', ''), '-', ''), '+', ''), '(', ''), ')', ''), '.', '')";
+        $searchClauses[] = "{$cleanPhoneSql} LIKE ?";
+        $searchArgs[] = '%' . $this->db->escapeLike($searchDigits) . '%';
+
+        if (str_starts_with($searchDigits, '57') && strlen($searchDigits) >= 12) {
+          $without57 = substr($searchDigits, 2);
+          $searchClauses[] = "{$cleanPhoneSql} LIKE ?";
+          $searchArgs[] = '%' . $this->db->escapeLike($without57) . '%';
+        }
+      }
+
+      $where[] = '(' . implode(' OR ', $searchClauses) . ')';
+      array_push($args, ...$searchArgs);
     }
 
     $employee = trim((string) ($filters['id_empleado'] ?? ''));
@@ -1907,17 +1940,32 @@ final class CommercialTicketsRepository
       array_push($args, $ticketId, $like);
     }
 
-    foreach ([
-      'solicitante' => 'solicitante',
-      'celular' => 'celular_solicitante',
-      'correo' => 'correo_solicitante',
-    ] as $filterKey => $column) {
-      $value = trim((string) ($filters[$filterKey] ?? ''));
-      if ($value === '') {
-        continue;
+    $solicitante = trim((string) ($filters['solicitante'] ?? ''));
+    if ($solicitante !== '') {
+      $where[] = "(t.`solicitante` LIKE ? OR t.`nombre_empleado` LIKE ?)";
+      $likeSol = '%' . $this->db->escapeLike($solicitante) . '%';
+      array_push($args, $likeSol, $likeSol);
+    }
+
+    $correo = trim((string) ($filters['correo'] ?? ''));
+    if ($correo !== '') {
+      $where[] = "(t.`correo_solicitante` LIKE ? OR t.`correo_empleado` LIKE ?)";
+      $likeCorreo = '%' . $this->db->escapeLike($correo) . '%';
+      array_push($args, $likeCorreo, $likeCorreo);
+    }
+
+    $celular = trim((string) ($filters['celular'] ?? ''));
+    if ($celular !== '') {
+      $celDigits = preg_replace('/[^0-9]/', '', $celular);
+      if ($celDigits !== '' && strlen($celDigits) >= 4) {
+        $cleanPhoneSql = "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(t.`celular_solicitante`, ''), ' ', ''), '-', ''), '+', ''), '(', ''), ')', ''), '.', '')";
+        $where[] = "(t.`celular_solicitante` LIKE ? OR {$cleanPhoneSql} LIKE ?)";
+        $args[] = '%' . $this->db->escapeLike($celular) . '%';
+        $args[] = '%' . $this->db->escapeLike($celDigits) . '%';
+      } else {
+        $where[] = "t.`celular_solicitante` LIKE ?";
+        $args[] = '%' . $this->db->escapeLike($celular) . '%';
       }
-      $where[] = "t.`{$column}` LIKE ?";
-      $args[] = '%' . $this->db->escapeLike($value) . '%';
     }
 
     $property = trim((string) ($filters['inmueble'] ?? ''));

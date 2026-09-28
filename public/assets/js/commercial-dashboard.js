@@ -1051,20 +1051,58 @@
     var ddTrigger = event.target.closest("[data-commercial-dropdown-trigger]");
     if (ddTrigger) {
       event.preventDefault();
-      var ddKey = ddTrigger.getAttribute("data-commercial-dropdown-trigger");
-      var ddMenu = root.querySelector('[data-commercial-dropdown-menu="' + ddKey + '"]');
+      var ddContainer = ddTrigger.closest("[data-commercial-dropdown]");
+      var ddKey = ddTrigger.getAttribute("data-commercial-dropdown-trigger") || (ddContainer && ddContainer.getAttribute("data-commercial-dropdown")) || "";
+      var ddMenu = ddContainer ? ddContainer.querySelector("[data-commercial-dropdown-menu]") : root.querySelector('[data-commercial-dropdown-menu="' + ddKey + '"]');
       if (ddMenu) {
-        ddMenu.classList.toggle("!block");
+        var isOpen = ddMenu.classList.contains("is-open");
+        root.querySelectorAll("[data-commercial-dropdown-menu].is-open").forEach(function (m) {
+          if (m !== ddMenu) m.classList.remove("is-open");
+        });
+        root.querySelectorAll("[data-commercial-dropdown].is-open").forEach(function (d) {
+          if (d !== ddContainer) d.classList.remove("is-open");
+        });
+        root.querySelectorAll("[data-commercial-subflyout].is-open, [data-commercial-subgroup].is-open").forEach(function (sf) {
+          sf.classList.remove("is-open");
+        });
+        ddMenu.classList.toggle("is-open", !isOpen);
+        if (ddContainer) ddContainer.classList.toggle("is-open", !isOpen);
+        ddTrigger.setAttribute("aria-expanded", !isOpen ? "true" : "false");
       }
       return;
+    }
+
+    var subTrigger = event.target.closest("[data-commercial-subflyout-trigger]") || event.target.closest("[data-commercial-subgroup]");
+    if (subTrigger && !event.target.closest("a")) {
+      var subGroup = subTrigger.closest("[data-commercial-subgroup]");
+      var flyout = subGroup ? subGroup.querySelector("[data-commercial-subflyout]") : null;
+      if (flyout) {
+        event.preventDefault();
+        var isSubOpen = flyout.classList.contains("is-open");
+        var parentMenu = subGroup.closest("[data-commercial-dropdown-menu]");
+        if (parentMenu) {
+          parentMenu.querySelectorAll("[data-commercial-subflyout].is-open").forEach(function (f) {
+            if (f !== flyout) f.classList.remove("is-open");
+          });
+          parentMenu.querySelectorAll("[data-commercial-subgroup].is-open").forEach(function (sg) {
+            if (sg !== subGroup) sg.classList.remove("is-open");
+          });
+        }
+        flyout.classList.toggle("is-open", !isSubOpen);
+        subGroup.classList.toggle("is-open", !isSubOpen);
+        return;
+      }
     }
 
     if (tab) {
       event.preventDefault();
       var notifDropdown = document.getElementById("scm-notifications-dropdown");
       if (notifDropdown) notifDropdown.classList.add("hidden");
-      root.querySelectorAll("[data-commercial-dropdown-menu].!block").forEach(function (m) {
-        m.classList.remove("!block");
+      root.querySelectorAll("[data-commercial-dropdown-menu].is-open, [data-commercial-dropdown].is-open, [data-commercial-subflyout].is-open, [data-commercial-subgroup].is-open").forEach(function (m) {
+        m.classList.remove("is-open");
+      });
+      root.querySelectorAll("[data-commercial-dropdown-trigger]").forEach(function (btn) {
+        btn.setAttribute("aria-expanded", "false");
       });
       loadTickets(tab.href, { focus: true });
       return;
@@ -1117,8 +1155,11 @@
       }
     }
     if (!event.target.closest("[data-commercial-dropdown]")) {
-      root.querySelectorAll("[data-commercial-dropdown-menu].!block").forEach(function (m) {
-        m.classList.remove("!block");
+      root.querySelectorAll("[data-commercial-dropdown-menu].is-open, [data-commercial-dropdown].is-open, [data-commercial-subflyout].is-open, [data-commercial-subgroup].is-open").forEach(function (m) {
+        m.classList.remove("is-open");
+      });
+      root.querySelectorAll("[data-commercial-dropdown-trigger]").forEach(function (btn) {
+        btn.setAttribute("aria-expanded", "false");
       });
     }
   });
@@ -1356,27 +1397,59 @@
     }
   });
 
-  // Quick search in header (Cmd+K / Ctrl+K and Enter)
+  // Quick search in header (Ctrl+K / Cmd+K, Enter and Click)
+  function executeHeaderSearch() {
+    var qs = document.getElementById("quick-search-nav");
+    if (!qs) return;
+    var val = qs.value.trim();
+    var currentTab = activeTab();
+    var taskTabs = ["abiertos", "mis_tickets", "postergados", "cerrados"];
+    var targetTab = taskTabs.indexOf(currentTab) !== -1 ? currentTab : "abiertos";
+
+    var activeForm = root.querySelector("[data-commercial-filter-form]");
+    if (activeForm && taskTabs.indexOf(currentTab) !== -1) {
+      var searchInput = activeForm.querySelector('input[name="busqueda"]');
+      if (searchInput) searchInput.value = val;
+      activeForm.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+      return;
+    }
+
+    var url = normalizedUrl(window.location.href);
+    url.searchParams.set("tab", targetTab);
+    if (val !== "") {
+      url.searchParams.set("busqueda", val);
+    } else {
+      url.searchParams.delete("busqueda");
+    }
+    url.searchParams.delete("page");
+    loadTickets(url.href, { focus: false });
+  }
+
   var quickSearch = document.getElementById("quick-search-nav");
   if (quickSearch) {
     quickSearch.addEventListener("keydown", function (event) {
       if (event.key === "Enter") {
         event.preventDefault();
-        var val = quickSearch.value.trim();
-        var activeForm = root.querySelector("[data-commercial-filter-form]");
-        if (activeForm) {
-          var searchInput = activeForm.querySelector('input[name="busqueda"]');
-          if (searchInput) searchInput.value = val;
-          activeForm.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
-        } else {
-          var url = normalizedUrl(window.location.href);
-          url.searchParams.set("busqueda", val);
-          url.searchParams.set("tab", "abiertos");
-          loadTickets(url.href, { focus: false });
-        }
+        executeHeaderSearch();
       }
     });
   }
+
+  document.addEventListener("click", function (event) {
+    if (event.target.closest("#quick-search-btn")) {
+      event.preventDefault();
+      executeHeaderSearch();
+    }
+  });
+
+  // Windows / Mac detection for shortcut badge
+  try {
+    var isMac = /Mac|iPhone|iPad|iPod/i.test(navigator.userAgent || navigator.platform || "");
+    var kbdBadge = document.getElementById("quick-search-kbd");
+    if (kbdBadge) {
+      kbdBadge.textContent = isMac ? "⌘K" : "Ctrl+K";
+    }
+  } catch (_e) {}
 
   document.addEventListener("keydown", function (event) {
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
