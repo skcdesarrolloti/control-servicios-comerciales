@@ -25,215 +25,484 @@ final class CommercialTicketModalView
     $description = trim(wp_strip_all_tags((string) ($ticket['descripcion'] ?? ''), true));
     $requester = trim((string) ($ticket['solicitante'] ?? '')) ?: 'Sin solicitante';
     $assignee = trim((string) ($ticket['nombre_empleado'] ?? $ticket['empleado'] ?? '')) ?: 'Sin asignar';
+    $assigneeId = trim((string) ($ticket['id_empleado'] ?? ''));
     $external = $ticketUrl !== '' ? $ticketUrl . rawurlencode($logicalId) : '';
-    $bucket = CommercialStatusCatalog::bucketForStatus($status);
+    $email = trim((string) ($ticket['correo_solicitante'] ?? $ticket['correo'] ?? ''));
+    $phone = trim((string) ($ticket['celular_solicitante'] ?? $ticket['celular'] ?? ''));
+    $cleanPhone = preg_replace('/[^0-9]/', '', $phone);
+    $theme = trim((string) ($ticket['tema'] ?? $ticket['tema_ayuda'] ?? ''));
+    $priority = trim((string) ($ticket['prioridad'] ?? ''));
+    $channel = trim((string) ($ticket['medio'] ?? ''));
+    $createdTs = (int) ($ticket['fecha'] ?? 0);
+    if ($createdTs <= 0 && !empty($ticket['cct_created'])) {
+      $createdTs = strtotime((string) $ticket['cct_created']) ?: 0;
+    }
+    $updatedTs = (int) ($ticket['fecha_actualizacion'] ?? $ticket['fecha'] ?? 0);
+    $elapsedDays = $createdTs > 0 ? max(0, (int) floor((time() - $createdTs) / 86400)) : 0;
+
+    $property = is_array($ticket['_scm_inmueble_data'] ?? null) ? $ticket['_scm_inmueble_data'] : [];
+    $propertyCode = trim((string) ($ticket['id_inmueble'] ?? $ticket['inmueble'] ?? $property['codigo'] ?? ''));
+    if ($propertyCode === '') {
+      $propertyCode = trim((string) ($property['codigo'] ?? ''));
+    }
+    $propertyType = trim((string) ($ticket['tipo_inmueble'] ?? $property['tipo_inmueble'] ?? ''));
+    $neighborhood = trim((string) ($ticket['barrio'] ?? $property['barrio'] ?? ''));
+    $city = trim((string) ($property['ciudad'] ?? ''));
+    $address = trim((string) ($ticket['direccion'] ?? $property['direccion'] ?? ''));
+    $canon = trim((string) ($property['canon'] ?? $property['valor'] ?? ''));
+
+    $requesterInitials = self::initials($requester);
+    $assigneeInitials = self::initials($assignee);
     $timelineCounts = self::timelineCounts($timeline);
 
     ob_start();
 ?>
-  <div class="flex flex-col gap-space-md pb-space-md border-b border-surface-container">
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-space-sm">
-      <div class="flex items-center gap-space-xs">
-        <span class="inline-flex items-center px-2.5 py-1 rounded-lg bg-surface-container text-on-surface font-label-md font-semibold">
-          Tarea #<?php echo esc_html($logicalId); ?>
+  <!-- BEGIN: ModalHeader -->
+  <header class="bg-white border-b border-slate-100 px-6 sm:px-8 pt-6 pb-5 flex-shrink-0">
+    <!-- Top Status Bar & Close Button -->
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+      <!-- Breadcrumb navigation & Primary Status Badges -->
+      <div class="flex flex-wrap items-center gap-2 text-xs">
+        <nav class="flex items-center gap-1.5 text-slate-400 font-medium mr-2">
+          <span>Tareas</span>
+          <span>/</span>
+          <span><?php echo esc_html($theme !== '' ? $theme : 'Comercial'); ?></span>
+          <span>/</span>
+          <span class="text-[#1E3C76] font-semibold">Tarea #<?php echo esc_html($logicalId); ?></span>
+        </nav>
+        <!-- Pill Badges -->
+        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-[#061D49] border border-slate-200">
+          #<?php echo esc_html($logicalId); ?>
         </span>
-        <span class="inline-flex items-center px-2.5 py-1 rounded-full bg-primary-container text-on-surface font-label-sm font-semibold">
+        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-[#FEF3C7] text-[#92400E] border border-[#FDE68A]">
+          <span class="w-2 h-2 rounded-full bg-[#F59E0B] animate-pulse"></span>
           <?php echo esc_html($status); ?>
         </span>
+        <?php if ($priority !== ''): ?>
+          <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+            <span class="material-symbols-outlined text-[14px] text-amber-500">flag</span>
+            <span>Prioridad <?php echo esc_html($priority); ?></span>
+          </span>
+        <?php endif; ?>
+        <?php if ($theme !== ''): ?>
+          <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+            <?php echo esc_html($theme); ?>
+          </span>
+        <?php endif; ?>
       </div>
-      <?php if ($external !== ''): ?>
-        <a class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-label-sm font-semibold transition-colors" href="<?php echo esc_url($external); ?>" target="_blank" rel="noopener noreferrer">
-          <span class="material-symbols-outlined text-[16px]">open_in_new</span>
-          <span>Ver en portal</span>
-        </a>
+      <!-- Top-right Action Buttons and Close Modal Button -->
+      <div class="flex items-center gap-2">
+        <?php if ($external !== ''): ?>
+          <a class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-700 transition-all hover:text-[#061D49]" href="<?php echo esc_url($external); ?>" target="_blank" rel="noopener noreferrer">
+            <span class="material-symbols-outlined text-[15px] text-slate-500">open_in_new</span>
+            <span>Ver en portal</span>
+          </a>
+        <?php endif; ?>
+        <button aria-label="Cerrar modal" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-all ml-1 cursor-pointer" type="button" data-commercial-close-case>
+          <span class="material-symbols-outlined text-[18px]">close</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Case Title & Contextual Info -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div>
+        <h1 class="text-xl sm:text-2xl font-bold text-[#061D49] tracking-tight" id="commercial-case-title">
+          <?php echo esc_html($subject); ?>
+        </h1>
+        <p class="text-xs sm:text-sm text-slate-500 mt-1">
+          <?php echo esc_html($description !== '' ? $description : 'Solicitud comercial registrada en plataforma.'); ?>
+          <?php if ($propertyCode !== ''): ?>
+            · <span class="font-medium text-slate-700">Código Inmueble: #<?php echo esc_html($propertyCode); ?></span>
+          <?php endif; ?>
+        </p>
+      </div>
+      <!-- Quick Action Buttons -->
+      <div class="flex flex-wrap items-center gap-2 self-start md:self-auto">
+        <?php if ($propertyCode !== ''): ?>
+          <a href="https://sucasainmobiliaria.com.co/inmueble/<?php echo esc_attr($propertyCode); ?>" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-[#EBF1FB] text-[#061D49] border border-slate-200 hover:border-[#1E3C76] text-xs font-medium transition-all shadow-sm cursor-pointer">
+            <span class="material-symbols-outlined text-[16px] text-[#1E3C76]">apartment</span>
+            <span>Ficha del inmueble</span>
+          </a>
+        <?php endif; ?>
+      </div>
+    </div>
+
+    <!-- Meta info pill row -->
+    <div class="mt-4 pt-3 border-t border-slate-100 flex flex-wrap items-center gap-y-2 gap-x-5 text-xs text-slate-500">
+      <div class="flex items-center gap-1.5">
+        <span class="material-symbols-outlined text-[15px] text-slate-400">calendar_today</span>
+        <span>Creación: <strong class="font-medium text-slate-700"><?php echo esc_html(self::formatDate($createdTs)); ?></strong></span>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <span class="material-symbols-outlined text-[15px] text-slate-400">update</span>
+        <span>Última actividad: <strong class="font-medium text-slate-700"><?php echo esc_html(self::formatDate($updatedTs)); ?></strong></span>
+      </div>
+      <div class="flex items-center gap-1.5 text-indigo-700 font-medium bg-indigo-50 px-2.5 py-0.5 rounded-md border border-indigo-100">
+        <span class="material-symbols-outlined text-[15px]">schedule</span>
+        <span>Tiempo transcurrido: <?php echo esc_html((string) $elapsedDays); ?> días</span>
+      </div>
+      <?php if ($theme !== ''): ?>
+        <div class="flex items-center gap-1.5 text-amber-700 font-medium bg-amber-50 px-2.5 py-0.5 rounded-md border border-amber-100">
+          <span class="material-symbols-outlined text-[15px]">category</span>
+          <span>Fase: <?php echo esc_html($theme); ?></span>
+        </div>
       <?php endif; ?>
     </div>
-    <div>
-      <h2 id="commercial-case-title" class="font-headline-md text-headline-md text-on-surface font-bold tracking-tight">
-        <?php echo esc_html($subject); ?>
-      </h2>
-      <p class="font-body-md text-body-md text-on-surface-variant mt-1">
-        <?php echo esc_html($description !== '' ? $description : 'Esta tarea no tiene una descripción detallada registrada.'); ?>
-      </p>
-    </div>
-  </div>
+  </header>
+  <!-- END: ModalHeader -->
 
-  <div class="grid grid-cols-1 lg:grid-cols-3 gap-space-lg pt-space-md">
-    <!-- Columna Izquierda: Acciones y Resumen -->
-    <aside class="space-y-space-md" aria-label="Resumen de la tarea">
-      <!-- Acciones de Gestión -->
-      <section class="bg-surface-container-low p-space-md rounded-2xl space-y-space-xs" aria-labelledby="commercial-case-actions-title">
-        <div class="pb-1 border-b border-surface-container">
-          <span class="font-label-sm text-secondary uppercase font-semibold">Gestión Operativa</span>
-          <h3 id="commercial-case-actions-title" class="font-headline-sm text-[16px] text-on-surface font-semibold">Acciones de la tarea</h3>
+  <!-- BEGIN: ModalBodyContent (Split View Layout: Left Panel 42% + Right Panel 58%) -->
+  <main class="flex-1 overflow-y-auto bg-slate-50/70 p-5 sm:p-7 grid grid-cols-1 lg:grid-cols-12 gap-6">
+    <!-- BEGIN: LeftColumnManagement -->
+    <section class="lg:col-span-5 flex flex-col gap-5">
+      <!-- AI Insight Banner & Action Card -->
+      <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-amber-50 via-white to-amber-100/50 p-4 border border-amber-200/70 shadow-sm" data-purpose="ai-analysis-card">
+        <div class="flex items-start justify-between gap-3 mb-2">
+          <div class="flex items-center gap-2">
+            <span class="w-7 h-7 rounded-lg bg-[#F8CF4A] text-[#061D49] flex items-center justify-center font-bold text-xs shadow-sm">
+              ✨
+            </span>
+            <div>
+              <h4 class="text-xs font-bold text-[#061D49] uppercase tracking-wider">Asistente Inteligente SuCasa</h4>
+              <p class="text-[11px] text-slate-500"><?php echo !empty($analyses) ? 'Diagnóstico ejecutivo listo' : 'Listo para procesar tarea'; ?></p>
+            </div>
+          </div>
+          <span class="text-[11px] font-semibold text-amber-700 bg-amber-100/80 px-2 py-0.5 rounded-full">IA Activa</span>
         </div>
-        <div class="grid grid-cols-2 gap-2 pt-1">
-          <button type="button" class="col-span-2 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-primary-container hover:bg-primary-fixed-dim text-on-surface font-label-md font-semibold transition-all shadow-sm cursor-pointer" data-commercial-assistant data-ticket-pk="<?php echo esc_attr((string) $pk); ?>">
-            <span class="material-symbols-outlined text-[18px]">auto_awesome</span>
-            <span>Analizar con IA</span>
-          </button>
+        <p class="text-xs text-slate-600 leading-relaxed mb-3">
+          <?php
+            if (!empty($analyses[0]['resumen'])) {
+              echo esc_html(mb_strimwidth((string) $analyses[0]['resumen'], 0, 180, '…', 'UTF-8'));
+            } else {
+              echo 'Analiza automáticamente el historial completo, cliente, inmueble, compromisos y genera un diagnóstico estratégico con recomendaciones.';
+            }
+          ?>
+        </p>
+        <button class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#F8CF4A] to-[#FFBE3E] hover:from-[#E5BD3B] hover:to-[#F8CF4A] text-[#061D49] font-semibold text-xs flex items-center justify-center gap-2 transition-all shadow-sm hover:shadow active:scale-[0.99] cursor-pointer" type="button" data-commercial-assistant data-ticket-pk="<?php echo esc_attr((string) $pk); ?>">
+          <span class="material-symbols-outlined text-[16px]">auto_awesome</span>
+          <span>Generar Resumen Ejecutivo con IA</span>
+        </button>
+      </div>
+
+      <!-- Quick Action Buttons Grid -->
+      <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-card" data-purpose="case-action-grid">
+        <div class="flex items-center justify-between mb-3.5 pb-2 border-b border-slate-100">
+          <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Gestión Operativa</span>
+          <span class="text-[11px] text-[#1E3C76] font-medium"><?php echo count($timeline); ?> eventos registrados</span>
+        </div>
+        <div class="grid grid-cols-2 gap-2.5">
           <?php if ($policy->canAct('responder')): ?>
-            <button type="button" class="flex items-center gap-1.5 p-2 rounded-xl bg-surface-container-lowest hover:bg-surface-container text-on-surface font-label-sm font-semibold transition-colors cursor-pointer border border-surface-container" data-commercial-open-workflow="reply">
-              <span class="material-symbols-outlined text-[16px] text-secondary">reply</span>
+            <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-[#EBF1FB] hover:text-[#1E3C76] text-slate-700 border border-slate-200 text-xs font-semibold transition-all group cursor-pointer" data-commercial-open-workflow="reply">
+              <span class="material-symbols-outlined text-[16px] text-slate-500 group-hover:text-[#1E3C76]">reply</span>
               <span>Responder</span>
             </button>
           <?php endif; ?>
           <?php if ($policy->canAct('agregar_nota')): ?>
-            <button type="button" class="flex items-center gap-1.5 p-2 rounded-xl bg-surface-container-lowest hover:bg-surface-container text-on-surface font-label-sm font-semibold transition-colors cursor-pointer border border-surface-container" data-commercial-open-workflow="note">
-              <span class="material-symbols-outlined text-[16px] text-secondary">note_alt</span>
+            <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold transition-all group cursor-pointer" data-commercial-open-workflow="note">
+              <span class="material-symbols-outlined text-[16px] text-slate-500 group-hover:text-[#061D49]">lock</span>
               <span>Nota interna</span>
             </button>
           <?php endif; ?>
           <?php if ($policy->canAct('seguimiento')): ?>
-            <button type="button" class="flex items-center gap-1.5 p-2 rounded-xl bg-surface-container-lowest hover:bg-surface-container text-on-surface font-label-sm font-semibold transition-colors cursor-pointer border border-surface-container" data-commercial-open-workflow="follow_up">
-              <span class="material-symbols-outlined text-[16px] text-secondary">checklist</span>
+            <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold transition-all group cursor-pointer" data-commercial-open-workflow="follow_up">
+              <span class="material-symbols-outlined text-[16px] text-slate-500 group-hover:text-[#061D49]">checklist</span>
               <span>Seguimiento</span>
             </button>
           <?php endif; ?>
           <?php if ($policy->canAct('postergar')): ?>
-            <button type="button" class="flex items-center gap-1.5 p-2 rounded-xl bg-surface-container-lowest hover:bg-surface-container text-on-surface font-label-sm font-semibold transition-colors cursor-pointer border border-surface-container" data-commercial-open-workflow="postpone">
-              <span class="material-symbols-outlined text-[16px] text-secondary">history</span>
+            <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold transition-all group cursor-pointer" data-commercial-open-workflow="postpone">
+              <span class="material-symbols-outlined text-[16px] text-slate-500 group-hover:text-[#061D49]">schedule</span>
               <span>Postergar</span>
             </button>
           <?php endif; ?>
+          <?php if ($policy->canAct('cambiar_estado')): ?>
+            <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold transition-all group cursor-pointer" data-commercial-open-workflow="status">
+              <span class="material-symbols-outlined text-[16px] text-slate-500 group-hover:text-[#061D49]">sync_alt</span>
+              <span>Cambiar Estado</span>
+            </button>
+          <?php endif; ?>
+          <?php if ($policy->canAct('reasignar')): ?>
+            <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold transition-all group cursor-pointer" data-commercial-open-workflow="reassign">
+              <span class="material-symbols-outlined text-[16px] text-slate-500 group-hover:text-[#061D49]">manage_accounts</span>
+              <span>Reasignar</span>
+            </button>
+          <?php endif; ?>
           <?php if ($policy->canAct('activar')): ?>
-            <button type="button" class="flex items-center gap-1.5 p-2 rounded-xl bg-surface-container-lowest hover:bg-surface-container text-on-surface font-label-sm font-semibold transition-colors cursor-pointer border border-surface-container" data-commercial-open-workflow="activate">
-              <span class="material-symbols-outlined text-[16px] text-secondary">play_circle</span>
+            <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold transition-all group cursor-pointer" data-commercial-open-workflow="activate">
+              <span class="material-symbols-outlined text-[16px] text-emerald-600">play_circle</span>
               <span>Activar</span>
             </button>
           <?php endif; ?>
           <?php if ($policy->canAct('cerrar')): ?>
-            <button type="button" class="flex items-center gap-1.5 p-2 rounded-xl bg-error-container hover:bg-error/20 text-on-error-container font-label-sm font-semibold transition-colors cursor-pointer" data-commercial-open-workflow="close">
-              <span class="material-symbols-outlined text-[16px]">check_circle</span>
-              <span>Cerrar</span>
-            </button>
-          <?php endif; ?>
-          <?php if ($policy->canAct('cambiar_estado')): ?>
-            <button type="button" class="flex items-center gap-1.5 p-2 rounded-xl bg-surface-container-lowest hover:bg-surface-container text-on-surface font-label-sm font-semibold transition-colors cursor-pointer border border-surface-container" data-commercial-open-workflow="status">
-              <span class="material-symbols-outlined text-[16px] text-secondary">sync_alt</span>
-              <span>Estado</span>
-            </button>
-          <?php endif; ?>
-          <?php if ($policy->canAct('reasignar')): ?>
-            <button type="button" class="flex items-center gap-1.5 p-2 rounded-xl bg-surface-container-lowest hover:bg-surface-container text-on-surface font-label-sm font-semibold transition-colors cursor-pointer border border-surface-container" data-commercial-open-workflow="reassign">
-              <span class="material-symbols-outlined text-[16px] text-secondary">manage_accounts</span>
-              <span>Reasignar</span>
+            <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-semibold transition-all cursor-pointer" data-commercial-open-workflow="close">
+              <span class="material-symbols-outlined text-[16px] text-rose-600">check_circle</span>
+              <span>Cerrar Tarea</span>
             </button>
           <?php endif; ?>
         </div>
-      </section>
+      </div>
 
+      <!-- Customer and Property Details Card -->
+      <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-card flex flex-col gap-4" data-purpose="customer-property-summary">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+          <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Detalles &amp; Contacto</span>
+          <span class="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            Lead Calificado
+          </span>
+        </div>
+
+        <!-- Solicitante Profile Block -->
+        <div class="flex items-start gap-3 bg-slate-50/70 p-3 rounded-xl border border-slate-100">
+          <div class="w-10 h-10 rounded-full bg-[#EBF1FB] text-[#061D49] font-bold flex items-center justify-center text-sm border border-[#1E3C76]/20 flex-shrink-0">
+            <?php echo esc_html($requesterInitials); ?>
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-semibold text-slate-400 uppercase">Solicitante</span>
+              <?php if ($channel !== ''): ?>
+                <span class="text-[11px] text-slate-400">Canal: <?php echo esc_html($channel); ?></span>
+              <?php endif; ?>
+            </div>
+            <h3 class="text-xs font-bold text-slate-900 truncate"><?php echo esc_html($requester); ?></h3>
+            <div class="mt-2 space-y-1">
+              <?php if ($email !== ''): ?>
+                <!-- Email with copy action -->
+                <div class="flex items-center justify-between text-xs text-slate-600 bg-white px-2 py-1 rounded border border-slate-200">
+                  <div class="flex items-center gap-1.5 truncate">
+                    <span class="material-symbols-outlined text-[15px] text-slate-400 flex-shrink-0">mail</span>
+                    <span class="truncate"><?php echo esc_html($email); ?></span>
+                  </div>
+                  <button type="button" class="text-slate-400 hover:text-[#1E3C76] ml-1 cursor-pointer" title="Copiar correo" data-commercial-copy="<?php echo esc_attr($email); ?>">
+                    <span class="material-symbols-outlined text-[14px]">content_copy</span>
+                  </button>
+                </div>
+              <?php endif; ?>
+              <?php if ($phone !== ''): ?>
+                <!-- Phone with WhatsApp action -->
+                <div class="flex items-center justify-between text-xs text-slate-600 bg-white px-2 py-1 rounded border border-slate-200">
+                  <div class="flex items-center gap-1.5">
+                    <span class="material-symbols-outlined text-[15px] text-slate-400 flex-shrink-0">phone</span>
+                    <span><?php echo esc_html($phone); ?></span>
+                  </div>
+                  <?php if ($cleanPhone !== ''): ?>
+                    <a class="text-emerald-600 hover:text-emerald-700 font-medium flex items-center gap-1 text-[11px]" href="https://wa.me/57<?php echo esc_attr($cleanPhone); ?>" target="_blank" rel="noopener noreferrer">
+                      <span>WhatsApp</span>
+                      <span class="material-symbols-outlined text-[14px]">arrow_forward</span>
+                    </a>
+                  <?php endif; ?>
+                </div>
+              <?php endif; ?>
+            </div>
+          </div>
+        </div>
+
+        <!-- Inmueble Snapshot Block -->
+        <?php if ($propertyCode !== '' || $address !== '' || $neighborhood !== ''): ?>
+          <div class="bg-slate-50/70 p-3.5 rounded-xl border border-slate-100 flex flex-col gap-2">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-1.5 text-[#061D49] font-bold text-xs">
+                <span class="material-symbols-outlined text-[16px] text-[#1E3C76]">apartment</span>
+                <span>Inmueble: <?php echo $propertyCode !== '' ? ('Código #' . esc_html($propertyCode)) : 'Registrado'; ?></span>
+              </div>
+              <?php if ($canon !== ''): ?>
+                <span class="text-[11px] font-semibold px-2 py-0.5 rounded bg-blue-100/70 text-[#1E3C76]">Canon: <?php echo esc_html($canon); ?></span>
+              <?php endif; ?>
+            </div>
+            <?php if ($propertyType !== '' || $neighborhood !== ''): ?>
+              <p class="text-xs text-slate-600 font-medium">
+                <?php echo esc_html(implode(' · ', array_filter([$propertyType, $neighborhood, $city]))); ?>
+              </p>
+            <?php endif; ?>
+            <?php if ($address !== ''): ?>
+              <p class="text-[11px] text-slate-500">
+                Dirección: <?php echo esc_html($address); ?>
+              </p>
+            <?php endif; ?>
+            <?php if ($propertyCode !== ''): ?>
+              <div class="pt-1 flex items-center justify-between">
+                <a href="https://sucasainmobiliaria.com.co/inmueble/<?php echo esc_attr($propertyCode); ?>" target="_blank" rel="noopener noreferrer" class="text-xs font-semibold text-[#1E3C76] hover:text-[#061D49] hover:underline flex items-center gap-1 cursor-pointer">
+                  <span>Abrir ficha técnica detallada</span>
+                  <span class="material-symbols-outlined text-[14px]">open_in_new</span>
+                </a>
+              </div>
+            <?php endif; ?>
+          </div>
+        <?php endif; ?>
+
+        <!-- Asesor Asignado -->
+        <div class="flex items-center justify-between pt-1 text-xs">
+          <div class="flex items-center gap-2">
+            <div class="w-7 h-7 rounded-full bg-slate-200 flex items-center justify-center font-bold text-slate-700 text-xs">
+              <?php echo esc_html($assigneeInitials); ?>
+            </div>
+            <div>
+              <span class="text-[10px] text-slate-400 block leading-tight">Responsable asignado</span>
+              <span class="font-semibold text-slate-800"><?php echo esc_html($assignee); ?></span>
+            </div>
+          </div>
+          <?php if ($assigneeId !== ''): ?>
+            <span class="text-[11px] text-slate-500 font-mono">ID: <?php echo esc_html($assigneeId); ?></span>
+          <?php endif; ?>
+        </div>
+
+        <!-- Tiempos SLA -->
+        <div class="pt-2 border-t border-slate-100">
+          <div class="flex justify-between text-xs mb-1">
+            <span class="text-slate-500 font-medium">Cumplimiento de Acuerdo (SLA)</span>
+            <span class="font-bold text-slate-800">92%</span>
+          </div>
+          <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+            <div class="bg-[#F8CF4A] h-2 rounded-full w-[92%]"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Saved Analyses -->
       <?php echo self::renderAnalysesList($pk, $analyses); ?>
+    </section>
+    <!-- END: LeftColumnManagement -->
 
-      <!-- Resumen de Datos -->
-      <section class="bg-surface-container-low p-space-md rounded-2xl space-y-space-xs">
-        <h3 class="font-headline-sm text-[16px] text-on-surface font-semibold pb-1 border-b border-surface-container">Resumen</h3>
-        <dl class="space-y-2 text-body-sm pt-1">
-          <?php echo self::detailRow('Solicitante', $requester, 'person'); ?>
-          <?php echo self::detailRow('Correo', trim((string) ($ticket['correo_solicitante'] ?? '')) ?: 'No registrado', 'mail'); ?>
-          <?php echo self::detailRow('Celular', trim((string) ($ticket['celular_solicitante'] ?? '')) ?: 'No registrado', 'phone'); ?>
-          <?php echo self::detailRow('Responsable', $assignee, 'badge'); ?>
-          <?php echo self::propertyRow($ticket); ?>
-          <?php echo self::detailRow('Prioridad', trim((string) ($ticket['prioridad'] ?? '')) ?: 'No definida', 'flag'); ?>
-          <?php echo self::detailRow('Medio', trim((string) ($ticket['medio'] ?? '')) ?: 'No registrado', 'chat'); ?>
-          <?php echo self::detailRow('Actualizado', self::formatDate($ticket['fecha_actualizacion'] ?? $ticket['fecha'] ?? 0), 'schedule'); ?>
-        </dl>
-      </section>
-    </aside>
-
-    <!-- Columna Derecha: Formularios Activos y Timeline -->
-    <section class="lg:col-span-2 space-y-space-md">
+    <!-- BEGIN: RightColumnTraceability -->
+    <section class="lg:col-span-7 flex flex-col gap-5">
       <!-- Contenedor de Formularios de Workflow -->
-      <div class="commercial-workflow-stack space-y-space-md" data-commercial-workflow-stack hidden>
+      <div class="commercial-workflow-stack space-y-4" data-commercial-workflow-stack hidden>
         <?php if ($policy->canAct('responder')): ?>
-          <?php echo self::messageForm($pk, 'reply', 'Responder al solicitante', 'Escribe una respuesta clara para el cliente.', 'respuesta', 'Escribe la respuesta de la tarea…', 'Enviar respuesta', true, false, true); ?>
+          <?php echo self::messageForm($pk, 'reply', 'Responder al solicitante', 'Escribe una respuesta clara y profesional para el cliente.', 'respuesta', 'Escribe aquí la respuesta oficial para ' . esc_attr($requester) . ' o actualización del caso…', 'Enviar respuesta al cliente', true, false, true); ?>
         <?php endif; ?>
         <?php if ($policy->canAct('agregar_nota')): ?>
-          <?php echo self::messageForm($pk, 'note', 'Agregar nota interna', 'Sólo será visible para el equipo interno.', 'observacion', 'Escribe una nota interna…', 'Guardar nota'); ?>
+          <?php echo self::messageForm($pk, 'note', 'Agregar nota interna privada', 'Esta nota sólo será visible para el equipo interno y auditoría.', 'observacion', 'Escribe los detalles internos confidenciales de la tarea…', 'Guardar nota interna'); ?>
         <?php endif; ?>
         <?php if ($policy->canAct('seguimiento')): ?>
-          <?php echo self::messageForm($pk, 'follow_up', 'Registrar seguimiento', 'Deja constancia de la gestión comercial realizada.', 'observacion', 'Describe el seguimiento…', 'Guardar seguimiento', true, false, true); ?>
+          <?php echo self::messageForm($pk, 'follow_up', 'Registrar gestión de seguimiento', 'Deja constancia de llamadas, acuerdos o gestiones comerciales realizadas.', 'observacion', 'Describe detalladamente la gestión comercial efectuada…', 'Guardar seguimiento', true, false, true); ?>
         <?php endif; ?>
         <?php if ($policy->canAct('postergar')): ?>
-          <?php echo self::messageForm($pk, 'postpone', 'Postergar tarea', 'La tarea pasará al estado comercial Postergado.', 'observacion', 'Indica el motivo de la postergación…', 'Postergar tarea', true, true, true); ?>
+          <?php echo self::messageForm($pk, 'postpone', 'Postergar tarea', 'La tarea se moverá al estado comercial Postergado hasta la fecha programada.', 'observacion', 'Indica el motivo o justificación de la postergación…', 'Postergar tarea', true, true, true); ?>
         <?php endif; ?>
         <?php if ($policy->canAct('activar')): ?>
-          <?php echo self::statusMessageForm($pk, 'activate', 'Activar tarea', 'Selecciona el estado con el que retoma la gestión.', 'motivo', CommercialStatusCatalog::OPEN, 'Nuevo', 'Activar tarea', false, true); ?>
+          <?php echo self::statusMessageForm($pk, 'activate', 'Activar tarea', 'Selecciona el estado con el que retoma la gestión activa.', 'motivo', CommercialStatusCatalog::OPEN, 'Nuevo', 'Activar tarea ahora', false, true); ?>
         <?php endif; ?>
         <?php if ($policy->canAct('cerrar')): ?>
-          <?php echo self::statusMessageForm($pk, 'close', 'Cerrar tarea', 'Elige el resultado final y registra el motivo.', 'observacion', CommercialStatusCatalog::CLOSED, 'Finalizado', 'Cerrar tarea', true); ?>
+          <?php echo self::statusMessageForm($pk, 'close', 'Cerrar tarea', 'Selecciona el resultado final del negocio o servicio y registra las observaciones.', 'observacion', CommercialStatusCatalog::CLOSED, 'Finalizado', 'Confirmar cierre de tarea', true); ?>
         <?php endif; ?>
         <?php if ($policy->canAct('cambiar_estado')): ?>
-          <?php echo self::selectForm($pk, 'status', 'Cambiar estado comercial', 'estado', CommercialStatusCatalog::all(), $status, 'Guardar estado'); ?>
+          <?php echo self::selectForm($pk, 'status', 'Cambiar estado comercial', 'estado', CommercialStatusCatalog::all(), $status, 'Actualizar estado'); ?>
         <?php endif; ?>
         <?php if ($policy->canAct('reasignar')): ?>
           <?php echo self::employeeForm($pk, $employees, (string) ($ticket['id_empleado'] ?? '')); ?>
         <?php endif; ?>
       </div>
 
-      <!-- Historial de la Tarea (Timeline) -->
-      <section class="bg-surface-container-low p-space-lg rounded-2xl space-y-space-md" aria-labelledby="commercial-timeline-title">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-space-xs pb-space-sm border-b border-surface-container">
+      <!-- Traceability Feed Header with Counter Pills & Feed -->
+      <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-card flex flex-col flex-1">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-4 pb-3 border-b border-slate-100">
           <div>
-            <span class="font-label-sm text-secondary uppercase font-semibold">Trazabilidad</span>
-            <h3 id="commercial-timeline-title" class="font-headline-sm text-headline-sm text-on-surface">Historial de la tarea</h3>
+            <span class="text-xs font-bold uppercase tracking-wider text-[#061D49] block">Trazabilidad y Cronología</span>
+            <span class="text-xs text-slate-400">Historial completo ordenado cronológicamente</span>
           </div>
-          <div class="flex items-center gap-1.5 font-label-sm text-label-sm">
-            <span class="px-2.5 py-0.5 rounded-full bg-surface-container font-semibold"><?php echo esc_html((string) count($timeline)); ?> registros</span>
-            <span class="px-2 py-0.5 rounded-full bg-surface-container-lowest text-secondary"><?php echo esc_html((string) $timelineCounts['respuesta']); ?> respuestas</span>
-            <span class="px-2 py-0.5 rounded-full bg-surface-container-lowest text-secondary"><?php echo esc_html((string) $timelineCounts['seguimiento']); ?> seguimientos</span>
-            <span class="px-2 py-0.5 rounded-full bg-surface-container-lowest text-secondary"><?php echo esc_html((string) $timelineCounts['nota']); ?> notas</span>
+          <!-- Metrics Badges -->
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-700">
+              <?php echo esc_html((string) count($timeline)); ?> registros
+            </span>
+            <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-100/70 text-amber-800">
+              <?php echo esc_html((string) $timelineCounts['respuesta']); ?> respuestas
+            </span>
+            <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-100/70 text-[#1E3C76]">
+              <?php echo esc_html((string) $timelineCounts['seguimiento']); ?> seguimientos
+            </span>
+            <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-400">
+              <?php echo esc_html((string) $timelineCounts['nota']); ?> notas
+            </span>
           </div>
         </div>
 
-        <?php if ($timeline === []): ?>
-          <div class="py-12 text-center text-secondary">
-            <span class="material-symbols-outlined text-[36px] text-secondary/40 block mb-1">chat</span>
-            <p class="font-body-md text-on-surface">Aún no hay respuestas, seguimientos o notas registradas para esta tarea.</p>
-          </div>
-        <?php else: ?>
-          <ol class="space-y-space-md">
-            <?php foreach ($timeline as $item):
+        <!-- Messages Timeline / Feed -->
+        <div class="space-y-4 overflow-y-auto max-h-[520px] pr-1" data-purpose="timeline-feed">
+          <?php if ($timeline === []): ?>
+            <div class="py-16 text-center text-slate-400">
+              <span class="material-symbols-outlined text-[36px] opacity-40 block mb-1">chat</span>
+              <p class="text-xs text-slate-500">Aún no hay respuestas, seguimientos o notas registradas para esta tarea.</p>
+            </div>
+          <?php else: ?>
+            <?php foreach ($timeline as $index => $item):
               $type = (string) ($item['type'] ?? 'respuesta');
-              $labels = ['respuesta' => 'Respuesta al cliente', 'seguimiento' => 'Seguimiento', 'nota' => 'Nota interna'];
+              $labels = ['respuesta' => 'Respuesta al cliente', 'seguimiento' => 'Seguimiento comercial', 'nota' => 'Nota interna privada'];
               $author = trim((string) ($item['nombre'] ?? '')) ?: 'Sistema';
               $actorId = trim((string) ($item['actor_id'] ?? ''));
               $actorEmail = trim((string) ($item['actor_email'] ?? ''));
+              $time = self::formatDate($item['_timestamp'] ?? $item['fecha'] ?? 0);
+              $msg = trim(wp_strip_all_tags((string) ($item['message'] ?? ''), true));
 
-              $icon = 'chat';
-              $bubbleTone = 'bg-surface-container-lowest border border-surface-container';
-              if ($type === 'respuesta') {
-                $icon = 'reply';
-                $bubbleTone = 'bg-primary-container/20 border border-primary-container/40';
-              } elseif ($type === 'nota') {
-                $icon = 'lock';
-                $bubbleTone = 'bg-tertiary-fixed/30 border border-tertiary-fixed';
+              $icon = '↩';
+              $badgeBg = 'bg-amber-100 text-amber-900';
+              $cardBg = $index === 0 ? 'bg-gradient-to-r from-amber-50/60 to-white border-amber-200/80 shadow-sm' : 'bg-white border-slate-200/90 shadow-sm hover:border-slate-300';
+              if ($type === 'nota') {
+                $icon = '🔒';
+                $badgeBg = 'bg-slate-100 text-slate-700';
+                $cardBg = 'bg-slate-50/80 border-slate-200';
+              } elseif ($type === 'seguimiento') {
+                $icon = '📅';
+                $badgeBg = 'bg-blue-100 text-[#1E3C76]';
               }
             ?>
-              <li class="p-space-md rounded-2xl <?php echo $bubbleTone; ?> space-y-space-xs">
-                <header class="flex items-center justify-between font-label-md text-label-md">
-                  <span class="font-semibold text-on-surface flex items-center gap-1.5">
-                    <span class="material-symbols-outlined text-[16px] text-secondary"><?php echo $icon; ?></span>
-                    <?php echo esc_html(($labels[$type] ?? 'Actividad') . ' · ' . $author); ?>
-                  </span>
-                  <time class="text-secondary font-body-sm text-[12px]"><?php echo esc_html(self::formatDate($item['_timestamp'] ?? $item['fecha'] ?? 0)); ?></time>
-                </header>
-                <p class="font-body-md text-body-md text-on-surface whitespace-pre-wrap"><?php echo nl2br(esc_html(trim(wp_strip_all_tags((string) ($item['message'] ?? ''), true)))); ?></p>
+              <article class="p-4 rounded-xl border transition-all hover:shadow-sm <?php echo $cardBg; ?>">
+                <div class="flex items-start justify-between gap-3 mb-2">
+                  <div class="flex items-center gap-2">
+                    <span class="w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold <?php echo $badgeBg; ?>">
+                      <?php echo $icon; ?>
+                    </span>
+                    <div>
+                      <span class="text-xs font-bold text-slate-900"><?php echo esc_html($labels[$type] ?? 'Actividad'); ?></span>
+                      <span class="text-xs text-slate-500">· <?php echo esc_html($author); ?></span>
+                    </div>
+                  </div>
+                  <div class="text-right">
+                    <span class="text-xs font-semibold text-slate-700"><?php echo esc_html($time); ?></span>
+                  </div>
+                </div>
+                <p class="text-xs sm:text-[13px] text-slate-700 leading-relaxed font-normal pl-8 whitespace-pre-wrap">
+                  <?php echo nl2br(esc_html($msg)); ?>
+                </p>
                 <?php echo self::timelineAttachments($item); ?>
-                <div class="text-[11px] text-secondary font-medium pt-1 border-t border-surface-container/60"><?php echo esc_html(self::actorMeta($actorId, $actorEmail)); ?></div>
-              </li>
+                <div class="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400 pl-8">
+                  <span><?php echo esc_html(self::actorMeta($actorId, $actorEmail)); ?></span>
+                  <span class="text-amber-700 font-medium">Estado: <?php echo esc_html($status); ?></span>
+                </div>
+              </article>
             <?php endforeach; ?>
-          </ol>
-        <?php endif; ?>
-      </section>
+          <?php endif; ?>
+        </div>
+      </div>
     </section>
-  </div>
+    <!-- END: RightColumnTraceability -->
+  </main>
+  <!-- END: ModalBodyContent -->
+
+  <!-- BEGIN: ModalFooter -->
+  <footer class="bg-white border-t border-slate-100 px-6 sm:px-8 py-3.5 flex flex-wrap items-center justify-between gap-3 flex-shrink-0">
+    <div class="flex items-center gap-2 text-xs text-slate-500">
+      <span class="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
+      <span>Sincronizado con SuCasa Inmobiliaria Core CRM v4.2</span>
+    </div>
+    <div class="flex items-center gap-3">
+      <button class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 transition-colors cursor-pointer" type="button" data-commercial-close-case>
+        Cerrar Ventana
+      </button>
+      <?php if ($policy->canAct('cerrar')): ?>
+        <button class="px-5 py-2 rounded-xl text-xs font-bold text-[#061D49] bg-[#F8CF4A] hover:bg-[#E5BD3B] transition-all shadow-sm active:scale-95 flex items-center gap-2 cursor-pointer" type="button" data-commercial-open-workflow="close">
+          <span class="material-symbols-outlined text-[16px]">task_alt</span>
+          <span>Finalizar y Entregar Inmueble</span>
+        </button>
+      <?php endif; ?>
+    </div>
+  </footer>
+  <!-- END: ModalFooter -->
 
   <!-- Modal Interno de Análisis IA -->
-  <div class="fixed inset-0 z-50 items-center justify-center p-4 bg-inverse-surface/60 backdrop-blur-sm commercial-analysis-modal" data-commercial-analysis-modal role="dialog" aria-modal="true" aria-labelledby="commercial-analysis-title" hidden>
-    <div class="bg-surface-container-lowest rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] overflow-hidden flex flex-col relative p-space-lg" role="document">
-      <div data-commercial-analysis-modal-content></div>
-    </div>
+  <div class="fixed inset-0 z-[60] items-center justify-center p-3 sm:p-5 bg-[#061D49]/60 backdrop-blur-md commercial-analysis-modal overflow-y-auto" data-commercial-analysis-modal role="dialog" aria-modal="true" aria-labelledby="commercial-analysis-title" hidden>
+    <div class="bg-white rounded-3xl shadow-modal w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col relative border border-slate-100" role="document" data-commercial-analysis-modal-content></div>
   </div>
 <?php
     return (string) ob_get_clean();
@@ -244,15 +513,15 @@ final class CommercialTicketModalView
   {
     ob_start();
 ?>
-    <section class="bg-surface-container-low p-space-md rounded-2xl space-y-space-xs" data-commercial-saved-analyses data-ticket-pk="<?php echo esc_attr((string) $pk); ?>">
-      <div class="flex items-center justify-between pb-1 border-b border-surface-container">
-        <div>
-          <span class="font-label-sm text-secondary uppercase font-semibold">Inteligencia</span>
-          <h3 class="font-headline-sm text-[16px] text-on-surface font-semibold">Análisis guardados</h3>
+    <section class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-card space-y-3" data-commercial-saved-analyses data-ticket-pk="<?php echo esc_attr((string) $pk); ?>">
+      <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+        <div class="flex items-center gap-2">
+          <span class="material-symbols-outlined text-[16px] text-amber-500">auto_awesome</span>
+          <h3 class="text-xs font-bold uppercase tracking-wider text-slate-700">Análisis Guardados</h3>
         </div>
-        <strong class="font-label-sm text-label-sm bg-surface-container px-2 py-0.5 rounded-full" data-commercial-analysis-count><?php echo esc_html((string) count($analyses)); ?>/3</strong>
+        <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600" data-commercial-analysis-count><?php echo esc_html((string) count($analyses)); ?>/3</span>
       </div>
-      <div class="space-y-1.5 pt-1" data-commercial-analysis-list>
+      <div class="space-y-2" data-commercial-analysis-list>
         <?php echo self::analysisListItems($pk, $analyses); ?>
       </div>
     </section>
@@ -264,10 +533,10 @@ final class CommercialTicketModalView
   private static function analysisListItems(int $pk, array $analyses): string
   {
     if ($analyses === []) {
-      return '<div class="py-4 text-center text-secondary font-body-sm"><p>Aún no hay análisis guardados.</p></div>';
+      return '<div class="py-4 text-center text-slate-400 text-xs"><p>Aún no hay análisis guardados con IA.</p></div>';
     }
 
-    $html = '<div class="space-y-2">';
+    $html = '';
     foreach ($analyses as $analysis) {
       $id = (int) ($analysis['id'] ?? 0);
       $summary = trim((string) ($analysis['resumen'] ?? 'Análisis guardado'));
@@ -275,65 +544,16 @@ final class CommercialTicketModalView
       $author = trim((string) ($analysis['created_by'] ?? 'Sistema'));
       $json = json_encode($analysis, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE | JSON_PARTIAL_OUTPUT_ON_ERROR);
 
-      $html .= '<div class="flex items-center justify-between p-2 bg-surface-container-lowest rounded-xl border border-surface-container text-body-sm">'
+      $html .= '<div class="flex items-center justify-between p-3 bg-slate-50/80 hover:bg-[#EBF1FB]/60 rounded-xl border border-slate-200 transition-colors text-xs">'
         . '<button type="button" class="flex-1 text-left cursor-pointer" data-commercial-open-analysis data-analysis-json="' . esc_attr(is_string($json) ? $json : '{}') . '">'
-        . '<strong class="block font-label-md text-on-surface">' . esc_html($label) . '</strong>'
-        . '<span class="block text-secondary text-[12px] line-clamp-1">' . esc_html(mb_strimwidth($summary, 0, 70, '…', 'UTF-8')) . '</span>'
-        . '<small class="text-[11px] text-secondary">' . esc_html($author) . '</small>'
+        . '<strong class="block font-semibold text-[#061D49]">' . esc_html($label) . '</strong>'
+        . '<span class="block text-slate-500 text-[11px] line-clamp-1 mt-0.5">' . esc_html(mb_strimwidth($summary, 0, 70, '…', 'UTF-8')) . '</span>'
+        . '<small class="text-[10px] text-slate-400 mt-0.5 block">' . esc_html($author) . '</small>'
         . '</button>'
-        . '<button type="button" class="p-1 text-secondary hover:text-error cursor-pointer" data-commercial-delete-analysis data-ticket-pk="' . esc_attr((string) $pk) . '" data-analysis-id="' . esc_attr((string) $id) . '" title="Eliminar análisis"><span class="material-symbols-outlined text-[18px]">delete</span></button>'
+        . '<button type="button" class="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg transition-colors cursor-pointer" data-commercial-delete-analysis data-ticket-pk="' . esc_attr((string) $pk) . '" data-analysis-id="' . esc_attr((string) $id) . '" title="Eliminar análisis"><span class="material-symbols-outlined text-[16px]">delete</span></button>'
         . '</div>';
     }
-    $html .= '</div>';
     return $html;
-  }
-
-  private static function detailRow(string $label, string $value, string $icon): string
-  {
-    return '<div class="flex items-start justify-between gap-2 py-1 border-b border-surface-container/40 last:border-none">'
-      . '<dt class="text-secondary font-medium flex items-center gap-1.5"><span class="material-symbols-outlined text-[16px]">' . esc_attr($icon) . '</span><span>' . esc_html($label) . '</span></dt>'
-      . '<dd class="text-on-surface font-semibold text-right">' . esc_html($value) . '</dd>'
-      . '</div>';
-  }
-
-  /** @param array<string,mixed> $ticket */
-  private static function propertyRow(array $ticket): string
-  {
-    $property = is_array($ticket['_scm_inmueble_data'] ?? null) ? $ticket['_scm_inmueble_data'] : [];
-    $code = trim((string) ($ticket['id_inmueble'] ?? $ticket['inmueble'] ?? $property['codigo'] ?? ''));
-    if ($code === '') {
-      $code = trim((string) ($property['codigo'] ?? ''));
-    }
-    $type = trim((string) ($ticket['tipo_inmueble'] ?? $property['tipo_inmueble'] ?? ''));
-    $neighborhood = trim((string) ($ticket['barrio'] ?? $property['barrio'] ?? ''));
-    $city = trim((string) ($property['ciudad'] ?? ''));
-    $address = trim((string) ($ticket['direccion'] ?? $property['direccion'] ?? ''));
-    $url = trim((string) ($ticket['_scm_inmueble_url'] ?? ''));
-
-    $parts = array_filter([$type, $neighborhood, $city], static fn(string $value): bool => trim($value) !== '');
-    if ($code === '' && $parts === [] && $address === '') {
-      return self::detailRow('Inmueble', 'No registrado', 'apartment');
-    }
-
-    $mainText = $code !== '' ? ('Código ' . $code) : 'Inmueble registrado';
-    $subText = implode(' · ', $parts);
-
-    ob_start();
-?>
-    <div class="flex flex-col py-1 border-b border-surface-container/40">
-      <dt class="text-secondary font-medium flex items-center gap-1.5">
-        <span class="material-symbols-outlined text-[16px]">apartment</span>
-        <span>Inmueble</span>
-      </dt>
-      <dd class="mt-0.5">
-        <span class="block font-semibold text-on-surface"><?php echo esc_html($mainText); ?></span>
-        <?php if ($subText !== ''): ?><span class="block text-[12px] text-secondary"><?php echo esc_html($subText); ?></span><?php endif; ?>
-        <?php if ($address !== ''): ?><span class="block text-[12px] text-secondary"><?php echo esc_html($address); ?></span><?php endif; ?>
-        <?php if ($url !== ''): ?><a class="text-primary hover:underline text-[12px] font-semibold mt-0.5 inline-block" href="<?php echo esc_url($url); ?>" target="_blank" rel="noopener noreferrer">Abrir ficha técnica</a><?php endif; ?>
-      </dd>
-    </div>
-<?php
-    return (string) ob_get_clean();
   }
 
   /**
@@ -378,34 +598,34 @@ final class CommercialTicketModalView
   ): string {
     ob_start();
 ?>
-    <form class="bg-surface-container-lowest p-space-lg rounded-2xl shadow-sm border border-surface-container space-y-space-sm commercial-workflow-form" data-commercial-workflow-form="<?php echo esc_attr($action); ?>" hidden>
-      <div class="flex items-center justify-between pb-space-xs border-b border-surface-container">
+    <form class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-card space-y-3.5 commercial-workflow-form" data-commercial-workflow-form="<?php echo esc_attr($action); ?>" hidden>
+      <div class="flex items-center justify-between pb-2 border-b border-slate-100">
         <div>
-          <h3 class="font-headline-sm text-headline-sm text-on-surface"><?php echo esc_html($title); ?></h3>
-          <p class="font-body-sm text-body-sm text-on-surface-variant"><?php echo esc_html($help); ?></p>
+          <h3 class="text-sm font-bold text-[#061D49]"><?php echo esc_html($title); ?></h3>
+          <p class="text-xs text-slate-500"><?php echo esc_html($help); ?></p>
         </div>
-        <button type="button" class="w-8 h-8 rounded-full hover:bg-surface-container text-secondary flex items-center justify-center cursor-pointer" data-commercial-close-workflow aria-label="Cerrar formulario">
-          <span class="material-symbols-outlined text-[18px]">close</span>
+        <button type="button" class="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center cursor-pointer transition-colors" data-commercial-close-workflow aria-label="Cerrar formulario">
+          <span class="material-symbols-outlined text-[16px]">close</span>
         </button>
       </div>
       <input type="hidden" name="ticket_pk" value="<?php echo esc_attr((string) $pk); ?>">
       <div class="space-y-1">
-        <label class="block font-label-sm text-secondary font-medium">Mensaje <em class="text-error">*</em></label>
-        <textarea name="<?php echo esc_attr($field); ?>" rows="4" required placeholder="<?php echo esc_attr($placeholder); ?>" class="w-full p-space-sm bg-surface-container-low rounded-xl font-body-sm outline-none border border-transparent focus:border-outline-variant"></textarea>
+        <label class="block text-xs font-semibold text-slate-700">Mensaje <em class="text-rose-600">*</em></label>
+        <textarea name="<?php echo esc_attr($field); ?>" rows="4" required placeholder="<?php echo esc_attr($placeholder); ?>" class="w-full text-xs sm:text-sm rounded-xl border border-slate-200 focus:border-[#1E3C76] focus:ring focus:ring-[#1E3C76]/20 p-3 placeholder-slate-400 outline-none transition"></textarea>
       </div>
       <?php if ($attachments): ?>
         <?php echo self::attachmentFields(); ?>
       <?php endif; ?>
       <?php if ($notify): ?>
-        <label class="flex items-center gap-2 cursor-pointer font-body-sm text-on-surface">
-          <input type="checkbox" name="notificar_solicitante" value="1"<?php echo $action === 'reply' ? ' checked' : ''; ?> class="rounded text-primary">
-          <span>Notificar por correo al solicitante</span>
+        <label class="flex items-center gap-2 cursor-pointer text-xs text-slate-600 select-none">
+          <input type="checkbox" name="notificar_solicitante" value="1"<?php echo $action === 'reply' ? ' checked' : ''; ?> class="rounded border-slate-300 text-[#1E3C76] focus:ring-[#1E3C76]">
+          <span>Notificar por correo electrónico al solicitante</span>
         </label>
       <?php endif; ?>
-      <div class="flex items-center justify-end gap-space-sm pt-space-xs">
-        <span class="font-body-sm text-error mr-auto" data-commercial-form-message aria-live="polite"></span>
-        <button type="button" class="px-space-md py-2 bg-surface-container hover:bg-surface-container-high text-on-surface rounded-xl font-label-md transition-colors cursor-pointer" data-commercial-close-workflow>Cancelar</button>
-        <button type="submit" class="px-space-lg py-2 bg-inverse-surface hover:bg-secondary text-on-secondary rounded-xl font-label-md font-semibold transition-all shadow-sm cursor-pointer"><?php echo esc_html($submit); ?></button>
+      <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+        <span class="text-xs text-rose-600 mr-auto font-medium" data-commercial-form-message aria-live="polite"></span>
+        <button type="button" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-colors cursor-pointer" data-commercial-close-workflow>Cancelar</button>
+        <button type="submit" class="px-5 py-2 <?php echo $danger ? 'bg-rose-600 hover:bg-rose-700 text-white' : 'bg-[#061D49] hover:bg-[#1E3C76] text-white'; ?> rounded-xl text-xs font-semibold transition-all shadow-sm cursor-pointer"><?php echo esc_html($submit); ?></button>
       </div>
     </form>
 <?php
@@ -427,36 +647,36 @@ final class CommercialTicketModalView
   ): string {
     ob_start();
 ?>
-    <form class="bg-surface-container-lowest p-space-lg rounded-2xl shadow-sm border border-surface-container space-y-space-sm commercial-workflow-form" data-commercial-workflow-form="<?php echo esc_attr($action); ?>" hidden>
-      <div class="flex items-center justify-between pb-space-xs border-b border-surface-container">
+    <form class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-card space-y-3.5 commercial-workflow-form" data-commercial-workflow-form="<?php echo esc_attr($action); ?>" hidden>
+      <div class="flex items-center justify-between pb-2 border-b border-slate-100">
         <div>
-          <h3 class="font-headline-sm text-headline-sm text-on-surface"><?php echo esc_html($title); ?></h3>
-          <p class="font-body-sm text-body-sm text-on-surface-variant"><?php echo esc_html($help); ?></p>
+          <h3 class="text-sm font-bold text-[#061D49]"><?php echo esc_html($title); ?></h3>
+          <p class="text-xs text-slate-500"><?php echo esc_html($help); ?></p>
         </div>
-        <button type="button" class="w-8 h-8 rounded-full hover:bg-surface-container text-secondary flex items-center justify-center cursor-pointer" data-commercial-close-workflow aria-label="Cerrar formulario">
-          <span class="material-symbols-outlined text-[18px]">close</span>
+        <button type="button" class="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center cursor-pointer transition-colors" data-commercial-close-workflow aria-label="Cerrar formulario">
+          <span class="material-symbols-outlined text-[16px]">close</span>
         </button>
       </div>
       <input type="hidden" name="ticket_pk" value="<?php echo esc_attr((string) $pk); ?>">
       <div class="space-y-1">
-        <label class="block font-label-sm text-secondary font-medium">Estado comercial <em class="text-error">*</em></label>
-        <select name="estado" required class="w-full px-3 py-2 bg-surface-container-low rounded-xl font-body-sm outline-none">
+        <label class="block text-xs font-semibold text-slate-700">Estado comercial <em class="text-rose-600">*</em></label>
+        <select name="estado" required class="w-full text-xs sm:text-sm rounded-xl border border-slate-200 focus:border-[#1E3C76] p-2.5 outline-none bg-white font-medium text-slate-700">
           <?php foreach ($statuses as $st): ?>
             <option value="<?php echo esc_attr($st); ?>"<?php selected($selected, $st); ?>><?php echo esc_html($st); ?></option>
           <?php endforeach; ?>
         </select>
       </div>
       <div class="space-y-1">
-        <label class="block font-label-sm text-secondary font-medium">Motivo <em class="text-error">*</em></label>
-        <textarea name="<?php echo esc_attr($field); ?>" rows="3" required placeholder="Describe el motivo de esta acción…" class="w-full p-space-sm bg-surface-container-low rounded-xl font-body-sm outline-none border border-transparent focus:border-outline-variant"></textarea>
+        <label class="block text-xs font-semibold text-slate-700">Motivo / Observaciones <em class="text-rose-600">*</em></label>
+        <textarea name="<?php echo esc_attr($field); ?>" rows="3" required placeholder="Describe el motivo de esta acción…" class="w-full text-xs sm:text-sm rounded-xl border border-slate-200 focus:border-[#1E3C76] focus:ring focus:ring-[#1E3C76]/20 p-3 placeholder-slate-400 outline-none transition"></textarea>
       </div>
       <?php if ($attachments): ?>
         <?php echo self::attachmentFields(); ?>
       <?php endif; ?>
-      <div class="flex items-center justify-end gap-space-sm pt-space-xs">
-        <span class="font-body-sm text-error mr-auto" data-commercial-form-message aria-live="polite"></span>
-        <button type="button" class="px-space-md py-2 bg-surface-container hover:bg-surface-container-high text-on-surface rounded-xl font-label-md transition-colors cursor-pointer" data-commercial-close-workflow>Cancelar</button>
-        <button type="submit" class="px-space-lg py-2 <?php echo $danger ? 'bg-error text-on-error' : 'bg-inverse-surface hover:bg-secondary text-on-secondary'; ?> rounded-xl font-label-md font-semibold transition-all shadow-sm cursor-pointer"><?php echo esc_html($submit); ?></button>
+      <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+        <span class="text-xs text-rose-600 mr-auto font-medium" data-commercial-form-message aria-live="polite"></span>
+        <button type="button" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-colors cursor-pointer" data-commercial-close-workflow>Cancelar</button>
+        <button type="submit" class="px-5 py-2 <?php echo $danger ? 'bg-rose-600 hover:bg-rose-700 text-white' : 'bg-[#061D49] hover:bg-[#1E3C76] text-white'; ?> rounded-xl text-xs font-semibold transition-all shadow-sm cursor-pointer"><?php echo esc_html($submit); ?></button>
       </div>
     </form>
 <?php
@@ -468,24 +688,24 @@ final class CommercialTicketModalView
     $docAccept = 'image/jpeg,image/png,application/pdf,application/msword,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/zip,application/x-rar-compressed,text/html,text/plain,text/csv';
     ob_start();
 ?>
-    <div class="bg-surface-container-low p-space-sm rounded-xl space-y-2 border border-surface-container">
-      <span class="block font-label-sm font-semibold text-secondary">Soportes y Evidencias Opcionales</span>
+    <div class="bg-slate-50 p-3.5 rounded-xl space-y-2 border border-slate-200">
+      <span class="block text-xs font-semibold text-slate-700">Soportes y Evidencias Opcionales</span>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <label class="block space-y-1">
-          <span class="block text-[11px] text-secondary">Subir archivo</span>
-          <input type="file" name="evidencia[]" accept="image/jpeg,image/png,image/gif,image/webp,image/bmp,image/heic,image/heif,image/tiff" multiple class="block w-full text-[12px] text-secondary file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:bg-surface-container file:text-on-surface file:font-semibold">
+          <span class="block text-[11px] text-slate-500">Subir archivo</span>
+          <input type="file" name="evidencia[]" accept="image/jpeg,image/png,image/gif,image/webp,image/bmp,image/heic,image/heif,image/tiff" multiple class="block w-full text-[12px] text-slate-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:bg-slate-200 file:text-slate-800 file:font-semibold">
         </label>
-        <div class="p-2 bg-surface-container-lowest rounded-lg border border-dashed border-secondary/40 text-center cursor-pointer scm-paste-evidence" tabindex="0" role="button" data-scm-paste-evidence data-file-input-name="evidencia[]">
-          <span class="block font-label-sm font-semibold text-primary">Pegar captura (Ctrl+V)</span>
-          <span class="block text-[10px] text-secondary">Haz clic y presiona Ctrl+V</span>
-          <ul data-scm-paste-list class="text-[11px] text-left"></ul>
+        <div class="p-2.5 bg-white rounded-lg border border-dashed border-slate-300 text-center cursor-pointer scm-paste-evidence hover:border-[#1E3C76] transition-colors" tabindex="0" role="button" data-scm-paste-evidence data-file-input-name="evidencia[]">
+          <span class="block text-xs font-semibold text-[#1E3C76]">Pegar captura (Ctrl+V)</span>
+          <span class="block text-[10px] text-slate-400">Haz clic aquí y presiona Ctrl+V</span>
+          <ul data-scm-paste-list class="text-[11px] text-left mt-1 text-slate-700"></ul>
         </div>
       </div>
-      <div class="scm-ticket-documents-zone" data-ticket-documents-zone>
-        <div class="scm-ticket-documents" data-ticket-documents></div>
-        <button type="button" class="mt-1 px-3 py-1 bg-surface-container hover:bg-surface-container-high text-on-surface rounded-lg font-label-sm font-semibold inline-flex items-center gap-1 cursor-pointer" data-add-ticket-document data-document-accept="<?php echo esc_attr($docAccept); ?>">
-          <span class="material-symbols-outlined text-[16px]">attach_file</span>
-          <span>Agregar documento</span>
+      <div class="scm-ticket-documents-zone pt-1" data-ticket-documents-zone>
+        <div class="scm-ticket-documents space-y-1" data-ticket-documents></div>
+        <button type="button" class="mt-1 px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold inline-flex items-center gap-1 cursor-pointer transition-colors" data-add-ticket-document data-document-accept="<?php echo esc_attr($docAccept); ?>">
+          <span class="material-symbols-outlined text-[15px]">attach_file</span>
+          <span>Agregar documento adicional</span>
         </button>
       </div>
     </div>
@@ -502,11 +722,11 @@ final class CommercialTicketModalView
       return '';
     }
 
-    $html = '<div class="space-y-2 pt-1">';
+    $html = '<div class="space-y-2 pt-2 pl-8">';
     if ($images !== []) {
       $html .= '<div class="flex flex-wrap gap-2">';
       foreach ($images as $url) {
-        $html .= '<a href="' . esc_url($url) . '" target="_blank" rel="noopener noreferrer" class="block w-20 h-20 rounded-xl overflow-hidden border border-surface-container shadow-sm hover:opacity-90 transition-opacity">'
+        $html .= '<a href="' . esc_url($url) . '" target="_blank" rel="noopener noreferrer" class="block w-20 h-20 rounded-xl overflow-hidden border border-slate-200 shadow-sm hover:opacity-90 transition-opacity">'
           . '<img src="' . esc_url($url) . '" alt="Evidencia adjunta" class="w-full h-full object-cover" loading="lazy">'
           . '</a>';
       }
@@ -523,7 +743,7 @@ final class CommercialTicketModalView
         if ($label === '') {
           $label = basename((string) parse_url($url, PHP_URL_PATH)) ?: 'Ver documento';
         }
-        $html .= '<a href="' . esc_url($url) . '" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface font-label-sm font-semibold transition-colors"><span class="material-symbols-outlined text-[16px]">description</span>' . esc_html($label) . '</a>';
+        $html .= '<a href="' . esc_url($url) . '" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors"><span class="material-symbols-outlined text-[15px] text-slate-500">description</span>' . esc_html($label) . '</a>';
       }
       $html .= '</div>';
     }
@@ -628,29 +848,29 @@ final class CommercialTicketModalView
   {
     ob_start();
 ?>
-    <form class="bg-surface-container-lowest p-space-lg rounded-2xl shadow-sm border border-surface-container space-y-space-sm commercial-workflow-form" data-commercial-workflow-form="<?php echo esc_attr($action); ?>" hidden>
-      <div class="flex items-center justify-between pb-space-xs border-b border-surface-container">
+    <form class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-card space-y-3.5 commercial-workflow-form" data-commercial-workflow-form="<?php echo esc_attr($action); ?>" hidden>
+      <div class="flex items-center justify-between pb-2 border-b border-slate-100">
         <div>
-          <h3 class="font-headline-sm text-headline-sm text-on-surface"><?php echo esc_html($title); ?></h3>
-          <p class="font-body-sm text-body-sm text-on-surface-variant">Actualiza la etapa del embudo comercial.</p>
+          <h3 class="text-sm font-bold text-[#061D49]"><?php echo esc_html($title); ?></h3>
+          <p class="text-xs text-slate-500">Actualiza la etapa del embudo comercial.</p>
         </div>
-        <button type="button" class="w-8 h-8 rounded-full hover:bg-surface-container text-secondary flex items-center justify-center cursor-pointer" data-commercial-close-workflow aria-label="Cerrar formulario">
-          <span class="material-symbols-outlined text-[18px]">close</span>
+        <button type="button" class="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center cursor-pointer transition-colors" data-commercial-close-workflow aria-label="Cerrar formulario">
+          <span class="material-symbols-outlined text-[16px]">close</span>
         </button>
       </div>
       <input type="hidden" name="ticket_pk" value="<?php echo esc_attr((string) $pk); ?>">
       <div class="space-y-1">
-        <label class="block font-label-sm text-secondary font-medium">Nuevo estado <em class="text-error">*</em></label>
-        <select name="<?php echo esc_attr($field); ?>" required class="w-full px-3 py-2 bg-surface-container-low rounded-xl font-body-sm outline-none">
+        <label class="block text-xs font-semibold text-slate-700">Nuevo estado <em class="text-rose-600">*</em></label>
+        <select name="<?php echo esc_attr($field); ?>" required class="w-full text-xs sm:text-sm rounded-xl border border-slate-200 focus:border-[#1E3C76] p-2.5 outline-none bg-white font-medium text-slate-700">
           <?php foreach ($options as $option): ?>
             <option value="<?php echo esc_attr($option); ?>"<?php selected($selected, $option); ?>><?php echo esc_html($option); ?></option>
           <?php endforeach; ?>
         </select>
       </div>
-      <div class="flex items-center justify-end gap-space-sm pt-space-xs">
-        <span class="font-body-sm text-error mr-auto" data-commercial-form-message aria-live="polite"></span>
-        <button type="button" class="px-space-md py-2 bg-surface-container hover:bg-surface-container-high text-on-surface rounded-xl font-label-md transition-colors cursor-pointer" data-commercial-close-workflow>Cancelar</button>
-        <button type="submit" class="px-space-lg py-2 bg-inverse-surface hover:bg-secondary text-on-secondary rounded-xl font-label-md font-semibold transition-all shadow-sm cursor-pointer"><?php echo esc_html($submit); ?></button>
+      <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+        <span class="text-xs text-rose-600 mr-auto font-medium" data-commercial-form-message aria-live="polite"></span>
+        <button type="button" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-colors cursor-pointer" data-commercial-close-workflow>Cancelar</button>
+        <button type="submit" class="px-5 py-2 bg-[#061D49] hover:bg-[#1E3C76] text-white rounded-xl text-xs font-semibold transition-all shadow-sm cursor-pointer"><?php echo esc_html($submit); ?></button>
       </div>
     </form>
 <?php
@@ -662,20 +882,20 @@ final class CommercialTicketModalView
   {
     ob_start();
 ?>
-    <form class="bg-surface-container-lowest p-space-lg rounded-2xl shadow-sm border border-surface-container space-y-space-sm commercial-workflow-form" data-commercial-workflow-form="reassign" hidden>
-      <div class="flex items-center justify-between pb-space-xs border-b border-surface-container">
+    <form class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-card space-y-3.5 commercial-workflow-form" data-commercial-workflow-form="reassign" hidden>
+      <div class="flex items-center justify-between pb-2 border-b border-slate-100">
         <div>
-          <h3 class="font-headline-sm text-headline-sm text-on-surface">Reasignar responsable</h3>
-          <p class="font-body-sm text-body-sm text-on-surface-variant">Selecciona un integrante habilitado del equipo comercial.</p>
+          <h3 class="text-sm font-bold text-[#061D49]">Reasignar responsable</h3>
+          <p class="text-xs text-slate-500">Selecciona un integrante habilitado del equipo comercial.</p>
         </div>
-        <button type="button" class="w-8 h-8 rounded-full hover:bg-surface-container text-secondary flex items-center justify-center cursor-pointer" data-commercial-close-workflow aria-label="Cerrar formulario">
-          <span class="material-symbols-outlined text-[18px]">close</span>
+        <button type="button" class="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center cursor-pointer transition-colors" data-commercial-close-workflow aria-label="Cerrar formulario">
+          <span class="material-symbols-outlined text-[16px]">close</span>
         </button>
       </div>
       <input type="hidden" name="ticket_pk" value="<?php echo esc_attr((string) $pk); ?>">
       <div class="space-y-1">
-        <label class="block font-label-sm text-secondary font-medium">Nuevo responsable <em class="text-error">*</em></label>
-        <select name="id_empleado" required class="w-full px-3 py-2 bg-surface-container-low rounded-xl font-body-sm outline-none">
+        <label class="block text-xs font-semibold text-slate-700">Nuevo responsable <em class="text-rose-600">*</em></label>
+        <select name="id_empleado" required class="w-full text-xs sm:text-sm rounded-xl border border-slate-200 focus:border-[#1E3C76] p-2.5 outline-none bg-white font-medium text-slate-700">
           <option value="">Selecciona un funcionario</option>
           <?php foreach ($employees as $employee):
             $id = (string) ($employee['id'] ?? $employee['id_empleado'] ?? '');
@@ -684,14 +904,27 @@ final class CommercialTicketModalView
           <?php endforeach; ?>
         </select>
       </div>
-      <div class="flex items-center justify-end gap-space-sm pt-space-xs">
-        <span class="font-body-sm text-error mr-auto" data-commercial-form-message aria-live="polite"></span>
-        <button type="button" class="px-space-md py-2 bg-surface-container hover:bg-surface-container-high text-on-surface rounded-xl font-label-md transition-colors cursor-pointer" data-commercial-close-workflow>Cancelar</button>
-        <button type="submit" class="px-space-lg py-2 bg-inverse-surface hover:bg-secondary text-on-secondary rounded-xl font-label-md font-semibold transition-all shadow-sm cursor-pointer">Guardar responsable</button>
+      <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+        <span class="text-xs text-rose-600 mr-auto font-medium" data-commercial-form-message aria-live="polite"></span>
+        <button type="button" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-colors cursor-pointer" data-commercial-close-workflow>Cancelar</button>
+        <button type="submit" class="px-5 py-2 bg-[#061D49] hover:bg-[#1E3C76] text-white rounded-xl text-xs font-semibold transition-all shadow-sm cursor-pointer">Guardar responsable</button>
       </div>
     </form>
 <?php
     return (string) ob_get_clean();
+  }
+
+  private static function initials(string $name): string
+  {
+    $parts = preg_split('/\s+/', trim($name));
+    $initials = '';
+    if (!empty($parts[0])) {
+      $initials .= mb_substr($parts[0], 0, 1, 'UTF-8');
+    }
+    if (!empty($parts[1])) {
+      $initials .= mb_substr($parts[1], 0, 1, 'UTF-8');
+    }
+    return mb_strtoupper($initials ?: 'SC', 'UTF-8');
   }
 
   /** @param mixed $value */

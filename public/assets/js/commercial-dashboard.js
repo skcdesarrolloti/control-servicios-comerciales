@@ -35,7 +35,19 @@
   };
 
   function loadingMarkup() {
-    return '<div class="commercial-case-loading"><span></span><span></span><span></span><p>Cargando información de la tarea…</p></div>';
+    return (
+      '<div class="w-full py-28 flex flex-col items-center justify-center text-center p-8">' +
+        '<div class="relative w-16 h-16 mb-4 flex items-center justify-center">' +
+          '<div class="absolute inset-0 rounded-2xl bg-gradient-to-tr from-[#F8CF4A]/30 to-[#1E3C76]/20 animate-pulse"></div>' +
+          '<div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#061D49] to-[#1E3C76] flex items-center justify-center shadow-lg text-white">' +
+            '<span class="material-symbols-outlined text-[28px] text-[#F8CF4A]">task_alt</span>' +
+          '</div>' +
+        '</div>' +
+        '<h3 class="text-base font-bold text-[#061D49]">Cargando información de la tarea…</h3>' +
+        '<p class="text-xs text-slate-400 mt-1 max-w-sm">Obteniendo expediente comercial, historial de gestiones y opciones disponibles</p>' +
+        '<div class="sicv-search-modal__progress mt-5"><span></span><span></span><span></span></div>' +
+      '</div>'
+    );
   }
 
   function notify(type, message) {
@@ -63,9 +75,29 @@
       .replace(/'/g, "&#039;");
   }
 
-  function assistantList(items) {
-    if (!Array.isArray(items) || !items.length) return '<p class="commercial-assistant-muted">Sin hallazgos registrados.</p>';
-    return "<ul>" + items.map(function (item) { return "<li>" + escapeHtml(item) + "</li>"; }).join("") + "</ul>";
+  function assistantList(items, bulletColor) {
+    if (!Array.isArray(items) || !items.length) {
+      return '<p class="text-xs text-slate-400 italic py-1">Sin hallazgos registrados.</p>';
+    }
+    var bullet = bulletColor || "bg-[#1E3C76]";
+    return (
+      '<ul class="space-y-1.5">' +
+      items
+        .map(function (item) {
+          return (
+            '<li class="flex items-start gap-2 text-xs text-slate-700 leading-relaxed">' +
+            '<span class="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ' +
+            bullet +
+            '"></span>' +
+            '<span>' +
+            escapeHtml(item) +
+            "</span>" +
+            "</li>"
+          );
+        })
+        .join("") +
+      "</ul>"
+    );
   }
 
   function assistantText(value) {
@@ -83,79 +115,192 @@
     return text.toLowerCase() === "array" ? "" : text;
   }
 
-  function assistantBlock(title, content) {
+  function assistantCard(title, content, icon, colorTheme) {
+    if (!content) return "";
+    var themes = {
+      client: { bg: "bg-slate-50/70", border: "border-slate-200", iconColor: "text-[#1E3C76]", titleColor: "text-[#061D49]" },
+      status: { bg: "bg-blue-50/50", border: "border-blue-100", iconColor: "text-[#1E3C76]", titleColor: "text-[#061D49]" },
+      risks: { bg: "bg-rose-50/50", border: "border-rose-100", iconColor: "text-rose-600", titleColor: "text-rose-900" },
+      opps: { bg: "bg-emerald-50/50", border: "border-emerald-100", iconColor: "text-emerald-600", titleColor: "text-emerald-900" },
+      recs: { bg: "bg-sky-50/50", border: "border-sky-100", iconColor: "text-[#1E3C76]", titleColor: "text-[#061D49]" },
+      steps: { bg: "bg-amber-50/50", border: "border-amber-100", iconColor: "text-amber-600", titleColor: "text-amber-900" },
+      missing: { bg: "bg-slate-50", border: "border-slate-200", iconColor: "text-slate-500", titleColor: "text-slate-700" },
+    };
+    var t = themes[colorTheme] || themes.client;
     return (
-      '<section class="commercial-assistant-block">' +
-      "<h4>" + escapeHtml(title) + "</h4>" +
-      content +
-      "</section>"
+      '<div class="p-4 rounded-2xl ' + t.bg + ' border ' + t.border + ' shadow-sm flex flex-col gap-2.5">' +
+        '<div class="flex items-center gap-2">' +
+          (icon ? '<span class="material-symbols-outlined text-[18px] ' + t.iconColor + '">' + icon + '</span>' : '') +
+          '<h4 class="text-xs font-bold uppercase tracking-wider ' + t.titleColor + '">' + escapeHtml(title) + '</h4>' +
+        '</div>' +
+        '<div class="text-xs text-slate-700 leading-relaxed">' + content + '</div>' +
+      '</div>'
     );
   }
 
   function assistantLoadingMarkup() {
     return (
-      '<div class="commercial-assistant-loading">' +
-      '<span class="commercial-assistant-spinner" aria-hidden="true"></span>' +
-      '<div><h3>Analizando tarea con MiniMax…</h3><p>Estoy revisando datos de la tarea, inmueble, historial, respuestas, seguimientos y notas.</p></div>' +
-      "</div>"
+      '<div class="p-8 sm:p-14 flex flex-col items-center justify-center text-center">' +
+        '<div class="relative w-24 h-24 mb-6 flex items-center justify-center">' +
+          '<div class="absolute inset-0 rounded-3xl bg-gradient-to-tr from-[#F8CF4A]/30 to-[#1E3C76]/20 animate-pulse"></div>' +
+          '<div class="w-20 h-20 rounded-2xl bg-gradient-to-br from-[#061D49] to-[#1E3C76] flex items-center justify-center shadow-xl text-white">' +
+            '<span class="material-symbols-outlined text-[36px] text-[#F8CF4A] sicv-ai-icon-rotate">auto_awesome</span>' +
+          '</div>' +
+          '<span class="absolute -bottom-2 -right-2 w-8 h-8 rounded-full bg-[#F8CF4A] text-[#061D49] flex items-center justify-center font-bold text-xs shadow-md border-2 border-white">IA</span>' +
+        '</div>' +
+        '<span class="text-[11px] font-bold uppercase tracking-widest text-amber-700 bg-amber-50 px-3 py-1 rounded-full border border-amber-200 mb-3">Asistente Inteligente SuCasa</span>' +
+        '<h2 class="text-xl sm:text-2xl font-bold text-[#061D49] tracking-tight">Analizando tarea comercial…</h2>' +
+        '<p class="text-xs sm:text-sm text-slate-500 max-w-md mt-2 leading-relaxed">Estoy evaluando el historial completo, estado del cliente, características del inmueble, riesgos, oportunidades y generando recomendaciones estratégicas en tiempo real.</p>' +
+        '<div class="sicv-search-modal__progress mt-6"><span></span><span></span><span></span></div>' +
+      '</div>'
     );
   }
 
   function assistantErrorMarkup(message) {
     return (
-      '<div class="commercial-assistant-error">' +
-      '<div><h3>No se pudo analizar la tarea</h3><p>' + escapeHtml(message || "Inténtalo nuevamente.") + "</p></div>" +
-      "</div>"
+      '<div class="p-8 sm:p-12 flex flex-col items-center justify-center text-center">' +
+        '<div class="w-14 h-14 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mb-4 border border-rose-200">' +
+          '<span class="material-symbols-outlined text-[32px]">error</span>' +
+        '</div>' +
+        '<h3 class="text-base font-bold text-slate-800">No se pudo generar el análisis</h3>' +
+        '<p class="text-xs text-slate-500 mt-2 max-w-sm leading-relaxed">' + escapeHtml(message || "Inténtalo nuevamente en unos momentos.") + '</p>' +
+        '<button type="button" class="mt-6 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-colors cursor-pointer" data-commercial-close-assistant>' +
+          'Cerrar' +
+        '</button>' +
+      '</div>'
     );
   }
 
   function assistantAnalysisMarkup(analysis) {
     analysis = analysis || {};
-    var summary = escapeHtml(analysis.resumen || "Sin resumen generado.");
+    var summary = escapeHtml(analysis.resumen || "Sin resumen ejecutivo generado.");
     var clientText = assistantText(analysis.cliente);
     var statusText = assistantText(analysis.estado_actual);
-    var client = clientText ? '<p>' + escapeHtml(clientText) + "</p>" : "";
-    var currentStatus = statusText ? '<p>' + escapeHtml(statusText) + "</p>" : "";
-    var suggested = analysis.mensaje_sugerido ? '<div class="commercial-assistant-suggested"><div class="commercial-assistant-suggested-actions"><button type="button" class="commercial-secondary-btn" data-commercial-use-assistant-message>Usar en respuesta</button><button type="button" class="commercial-secondary-btn" data-commercial-copy-assistant-message>Copiar mensaje</button></div><p>' + escapeHtml(analysis.mensaje_sugerido) + "</p></div>" : '<p class="commercial-assistant-muted">Sin mensaje sugerido.</p>';
+    var clientHtml = clientText ? '<p class="text-xs text-slate-700">' + escapeHtml(clientText) + '</p>' : '';
+    var statusHtml = statusText ? '<p class="text-xs text-slate-700 font-medium">' + escapeHtml(statusText) + '</p>' : '';
+    var modelName = escapeHtml(analysis.model || "MiniMax / IA");
+    var author = escapeHtml(analysis.created_by ? ("Guardado por " + analysis.created_by) : "Generado por IA");
+    var dateLabel = escapeHtml(analysis.created_label || analysis.generated_at || "");
+
+    var suggestedMessage = analysis.mensaje_sugerido ? String(analysis.mensaje_sugerido).trim() : "";
+    var suggestedBlock = "";
+    if (suggestedMessage) {
+      suggestedBlock =
+        '<div class="col-span-1 md:col-span-2 bg-[#061D49]/5 border border-[#1E3C76]/20 rounded-2xl p-5 relative overflow-hidden commercial-assistant-suggested" data-purpose="suggested-message-card">' +
+          '<div class="flex flex-wrap items-center justify-between gap-3 mb-3">' +
+            '<div class="flex items-center gap-2">' +
+              '<span class="material-symbols-outlined text-[20px] text-[#1E3C76]">mark_chat_unread</span>' +
+              '<h4 class="text-xs font-bold uppercase tracking-wider text-[#061D49]">Mensaje Sugerido para el Cliente</h4>' +
+            '</div>' +
+            '<div class="flex items-center gap-2">' +
+              '<button type="button" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold shadow-sm transition-colors cursor-pointer" data-commercial-copy-assistant-message>' +
+                '<span class="material-symbols-outlined text-[15px] text-slate-500">content_copy</span>' +
+                '<span>Copiar</span>' +
+              '</button>' +
+              '<button type="button" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#061D49] hover:bg-[#1E3C76] text-white text-xs font-semibold shadow-sm transition-all cursor-pointer" data-commercial-use-assistant-message>' +
+                '<span class="material-symbols-outlined text-[15px] text-[#F8CF4A]">reply</span>' +
+                '<span>Usar en respuesta</span>' +
+              '</button>' +
+            '</div>' +
+          '</div>' +
+          '<blockquote class="text-xs sm:text-sm text-slate-800 bg-white/80 p-4 rounded-xl border border-slate-200/80 leading-relaxed font-normal italic">' +
+            escapeHtml(suggestedMessage) +
+          '</blockquote>' +
+        '</div>';
+    }
+
     return (
-      '<header class="commercial-assistant-result-head">' +
-      '<div><span>Asistente comercial</span><h3 id="commercial-analysis-title">Análisis de la tarea</h3><p>' + escapeHtml(analysis.created_by ? ("Guardado por " + analysis.created_by) : "Generado con " + (analysis.model || "MiniMax")) + (analysis.created_label ? " · " + escapeHtml(analysis.created_label) : (analysis.generated_at ? " · " + escapeHtml(analysis.generated_at) : "")) + "</p></div>" +
-      '<button type="button" class="commercial-modal-close commercial-assistant-close" data-commercial-close-assistant aria-label="Cerrar análisis">&times;</button>' +
-      "</header>" +
-      '<div class="commercial-assistant-summary"><strong>IA</strong><p>' + summary + "</p></div>" +
-      '<div class="commercial-assistant-grid">' +
-      (client ? assistantBlock("Cliente", client) : "") +
-      (currentStatus ? assistantBlock("Estado actual", currentStatus) : "") +
-      assistantBlock("Riesgos", assistantList(analysis.riesgos)) +
-      assistantBlock("Oportunidades", assistantList(analysis.oportunidades)) +
-      assistantBlock("Recomendaciones", assistantList(analysis.recomendaciones)) +
-      assistantBlock("Próximos pasos", assistantList(analysis.proximos_pasos)) +
-      assistantBlock("Datos faltantes", assistantList(analysis.datos_faltantes)) +
-      assistantBlock("Mensaje sugerido para el cliente", suggested) +
-      "</div>"
+      '<!-- Modal Header -->' +
+      '<div class="px-6 py-4 bg-gradient-to-r from-[#061D49] to-[#1E3C76] text-white flex items-center justify-between shrink-0">' +
+        '<div class="flex items-center gap-3">' +
+          '<div class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-[#F8CF4A] border border-white/15">' +
+            '<span class="material-symbols-outlined text-[22px]">auto_awesome</span>' +
+          '</div>' +
+          '<div>' +
+            '<div class="flex items-center gap-2">' +
+              '<h3 class="text-base font-bold text-white tracking-tight" id="commercial-analysis-title">Diagnóstico Estratégico Comercial</h3>' +
+              '<span class="text-[10px] font-bold uppercase tracking-wider bg-[#F8CF4A] text-[#061D49] px-2 py-0.5 rounded-full font-mono">' + modelName + '</span>' +
+            '</div>' +
+            '<p class="text-xs text-white/70 mt-0.5">' + author + (dateLabel ? ' · ' + dateLabel : '') + '</p>' +
+          '</div>' +
+        '</div>' +
+        '<button type="button" class="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer" data-commercial-close-assistant aria-label="Cerrar análisis">' +
+          '<span class="material-symbols-outlined text-[20px]">close</span>' +
+        '</button>' +
+      '</div>' +
+
+      '<!-- Modal Body -->' +
+      '<div class="p-6 overflow-y-auto space-y-5 flex-1">' +
+        '<!-- Executive Summary Banner -->' +
+        '<div class="rounded-2xl p-5 bg-gradient-to-br from-amber-500/10 via-amber-100/30 to-[#1E3C76]/5 border border-amber-200/80 shadow-sm">' +
+          '<div class="flex items-center gap-2 mb-2">' +
+            '<span class="material-symbols-outlined text-[20px] text-amber-600">psychology</span>' +
+            '<h4 class="text-xs font-bold uppercase tracking-wider text-amber-900">Resumen Ejecutivo del Caso</h4>' +
+          '</div>' +
+          '<p class="text-xs sm:text-sm text-slate-800 leading-relaxed">' + summary + '</p>' +
+        '</div>' +
+
+        '<!-- 2-Col Findings Grid -->' +
+        '<div class="grid grid-cols-1 md:grid-cols-2 gap-4">' +
+          (clientHtml ? assistantCard("Cliente", clientHtml, "person", "client") : "") +
+          (statusHtml ? assistantCard("Estado Comercial", statusHtml, "info", "status") : "") +
+          assistantCard("Riesgos Detectados", assistantList(analysis.riesgos, "bg-rose-500"), "warning", "risks") +
+          assistantCard("Oportunidades Comerciales", assistantList(analysis.oportunidades, "bg-emerald-500"), "trending_up", "opps") +
+          assistantCard("Recomendaciones de Acción", assistantList(analysis.recomendaciones, "bg-[#1E3C76]"), "lightbulb", "recs") +
+          assistantCard("Próximos Pasos Sugeridos", assistantList(analysis.proximos_pasos, "bg-amber-500"), "check_circle", "steps") +
+          (Array.isArray(analysis.datos_faltantes) && analysis.datos_faltantes.length ? assistantCard("Datos Faltantes", assistantList(analysis.datos_faltantes, "bg-slate-400"), "help", "missing") : "") +
+          suggestedBlock +
+        '</div>' +
+      '</div>' +
+
+      '<!-- Modal Footer -->' +
+      '<div class="px-6 py-3.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between shrink-0">' +
+        '<span class="text-xs text-slate-400">Análisis asistido con IA para toma de decisiones ágil</span>' +
+        '<button type="button" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-semibold transition-colors cursor-pointer" data-commercial-close-assistant>' +
+          'Cerrar Ventana' +
+        '</button>' +
+      '</div>'
     );
   }
 
   function analysisListMarkup(ticketPk, analyses) {
     analyses = Array.isArray(analyses) ? analyses : [];
     if (!analyses.length) {
-      return '<div class="commercial-analysis-empty"><p>Aún no hay análisis guardados.</p></div>';
+      return '<div class="py-4 text-center text-slate-400 text-xs"><p>Aún no hay análisis guardados con IA.</p></div>';
     }
-    return "<ol>" + analyses.map(function (analysis) {
-      var json = escapeHtml(JSON.stringify(analysis || {}));
-      var summary = String((analysis && analysis.resumen) || "Análisis guardado");
-      var shortSummary = summary.length > 96 ? summary.slice(0, 95) + "…" : summary;
-      return (
-        "<li>" +
-        '<button type="button" class="commercial-analysis-open" data-commercial-open-analysis data-analysis-json="' + json + '">' +
-        "<span><strong>" + escapeHtml((analysis && (analysis.created_label || analysis.generated_at)) || "Sin fecha") + "</strong>" +
-        "<small>" + escapeHtml(shortSummary) + "</small>" +
-        "<em>" + escapeHtml((analysis && analysis.created_by) || "Sistema") + "</em></span>" +
-        "</button>" +
-        '<button type="button" class="commercial-analysis-delete" data-commercial-delete-analysis data-ticket-pk="' + escapeHtml(ticketPk || currentCasePk || "") + '" data-analysis-id="' + escapeHtml((analysis && analysis.id) || "") + '" aria-label="Eliminar análisis">Eliminar</button>' +
-        "</li>"
-      );
-    }).join("") + "</ol>";
+    return analyses
+      .map(function (analysis) {
+        analysis = analysis || {};
+        var id = escapeHtml(analysis.id || "");
+        var label = escapeHtml(analysis.created_label || analysis.generated_at || "Sin fecha");
+        var summary = String(analysis.resumen || "Análisis guardado");
+        var shortSummary = escapeHtml(summary.length > 70 ? summary.slice(0, 69) + "…" : summary);
+        var author = escapeHtml(analysis.created_by || "Sistema");
+        var json = escapeHtml(JSON.stringify(analysis));
+        return (
+          '<div class="flex items-center justify-between p-3 bg-slate-50/80 hover:bg-[#EBF1FB]/60 rounded-xl border border-slate-200 transition-colors text-xs">' +
+          '<button type="button" class="flex-1 text-left cursor-pointer" data-commercial-open-analysis data-analysis-json="' +
+          json +
+          '">' +
+          '<strong class="block font-semibold text-[#061D49]">' +
+          label +
+          "</strong>" +
+          '<span class="block text-slate-500 text-[11px] line-clamp-1 mt-0.5">' +
+          shortSummary +
+          "</span>" +
+          '<small class="text-[10px] text-slate-400 mt-0.5 block">' +
+          author +
+          "</small>" +
+          "</button>" +
+          '<button type="button" class="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg transition-colors cursor-pointer" data-commercial-delete-analysis data-ticket-pk="' +
+          escapeHtml(ticketPk || currentCasePk || "") +
+          '" data-analysis-id="' +
+          id +
+          '" title="Eliminar análisis"><span class="material-symbols-outlined text-[16px]">delete</span></button>' +
+          "</div>"
+        );
+      })
+      .join("");
   }
 
   function updateAnalysisList(analyses) {
@@ -742,8 +887,10 @@
   }
 
   function assistantSuggestedText(button) {
-    var suggested = button.closest(".commercial-assistant-suggested");
-    return suggested ? (suggested.querySelector("p") || {}).textContent || "" : "";
+    var suggested = button.closest(".commercial-assistant-suggested") || button.closest("[data-purpose='suggested-message-card']");
+    if (!suggested) return "";
+    var block = suggested.querySelector("blockquote") || suggested.querySelector("p");
+    return block ? block.textContent.trim() : "";
   }
 
   function useAssistantMessage(button) {
@@ -1067,6 +1214,15 @@
         var text = assistantSuggestedText(copyAssistant);
         if (text && navigator.clipboard && navigator.clipboard.writeText) {
           navigator.clipboard.writeText(text).then(function () { notify("success", "Mensaje sugerido copiado."); });
+        }
+        return;
+      }
+      var copyGeneric = event.target.closest("[data-commercial-copy]");
+      if (copyGeneric) {
+        event.preventDefault();
+        var copyText = copyGeneric.getAttribute("data-commercial-copy") || "";
+        if (copyText && navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(copyText).then(function () { notify("success", "Copiado al portapapeles: " + copyText); });
         }
         return;
       }

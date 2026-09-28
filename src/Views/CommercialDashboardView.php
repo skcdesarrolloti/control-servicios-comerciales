@@ -25,6 +25,7 @@ final class CommercialDashboardView
     $ticketEmployees = is_array($data['ticket_employees'] ?? null) ? $data['ticket_employees'] : [];
     $commercialEmployeeCargos = is_array($data['commercial_employee_cargos'] ?? null) ? array_values(array_map('strval', $data['commercial_employee_cargos'])) : [];
     $filterOptions = is_array($data['filter_options'] ?? null) ? $data['filter_options'] : [];
+    $tabCounts = is_array($data['tab_counts'] ?? null) ? $data['tab_counts'] : [];
     $subtab = (string) ($data['subtab'] ?? 'mine');
     $topicHierarchy = is_array($data['topic_hierarchy'] ?? null) ? $data['topic_hierarchy'] : [];
     $recentTickets = is_array($data['recent_tickets'] ?? null) ? $data['recent_tickets'] : [];
@@ -73,14 +74,48 @@ final class CommercialDashboardView
     }
     .commercial-modal.open,
     .commercial-modal.active,
+    .commercial-analysis-modal.open,
+    .commercial-analysis-modal.active,
     .commercial-guide.open,
     .commercial-guide.active,
     #scm-guide-modal.open,
     #scm-guide-modal.active {
       display: flex !important;
     }
+    .commercial-analysis-modal {
+      display: none;
+    }
     .commercial-modal-open {
       overflow: hidden;
+    }
+    .sicv-ai-icon-rotate {
+      animation: sicv-guardian-search 1.15s ease-in-out infinite;
+    }
+    .sicv-search-modal__progress {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+    }
+    .sicv-search-modal__progress span {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #F59E0B;
+      animation: sicv-search-pulse 1s ease-in-out infinite;
+    }
+    .sicv-search-modal__progress span:nth-child(2) {
+      animation-delay: 0.14s;
+    }
+    .sicv-search-modal__progress span:nth-child(3) {
+      animation-delay: 0.28s;
+    }
+    @keyframes sicv-guardian-search {
+      0%, 100% { transform: rotate(-8deg) scale(0.96); }
+      50% { transform: rotate(8deg) scale(1.04); }
+    }
+    @keyframes sicv-search-pulse {
+      0%, 100% { opacity: 0.35; transform: scale(0.78); }
+      50% { opacity: 1; transform: scale(1); }
     }
     /* Estilos para Disponibilidad, Franja Horaria y Popups del Calendario */
     .swal2-popup .scm-calendar-availability-status {
@@ -147,7 +182,21 @@ final class CommercialDashboardView
     "darkMode": "class",
     "theme": {
       "extend": {
+        "boxShadow": {
+          "modal": "0 25px 60px -15px rgba(6, 29, 73, 0.35)",
+          "card": "0 2px 10px rgba(6, 29, 73, 0.04)"
+        },
         "colors": {
+          "brand": {
+            "navy": "#061D49",
+            "blue": "#1E3C76",
+            "lightBlue": "#EBF1FB",
+            "gold": "#F8CF4A",
+            "goldHover": "#E5BD3B",
+            "goldSoft": "#FEF9E7",
+            "grayBg": "#F6F8FC",
+            "border": "#E2E8F0"
+          },
           "surface-container": "#e9edff",
           "tertiary": "#7d5700",
           "on-secondary": "#ffffff",
@@ -419,16 +468,11 @@ final class CommercialDashboardView
     <?php endif; ?>
 
     <!-- Modal de Caso / Tarea -->
-    <div class="fixed inset-0 z-50 items-center justify-center p-4 bg-inverse-surface/60 backdrop-blur-sm commercial-modal" id="commercial-case-modal" role="dialog" aria-modal="true" aria-labelledby="commercial-case-title" aria-hidden="true">
-      <div class="bg-surface-container-lowest rounded-2xl shadow-2xl w-full max-w-5xl max-h-[92vh] overflow-hidden flex flex-col relative" role="document">
-        <button type="button" class="absolute top-4 right-4 z-10 w-9 h-9 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface flex items-center justify-center transition-colors cursor-pointer" data-commercial-close-case aria-label="Cerrar detalle">
-          <span class="material-symbols-outlined text-[20px]">close</span>
-        </button>
-        <div class="overflow-y-auto flex-1 p-space-lg" data-commercial-case-content>
-          <div class="flex items-center justify-center py-20 text-secondary gap-3">
-            <span class="w-3 h-3 rounded-full bg-primary animate-ping"></span>
-            <p class="font-body-md text-body-md font-medium">Cargando información de la tarea…</p>
-          </div>
+    <div class="fixed inset-0 z-50 items-center justify-center p-3 sm:p-5 lg:p-7 bg-[#061D49]/50 backdrop-blur-md commercial-modal overflow-y-auto" id="commercial-case-modal" role="dialog" aria-modal="true" aria-labelledby="commercial-case-title" aria-hidden="true">
+      <div class="bg-white w-full max-w-[1400px] max-h-[94vh] rounded-3xl shadow-modal border border-slate-100 flex flex-col overflow-hidden relative" role="document" data-commercial-case-content>
+        <div class="flex items-center justify-center py-28 text-slate-500 gap-3">
+          <span class="w-3 h-3 rounded-full bg-[#1E3C76] animate-ping"></span>
+          <p class="font-body-md text-sm font-medium">Cargando información de la tarea…</p>
         </div>
       </div>
     </div>
