@@ -102,12 +102,18 @@ final class CommercialDashboardView
     }
     [data-commercial-subflyout].is-open,
     .group\/sub:hover > [data-commercial-subflyout],
-    [data-commercial-subgroup]:hover > [data-commercial-subflyout] {
+    [data-commercial-subgroup]:hover > [data-commercial-subflyout],
+    [data-commercial-subgroup].is-open > [data-commercial-subflyout] {
       display: block !important;
     }
     .group\/nav:hover [data-commercial-dropdown-trigger] .material-symbols-outlined,
     [data-commercial-dropdown].is-open [data-commercial-dropdown-trigger] .material-symbols-outlined {
       transform: rotate(180deg);
+    }
+    [data-commercial-subgroup]:hover [data-commercial-subflyout-trigger] .material-symbols-outlined,
+    [data-commercial-subgroup].is-open [data-commercial-subflyout-trigger] .material-symbols-outlined {
+      transform: translateX(2px);
+      color: #735c00;
     }
     .sicv-ai-icon-rotate {
       animation: sicv-guardian-search 1.15s ease-in-out infinite;
@@ -619,8 +625,8 @@ final class CommercialDashboardView
               <span>Por Tema de Ayuda</span>
               <span class="text-[10px] text-secondary/70">Estados &rsaquo;</span>
             </div>
-            <div class="p-1 space-y-0.5 max-h-[260px] overflow-y-auto">
-              <?php foreach (array_slice($topicHierarchy, 0, 10) as $th): ?>
+            <div class="p-1 space-y-0.5 overflow-visible">
+              <?php foreach ($topicHierarchy as $th): ?>
                 <?php
                   $topicName = (string) ($th['topic'] ?? '');
                   $topicTotal = (int) ($th['total'] ?? 0);
@@ -628,29 +634,39 @@ final class CommercialDashboardView
                 ?>
                 <div class="relative group/sub" data-commercial-subgroup>
                   <div class="flex items-center justify-between px-3 py-1.5 rounded-xl text-body-sm hover:bg-surface-container-low transition-colors">
-                    <a class="flex-1 font-medium text-on-surface hover:text-primary transition-colors flex items-center justify-between" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'abiertos', 'tema' => $topicName])); ?>">
+                    <a class="flex-1 font-medium text-on-surface hover:text-primary transition-colors flex items-center justify-between" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'abiertos', 'tema' => $topicName])); ?>" data-commercial-tab="abiertos">
                       <span class="truncate max-w-[170px]" title="<?php echo esc_attr($topicName); ?>"><?php echo esc_html($topicName); ?></span>
                       <span class="font-label-sm text-[11px] bg-surface-container px-1.5 py-0.5 rounded text-on-surface font-semibold ml-1"><?php echo esc_html((string) $topicTotal); ?></span>
                     </a>
                     <?php if (!empty($statuses)): ?>
-                      <span class="material-symbols-outlined text-[16px] text-secondary ml-1 group-hover/sub:translate-x-0.5 transition-transform" aria-hidden="true">chevron_right</span>
+                      <button type="button" class="ml-1 p-1 -mr-1 text-secondary hover:text-primary rounded-lg transition-colors cursor-pointer flex items-center justify-center" data-commercial-subflyout-trigger aria-label="Ver estados comerciales de <?php echo esc_attr($topicName); ?>" title="Ver estados">
+                        <span class="material-symbols-outlined text-[16px] transition-transform group-hover/sub:translate-x-0.5" aria-hidden="true">chevron_right</span>
+                      </button>
                     <?php endif; ?>
                   </div>
 
                   <!-- Flyout Submenu a la derecha con Estados Comerciales del Tema -->
                   <?php if (!empty($statuses)): ?>
-                    <div class="absolute left-full top-0 ml-1 hidden group-hover/sub:block bg-surface-container-lowest shadow-[0_12px_32px_rgba(0,0,0,0.18)] rounded-xl py-space-xs min-w-[210px] max-w-[260px] border border-outline-variant/30 z-50 p-1 space-y-0.5" data-commercial-subflyout>
-                      <div class="px-3 py-1 border-b border-surface-container pb-1 mb-1">
-                        <span class="font-label-sm uppercase font-semibold text-secondary block truncate"><?php echo esc_html($topicName); ?></span>
-                        <a href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'abiertos', 'tema' => $topicName])); ?>" class="text-[11px] text-primary hover:underline font-semibold block mt-0.5">Ver todos (<?php echo esc_html((string) $topicTotal); ?>)</a>
-                      </div>
-                      <div class="max-h-[220px] overflow-y-auto space-y-0.5">
-                        <?php foreach (array_slice($statuses, 0, 8) as $st): ?>
-                          <a href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'abiertos', 'tema' => $topicName, 'estado' => $st['status']])); ?>" class="flex items-center justify-between px-2.5 py-1 rounded-lg text-[12px] text-on-surface hover:bg-surface-container transition-colors">
-                            <span class="truncate"><?php echo esc_html($st['status']); ?></span>
-                            <span class="font-label-sm text-secondary bg-surface-container-high px-1.5 py-0.2 rounded text-[10px] ml-1 font-semibold"><?php echo esc_html((string) $st['total']); ?></span>
+                    <div class="absolute left-full top-0 pl-1.5 hidden group-hover/sub:block z-50 pointer-events-auto" data-commercial-subflyout>
+                      <div class="bg-surface-container-lowest shadow-[0_12px_32px_rgba(0,0,0,0.18)] rounded-2xl py-2 min-w-[220px] max-w-[280px] border border-outline-variant/30 p-1.5 space-y-1">
+                        <div class="px-3 py-1.5 border-b border-surface-container pb-1.5 mb-1 bg-surface-container-low/50 rounded-xl">
+                          <div class="flex items-center justify-between">
+                            <span class="font-label-sm uppercase font-bold text-on-surface text-[11px] block truncate"><?php echo esc_html($topicName); ?></span>
+                            <span class="font-label-sm text-[10px] bg-primary-container text-on-surface px-1.5 py-0.2 rounded font-bold"><?php echo esc_html((string) $topicTotal); ?></span>
+                          </div>
+                          <a href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'abiertos', 'tema' => $topicName])); ?>" class="text-[11px] text-primary hover:underline font-semibold flex items-center gap-1 mt-1" data-commercial-tab="abiertos">
+                            <span>Ver todas las tareas</span>
+                            <span class="material-symbols-outlined text-[12px]">arrow_forward</span>
                           </a>
-                        <?php endforeach; ?>
+                        </div>
+                        <div class="max-h-[260px] overflow-y-auto space-y-0.5 pr-1">
+                          <?php foreach ($statuses as $st): ?>
+                            <a href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'abiertos', 'tema' => $topicName, 'estado' => $st['status']])); ?>" class="flex items-center justify-between px-2.5 py-1.5 rounded-xl text-[12px] text-on-surface hover:bg-surface-container hover:text-primary transition-colors font-medium" data-commercial-tab="abiertos">
+                              <span class="truncate"><?php echo esc_html($st['status']); ?></span>
+                              <span class="font-label-sm text-secondary bg-surface-container-high px-1.5 py-0.5 rounded text-[10px] ml-1 font-semibold"><?php echo esc_html((string) $st['total']); ?></span>
+                            </a>
+                          <?php endforeach; ?>
+                        </div>
                       </div>
                     </div>
                   <?php endif; ?>

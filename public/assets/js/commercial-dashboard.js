@@ -1078,6 +1078,7 @@
       var flyout = subGroup ? subGroup.querySelector("[data-commercial-subflyout]") : null;
       if (flyout) {
         event.preventDefault();
+        event.stopPropagation();
         var isSubOpen = flyout.classList.contains("is-open");
         var parentMenu = subGroup.closest("[data-commercial-dropdown-menu]");
         if (parentMenu) {

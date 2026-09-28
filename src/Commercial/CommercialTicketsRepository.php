@@ -11,6 +11,19 @@ use SCM\Support\SchemaInspector;
 
 final class CommercialTicketsRepository
 {
+  public const COMMERCIAL_TOPICS = [
+    'Avaluo',
+    'Actualizacion',
+    'Captacion',
+    'Recaptacion',
+    'Arriendo',
+    'Venta',
+    'Arriendo o venta',
+    'Ruta',
+    'Retoque',
+    'Retencion de contrato',
+  ];
+
   private Database $db;
   private CommercialSlaService $sla;
   private SchemaInspector $schema;
@@ -272,7 +285,10 @@ final class CommercialTicketsRepository
         $args[] = $status;
       }
     }
-    $where[] = 'TRIM(COALESCE(t.`tema_ayuda`, \'\')) <> \'\'';
+    $topics = self::COMMERCIAL_TOPICS;
+    $topicPlaceholders = implode(',', array_fill(0, count($topics), '?'));
+    $where[] = "TRIM(COALESCE(t.`tema_ayuda`, '')) IN ({$topicPlaceholders})";
+    $args = array_merge($args, $topics);
     [$filterWhere, $filterArgs] = $this->ticketFilterClauses($countFilters);
     $where = array_merge($where, $filterWhere);
     $args = array_merge($args, $filterArgs);
@@ -298,7 +314,7 @@ final class CommercialTicketsRepository
   }
 
   /**
-   * Obtiene la jerarquía de temas de ayuda con sus conteos y los estados comerciales
+   * Obtiene la jerarquía de temas de ayuda comerciales con sus conteos y los estados comerciales
    * asociados dentro de cada tema para el menú desplegable interactivo.
    *
    * @param array<string,mixed> $filters
@@ -310,11 +326,14 @@ final class CommercialTicketsRepository
     $countFilters = $this->navigationCountFilters($filters);
     [$filterWhere, $filterArgs] = $this->ticketFilterClauses($countFilters);
 
+    $topics = self::COMMERCIAL_TOPICS;
+    $topicPlaceholders = implode(',', array_fill(0, count($topics), '?'));
+
     $where = [
-      "TRIM(COALESCE(t.`tema_ayuda`, '')) <> ''",
+      "TRIM(COALESCE(t.`tema_ayuda`, '')) IN ({$topicPlaceholders})",
       "TRIM(COALESCE(t.`estado_comercial`, '')) <> ''",
     ];
-    $args = [];
+    $args = $topics;
     $where = array_merge($where, $filterWhere);
     $args = array_merge($args, $filterArgs);
 
@@ -368,8 +387,13 @@ final class CommercialTicketsRepository
   public function latestCreatedTickets(bool $onlyForEmployee = false, string $employeeFilter = '', int $limit = 10): array
   {
     $table = $this->db->table('jet_cct_tickets');
-    $where = ["TRIM(COALESCE(t.`estado_comercial`, '')) <> ''"];
-    $args = [];
+    $topics = self::COMMERCIAL_TOPICS;
+    $topicPlaceholders = implode(',', array_fill(0, count($topics), '?'));
+    $where = [
+      "TRIM(COALESCE(t.`estado_comercial`, '')) <> ''",
+      "(TRIM(COALESCE(t.`tema_ayuda`, '')) IN ({$topicPlaceholders}) OR (TRIM(COALESCE(t.`tema_ayuda`, '')) = '' AND TRIM(COALESCE(t.`estado_comercial`, '')) <> ''))",
+    ];
+    $args = $topics;
     if ($onlyForEmployee && trim($employeeFilter) !== '') {
       $employeeIds = array_values(array_unique(array_filter(array_map('trim', explode(',', $employeeFilter)), static fn(string $id): bool => $id !== '')));
       if (count($employeeIds) > 1) {
@@ -402,8 +426,13 @@ final class CommercialTicketsRepository
   public function latestCreatedCount(bool $onlyForEmployee = false, string $employeeFilter = ''): int
   {
     $table = $this->db->table('jet_cct_tickets');
-    $where = ["TRIM(COALESCE(t.`estado_comercial`, '')) <> ''"];
-    $args = [];
+    $topics = self::COMMERCIAL_TOPICS;
+    $topicPlaceholders = implode(',', array_fill(0, count($topics), '?'));
+    $where = [
+      "TRIM(COALESCE(t.`estado_comercial`, '')) <> ''",
+      "(TRIM(COALESCE(t.`tema_ayuda`, '')) IN ({$topicPlaceholders}) OR (TRIM(COALESCE(t.`tema_ayuda`, '')) = '' AND TRIM(COALESCE(t.`estado_comercial`, '')) <> ''))",
+    ];
+    $args = $topics;
     if ($onlyForEmployee && trim($employeeFilter) !== '') {
       $employeeIds = array_values(array_unique(array_filter(array_map('trim', explode(',', $employeeFilter)), static fn(string $id): bool => $id !== '')));
       if (count($employeeIds) > 1) {
@@ -591,7 +620,7 @@ final class CommercialTicketsRepository
     return [
       'medios' => $this->distinctTicketValues('medio'),
       'prioridades' => $this->distinctTicketValues('prioridad'),
-      'temas' => $this->distinctTicketValues('tema_ayuda'),
+      'temas' => self::COMMERCIAL_TOPICS,
       'barrios' => $this->neighborhoodOptions(),
       'encargados_seguimiento' => $this->followUpEmployeeOptions(),
       'estados_administrativos' => $this->distinctTicketValues('estado_administrativo'),
@@ -1996,7 +2025,6 @@ final class CommercialTicketsRepository
     foreach ([
       'medio' => 'medio',
       'prioridad' => 'prioridad',
-      'tema' => 'tema_ayuda',
       'estado_administrativo' => 'estado_administrativo',
     ] as $filterKey => $column) {
       $value = trim((string) ($filters[$filterKey] ?? ''));
@@ -2005,6 +2033,17 @@ final class CommercialTicketsRepository
       }
       $where[] = "TRIM(COALESCE(t.`{$column}`, '')) = ?";
       $args[] = $value;
+    }
+
+    $temaValue = trim((string) ($filters['tema'] ?? ''));
+    if ($temaValue !== '') {
+      $where[] = "TRIM(COALESCE(t.`tema_ayuda`, '')) = ?";
+      $args[] = $temaValue;
+    } else {
+      $topics = self::COMMERCIAL_TOPICS;
+      $topicPlaceholders = implode(',', array_fill(0, count($topics), '?'));
+      $where[] = "(TRIM(COALESCE(t.`tema_ayuda`, '')) IN ({$topicPlaceholders}) OR (TRIM(COALESCE(t.`tema_ayuda`, '')) = '' AND TRIM(COALESCE(t.`estado_comercial`, '')) <> ''))";
+      array_push($args, ...$topics);
     }
 
     $followUp = mb_strtolower(trim((string) ($filters['seguimiento'] ?? '')), 'UTF-8');
