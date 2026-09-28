@@ -31,59 +31,128 @@ final class CommercialTicketModalView
 
     ob_start();
 ?>
-  <div class="commercial-case-headline">
-    <div>
-      <div class="commercial-case-eyebrow"><span>Tarea #<?php echo esc_html($logicalId); ?></span><span class="commercial-status-badge commercial-status-badge--<?php echo esc_attr($bucket); ?>"><?php echo esc_html($status); ?></span></div>
-      <h2 id="commercial-case-title"><?php echo esc_html($subject); ?></h2>
-      <p><?php echo esc_html($description !== '' ? $description : 'Esta tarea no tiene una descripción registrada.'); ?></p>
+  <div class="flex flex-col gap-space-md pb-space-md border-b border-surface-container">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-space-sm">
+      <div class="flex items-center gap-space-xs">
+        <span class="inline-flex items-center px-2.5 py-1 rounded-lg bg-surface-container text-on-surface font-label-md font-semibold">
+          Tarea #<?php echo esc_html($logicalId); ?>
+        </span>
+        <span class="inline-flex items-center px-2.5 py-1 rounded-full bg-primary-container text-on-surface font-label-sm font-semibold">
+          <?php echo esc_html($status); ?>
+        </span>
+      </div>
+      <?php if ($external !== ''): ?>
+        <a class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-label-sm font-semibold transition-colors" href="<?php echo esc_url($external); ?>" target="_blank" rel="noopener noreferrer">
+          <span class="material-symbols-outlined text-[16px]">open_in_new</span>
+          <span>Ver en portal</span>
+        </a>
+      <?php endif; ?>
     </div>
-    <?php if ($external !== ''): ?><a class="commercial-secondary-btn commercial-external-link" href="<?php echo esc_url($external); ?>" target="_blank" rel="noopener noreferrer"><i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i> Ver en portal</a><?php endif; ?>
+    <div>
+      <h2 id="commercial-case-title" class="font-headline-md text-headline-md text-on-surface font-bold tracking-tight">
+        <?php echo esc_html($subject); ?>
+      </h2>
+      <p class="font-body-md text-body-md text-on-surface-variant mt-1">
+        <?php echo esc_html($description !== '' ? $description : 'Esta tarea no tiene una descripción detallada registrada.'); ?>
+      </p>
+    </div>
   </div>
 
-  <div class="commercial-case-layout">
-    <aside class="commercial-case-sidebar" aria-label="Resumen de la tarea">
-      <section class="commercial-case-actions" aria-labelledby="commercial-case-actions-title">
-        <div class="commercial-case-section-title"><div><span>Gestión</span><h3 id="commercial-case-actions-title">Acciones de la tarea</h3></div></div>
-        <div class="commercial-case-action-grid">
-          <button type="button" class="commercial-case-action--assistant" data-commercial-assistant data-ticket-pk="<?php echo esc_attr((string) $pk); ?>"><i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i><span>Analizar con asistente</span></button>
-          <?php if ($policy->canAct('responder')): ?><button type="button" data-commercial-open-workflow="reply"><i class="fas fa-reply" aria-hidden="true"></i><span>Responder</span></button><?php endif; ?>
-          <?php if ($policy->canAct('agregar_nota')): ?><button type="button" data-commercial-open-workflow="note"><i class="fas fa-note-sticky" aria-hidden="true"></i><span>Nota interna</span></button><?php endif; ?>
-          <?php if ($policy->canAct('seguimiento')): ?><button type="button" data-commercial-open-workflow="follow_up"><i class="fas fa-list-check" aria-hidden="true"></i><span>Seguimiento</span></button><?php endif; ?>
-          <?php if ($policy->canAct('postergar')): ?><button type="button" data-commercial-open-workflow="postpone"><i class="fas fa-clock-rotate-left" aria-hidden="true"></i><span>Postergar</span></button><?php endif; ?>
-          <?php if ($policy->canAct('activar')): ?><button type="button" data-commercial-open-workflow="activate"><i class="fas fa-circle-play" aria-hidden="true"></i><span>Activar</span></button><?php endif; ?>
-          <?php if ($policy->canAct('cerrar')): ?><button type="button" class="commercial-case-action--danger" data-commercial-open-workflow="close"><i class="fas fa-circle-check" aria-hidden="true"></i><span>Cerrar</span></button><?php endif; ?>
-          <?php if ($policy->canAct('cambiar_estado')): ?><button type="button" data-commercial-open-workflow="status"><i class="fas fa-arrow-right-arrow-left" aria-hidden="true"></i><span>Cambiar estado</span></button><?php endif; ?>
-          <?php if ($policy->canAct('reasignar')): ?><button type="button" data-commercial-open-workflow="reassign"><i class="fas fa-user-pen" aria-hidden="true"></i><span>Reasignar</span></button><?php endif; ?>
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-space-lg pt-space-md">
+    <!-- Columna Izquierda: Acciones y Resumen -->
+    <aside class="space-y-space-md" aria-label="Resumen de la tarea">
+      <!-- Acciones de Gestión -->
+      <section class="bg-surface-container-low p-space-md rounded-2xl space-y-space-xs" aria-labelledby="commercial-case-actions-title">
+        <div class="pb-1 border-b border-surface-container">
+          <span class="font-label-sm text-secondary uppercase font-semibold">Gestión Operativa</span>
+          <h3 id="commercial-case-actions-title" class="font-headline-sm text-[16px] text-on-surface font-semibold">Acciones de la tarea</h3>
+        </div>
+        <div class="grid grid-cols-2 gap-2 pt-1">
+          <button type="button" class="col-span-2 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-primary-container hover:bg-primary-fixed-dim text-on-surface font-label-md font-semibold transition-all shadow-sm cursor-pointer" data-commercial-assistant data-ticket-pk="<?php echo esc_attr((string) $pk); ?>">
+            <span class="material-symbols-outlined text-[18px]">auto_awesome</span>
+            <span>Analizar con IA</span>
+          </button>
+          <?php if ($policy->canAct('responder')): ?>
+            <button type="button" class="flex items-center gap-1.5 p-2 rounded-xl bg-surface-container-lowest hover:bg-surface-container text-on-surface font-label-sm font-semibold transition-colors cursor-pointer border border-surface-container" data-commercial-open-workflow="reply">
+              <span class="material-symbols-outlined text-[16px] text-secondary">reply</span>
+              <span>Responder</span>
+            </button>
+          <?php endif; ?>
+          <?php if ($policy->canAct('agregar_nota')): ?>
+            <button type="button" class="flex items-center gap-1.5 p-2 rounded-xl bg-surface-container-lowest hover:bg-surface-container text-on-surface font-label-sm font-semibold transition-colors cursor-pointer border border-surface-container" data-commercial-open-workflow="note">
+              <span class="material-symbols-outlined text-[16px] text-secondary">note_alt</span>
+              <span>Nota interna</span>
+            </button>
+          <?php endif; ?>
+          <?php if ($policy->canAct('seguimiento')): ?>
+            <button type="button" class="flex items-center gap-1.5 p-2 rounded-xl bg-surface-container-lowest hover:bg-surface-container text-on-surface font-label-sm font-semibold transition-colors cursor-pointer border border-surface-container" data-commercial-open-workflow="follow_up">
+              <span class="material-symbols-outlined text-[16px] text-secondary">checklist</span>
+              <span>Seguimiento</span>
+            </button>
+          <?php endif; ?>
+          <?php if ($policy->canAct('postergar')): ?>
+            <button type="button" class="flex items-center gap-1.5 p-2 rounded-xl bg-surface-container-lowest hover:bg-surface-container text-on-surface font-label-sm font-semibold transition-colors cursor-pointer border border-surface-container" data-commercial-open-workflow="postpone">
+              <span class="material-symbols-outlined text-[16px] text-secondary">history</span>
+              <span>Postergar</span>
+            </button>
+          <?php endif; ?>
+          <?php if ($policy->canAct('activar')): ?>
+            <button type="button" class="flex items-center gap-1.5 p-2 rounded-xl bg-surface-container-lowest hover:bg-surface-container text-on-surface font-label-sm font-semibold transition-colors cursor-pointer border border-surface-container" data-commercial-open-workflow="activate">
+              <span class="material-symbols-outlined text-[16px] text-secondary">play_circle</span>
+              <span>Activar</span>
+            </button>
+          <?php endif; ?>
+          <?php if ($policy->canAct('cerrar')): ?>
+            <button type="button" class="flex items-center gap-1.5 p-2 rounded-xl bg-error-container hover:bg-error/20 text-on-error-container font-label-sm font-semibold transition-colors cursor-pointer" data-commercial-open-workflow="close">
+              <span class="material-symbols-outlined text-[16px]">check_circle</span>
+              <span>Cerrar</span>
+            </button>
+          <?php endif; ?>
+          <?php if ($policy->canAct('cambiar_estado')): ?>
+            <button type="button" class="flex items-center gap-1.5 p-2 rounded-xl bg-surface-container-lowest hover:bg-surface-container text-on-surface font-label-sm font-semibold transition-colors cursor-pointer border border-surface-container" data-commercial-open-workflow="status">
+              <span class="material-symbols-outlined text-[16px] text-secondary">sync_alt</span>
+              <span>Estado</span>
+            </button>
+          <?php endif; ?>
+          <?php if ($policy->canAct('reasignar')): ?>
+            <button type="button" class="flex items-center gap-1.5 p-2 rounded-xl bg-surface-container-lowest hover:bg-surface-container text-on-surface font-label-sm font-semibold transition-colors cursor-pointer border border-surface-container" data-commercial-open-workflow="reassign">
+              <span class="material-symbols-outlined text-[16px] text-secondary">manage_accounts</span>
+              <span>Reasignar</span>
+            </button>
+          <?php endif; ?>
         </div>
       </section>
 
       <?php echo self::renderAnalysesList($pk, $analyses); ?>
 
-      <section class="commercial-case-summary">
-        <h3>Resumen</h3>
-        <dl>
-          <?php echo self::detailRow('Solicitante', $requester, 'fa-user'); ?>
-          <?php echo self::detailRow('Correo', trim((string) ($ticket['correo_solicitante'] ?? '')) ?: 'No registrado', 'fa-envelope'); ?>
-          <?php echo self::detailRow('Celular', trim((string) ($ticket['celular_solicitante'] ?? '')) ?: 'No registrado', 'fa-phone'); ?>
-          <?php echo self::detailRow('Responsable', $assignee, 'fa-user-tie'); ?>
+      <!-- Resumen de Datos -->
+      <section class="bg-surface-container-low p-space-md rounded-2xl space-y-space-xs">
+        <h3 class="font-headline-sm text-[16px] text-on-surface font-semibold pb-1 border-b border-surface-container">Resumen</h3>
+        <dl class="space-y-2 text-body-sm pt-1">
+          <?php echo self::detailRow('Solicitante', $requester, 'person'); ?>
+          <?php echo self::detailRow('Correo', trim((string) ($ticket['correo_solicitante'] ?? '')) ?: 'No registrado', 'mail'); ?>
+          <?php echo self::detailRow('Celular', trim((string) ($ticket['celular_solicitante'] ?? '')) ?: 'No registrado', 'phone'); ?>
+          <?php echo self::detailRow('Responsable', $assignee, 'badge'); ?>
           <?php echo self::propertyRow($ticket); ?>
-          <?php echo self::detailRow('Prioridad', trim((string) ($ticket['prioridad'] ?? '')) ?: 'No definida', 'fa-flag'); ?>
-          <?php echo self::detailRow('Medio', trim((string) ($ticket['medio'] ?? '')) ?: 'No registrado', 'fa-message'); ?>
-          <?php echo self::detailRow('Actualizado', self::formatDate($ticket['fecha_actualizacion'] ?? $ticket['fecha'] ?? 0), 'fa-clock'); ?>
+          <?php echo self::detailRow('Prioridad', trim((string) ($ticket['prioridad'] ?? '')) ?: 'No definida', 'flag'); ?>
+          <?php echo self::detailRow('Medio', trim((string) ($ticket['medio'] ?? '')) ?: 'No registrado', 'chat'); ?>
+          <?php echo self::detailRow('Actualizado', self::formatDate($ticket['fecha_actualizacion'] ?? $ticket['fecha'] ?? 0), 'schedule'); ?>
         </dl>
       </section>
     </aside>
 
-    <section class="commercial-case-main">
-      <div class="commercial-workflow-stack" data-commercial-workflow-stack hidden>
+    <!-- Columna Derecha: Formularios Activos y Timeline -->
+    <section class="lg:col-span-2 space-y-space-md">
+      <!-- Contenedor de Formularios de Workflow -->
+      <div class="commercial-workflow-stack space-y-space-md" data-commercial-workflow-stack hidden>
         <?php if ($policy->canAct('responder')): ?>
           <?php echo self::messageForm($pk, 'reply', 'Responder al solicitante', 'Escribe una respuesta clara para el cliente.', 'respuesta', 'Escribe la respuesta de la tarea…', 'Enviar respuesta', true, false, true); ?>
         <?php endif; ?>
         <?php if ($policy->canAct('agregar_nota')): ?>
-          <?php echo self::messageForm($pk, 'note', 'Agregar nota interna', 'Sólo será visible para el equipo.', 'observacion', 'Escribe una nota interna…', 'Guardar nota'); ?>
+          <?php echo self::messageForm($pk, 'note', 'Agregar nota interna', 'Sólo será visible para el equipo interno.', 'observacion', 'Escribe una nota interna…', 'Guardar nota'); ?>
         <?php endif; ?>
         <?php if ($policy->canAct('seguimiento')): ?>
-          <?php echo self::messageForm($pk, 'follow_up', 'Registrar seguimiento', 'Deja constancia de la gestión realizada.', 'observacion', 'Describe el seguimiento…', 'Guardar seguimiento', true, false, true); ?>
+          <?php echo self::messageForm($pk, 'follow_up', 'Registrar seguimiento', 'Deja constancia de la gestión comercial realizada.', 'observacion', 'Describe el seguimiento…', 'Guardar seguimiento', true, false, true); ?>
         <?php endif; ?>
         <?php if ($policy->canAct('postergar')): ?>
           <?php echo self::messageForm($pk, 'postpone', 'Postergar tarea', 'La tarea pasará al estado comercial Postergado.', 'observacion', 'Indica el motivo de la postergación…', 'Postergar tarea', true, true, true); ?>
@@ -102,38 +171,56 @@ final class CommercialTicketModalView
         <?php endif; ?>
       </div>
 
-      <section class="commercial-timeline" aria-labelledby="commercial-timeline-title">
-        <div class="commercial-case-section-title commercial-case-section-title--stacked">
-          <div><span>Actividad</span><h3 id="commercial-timeline-title">Historial de la tarea</h3></div>
-          <div class="commercial-timeline-counts" aria-label="Resumen del historial">
-            <strong><?php echo esc_html((string) count($timeline)); ?> registros</strong>
-            <small><?php echo esc_html((string) $timelineCounts['respuesta']); ?> respuestas</small>
-            <small><?php echo esc_html((string) $timelineCounts['seguimiento']); ?> seguimientos</small>
-            <small><?php echo esc_html((string) $timelineCounts['nota']); ?> notas</small>
+      <!-- Historial de la Tarea (Timeline) -->
+      <section class="bg-surface-container-low p-space-lg rounded-2xl space-y-space-md" aria-labelledby="commercial-timeline-title">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-space-xs pb-space-sm border-b border-surface-container">
+          <div>
+            <span class="font-label-sm text-secondary uppercase font-semibold">Trazabilidad</span>
+            <h3 id="commercial-timeline-title" class="font-headline-sm text-headline-sm text-on-surface">Historial de la tarea</h3>
+          </div>
+          <div class="flex items-center gap-1.5 font-label-sm text-label-sm">
+            <span class="px-2.5 py-0.5 rounded-full bg-surface-container font-semibold"><?php echo esc_html((string) count($timeline)); ?> registros</span>
+            <span class="px-2 py-0.5 rounded-full bg-surface-container-lowest text-secondary"><?php echo esc_html((string) $timelineCounts['respuesta']); ?> respuestas</span>
+            <span class="px-2 py-0.5 rounded-full bg-surface-container-lowest text-secondary"><?php echo esc_html((string) $timelineCounts['seguimiento']); ?> seguimientos</span>
+            <span class="px-2 py-0.5 rounded-full bg-surface-container-lowest text-secondary"><?php echo esc_html((string) $timelineCounts['nota']); ?> notas</span>
           </div>
         </div>
+
         <?php if ($timeline === []): ?>
-          <div class="commercial-timeline-empty"><i class="far fa-comments" aria-hidden="true"></i><p>Aún no hay respuestas, seguimientos o notas para esta tarea.</p></div>
+          <div class="py-12 text-center text-secondary">
+            <span class="material-symbols-outlined text-[36px] text-secondary/40 block mb-1">chat</span>
+            <p class="font-body-md text-on-surface">Aún no hay respuestas, seguimientos o notas registradas para esta tarea.</p>
+          </div>
         <?php else: ?>
-          <ol>
+          <ol class="space-y-space-md">
             <?php foreach ($timeline as $item):
               $type = (string) ($item['type'] ?? 'respuesta');
-              $labels = ['respuesta' => 'Respuesta', 'seguimiento' => 'Seguimiento', 'nota' => 'Nota interna'];
+              $labels = ['respuesta' => 'Respuesta al cliente', 'seguimiento' => 'Seguimiento', 'nota' => 'Nota interna'];
               $author = trim((string) ($item['nombre'] ?? '')) ?: 'Sistema';
               $actorId = trim((string) ($item['actor_id'] ?? ''));
               $actorEmail = trim((string) ($item['actor_email'] ?? ''));
+
+              $icon = 'chat';
+              $bubbleTone = 'bg-surface-container-lowest border border-surface-container';
+              if ($type === 'respuesta') {
+                $icon = 'reply';
+                $bubbleTone = 'bg-primary-container/20 border border-primary-container/40';
+              } elseif ($type === 'nota') {
+                $icon = 'lock';
+                $bubbleTone = 'bg-tertiary-fixed/30 border border-tertiary-fixed';
+              }
             ?>
-              <li class="commercial-timeline-item commercial-timeline-item--<?php echo esc_attr($type); ?>">
-                <span class="commercial-timeline-icon" aria-hidden="true"><?php echo esc_html(mb_strtoupper(mb_substr($labels[$type] ?? 'A', 0, 1))); ?></span>
-                <div>
-                  <header>
-                    <span><?php echo esc_html(($labels[$type] ?? 'Actividad') . ' · ' . $author); ?></span>
-                    <time><?php echo esc_html(self::formatDate($item['_timestamp'] ?? $item['fecha'] ?? 0)); ?></time>
-                  </header>
-                  <p><?php echo nl2br(esc_html(trim(wp_strip_all_tags((string) ($item['message'] ?? ''), true)))); ?></p>
-                  <?php echo self::timelineAttachments($item); ?>
-                  <small><?php echo esc_html(self::actorMeta($actorId, $actorEmail)); ?></small>
-                </div>
+              <li class="p-space-md rounded-2xl <?php echo $bubbleTone; ?> space-y-space-xs">
+                <header class="flex items-center justify-between font-label-md text-label-md">
+                  <span class="font-semibold text-on-surface flex items-center gap-1.5">
+                    <span class="material-symbols-outlined text-[16px] text-secondary"><?php echo $icon; ?></span>
+                    <?php echo esc_html(($labels[$type] ?? 'Actividad') . ' · ' . $author); ?>
+                  </span>
+                  <time class="text-secondary font-body-sm text-[12px]"><?php echo esc_html(self::formatDate($item['_timestamp'] ?? $item['fecha'] ?? 0)); ?></time>
+                </header>
+                <p class="font-body-md text-body-md text-on-surface whitespace-pre-wrap"><?php echo nl2br(esc_html(trim(wp_strip_all_tags((string) ($item['message'] ?? ''), true)))); ?></p>
+                <?php echo self::timelineAttachments($item); ?>
+                <div class="text-[11px] text-secondary font-medium pt-1 border-t border-surface-container/60"><?php echo esc_html(self::actorMeta($actorId, $actorEmail)); ?></div>
               </li>
             <?php endforeach; ?>
           </ol>
@@ -142,8 +229,9 @@ final class CommercialTicketModalView
     </section>
   </div>
 
-  <div class="commercial-analysis-modal" data-commercial-analysis-modal role="dialog" aria-modal="true" aria-labelledby="commercial-analysis-title" hidden>
-    <div class="commercial-analysis-card" role="document">
+  <!-- Modal Interno de Análisis IA -->
+  <div class="fixed inset-0 z-50 items-center justify-center p-4 bg-inverse-surface/60 backdrop-blur-sm commercial-analysis-modal" data-commercial-analysis-modal role="dialog" aria-modal="true" aria-labelledby="commercial-analysis-title" hidden>
+    <div class="bg-surface-container-lowest rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] overflow-hidden flex flex-col relative p-space-lg" role="document">
       <div data-commercial-analysis-modal-content></div>
     </div>
   </div>
@@ -156,15 +244,18 @@ final class CommercialTicketModalView
   {
     ob_start();
 ?>
-      <section class="commercial-case-analyses" data-commercial-saved-analyses data-ticket-pk="<?php echo esc_attr((string) $pk); ?>">
-        <div class="commercial-case-section-title">
-          <div><span>Asistente</span><h3>Análisis guardados</h3></div>
-          <strong data-commercial-analysis-count><?php echo esc_html((string) count($analyses)); ?>/3</strong>
+    <section class="bg-surface-container-low p-space-md rounded-2xl space-y-space-xs" data-commercial-saved-analyses data-ticket-pk="<?php echo esc_attr((string) $pk); ?>">
+      <div class="flex items-center justify-between pb-1 border-b border-surface-container">
+        <div>
+          <span class="font-label-sm text-secondary uppercase font-semibold">Inteligencia</span>
+          <h3 class="font-headline-sm text-[16px] text-on-surface font-semibold">Análisis guardados</h3>
         </div>
-        <div class="commercial-analysis-list" data-commercial-analysis-list>
-          <?php echo self::analysisListItems($pk, $analyses); ?>
-        </div>
-      </section>
+        <strong class="font-label-sm text-label-sm bg-surface-container px-2 py-0.5 rounded-full" data-commercial-analysis-count><?php echo esc_html((string) count($analyses)); ?>/3</strong>
+      </div>
+      <div class="space-y-1.5 pt-1" data-commercial-analysis-list>
+        <?php echo self::analysisListItems($pk, $analyses); ?>
+      </div>
+    </section>
 <?php
     return (string) ob_get_clean();
   }
@@ -173,29 +264,36 @@ final class CommercialTicketModalView
   private static function analysisListItems(int $pk, array $analyses): string
   {
     if ($analyses === []) {
-      return '<div class="commercial-analysis-empty"><p>Aún no hay análisis guardados.</p></div>';
+      return '<div class="py-4 text-center text-secondary font-body-sm"><p>Aún no hay análisis guardados.</p></div>';
     }
 
-    $html = '<ol>';
+    $html = '<div class="space-y-2">';
     foreach ($analyses as $analysis) {
       $id = (int) ($analysis['id'] ?? 0);
       $summary = trim((string) ($analysis['resumen'] ?? 'Análisis guardado'));
       $label = trim((string) ($analysis['created_label'] ?? $analysis['generated_at'] ?? 'Sin fecha'));
       $author = trim((string) ($analysis['created_by'] ?? 'Sistema'));
       $json = json_encode($analysis, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE | JSON_PARTIAL_OUTPUT_ON_ERROR);
-      $html .= '<li>'
-        . '<button type="button" class="commercial-analysis-open" data-commercial-open-analysis data-analysis-json="' . esc_attr(is_string($json) ? $json : '{}') . '">'
-        . '<span><strong>' . esc_html($label) . '</strong><small>' . esc_html(mb_substr($summary, 0, 96) . (mb_strlen($summary) > 96 ? '…' : '')) . '</small><em>' . esc_html($author) . '</em></span>'
+
+      $html .= '<div class="flex items-center justify-between p-2 bg-surface-container-lowest rounded-xl border border-surface-container text-body-sm">'
+        . '<button type="button" class="flex-1 text-left cursor-pointer" data-commercial-open-analysis data-analysis-json="' . esc_attr(is_string($json) ? $json : '{}') . '">'
+        . '<strong class="block font-label-md text-on-surface">' . esc_html($label) . '</strong>'
+        . '<span class="block text-secondary text-[12px] line-clamp-1">' . esc_html(mb_strimwidth($summary, 0, 70, '…', 'UTF-8')) . '</span>'
+        . '<small class="text-[11px] text-secondary">' . esc_html($author) . '</small>'
         . '</button>'
-        . '<button type="button" class="commercial-analysis-delete" data-commercial-delete-analysis data-ticket-pk="' . esc_attr((string) $pk) . '" data-analysis-id="' . esc_attr((string) $id) . '" aria-label="Eliminar análisis">Eliminar</button>'
-        . '</li>';
+        . '<button type="button" class="p-1 text-secondary hover:text-error cursor-pointer" data-commercial-delete-analysis data-ticket-pk="' . esc_attr((string) $pk) . '" data-analysis-id="' . esc_attr((string) $id) . '" title="Eliminar análisis"><span class="material-symbols-outlined text-[18px]">delete</span></button>'
+        . '</div>';
     }
-    return $html . '</ol>';
+    $html .= '</div>';
+    return $html;
   }
 
   private static function detailRow(string $label, string $value, string $icon): string
   {
-    return '<div><dt><i class="fas ' . esc_attr($icon) . '" aria-hidden="true"></i>' . esc_html($label) . '</dt><dd>' . esc_html($value) . '</dd></div>';
+    return '<div class="flex items-start justify-between gap-2 py-1 border-b border-surface-container/40 last:border-none">'
+      . '<dt class="text-secondary font-medium flex items-center gap-1.5"><span class="material-symbols-outlined text-[16px]">' . esc_attr($icon) . '</span><span>' . esc_html($label) . '</span></dt>'
+      . '<dd class="text-on-surface font-semibold text-right">' . esc_html($value) . '</dd>'
+      . '</div>';
   }
 
   /** @param array<string,mixed> $ticket */
@@ -213,22 +311,29 @@ final class CommercialTicketModalView
     $url = trim((string) ($ticket['_scm_inmueble_url'] ?? ''));
 
     $parts = array_filter([$type, $neighborhood, $city], static fn(string $value): bool => trim($value) !== '');
-    $html = '<div class="commercial-property-row"><dt><i class="fas fa-location-dot" aria-hidden="true"></i>Inmueble</dt><dd>';
     if ($code === '' && $parts === [] && $address === '') {
-      return $html . 'No registrado</dd></div>';
+      return self::detailRow('Inmueble', 'No registrado', 'apartment');
     }
 
-    $html .= '<span class="commercial-property-main">' . esc_html($code !== '' ? ('Código ' . $code) : 'Inmueble registrado') . '</span>';
-    if ($parts !== []) {
-      $html .= '<span class="commercial-property-meta">' . esc_html(implode(' · ', $parts)) . '</span>';
-    }
-    if ($address !== '') {
-      $html .= '<span class="commercial-property-address">' . esc_html($address) . '</span>';
-    }
-    if ($url !== '') {
-      $html .= '<a class="commercial-property-link" href="' . esc_url($url) . '" target="_blank" rel="noopener noreferrer">Ver inmueble</a>';
-    }
-    return $html . '</dd></div>';
+    $mainText = $code !== '' ? ('Código ' . $code) : 'Inmueble registrado';
+    $subText = implode(' · ', $parts);
+
+    ob_start();
+?>
+    <div class="flex flex-col py-1 border-b border-surface-container/40">
+      <dt class="text-secondary font-medium flex items-center gap-1.5">
+        <span class="material-symbols-outlined text-[16px]">apartment</span>
+        <span>Inmueble</span>
+      </dt>
+      <dd class="mt-0.5">
+        <span class="block font-semibold text-on-surface"><?php echo esc_html($mainText); ?></span>
+        <?php if ($subText !== ''): ?><span class="block text-[12px] text-secondary"><?php echo esc_html($subText); ?></span><?php endif; ?>
+        <?php if ($address !== ''): ?><span class="block text-[12px] text-secondary"><?php echo esc_html($address); ?></span><?php endif; ?>
+        <?php if ($url !== ''): ?><a class="text-primary hover:underline text-[12px] font-semibold mt-0.5 inline-block" href="<?php echo esc_url($url); ?>" target="_blank" rel="noopener noreferrer">Abrir ficha técnica</a><?php endif; ?>
+      </dd>
+    </div>
+<?php
+    return (string) ob_get_clean();
   }
 
   /**
@@ -259,34 +364,100 @@ final class CommercialTicketModalView
     return $parts !== [] ? implode(' · ', $parts) : 'Autor registrado en historial';
   }
 
-  private static function messageForm(int $pk, string $action, string $title, string $help, string $field, string $placeholder, string $submit, bool $notify = false, bool $danger = false, bool $attachments = false): string
-  {
+  private static function messageForm(
+    int $pk,
+    string $action,
+    string $title,
+    string $help,
+    string $field,
+    string $placeholder,
+    string $submit,
+    bool $notify = false,
+    bool $danger = false,
+    bool $attachments = false
+  ): string {
     ob_start();
 ?>
-    <form class="commercial-workflow-form<?php echo $danger ? ' commercial-workflow-form--warning' : ''; ?>" data-commercial-workflow-form="<?php echo esc_attr($action); ?>" hidden>
-      <header><div><h3><?php echo esc_html($title); ?></h3><p><?php echo esc_html($help); ?></p></div><button type="button" data-commercial-close-workflow aria-label="Cerrar formulario">&times;</button></header>
+    <form class="bg-surface-container-lowest p-space-lg rounded-2xl shadow-sm border border-surface-container space-y-space-sm commercial-workflow-form" data-commercial-workflow-form="<?php echo esc_attr($action); ?>" hidden>
+      <div class="flex items-center justify-between pb-space-xs border-b border-surface-container">
+        <div>
+          <h3 class="font-headline-sm text-headline-sm text-on-surface"><?php echo esc_html($title); ?></h3>
+          <p class="font-body-sm text-body-sm text-on-surface-variant"><?php echo esc_html($help); ?></p>
+        </div>
+        <button type="button" class="w-8 h-8 rounded-full hover:bg-surface-container text-secondary flex items-center justify-center cursor-pointer" data-commercial-close-workflow aria-label="Cerrar formulario">
+          <span class="material-symbols-outlined text-[18px]">close</span>
+        </button>
+      </div>
       <input type="hidden" name="ticket_pk" value="<?php echo esc_attr((string) $pk); ?>">
-      <label><span>Mensaje <em>*</em></span><textarea name="<?php echo esc_attr($field); ?>" rows="5" required placeholder="<?php echo esc_attr($placeholder); ?>"></textarea></label>
-      <?php if ($attachments): ?><?php echo self::attachmentFields(); ?><?php endif; ?>
-      <?php if ($notify): ?><label class="commercial-checkbox"><input type="checkbox" name="notificar_solicitante" value="1"<?php echo $action === 'reply' ? ' checked' : ''; ?>><span>Notificar por correo al solicitante</span></label><?php endif; ?>
-      <footer><span class="commercial-form-message" aria-live="polite"></span><button type="button" class="commercial-secondary-btn" data-commercial-close-workflow>Cancelar</button><button type="submit" class="commercial-primary-btn"><?php echo esc_html($submit); ?></button></footer>
+      <div class="space-y-1">
+        <label class="block font-label-sm text-secondary font-medium">Mensaje <em class="text-error">*</em></label>
+        <textarea name="<?php echo esc_attr($field); ?>" rows="4" required placeholder="<?php echo esc_attr($placeholder); ?>" class="w-full p-space-sm bg-surface-container-low rounded-xl font-body-sm outline-none border border-transparent focus:border-outline-variant"></textarea>
+      </div>
+      <?php if ($attachments): ?>
+        <?php echo self::attachmentFields(); ?>
+      <?php endif; ?>
+      <?php if ($notify): ?>
+        <label class="flex items-center gap-2 cursor-pointer font-body-sm text-on-surface">
+          <input type="checkbox" name="notificar_solicitante" value="1"<?php echo $action === 'reply' ? ' checked' : ''; ?> class="rounded text-primary">
+          <span>Notificar por correo al solicitante</span>
+        </label>
+      <?php endif; ?>
+      <div class="flex items-center justify-end gap-space-sm pt-space-xs">
+        <span class="font-body-sm text-error mr-auto" data-commercial-form-message aria-live="polite"></span>
+        <button type="button" class="px-space-md py-2 bg-surface-container hover:bg-surface-container-high text-on-surface rounded-xl font-label-md transition-colors cursor-pointer" data-commercial-close-workflow>Cancelar</button>
+        <button type="submit" class="px-space-lg py-2 bg-inverse-surface hover:bg-secondary text-on-secondary rounded-xl font-label-md font-semibold transition-all shadow-sm cursor-pointer"><?php echo esc_html($submit); ?></button>
+      </div>
     </form>
 <?php
     return (string) ob_get_clean();
   }
 
   /** @param array<int,string> $statuses */
-  private static function statusMessageForm(int $pk, string $action, string $title, string $help, string $field, array $statuses, string $selected, string $submit, bool $danger = false, bool $attachments = false): string
-  {
+  private static function statusMessageForm(
+    int $pk,
+    string $action,
+    string $title,
+    string $help,
+    string $field,
+    array $statuses,
+    string $selected,
+    string $submit,
+    bool $danger = false,
+    bool $attachments = false
+  ): string {
     ob_start();
 ?>
-    <form class="commercial-workflow-form<?php echo $danger ? ' commercial-workflow-form--danger' : ''; ?>" data-commercial-workflow-form="<?php echo esc_attr($action); ?>" hidden>
-      <header><div><h3><?php echo esc_html($title); ?></h3><p><?php echo esc_html($help); ?></p></div><button type="button" data-commercial-close-workflow aria-label="Cerrar formulario">&times;</button></header>
+    <form class="bg-surface-container-lowest p-space-lg rounded-2xl shadow-sm border border-surface-container space-y-space-sm commercial-workflow-form" data-commercial-workflow-form="<?php echo esc_attr($action); ?>" hidden>
+      <div class="flex items-center justify-between pb-space-xs border-b border-surface-container">
+        <div>
+          <h3 class="font-headline-sm text-headline-sm text-on-surface"><?php echo esc_html($title); ?></h3>
+          <p class="font-body-sm text-body-sm text-on-surface-variant"><?php echo esc_html($help); ?></p>
+        </div>
+        <button type="button" class="w-8 h-8 rounded-full hover:bg-surface-container text-secondary flex items-center justify-center cursor-pointer" data-commercial-close-workflow aria-label="Cerrar formulario">
+          <span class="material-symbols-outlined text-[18px]">close</span>
+        </button>
+      </div>
       <input type="hidden" name="ticket_pk" value="<?php echo esc_attr((string) $pk); ?>">
-      <label><span>Estado comercial <em>*</em></span><select name="estado" required><?php foreach ($statuses as $status): ?><option value="<?php echo esc_attr($status); ?>"<?php selected($selected, $status); ?>><?php echo esc_html($status); ?></option><?php endforeach; ?></select></label>
-      <label><span>Motivo <em>*</em></span><textarea name="<?php echo esc_attr($field); ?>" rows="4" required placeholder="Describe el motivo de esta acción…"></textarea></label>
-      <?php if ($attachments): ?><?php echo self::attachmentFields(); ?><?php endif; ?>
-      <footer><span class="commercial-form-message" aria-live="polite"></span><button type="button" class="commercial-secondary-btn" data-commercial-close-workflow>Cancelar</button><button type="submit" class="<?php echo $danger ? 'commercial-danger-btn' : 'commercial-primary-btn'; ?>"><?php echo esc_html($submit); ?></button></footer>
+      <div class="space-y-1">
+        <label class="block font-label-sm text-secondary font-medium">Estado comercial <em class="text-error">*</em></label>
+        <select name="estado" required class="w-full px-3 py-2 bg-surface-container-low rounded-xl font-body-sm outline-none">
+          <?php foreach ($statuses as $st): ?>
+            <option value="<?php echo esc_attr($st); ?>"<?php selected($selected, $st); ?>><?php echo esc_html($st); ?></option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+      <div class="space-y-1">
+        <label class="block font-label-sm text-secondary font-medium">Motivo <em class="text-error">*</em></label>
+        <textarea name="<?php echo esc_attr($field); ?>" rows="3" required placeholder="Describe el motivo de esta acción…" class="w-full p-space-sm bg-surface-container-low rounded-xl font-body-sm outline-none border border-transparent focus:border-outline-variant"></textarea>
+      </div>
+      <?php if ($attachments): ?>
+        <?php echo self::attachmentFields(); ?>
+      <?php endif; ?>
+      <div class="flex items-center justify-end gap-space-sm pt-space-xs">
+        <span class="font-body-sm text-error mr-auto" data-commercial-form-message aria-live="polite"></span>
+        <button type="button" class="px-space-md py-2 bg-surface-container hover:bg-surface-container-high text-on-surface rounded-xl font-label-md transition-colors cursor-pointer" data-commercial-close-workflow>Cancelar</button>
+        <button type="submit" class="px-space-lg py-2 <?php echo $danger ? 'bg-error text-on-error' : 'bg-inverse-surface hover:bg-secondary text-on-secondary'; ?> rounded-xl font-label-md font-semibold transition-all shadow-sm cursor-pointer"><?php echo esc_html($submit); ?></button>
+      </div>
     </form>
 <?php
     return (string) ob_get_clean();
@@ -297,25 +468,27 @@ final class CommercialTicketModalView
     $docAccept = 'image/jpeg,image/png,application/pdf,application/msword,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/zip,application/x-rar-compressed,text/html,text/plain,text/csv';
     ob_start();
 ?>
-      <fieldset class="commercial-attachment-fields">
-        <legend>Soportes opcionales</legend>
-        <label>
-          <span>Evidencia en imagen</span>
-          <input type="file" name="evidencia[]" accept="image/jpeg,image/png,image/gif,image/webp,image/bmp,image/heic,image/heif,image/tiff" multiple>
+    <div class="bg-surface-container-low p-space-sm rounded-xl space-y-2 border border-surface-container">
+      <span class="block font-label-sm font-semibold text-secondary">Soportes y Evidencias Opcionales</span>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <label class="block space-y-1">
+          <span class="block text-[11px] text-secondary">Subir archivo</span>
+          <input type="file" name="evidencia[]" accept="image/jpeg,image/png,image/gif,image/webp,image/bmp,image/heic,image/heif,image/tiff" multiple class="block w-full text-[12px] text-secondary file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:bg-surface-container file:text-on-surface file:font-semibold">
         </label>
-        <div class="commercial-paste-evidence scm-paste-evidence" tabindex="0" role="button" data-scm-paste-evidence data-file-input-name="evidencia[]">
-          <strong>Pegar captura</strong>
-          <span>Haz clic aquí y presiona Ctrl+V para adjuntar una imagen copiada.</span>
-          <ul data-scm-paste-list></ul>
+        <div class="p-2 bg-surface-container-lowest rounded-lg border border-dashed border-secondary/40 text-center cursor-pointer scm-paste-evidence" tabindex="0" role="button" data-scm-paste-evidence data-file-input-name="evidencia[]">
+          <span class="block font-label-sm font-semibold text-primary">Pegar captura (Ctrl+V)</span>
+          <span class="block text-[10px] text-secondary">Haz clic y presiona Ctrl+V</span>
+          <ul data-scm-paste-list class="text-[11px] text-left"></ul>
         </div>
-        <div class="commercial-ticket-documents-zone scm-ticket-documents-zone" data-ticket-documents-zone>
-          <div class="commercial-ticket-documents-label">Documentos opcionales</div>
-          <div class="commercial-ticket-documents scm-ticket-documents" data-ticket-documents></div>
-          <button type="button" class="commercial-secondary-btn commercial-add-ticket-document" data-add-ticket-document data-document-accept="<?php echo esc_attr($docAccept); ?>">
-            <i class="fas fa-paperclip" aria-hidden="true"></i> Agregar documento
-          </button>
-        </div>
-      </fieldset>
+      </div>
+      <div class="scm-ticket-documents-zone" data-ticket-documents-zone>
+        <div class="scm-ticket-documents" data-ticket-documents></div>
+        <button type="button" class="mt-1 px-3 py-1 bg-surface-container hover:bg-surface-container-high text-on-surface rounded-lg font-label-sm font-semibold inline-flex items-center gap-1 cursor-pointer" data-add-ticket-document data-document-accept="<?php echo esc_attr($docAccept); ?>">
+          <span class="material-symbols-outlined text-[16px]">attach_file</span>
+          <span>Agregar documento</span>
+        </button>
+      </div>
+    </div>
 <?php
     return (string) ob_get_clean();
   }
@@ -329,18 +502,18 @@ final class CommercialTicketModalView
       return '';
     }
 
-    $html = '<div class="commercial-timeline-attachments">';
+    $html = '<div class="space-y-2 pt-1">';
     if ($images !== []) {
-      $html .= '<div class="commercial-timeline-images" aria-label="Evidencias adjuntas">';
+      $html .= '<div class="flex flex-wrap gap-2">';
       foreach ($images as $url) {
-        $html .= '<a href="' . esc_url($url) . '" target="_blank" rel="noopener noreferrer">'
-          . '<img src="' . esc_url($url) . '" alt="Evidencia adjunta" loading="lazy">'
+        $html .= '<a href="' . esc_url($url) . '" target="_blank" rel="noopener noreferrer" class="block w-20 h-20 rounded-xl overflow-hidden border border-surface-container shadow-sm hover:opacity-90 transition-opacity">'
+          . '<img src="' . esc_url($url) . '" alt="Evidencia adjunta" class="w-full h-full object-cover" loading="lazy">'
           . '</a>';
       }
       $html .= '</div>';
     }
     if ($documents !== []) {
-      $html .= '<div class="commercial-timeline-documents" aria-label="Documentos adjuntos">';
+      $html .= '<div class="flex flex-wrap gap-2">';
       foreach ($documents as $doc) {
         $url = trim((string) ($doc['archivo'] ?? ''));
         if ($url === '' || !filter_var($url, FILTER_VALIDATE_URL)) {
@@ -350,12 +523,12 @@ final class CommercialTicketModalView
         if ($label === '') {
           $label = basename((string) parse_url($url, PHP_URL_PATH)) ?: 'Ver documento';
         }
-        $html .= '<a href="' . esc_url($url) . '" target="_blank" rel="noopener noreferrer"><i class="fas fa-file-lines" aria-hidden="true"></i>' . esc_html($label) . '</a>';
+        $html .= '<a href="' . esc_url($url) . '" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface font-label-sm font-semibold transition-colors"><span class="material-symbols-outlined text-[16px]">description</span>' . esc_html($label) . '</a>';
       }
       $html .= '</div>';
     }
-
-    return $html . '</div>';
+    $html .= '</div>';
+    return $html;
   }
 
   /** @param mixed $raw @return array<int,string> */
@@ -455,11 +628,30 @@ final class CommercialTicketModalView
   {
     ob_start();
 ?>
-    <form class="commercial-workflow-form" data-commercial-workflow-form="<?php echo esc_attr($action); ?>" hidden>
-      <header><div><h3><?php echo esc_html($title); ?></h3><p>Actualiza la etapa del embudo comercial.</p></div><button type="button" data-commercial-close-workflow aria-label="Cerrar formulario">&times;</button></header>
+    <form class="bg-surface-container-lowest p-space-lg rounded-2xl shadow-sm border border-surface-container space-y-space-sm commercial-workflow-form" data-commercial-workflow-form="<?php echo esc_attr($action); ?>" hidden>
+      <div class="flex items-center justify-between pb-space-xs border-b border-surface-container">
+        <div>
+          <h3 class="font-headline-sm text-headline-sm text-on-surface"><?php echo esc_html($title); ?></h3>
+          <p class="font-body-sm text-body-sm text-on-surface-variant">Actualiza la etapa del embudo comercial.</p>
+        </div>
+        <button type="button" class="w-8 h-8 rounded-full hover:bg-surface-container text-secondary flex items-center justify-center cursor-pointer" data-commercial-close-workflow aria-label="Cerrar formulario">
+          <span class="material-symbols-outlined text-[18px]">close</span>
+        </button>
+      </div>
       <input type="hidden" name="ticket_pk" value="<?php echo esc_attr((string) $pk); ?>">
-      <label><span>Nuevo estado <em>*</em></span><select name="<?php echo esc_attr($field); ?>" required><?php foreach ($options as $option): ?><option value="<?php echo esc_attr($option); ?>"<?php selected($selected, $option); ?>><?php echo esc_html($option); ?></option><?php endforeach; ?></select></label>
-      <footer><span class="commercial-form-message" aria-live="polite"></span><button type="button" class="commercial-secondary-btn" data-commercial-close-workflow>Cancelar</button><button type="submit" class="commercial-primary-btn"><?php echo esc_html($submit); ?></button></footer>
+      <div class="space-y-1">
+        <label class="block font-label-sm text-secondary font-medium">Nuevo estado <em class="text-error">*</em></label>
+        <select name="<?php echo esc_attr($field); ?>" required class="w-full px-3 py-2 bg-surface-container-low rounded-xl font-body-sm outline-none">
+          <?php foreach ($options as $option): ?>
+            <option value="<?php echo esc_attr($option); ?>"<?php selected($selected, $option); ?>><?php echo esc_html($option); ?></option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+      <div class="flex items-center justify-end gap-space-sm pt-space-xs">
+        <span class="font-body-sm text-error mr-auto" data-commercial-form-message aria-live="polite"></span>
+        <button type="button" class="px-space-md py-2 bg-surface-container hover:bg-surface-container-high text-on-surface rounded-xl font-label-md transition-colors cursor-pointer" data-commercial-close-workflow>Cancelar</button>
+        <button type="submit" class="px-space-lg py-2 bg-inverse-surface hover:bg-secondary text-on-secondary rounded-xl font-label-md font-semibold transition-all shadow-sm cursor-pointer"><?php echo esc_html($submit); ?></button>
+      </div>
     </form>
 <?php
     return (string) ob_get_clean();
@@ -470,11 +662,33 @@ final class CommercialTicketModalView
   {
     ob_start();
 ?>
-    <form class="commercial-workflow-form" data-commercial-workflow-form="reassign" hidden>
-      <header><div><h3>Reasignar responsable</h3><p>Selecciona un integrante habilitado del equipo comercial.</p></div><button type="button" data-commercial-close-workflow aria-label="Cerrar formulario">&times;</button></header>
+    <form class="bg-surface-container-lowest p-space-lg rounded-2xl shadow-sm border border-surface-container space-y-space-sm commercial-workflow-form" data-commercial-workflow-form="reassign" hidden>
+      <div class="flex items-center justify-between pb-space-xs border-b border-surface-container">
+        <div>
+          <h3 class="font-headline-sm text-headline-sm text-on-surface">Reasignar responsable</h3>
+          <p class="font-body-sm text-body-sm text-on-surface-variant">Selecciona un integrante habilitado del equipo comercial.</p>
+        </div>
+        <button type="button" class="w-8 h-8 rounded-full hover:bg-surface-container text-secondary flex items-center justify-center cursor-pointer" data-commercial-close-workflow aria-label="Cerrar formulario">
+          <span class="material-symbols-outlined text-[18px]">close</span>
+        </button>
+      </div>
       <input type="hidden" name="ticket_pk" value="<?php echo esc_attr((string) $pk); ?>">
-      <label><span>Nuevo responsable <em>*</em></span><select name="id_empleado" required><option value="">Selecciona un funcionario</option><?php foreach ($employees as $employee): $id = (string) ($employee['id'] ?? $employee['id_empleado'] ?? ''); ?><option value="<?php echo esc_attr($id); ?>"<?php selected($selected, $id); ?>><?php echo esc_html((string) ($employee['nombre'] ?? 'Funcionario')); ?></option><?php endforeach; ?></select></label>
-      <footer><span class="commercial-form-message" aria-live="polite"></span><button type="button" class="commercial-secondary-btn" data-commercial-close-workflow>Cancelar</button><button type="submit" class="commercial-primary-btn">Guardar responsable</button></footer>
+      <div class="space-y-1">
+        <label class="block font-label-sm text-secondary font-medium">Nuevo responsable <em class="text-error">*</em></label>
+        <select name="id_empleado" required class="w-full px-3 py-2 bg-surface-container-low rounded-xl font-body-sm outline-none">
+          <option value="">Selecciona un funcionario</option>
+          <?php foreach ($employees as $employee):
+            $id = (string) ($employee['id'] ?? $employee['id_empleado'] ?? '');
+          ?>
+            <option value="<?php echo esc_attr($id); ?>"<?php selected($selected, $id); ?>><?php echo esc_html((string) ($employee['nombre'] ?? 'Funcionario')); ?></option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+      <div class="flex items-center justify-end gap-space-sm pt-space-xs">
+        <span class="font-body-sm text-error mr-auto" data-commercial-form-message aria-live="polite"></span>
+        <button type="button" class="px-space-md py-2 bg-surface-container hover:bg-surface-container-high text-on-surface rounded-xl font-label-md transition-colors cursor-pointer" data-commercial-close-workflow>Cancelar</button>
+        <button type="submit" class="px-space-lg py-2 bg-inverse-surface hover:bg-secondary text-on-secondary rounded-xl font-label-md font-semibold transition-all shadow-sm cursor-pointer">Guardar responsable</button>
+      </div>
     </form>
 <?php
     return (string) ob_get_clean();

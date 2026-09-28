@@ -325,6 +325,35 @@ final class CommercialTicketsRepository
       $signs
     );
 
+    $overdueAdvisors = [];
+    foreach ($openSlaRows as $row) {
+      if (($row['scm_sla_status'] ?? '') === 'atrasado') {
+        $empId = trim((string) ($row['id_empleado'] ?? ''));
+        $empName = trim((string) ($row['nombre_empleado'] ?? 'Sin asignar')) ?: 'Sin asignar';
+        if (!isset($overdueAdvisors[$empName])) {
+          $parts = preg_split('/\s+/', $empName);
+          $initials = '';
+          if (!empty($parts[0])) {
+            $initials .= mb_substr($parts[0], 0, 1, 'UTF-8');
+          }
+          if (!empty($parts[1])) {
+            $initials .= mb_substr($parts[1], 0, 1, 'UTF-8');
+          }
+          if ($initials === '') {
+            $initials = 'KY';
+          }
+          $overdueAdvisors[$empName] = [
+            'id' => $empId,
+            'name' => $empName,
+            'initials' => mb_strtoupper($initials, 'UTF-8'),
+            'count' => 0,
+          ];
+        }
+        $overdueAdvisors[$empName]['count']++;
+      }
+    }
+    uasort($overdueAdvisors, static fn(array $a, array $b): int => (int) ($b['count'] ?? 0) <=> (int) ($a['count'] ?? 0));
+
     return [
       'generated_at' => time(),
       'scope_employee' => trim((string) ($scopedFilters['id_empleado'] ?? '')),
@@ -339,6 +368,7 @@ final class CommercialTicketsRepository
       'signs' => $signs,
       'alerts' => $alerts,
       'priority_tasks' => $this->priorityOpenTasksFromRows($openSlaRows, 6),
+      'overdue_advisors' => array_values($overdueAdvisors),
     ];
   }
 

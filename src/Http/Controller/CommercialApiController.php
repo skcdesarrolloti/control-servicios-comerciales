@@ -80,13 +80,16 @@ final class CommercialApiController
     $tabCounts['mis_tickets'] = (int) ($myTabCounts['mis_tickets'] ?? 0);
     $html = '';
     if ($bucket === 'inicio') {
+      $result = $this->tickets->search('abiertos', $filters);
       $html = CommercialDashboardView::renderHome(
         $this->tickets->homeDashboard($globalCountFilters),
         $filters,
         $this->policy,
         $this->baseUrl,
         $ticketEmployees,
-        $this->tickets->filterOptions()
+        $this->tickets->filterOptions(),
+        $result,
+        $tabCounts
       );
     } elseif ($bucket === 'actualizaciones') {
       $html = CommercialDashboardView::renderPropertyUpdatesPage(

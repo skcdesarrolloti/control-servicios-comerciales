@@ -1110,7 +1110,111 @@
     else if (caseModal && caseModal.classList.contains("open")) showCaseModal(false);
     else if (refreshAdvisoryModalRef() && advisoryModal.classList.contains("open")) showAdvisoryModal(false, advisoryModal, advisoryQueueActive);
     else if (permissionModal && permissionModal.classList.contains("open")) setPermissionModal(false);
+    var drawer = document.getElementById("side-drawer");
+    if (drawer && !drawer.classList.contains("translate-x-full")) drawer.classList.add("translate-x-full");
   });
+
+  // Handle drawer open / close
+  function openDrawer(open) {
+    var drawer = document.getElementById("side-drawer");
+    if (!drawer) return;
+    if (open) {
+      drawer.classList.remove("translate-x-full");
+    } else {
+      drawer.classList.add("translate-x-full");
+    }
+  }
+
+  document.addEventListener("click", function (event) {
+    if (event.target.closest("#btn-open-drawer") || event.target.closest("#btn-open-drawer-header")) {
+      event.preventDefault();
+      openDrawer(true);
+      return;
+    }
+    var drawer = document.getElementById("side-drawer");
+    if (drawer && !drawer.classList.contains("translate-x-full")) {
+      if (!event.target.closest("#side-drawer") && !event.target.closest("#btn-open-drawer") && !event.target.closest("#btn-open-drawer-header") && !event.target.closest("[onclick*='side-drawer']")) {
+        openDrawer(false);
+      }
+    }
+  });
+
+  // Quick search in header (Cmd+K / Ctrl+K and Enter)
+  var quickSearch = document.getElementById("quick-search-nav");
+  if (quickSearch) {
+    quickSearch.addEventListener("keydown", function (event) {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        var val = quickSearch.value.trim();
+        var activeForm = root.querySelector("[data-commercial-filter-form]");
+        if (activeForm) {
+          var searchInput = activeForm.querySelector('input[name="busqueda"]');
+          if (searchInput) searchInput.value = val;
+          activeForm.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+        } else {
+          var url = normalizedUrl(window.location.href);
+          url.searchParams.set("busqueda", val);
+          url.searchParams.set("tab", "abiertos");
+          loadTickets(url.href, { focus: false });
+        }
+      }
+    });
+  }
+
+  document.addEventListener("keydown", function (event) {
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+      var qs = document.getElementById("quick-search-nav");
+      if (qs) {
+        event.preventDefault();
+        qs.focus();
+        qs.select();
+      }
+    }
+  });
+
+  // Export visible table to CSV
+  function exportVisibleTableToCsv(filename) {
+    var table = document.getElementById("commercial-tickets-table") || root.querySelector("table");
+    if (!table) return;
+    var rows = Array.from(table.querySelectorAll("tr"));
+    var csvContent = "\uFEFF";
+    rows.forEach(function (row) {
+      var cols = Array.from(row.querySelectorAll("th, td"));
+      if (cols.length === 0) return;
+      var rowData = cols.map(function (col) {
+        var text = col.innerText.replace(/(\r\n|\n|\r)/gm, " ").replace(/\s+/g, " ").trim();
+        return '"' + text.replace(/"/g, '""') + '"';
+      });
+      csvContent += rowData.join(";") + "\r\n";
+    });
+    var blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    var link = document.createElement("a");
+    var url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", filename || "reporte_tareas_comerciales.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  document.addEventListener("click", function (event) {
+    if (event.target.closest("#btn-export-csv") || event.target.closest("#btn-export-report")) {
+      event.preventDefault();
+      exportVisibleTableToCsv("reporte_tareas_" + new Date().toISOString().slice(0, 10) + ".csv");
+      notify("success", "Reporte descargado correctamente en formato CSV.");
+    }
+    if (event.target.closest("#scm-footer-guide")) {
+      event.preventDefault();
+      var guideBtn = document.getElementById("scm-open-guide");
+      if (guideBtn) guideBtn.click();
+    }
+    if (event.target.closest("#scm-footer-permissions")) {
+      event.preventDefault();
+      var permBtn = document.getElementById("commercial-open-permissions");
+      if (permBtn) permBtn.click();
+    }
+  });
+
   window.addEventListener("popstate", function () {
     var url = normalizedUrl(window.location.href);
     var tab = url.searchParams.get("tab") || "abiertos";
