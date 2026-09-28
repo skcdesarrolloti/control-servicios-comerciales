@@ -298,6 +298,127 @@ final class CommercialTicketsRepository
   }
 
   /**
+   * Obtiene la jerarquía de temas de ayuda con sus conteos y los estados comerciales
+   * asociados dentro de cada tema para el menú desplegable interactivo.
+   *
+   * @param array<string,mixed> $filters
+   * @return array<int,array{topic:string,total:int,statuses:array<int,array{status:string,total:int}>}>
+   */
+  public function topicStatusHierarchy(array $filters = []): array
+  {
+    $table = $this->db->table('jet_cct_tickets');
+    $countFilters = $this->navigationCountFilters($filters);
+    [$filterWhere, $filterArgs] = $this->ticketFilterClauses($countFilters);
+
+    $where = [
+      "TRIM(COALESCE(t.`tema_ayuda`, '')) <> ''",
+      "TRIM(COALESCE(t.`estado_comercial`, '')) <> ''",
+    ];
+    $args = [];
+    $where = array_merge($where, $filterWhere);
+    $args = array_merge($args, $filterArgs);
+
+    $rows = $this->db->getResults(
+      'SELECT TRIM(COALESCE(t.`tema_ayuda`, \'\')) AS tema,
+              TRIM(COALESCE(t.`estado_comercial`, \'\')) AS estado,
+              COUNT(*) AS total'
+      . " FROM `{$table}` t WHERE " . implode(' AND ', $where)
+      . ' GROUP BY TRIM(COALESCE(t.`tema_ayuda`, \'\')), TRIM(COALESCE(t.`estado_comercial`, \'\'))'
+      . ' HAVING COUNT(*) > 0'
+      . ' ORDER BY tema ASC, total DESC',
+      $args
+    );
+
+    $grouped = [];
+    foreach ($rows as $row) {
+      $topic = trim((string) ($row['tema'] ?? ''));
+      $status = trim((string) ($row['estado'] ?? ''));
+      $total = (int) ($row['total'] ?? 0);
+      if ($topic === '' || $status === '' || $total <= 0) {
+        continue;
+      }
+      if (!isset($grouped[$topic])) {
+        $grouped[$topic] = [
+          'topic' => $topic,
+          'total' => 0,
+          'statuses' => [],
+        ];
+      }
+      $grouped[$topic]['total'] += $total;
+      $grouped[$topic]['statuses'][] = [
+        'status' => $status,
+        'total' => $total,
+      ];
+    }
+
+    uasort($grouped, static fn(array $a, array $b): int => ($b['total'] <=> $a['total']));
+
+    return array_values($grouped);
+  }
+
+  /**
+   * Obtiene las tareas más recientemente creadas para la campana de notificaciones.
+   * Si $onlyForEmployee es verdadero, filtra exclusivamente por las tareas de ese asesor.
+   *
+   * @param bool $onlyForEmployee
+   * @param string $employeeFilter
+   * @param int $limit
+   * @return array<int,array<string,mixed>>
+   */
+  public function latestCreatedTickets(bool $onlyForEmployee = false, string $employeeFilter = '', int $limit = 10): array
+  {
+    $table = $this->db->table('jet_cct_tickets');
+    $where = ["TRIM(COALESCE(t.`estado_comercial`, '')) <> ''"];
+    $args = [];
+    if ($onlyForEmployee && trim($employeeFilter) !== '') {
+      $employeeIds = array_values(array_unique(array_filter(array_map('trim', explode(',', $employeeFilter)), static fn(string $id): bool => $id !== '')));
+      if (count($employeeIds) > 1) {
+        $where[] = 'TRIM(COALESCE(t.`id_empleado`, \'\')) IN (' . implode(',', array_fill(0, count($employeeIds), '?')) . ')';
+        array_push($args, ...$employeeIds);
+      } else {
+        $where[] = 'TRIM(COALESCE(t.`id_empleado`, \'\')) = ?';
+        $args[] = $employeeIds[0] ?? $employeeFilter;
+      }
+    }
+    $whereSql = implode(' AND ', $where);
+    $sql = "SELECT t.`_ID`, t.`id_ticket`, t.`estado_comercial`, t.`asunto`, t.`solicitante`,
+                   t.`id_empleado`, t.`nombre_empleado`, t.`inmueble`, t.`direccion`, t.`barrio`,
+                   t.`tema_ayuda`, t.`fecha`, t.`cct_created`
+              FROM `{$table}` t
+             WHERE {$whereSql}
+             ORDER BY COALESCE(NULLIF(t.`fecha`, 0), UNIX_TIMESTAMP(t.`cct_created`), 0) DESC, t.`_ID` DESC
+             LIMIT {$limit}";
+
+    return $this->db->getResults($sql, $args);
+  }
+
+  /**
+   * Cuenta total de tareas recientes para el badge de la campana.
+   *
+   * @param bool $onlyForEmployee
+   * @param string $employeeFilter
+   * @return int
+   */
+  public function latestCreatedCount(bool $onlyForEmployee = false, string $employeeFilter = ''): int
+  {
+    $table = $this->db->table('jet_cct_tickets');
+    $where = ["TRIM(COALESCE(t.`estado_comercial`, '')) <> ''"];
+    $args = [];
+    if ($onlyForEmployee && trim($employeeFilter) !== '') {
+      $employeeIds = array_values(array_unique(array_filter(array_map('trim', explode(',', $employeeFilter)), static fn(string $id): bool => $id !== '')));
+      if (count($employeeIds) > 1) {
+        $where[] = 'TRIM(COALESCE(t.`id_empleado`, \'\')) IN (' . implode(',', array_fill(0, count($employeeIds), '?')) . ')';
+        array_push($args, ...$employeeIds);
+      } else {
+        $where[] = 'TRIM(COALESCE(t.`id_empleado`, \'\')) = ?';
+        $args[] = $employeeIds[0] ?? $employeeFilter;
+      }
+    }
+    $whereSql = implode(' AND ', $where);
+    return (int) $this->db->getVar("SELECT COUNT(*) FROM `{$table}` t WHERE {$whereSql}", $args);
+  }
+
+  /**
    * @param array<string,mixed> $filters
    * @return array<string,mixed>
    */

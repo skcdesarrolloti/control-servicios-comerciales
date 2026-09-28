@@ -322,11 +322,15 @@
   }
 
   function setVisiblePanel(tab) {
-    var isCalendar = tab === "calendario";
-    if (ticketsPanel) ticketsPanel.classList.toggle("active", !isCalendar);
-    if (calendarPanel) calendarPanel.classList.toggle("active", isCalendar);
+    if (ticketsPanel) ticketsPanel.classList.add("active");
+    if (calendarPanel) calendarPanel.classList.toggle("active", tab === "calendario");
     setActiveTab(tab);
-    if (isCalendar) root.dispatchEvent(new CustomEvent("scm:refresh-active-tab"));
+    if (tab === "calendario") {
+      root.dispatchEvent(new CustomEvent("scm:refresh-active-tab"));
+      if (typeof window.initCalendarPanel === "function") {
+        window.initCalendarPanel(ticketsPanel || root);
+      }
+    }
   }
 
   function refreshAdvisoryModalRef() {
@@ -410,11 +414,6 @@
     options = options || {};
     var nextUrl = normalizedUrl(url);
     var tab = nextUrl.searchParams.get("tab") || "abiertos";
-    if (tab === "calendario") {
-      setVisiblePanel(tab);
-      if (options.history !== false) updateHistory(nextUrl, !!options.replace);
-      return Promise.resolve();
-    }
     if (!ticketsPanel) return Promise.resolve();
     if (listRequest) listRequest.abort();
     listRequest = new AbortController();
@@ -425,6 +424,7 @@
     var data = new FormData();
     [
       "tab",
+      "subtab",
       "estado",
       "mis_bucket",
       "busqueda",
@@ -470,6 +470,13 @@
         if (options.history !== false) updateHistory(nextUrl, !!options.replace);
         maybeAutoOpenAdvisory();
         initHomeControls();
+        if (tab === "calendario" || ticketsPanel.querySelector("[data-scm-calendar-panel]")) {
+          if (typeof window.initCalendarPanel === "function") {
+            window.initCalendarPanel(ticketsPanel);
+          } else {
+            document.dispatchEvent(new CustomEvent("scm:init-calendar", { detail: { target: ticketsPanel } }));
+          }
+        }
         if (options.focus) {
           var heading = ticketsPanel.querySelector("h2");
           if (heading) {
@@ -870,13 +877,49 @@
       }
       return;
     }
+    var bellBtn = event.target.closest("#btn-notifications-bell");
+    if (bellBtn) {
+      event.preventDefault();
+      var notifDropdown = document.getElementById("scm-notifications-dropdown");
+      if (notifDropdown) {
+        var isHidden = notifDropdown.classList.contains("hidden");
+        notifDropdown.classList.toggle("hidden", !isHidden);
+        bellBtn.setAttribute("aria-expanded", isHidden ? "true" : "false");
+      }
+      return;
+    }
+
+    var closeNotifBtn = event.target.closest("[data-commercial-close-notifications]");
+    if (closeNotifBtn) {
+      event.preventDefault();
+      var notifDropdown = document.getElementById("scm-notifications-dropdown");
+      if (notifDropdown) {
+        notifDropdown.classList.add("hidden");
+        var bell = document.getElementById("btn-notifications-bell");
+        if (bell) bell.setAttribute("aria-expanded", "false");
+      }
+      return;
+    }
+
+    var ddTrigger = event.target.closest("[data-commercial-dropdown-trigger]");
+    if (ddTrigger) {
+      event.preventDefault();
+      var ddKey = ddTrigger.getAttribute("data-commercial-dropdown-trigger");
+      var ddMenu = root.querySelector('[data-commercial-dropdown-menu="' + ddKey + '"]');
+      if (ddMenu) {
+        ddMenu.classList.toggle("!block");
+      }
+      return;
+    }
+
     if (tab) {
       event.preventDefault();
-      var key = tab.getAttribute("data-commercial-tab") || "abiertos";
-      if (key === "calendario") {
-        setVisiblePanel(key);
-        updateHistory(normalizedUrl(tab.href), false);
-      } else loadTickets(tab.href, { focus: true });
+      var notifDropdown = document.getElementById("scm-notifications-dropdown");
+      if (notifDropdown) notifDropdown.classList.add("hidden");
+      root.querySelectorAll("[data-commercial-dropdown-menu].!block").forEach(function (m) {
+        m.classList.remove("!block");
+      });
+      loadTickets(tab.href, { focus: true });
       return;
     }
     if (filterLink) {
@@ -906,12 +949,30 @@
     }
     if (openButton) {
       event.preventDefault();
+      var notifDropdown = document.getElementById("scm-notifications-dropdown");
+      if (notifDropdown) notifDropdown.classList.add("hidden");
       openCase(openButton);
       return;
     }
     if (openAdvisory) {
       event.preventDefault();
       showAdvisoryModal(true, openAdvisory);
+    }
+  });
+
+  document.addEventListener("click", function (event) {
+    if (!event.target.closest('[data-commercial-dropdown="notifications"]')) {
+      var notifDropdown = document.getElementById("scm-notifications-dropdown");
+      if (notifDropdown && !notifDropdown.classList.contains("hidden")) {
+        notifDropdown.classList.add("hidden");
+        var bell = document.getElementById("btn-notifications-bell");
+        if (bell) bell.setAttribute("aria-expanded", "false");
+      }
+    }
+    if (!event.target.closest("[data-commercial-dropdown]")) {
+      root.querySelectorAll("[data-commercial-dropdown-menu].!block").forEach(function (m) {
+        m.classList.remove("!block");
+      });
     }
   });
 
@@ -1217,11 +1278,16 @@
 
   window.addEventListener("popstate", function () {
     var url = normalizedUrl(window.location.href);
-    var tab = url.searchParams.get("tab") || "abiertos";
-    if (tab === "calendario") setVisiblePanel(tab);
-    else loadTickets(url.href, { history: false, focus: true });
+    loadTickets(url.href, { history: false, focus: true });
   });
-  if (activeTab() === "calendario") window.setTimeout(function () { setVisiblePanel("calendario"); }, 0);
+  if (activeTab() === "calendario" || root.querySelector("[data-scm-calendar-panel]")) {
+    window.setTimeout(function () {
+      setVisiblePanel("calendario");
+      if (typeof window.initCalendarPanel === "function") {
+        window.initCalendarPanel(root);
+      }
+    }, 0);
+  }
   if (activeTab() === "inicio") window.setTimeout(maybeAutoOpenAdvisory, 0);
   if (root.querySelector("[data-commercial-home-controls]")) window.setTimeout(initHomeControls, 0);
 })();

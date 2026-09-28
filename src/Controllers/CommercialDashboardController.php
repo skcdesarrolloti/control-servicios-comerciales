@@ -72,6 +72,15 @@ final class CommercialDashboardController
       }
     }
 
+    $subtab = trim((string) ($input['subtab'] ?? 'mine'));
+    if (!in_array($subtab, ['mine', 'team', 'due'], true)) {
+      $subtab = 'mine';
+    }
+    $isNonAdmin = !$policy->canSeeAllCommercialTickets();
+    $recentTickets = $repository->latestCreatedTickets($isNonAdmin, $currentEmployeeFilter, 12);
+    $recentCount = $repository->latestCreatedCount($isNonAdmin, $currentEmployeeFilter);
+    $topicHierarchy = $repository->topicStatusHierarchy($globalCountFilters);
+
     $panelId = $bucket === 'calendario' ? 'scm-panel-actividades-administrativas' : 'scm-panel-' . $bucket;
     $runtime = [
       'ajaxUrl' => rtrim((string) SCM_BASE_URL, '/') . '/api.php',
@@ -85,11 +94,14 @@ final class CommercialDashboardController
         'calendar_current_employee_id' => $currentCalendarEmployeeId,
         'calendar_app_url' => (string) ($this->config['calendar_app_url'] ?? ''),
         'calendar_api_url' => (string) ($this->config['calendar_api_url'] ?? ''),
+        'calendar_initial_subtab' => $subtab,
+        'is_admin' => $policy->canManage(),
       ],
     ];
 
     return CommercialDashboardView::render([
       'bucket' => $bucket,
+      'subtab' => $subtab,
       'filters' => $filters,
       'result' => $result,
       'home_dashboard' => $homeDashboard,
@@ -102,6 +114,9 @@ final class CommercialDashboardController
       'personal_task_scope' => $personalTaskScope,
       'filter_options' => $repository->filterOptions(),
       'calendar_employees' => $calendarEmployees,
+      'topic_hierarchy' => $topicHierarchy,
+      'recent_tickets' => $recentTickets,
+      'recent_count' => $recentCount,
       'runtime' => $runtime,
       'base_url' => (string) SCM_BASE_URL,
       'ticket_url' => (string) ($this->config['ticket_url'] ?? ''),

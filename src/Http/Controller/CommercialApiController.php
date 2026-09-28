@@ -106,7 +106,10 @@ final class CommercialApiController
         $this->policy
       );
     } elseif ($bucket === 'calendario') {
-      $html = '';
+      $calendarCargos = $this->configuredCargoIds('commercial_calendar_cargos', [9, 10, 17]);
+      $calendarEmployees = $this->tickets->activeEmployeesByCargos($calendarCargos);
+      $subtab = trim((string) ($input['subtab'] ?? 'mine'));
+      $html = CommercialDashboardView::renderCalendarPage($this->config, $calendarEmployees, $subtab, $this->policy);
     } else {
       $result = $this->tickets->search($bucket, $filters);
       $html = CommercialDashboardView::renderTickets(
@@ -120,9 +123,10 @@ final class CommercialApiController
         $this->baseUrl
       );
     }
+    $topicHierarchy = $this->tickets->topicStatusHierarchy($globalCountFilters);
     JsonResponse::success([
       'html' => $html,
-      'tabs_html' => CommercialDashboardView::renderTabs($visibleViews, $bucket, $filters, $tabCounts, $this->baseUrl),
+      'tabs_html' => CommercialDashboardView::renderTabs($visibleViews, $bucket, $filters, $tabCounts, $this->baseUrl, $topicHierarchy),
       'tab' => $bucket,
     ]);
   }
