@@ -324,6 +324,7 @@ final class CommercialTicketsRepository
   {
     $table = $this->db->table('jet_cct_tickets');
     $countFilters = $this->navigationCountFilters($filters);
+    [$openWhere, $openArgs] = $this->bucketWhere('abiertos');
     [$filterWhere, $filterArgs] = $this->ticketFilterClauses($countFilters);
 
     $topics = self::COMMERCIAL_TOPICS;
@@ -334,8 +335,8 @@ final class CommercialTicketsRepository
       "TRIM(COALESCE(t.`estado_comercial`, '')) <> ''",
     ];
     $args = $topics;
-    $where = array_merge($where, $filterWhere);
-    $args = array_merge($args, $filterArgs);
+    $where = array_merge($where, $openWhere, $filterWhere);
+    $args = array_merge($args, $openArgs, $filterArgs);
 
     $rows = $this->db->getResults(
       'SELECT TRIM(COALESCE(t.`tema_ayuda`, \'\')) AS tema,
@@ -1793,10 +1794,22 @@ final class CommercialTicketsRepository
       return [['(' . implode(' OR ', $parts) . ')'], CommercialStatusCatalog::all()];
     }
 
+    if ($bucket === 'cerrados') {
+      [$closedWhere, $closedArgs] = $this->commercialStatusWhere(CommercialStatusCatalog::CLOSED);
+      $generalClosed = $this->generalStatusExpression(['cerrado']);
+      if ($generalClosed !== '') {
+        return [
+          ['(' . implode(' AND ', $closedWhere) . " OR {$generalClosed})"],
+          $closedArgs,
+        ];
+      }
+      return [$closedWhere, $closedArgs];
+    }
+
     if ($bucket === 'postergados') {
       [$closedWhere, $closedArgs] = $this->commercialStatusWhere(CommercialStatusCatalog::CLOSED);
       $adminPostponed = $this->adminPostponedExpression();
-      $generalPostponed = $this->generalStatusExpression(['postergado']);
+      $generalPostponed = $this->generalStatusExpression(['postergado', 'aplazado']);
       $generalClosed = $this->generalStatusExpression(['cerrado']);
       $postponedParts = [
         'TRIM(COALESCE(t.`estado_comercial`, \'\')) IN (' . implode(',', array_fill(0, count(CommercialStatusCatalog::POSTPONED), '?')) . ')',
@@ -1811,34 +1824,41 @@ final class CommercialTicketsRepository
       if ($generalClosed !== '') {
         $notClosed[] = "NOT ({$generalClosed})";
       }
-      if (count($postponedParts) > 1) {
-        return [
-          [
-            '(' . implode(' OR ', $postponedParts) . ')',
-            ...$notClosed,
-          ],
-          array_merge(CommercialStatusCatalog::POSTPONED, $closedArgs),
-        ];
-      }
+      return [
+        [
+          '(' . implode(' OR ', $postponedParts) . ')',
+          ...$notClosed,
+        ],
+        array_merge(CommercialStatusCatalog::POSTPONED, $closedArgs),
+      ];
     }
 
-    $statuses = CommercialStatusCatalog::statusesForBucket($bucket);
-    [$where, $args] = $this->commercialStatusWhere($statuses);
-    if ($bucket === 'abiertos') {
-      $adminPostponed = $this->adminPostponedExpression();
-      if ($adminPostponed !== '') {
-        $where[] = "NOT ({$adminPostponed})";
-      }
-      $generalPaused = $this->generalStatusExpression(['cerrado', 'postergado']);
-      if ($generalPaused !== '') {
-        $where[] = "NOT ({$generalPaused})";
-      }
-    } elseif ($bucket === 'cerrados') {
-      $generalClosed = $this->generalStatusExpression(['cerrado']);
-      if ($generalClosed !== '') {
-        $where = ['(' . implode(' AND ', $where) . " OR {$generalClosed})"];
-      }
+    // bucket === 'abiertos'
+    $statuses = CommercialStatusCatalog::OPEN;
+    [$openWhere, $openArgs] = $this->commercialStatusWhere($statuses);
+    [$closedWhere, $closedArgs] = $this->commercialStatusWhere(CommercialStatusCatalog::CLOSED);
+    [$postponedWhere, $postponedArgs] = $this->commercialStatusWhere(CommercialStatusCatalog::POSTPONED);
+
+    $where = [
+      ...$openWhere,
+      'NOT (' . implode(' AND ', $closedWhere) . ')',
+      'NOT (' . implode(' AND ', $postponedWhere) . ')',
+    ];
+    $args = array_merge($openArgs, $closedArgs, $postponedArgs);
+
+    $generalActive = $this->generalStatusExpression(['nuevo', 'en proceso']);
+    if ($generalActive !== '') {
+      $where[] = $generalActive;
     }
+    $generalClosedOrPostponed = $this->generalStatusExpression(['cerrado', 'postergado', 'aplazado']);
+    if ($generalClosedOrPostponed !== '') {
+      $where[] = "NOT ({$generalClosedOrPostponed})";
+    }
+    $adminPostponed = $this->adminPostponedExpression();
+    if ($adminPostponed !== '') {
+      $where[] = "NOT ({$adminPostponed})";
+    }
+
     return [$where, $args];
   }
 

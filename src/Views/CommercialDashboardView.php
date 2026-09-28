@@ -1355,10 +1355,30 @@ final class CommercialDashboardView
       $dueDays = 30;
     }
 
-    $isOverdue = ($slaStatus === 'atrasado');
-    $isWarning = (!$isOverdue && $attentionDays >= (int) ($dueDays * 0.8));
+    $generalEstado = (string) ($row['estado'] ?? '');
+    $isTicketClosed = ($slaStatus === 'cerrado' || CommercialStatusCatalog::isClosed($status, $generalEstado));
+    $isTicketPostponed = (!$isTicketClosed && ($slaStatus === 'postergado' || CommercialStatusCatalog::isPostponed($status, $generalEstado)));
 
-    if ($isOverdue) {
+    $isOverdue = (!$isTicketClosed && !$isTicketPostponed && $slaStatus === 'atrasado');
+    $isWarning = (!$isTicketClosed && !$isTicketPostponed && !$isOverdue && $attentionDays >= (int) ($dueDays * 0.8));
+
+    if ($isTicketClosed) {
+      $slaBadgeLabel = 'Cerrado';
+      $slaBadgeBg = 'bg-surface-container';
+      $slaBadgeText = 'text-on-surface-variant';
+      $slaBarBg = 'bg-surface-container';
+      $slaBarFill = 'bg-outline-variant';
+      $slaBarPct = 100;
+      $slaDaysColor = 'text-on-surface-variant';
+    } elseif ($isTicketPostponed) {
+      $slaBadgeLabel = 'Postergado';
+      $slaBadgeBg = 'bg-amber-100';
+      $slaBadgeText = 'text-amber-800';
+      $slaBarBg = 'bg-amber-50';
+      $slaBarFill = 'bg-amber-500';
+      $slaBarPct = 50;
+      $slaDaysColor = 'text-amber-700';
+    } elseif ($isOverdue) {
       $slaBadgeLabel = 'Vencido';
       $slaBadgeBg = 'bg-error-container';
       $slaBadgeText = 'text-on-error-container';

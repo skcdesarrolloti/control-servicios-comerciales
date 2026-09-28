@@ -74,6 +74,44 @@ final class CommercialStatusCatalog
     return array_values(array_unique(array_merge(self::OPEN, self::POSTPONED, self::CLOSED)));
   }
 
+  public static function isClosed(string $commercialStatus, string $generalStatus = ''): bool
+  {
+    $g = mb_strtolower(trim($generalStatus), 'UTF-8');
+    if ($g === 'cerrado') {
+      return true;
+    }
+    $c = mb_strtolower(trim($commercialStatus), 'UTF-8');
+    foreach (self::CLOSED as $closed) {
+      if (mb_strtolower($closed, 'UTF-8') === $c) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  public static function isPostponed(string $commercialStatus, string $generalStatus = ''): bool
+  {
+    if (self::isClosed($commercialStatus, $generalStatus)) {
+      return false;
+    }
+    $g = mb_strtolower(trim($generalStatus), 'UTF-8');
+    if (in_array($g, ['postergado', 'aplazado'], true)) {
+      return true;
+    }
+    $c = mb_strtolower(trim($commercialStatus), 'UTF-8');
+    foreach (self::POSTPONED as $postponed) {
+      if (mb_strtolower($postponed, 'UTF-8') === $c) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  public static function isOpen(string $commercialStatus, string $generalStatus = ''): bool
+  {
+    return !self::isClosed($commercialStatus, $generalStatus) && !self::isPostponed($commercialStatus, $generalStatus);
+  }
+
   /** @return array<int,string> */
   public static function statusesForBucket(string $bucket): array
   {

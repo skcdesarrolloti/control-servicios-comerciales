@@ -24,6 +24,35 @@ final class CommercialSlaService
   /** @param array<string,mixed> $ticket @return array<string,mixed> */
   public function decorateTicket(array $ticket): array
   {
+    $generalStatus = (string) ($ticket['estado'] ?? '');
+    $commercialStatus = (string) ($ticket['estado_comercial'] ?? '');
+
+    if (CommercialStatusCatalog::isClosed($commercialStatus, $generalStatus)) {
+      $ticket['scm_attention_days'] = 0;
+      $ticket['scm_attention_since'] = 0;
+      $ticket['scm_sla_status'] = 'cerrado';
+      $ticket['scm_sla_label'] = 'Cerrado';
+      $ticket['scm_sla_is_overdue'] = '0';
+      $ticket['scm_sla_due_days'] = 0;
+      $ticket['scm_sla_warning_from'] = 0;
+      $ticket['scm_sla_percent'] = 100;
+      $ticket['scm_sla_priority'] = 'ok';
+      return $ticket;
+    }
+
+    if (CommercialStatusCatalog::isPostponed($commercialStatus, $generalStatus)) {
+      $ticket['scm_attention_days'] = 0;
+      $ticket['scm_attention_since'] = 0;
+      $ticket['scm_sla_status'] = 'postergado';
+      $ticket['scm_sla_label'] = 'Postergado';
+      $ticket['scm_sla_is_overdue'] = '0';
+      $ticket['scm_sla_due_days'] = 0;
+      $ticket['scm_sla_warning_from'] = 0;
+      $ticket['scm_sla_percent'] = 0;
+      $ticket['scm_sla_priority'] = 'ok';
+      return $ticket;
+    }
+
     $timestamp = $this->attentionTimestamp($ticket);
     $days = $timestamp > 0 ? ColombiaBusinessCalendar::elapsedDays($timestamp) : 0;
     $state = $this->calculate($this->topicForTicket($ticket), $days);
