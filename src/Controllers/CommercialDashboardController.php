@@ -64,12 +64,20 @@ final class CommercialDashboardController
     $result = in_array($bucket, ['actualizaciones', 'avisos', 'calendario', 'sin_acceso'], true) ? ['rows' => [], 'counts' => $repository->statusCounts($filters), 'pagination' => []] : $repository->search($bucket === 'inicio' ? 'abiertos' : $bucket, $filters);
     $homeDashboard = $bucket === 'sin_acceso' ? [] : $repository->homeDashboard($globalCountFilters);
     $calendarEmployees = $repository->activeEmployeesByCargos($calendarCargos);
-    $currentCalendarEmployeeId = '';
-    foreach ($calendarEmployees as $employee) {
-      if ((int) ($employee['_pk'] ?? 0) === Auth::userId()) {
-        $currentCalendarEmployeeId = (string) ($employee['id_empleado'] ?? '');
-        break;
+    $currentCalendarEmployeeId = trim(Auth::employeeId());
+    if ($currentCalendarEmployeeId === '') {
+      foreach ($calendarEmployees as $employee) {
+        if ((int) ($employee['_pk'] ?? 0) === Auth::userId() || (string) ($employee['id_empleado'] ?? '') === (string) Auth::userId()) {
+          $currentCalendarEmployeeId = (string) ($employee['id_empleado'] ?? '');
+          break;
+        }
       }
+    }
+    if ($currentCalendarEmployeeId === '') {
+      $currentCalendarEmployeeId = $repository->currentEmployeeTicketFilter($calendarCargos);
+    }
+    if ($currentCalendarEmployeeId === '' && !empty($calendarEmployees)) {
+      $currentCalendarEmployeeId = (string) ($calendarEmployees[0]['id_empleado'] ?? '');
     }
 
     $subtab = trim((string) ($input['subtab'] ?? 'mine'));
@@ -92,8 +100,8 @@ final class CommercialDashboardController
         'calendar_allowed_cargos' => array_values(array_map('strval', $calendarCargos)),
         'calendar_allowed_employee_ids' => array_values(array_map(static fn(array $employee): string => (string) ($employee['id_empleado'] ?? ''), $calendarEmployees)),
         'calendar_current_employee_id' => $currentCalendarEmployeeId,
-        'calendar_app_url' => (string) ($this->config['calendar_app_url'] ?? ''),
-        'calendar_api_url' => (string) ($this->config['calendar_api_url'] ?? ''),
+        'calendar_app_url' => (string) ($this->config['calendar_app_url'] ?? 'https://calendar-skc.netlify.app'),
+        'calendar_api_url' => (string) ($this->config['calendar_api_url'] ?? 'https://sucasainmobiliaria.com.co/calendario-actividades/index.php?action='),
         'calendar_initial_subtab' => $subtab,
         'is_admin' => $policy->canManage(),
       ],

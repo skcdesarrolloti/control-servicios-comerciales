@@ -202,6 +202,139 @@ final class CommercialDashboardView
     .swal2-popup .scm-calendar-create-shell {
       text-align: left;
     }
+    /* Grilla de Tiempo para Vistas Semanal y Diaria del Calendario */
+    .scm-calendar-time-grid {
+      display: grid;
+      grid-template-columns: 56px repeat(7, minmax(110px, 1fr));
+      grid-auto-rows: 24px;
+      position: relative;
+      background-color: #ffffff;
+      border-radius: 1rem;
+      border: 1px solid #e2e8f0;
+      overflow-x: auto;
+      max-height: 600px;
+    }
+    .scm-calendar-time-grid--day {
+      grid-template-columns: 56px minmax(260px, 1fr);
+    }
+    .scm-calendar-time-gutter {
+      font-size: 11px;
+      font-weight: 500;
+      color: #64748b;
+      border-bottom: 1px solid #f1f5f9;
+      border-right: 1px solid #e2e8f0;
+      padding: 2px 6px;
+      text-align: right;
+      user-select: none;
+      background-color: #f8fafc;
+      line-height: 20px;
+    }
+    .scm-calendar-time-gutter--head {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      height: 48px;
+      line-height: 44px;
+      background-color: #f1f5f9;
+      font-weight: 700;
+    }
+    .scm-calendar-week-head {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      height: 48px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background-color: #f8fafc;
+      border-bottom: 1px solid #e2e8f0;
+      border-right: 1px solid #f1f5f9;
+      font-size: 12px;
+      color: #475569;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .scm-calendar-week-head:hover {
+      background-color: #f1f5f9;
+    }
+    .scm-calendar-week-head.is-today {
+      color: #1e3c76;
+      font-weight: 700;
+    }
+    .scm-calendar-week-head.is-today strong {
+      background-color: #1e3c76;
+      color: #ffffff;
+      border-radius: 9999px;
+      width: 22px;
+      height: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .scm-calendar-week-head.is-selected {
+      background-color: #ebf1fb;
+      border-bottom: 2px solid #1e3c76;
+    }
+    .scm-calendar-time-slot {
+      border-bottom: 1px dashed #f1f5f9;
+      border-right: 1px solid #f1f5f9;
+      background: transparent;
+      cursor: pointer;
+      transition: background 0.1s;
+      padding: 0;
+    }
+    .scm-calendar-time-slot:hover {
+      background-color: rgba(30, 60, 118, 0.06);
+    }
+    .scm-calendar-time-slot.is-selected-day {
+      background-color: rgba(30, 60, 118, 0.02);
+    }
+    .scm-calendar-time-slot.is-today {
+      background-color: rgba(30, 60, 118, 0.03);
+    }
+    .scm-calendar-time-slot.is-selecting {
+      background-color: rgba(30, 60, 118, 0.15) !important;
+    }
+    .scm-calendar-time-event {
+      grid-column-start: calc(var(--event-day, 0) + 2);
+      grid-column-end: span 1;
+      grid-row-start: calc(var(--event-start-slot, 0) + 2);
+      grid-row-end: span var(--event-slot-span, 2);
+      z-index: 10;
+      margin: 1px 3px;
+      padding: 3px 6px;
+      border-radius: 8px;
+      background-color: #ffffff;
+      border-left: 3px solid var(--event-color, #1e3c76);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      font-size: 11px;
+      line-height: 1.25;
+      text-align: left;
+      overflow: hidden;
+      cursor: pointer;
+      transition: transform 0.1s, box-shadow 0.1s;
+      display: flex;
+      flex-direction: column;
+    }
+    .scm-calendar-time-event:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.12);
+      z-index: 15;
+    }
+    .scm-calendar-time-event strong {
+      font-weight: 600;
+      color: #0f172a;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .scm-calendar-time-event em {
+      font-style: normal;
+      font-size: 10px;
+      color: #64748b;
+      margin-top: 1px;
+    }
   </style>
   <script src="https://cdn.tailwindcss.com"></script>
   <script id="tailwind-config">
@@ -680,7 +813,7 @@ final class CommercialDashboardView
       <!-- Dropdown Calendario Comercial (Mi calendario, Calendario equipo, Vencimientos) -->
       <?php if (in_array('calendario', $views, true)): ?>
         <div class="relative group/nav" data-commercial-dropdown="calendario">
-          <button type="button" class="flex items-center gap-space-xs px-space-md py-space-xs font-label-md text-label-md <?php echo $bucket === 'calendario' ? $activeClasses : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-dropdown-trigger="calendario" aria-expanded="false">
+          <button type="button" class="flex items-center gap-space-xs px-space-md py-space-xs font-label-md text-label-md <?php echo $bucket === 'calendario' ? ($activeClasses . ' active') : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-tab="calendario" data-commercial-dropdown-trigger="calendario" aria-expanded="false">
             <span class="material-symbols-outlined text-[16px]">calendar_month</span>
             <span>Calendario</span>
             <span class="material-symbols-outlined text-[16px] group-hover/nav:rotate-180 transition-transform">expand_more</span>
@@ -2135,7 +2268,7 @@ final class CommercialDashboardView
       $showCreateActions = true;
       $showPendingAction = true;
       $showReportAction = true;
-      $showEmployeeFilter = false;
+      $showEmployeeFilter = empty($currentEmployeeId);
     } elseif ($subtab === 'due') {
       $title = 'Control de Vencimientos';
       $kicker = 'Seguimiento y Plazos';
@@ -2272,7 +2405,16 @@ final class CommercialDashboardView
                 <div class="space-y-1">
                   <label class="block font-label-sm text-secondary font-medium">Funcionario</label>
                   <select name="id_empleado" data-scm-calendar-filter-employees class="w-full px-3 py-2 bg-surface-container-lowest rounded-xl font-body-sm outline-none border border-surface-container">
-                    <option value="">Selecciona funcionario</option>
+                    <option value=""><?php echo $mode === 'personal' ? 'Mi calendario' : 'Selecciona funcionario'; ?></option>
+                    <?php foreach ($employees as $emp): ?>
+                      <?php
+                        $empId = (string) ($emp['id_empleado'] ?? $emp['id'] ?? '');
+                        $empName = trim((string) ($emp['nombre'] ?? $emp['display_name'] ?? ''));
+                        if ($empId === '') continue;
+                        $isSelected = ($empId === $currentEmployeeId);
+                      ?>
+                      <option value="<?php echo esc_attr($empId); ?>" <?php echo $isSelected ? 'selected' : ''; ?>><?php echo esc_html($empName ?: "Funcionario #$empId"); ?></option>
+                    <?php endforeach; ?>
                   </select>
                 </div>
               <?php else: ?>
@@ -2389,7 +2531,7 @@ final class CommercialDashboardView
           <section class="lg:col-span-2 bg-surface-container-lowest rounded-2xl p-space-md border border-surface-container shadow-sm space-y-space-sm">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-space-sm pb-space-xs border-b border-surface-container">
               <div>
-                <span class="font-label-sm text-secondary uppercase font-semibold">Vista de calendario</span>
+                <span class="font-label-sm text-secondary uppercase font-semibold" data-scm-calendar-board-kicker>Vista de calendario</span>
                 <h4 class="font-headline-sm text-headline-sm text-on-surface" data-scm-calendar-title>Calendario</h4>
                 <p class="font-body-sm text-secondary"><?php echo $view === 'pending' ? 'Haz clic en un día para revisar los casos con vencimiento agrupado.' : 'Haz clic en un día para ver sus eventos o crear uno nuevo.'; ?></p>
               </div>
@@ -2406,7 +2548,7 @@ final class CommercialDashboardView
                 </div>
               </div>
             </div>
-            <div class="grid grid-cols-7 text-center font-label-sm text-secondary font-semibold py-2.5 bg-surface-container-low/60 rounded-xl border border-surface-container" aria-hidden="true">
+            <div class="grid grid-cols-7 text-center font-label-sm text-secondary font-semibold py-2.5 bg-surface-container-low/60 rounded-xl border border-surface-container" aria-hidden="true" data-scm-calendar-weekdays-header>
               <span>Lun</span><span>Mar</span><span>Mié</span><span>Jue</span><span>Vie</span><span>Sáb</span><span>Dom</span>
             </div>
             <div class="scm-calendar-month-grid min-h-[400px] rounded-xl" data-scm-calendar-grid aria-live="polite">

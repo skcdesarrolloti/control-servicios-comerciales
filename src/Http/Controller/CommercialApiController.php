@@ -108,8 +108,32 @@ final class CommercialApiController
     } elseif ($bucket === 'calendario') {
       $calendarCargos = $this->configuredCargoIds('commercial_calendar_cargos', [9, 10, 17]);
       $calendarEmployees = $this->tickets->activeEmployeesByCargos($calendarCargos);
+      $currentCalendarEmployeeId = trim(\SCM\Core\Auth::employeeId());
+      if ($currentCalendarEmployeeId === '') {
+        foreach ($calendarEmployees as $employee) {
+          if ((int) ($employee['_pk'] ?? 0) === \SCM\Core\Auth::userId() || (string) ($employee['id_empleado'] ?? '') === (string) \SCM\Core\Auth::userId()) {
+            $currentCalendarEmployeeId = (string) ($employee['id_empleado'] ?? '');
+            break;
+          }
+        }
+      }
+      if ($currentCalendarEmployeeId === '') {
+        $currentCalendarEmployeeId = $this->tickets->currentEmployeeTicketFilter($calendarCargos);
+      }
+      if ($currentCalendarEmployeeId === '' && !empty($calendarEmployees)) {
+        $currentCalendarEmployeeId = (string) ($calendarEmployees[0]['id_empleado'] ?? '');
+      }
       $subtab = trim((string) ($input['subtab'] ?? 'mine'));
-      $html = CommercialDashboardView::renderCalendarPage($this->config, $calendarEmployees, $subtab, $this->policy);
+      $calendarConfig = array_merge($this->config, [
+        'calendar_allowed_cargos' => array_values(array_map('strval', $calendarCargos)),
+        'calendar_allowed_employee_ids' => array_values(array_map(static fn(array $employee): string => (string) ($employee['id_empleado'] ?? ''), $calendarEmployees)),
+        'calendar_current_employee_id' => $currentCalendarEmployeeId,
+        'calendar_app_url' => (string) ($this->config['calendar_app_url'] ?? 'https://calendar-skc.netlify.app'),
+        'calendar_api_url' => (string) ($this->config['calendar_api_url'] ?? 'https://sucasainmobiliaria.com.co/calendario-actividades/index.php?action='),
+        'calendar_initial_subtab' => $subtab,
+        'is_admin' => $this->policy->canManage(),
+      ]);
+      $html = CommercialDashboardView::renderCalendarPage($calendarConfig, $calendarEmployees, $subtab, $this->policy, $this->baseUrl);
     } else {
       $result = $this->tickets->search($bucket, $filters);
       $html = CommercialDashboardView::renderTickets(
