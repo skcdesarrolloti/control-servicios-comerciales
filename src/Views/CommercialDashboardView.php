@@ -68,12 +68,15 @@ final class CommercialDashboardView
     }
     ::-webkit-scrollbar { display: none; }
     .commercial-modal,
+    .commercial-advisory-modal,
     .commercial-guide,
     #scm-guide-modal {
       display: none;
     }
     .commercial-modal.open,
     .commercial-modal.active,
+    .commercial-advisory-modal.open,
+    .commercial-advisory-modal.active,
     .commercial-analysis-modal.open,
     .commercial-analysis-modal.active,
     .commercial-guide.open,
@@ -617,7 +620,7 @@ final class CommercialDashboardView
       <div class="scm-tab-panel commercial-panel active" id="commercial-tickets-panel" data-commercial-tickets-panel aria-live="polite">
         <?php
           if ($bucket === 'inicio') {
-            echo self::renderHome($homeDashboard, $filters, $policy, $baseUrl, $ticketEmployees, $filterOptions, $result, $tabCounts);
+            echo self::renderHome($homeDashboard, $filters, $policy, $baseUrl, $ticketEmployees, $filterOptions, $result, $tabCounts, $userName);
           } elseif ($bucket === 'actualizaciones') {
             echo self::renderPropertyUpdatesPage($filters, $ticketEmployees, $filterOptions, $policy);
           } elseif ($bucket === 'avisos') {
@@ -911,56 +914,67 @@ final class CommercialDashboardView
     array $ticketEmployees = [],
     array $filterOptions = [],
     array $result = [],
-    array $tabCounts = []
+    array $tabCounts = [],
+    string $userName = ''
   ): string {
     $slaSummary = is_array($dashboard['sla_summary'] ?? null) ? $dashboard['sla_summary'] : [];
     $properties = is_array($dashboard['properties'] ?? null) ? $dashboard['properties'] : [];
     $signs = is_array($dashboard['signs'] ?? null) ? $dashboard['signs'] : [];
     $overdueAdvisors = is_array($dashboard['overdue_advisors'] ?? null) ? $dashboard['overdue_advisors'] : [];
 
-    $rows = is_array($result['rows'] ?? null) ? $result['rows'] : [];
-    $counts = is_array($result['counts'] ?? null) ? $result['counts'] : (is_array($dashboard['status_counts'] ?? null) ? $dashboard['status_counts'] : []);
-    $pagination = is_array($result['pagination'] ?? null) ? $result['pagination'] : [];
-
     $taskTotal = (int) ($slaSummary['total'] ?? 0);
     $taskOverdue = (int) ($slaSummary['atrasados'] ?? 0);
     $taskCompliancePct = (int) ($slaSummary['porcentaje_cumplimiento'] ?? 0);
-    $visibleTotal = isset($pagination['total']) ? (int) $pagination['total'] : ($taskTotal ?: count($rows));
+
+    $propertyAlert = (int) ($properties['actualizacion_alerta'] ?? 0);
+    $propertyExpired = (int) ($properties['actualizacion_vencida'] ?? 0);
+    $propertyPending = $propertyAlert + $propertyExpired;
+
+    $retouchExpired = (int) ($signs['retoque_vencido'] ?? 0);
+    $retouchAlert = (int) ($signs['retoque_alerta'] ?? 0);
+    $newSignLate = (int) ($signs['instalacion_atrasada'] ?? 0);
+    $signPending = $retouchExpired + $retouchAlert + $newSignLate;
+
+    if ($userName === '') {
+      $userName = trim(Auth::user()) ?: 'Usuario';
+    }
 
     ob_start();
 ?>
-    <div class="flex flex-col w-full">
+    <div class="flex flex-col w-full space-y-space-md py-space-md">
       <!-- Sub-header Operativo y Acciones Clave -->
-      <section class="w-full px-margin py-space-md">
+      <section class="w-full px-margin">
         <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-space-md bg-surface-container-lowest p-space-lg rounded-2xl shadow-sm">
           <div class="space-y-space-xs">
             <div class="flex items-center gap-space-xs">
-              <span class="inline-flex items-center justify-center w-2.5 h-2.5 rounded-full bg-error animate-ping"></span>
-              <span class="font-label-sm text-label-sm uppercase tracking-wider text-error font-semibold">Monitor Operativo en Vivo</span>
+              <span class="inline-flex items-center justify-center w-2.5 h-2.5 rounded-full <?php echo $taskOverdue > 0 ? 'bg-error animate-ping' : 'bg-emerald-500'; ?>"></span>
+              <span class="font-label-sm text-label-sm uppercase tracking-wider <?php echo $taskOverdue > 0 ? 'text-error' : 'text-emerald-700'; ?> font-semibold">Monitor Operativo en Vivo</span>
               <span class="text-outline-variant">•</span>
               <span class="font-label-sm text-label-sm text-secondary flex items-center gap-1">
                 <span class="material-symbols-outlined text-[15px]">calendar_today</span>
                 <?php echo esc_html(self::currentDateFormatted()); ?>
               </span>
             </div>
-            <h1 class="font-headline-lg text-headline-lg text-on-surface tracking-tight">Control Operativo de Tareas Comerciales</h1>
+            <h1 class="font-headline-lg text-headline-lg text-on-surface tracking-tight">Centro de Control &amp; Servicios Comerciales</h1>
             <p class="font-body-md text-body-md text-on-surface-variant max-w-3xl">
-              Monitoreo en tiempo real de embudos de captación, auditoría de vencimientos de inmuebles y trazabilidad de avisos en fachada.
+              Bienvenido, <strong class="text-on-surface"><?php echo esc_html($userName); ?></strong>. Este módulo centraliza los avisos de pendientes críticos, cumplimiento de SLAs y accesos rápidos directos a cada sección operativa.
             </p>
           </div>
           <div class="flex flex-wrap items-center gap-space-sm pt-space-xs lg:pt-0">
-            <button type="button" class="flex items-center gap-space-xs bg-surface-container-low hover:bg-surface-container text-on-surface px-space-md py-2.5 rounded-xl font-label-md text-label-md transition-all shadow-sm cursor-pointer" id="btn-export-report">
-              <span class="material-symbols-outlined text-[18px] text-secondary">download</span>
-              <span>Exportar Reporte Diario</span>
-            </button>
-            <button type="button" class="flex items-center gap-space-xs bg-error-container hover:bg-error/20 text-on-error-container px-space-md py-2.5 rounded-xl font-label-md text-label-md transition-all shadow-sm cursor-pointer" id="btn-open-drawer">
-              <span class="material-symbols-outlined text-[18px]">warning</span>
+            <?php if ($taskOverdue > 0 || $propertyPending > 0 || $signPending > 0): ?>
+              <button type="button" class="flex items-center gap-space-xs bg-error-container hover:bg-error/20 text-on-error-container px-space-md py-2.5 rounded-xl font-label-md text-label-md transition-all shadow-sm cursor-pointer" data-commercial-open-advisory="task_updates">
+                <span class="material-symbols-outlined text-[18px]">notification_important</span>
+                <span>Aviso de Pendientes (<?php echo esc_html((string) ($taskOverdue + $propertyPending + $signPending)); ?>)</span>
+              </button>
+            <?php endif; ?>
+            <button type="button" class="flex items-center gap-space-xs bg-surface-container-low hover:bg-surface-container text-on-surface px-space-md py-2.5 rounded-xl font-label-md text-label-md transition-all shadow-sm cursor-pointer" id="btn-open-drawer">
+              <span class="material-symbols-outlined text-[18px] text-error">warning</span>
               <span>Auditar Atrasados (<?php echo esc_html((string) $taskOverdue); ?>)</span>
             </button>
-            <button type="button" class="flex items-center gap-space-xs bg-primary-container hover:bg-primary-fixed-dim text-on-surface px-space-lg py-2.5 rounded-xl font-label-md text-label-md font-semibold transition-all shadow-md transform hover:-translate-y-0.5 cursor-pointer" id="btn-new-task" onclick="window.location.href='<?php echo esc_url(self::url($baseUrl, ['tab' => 'abiertos'])); ?>'">
-              <span class="material-symbols-outlined text-[20px]">add_circle</span>
-              <span>+ Nueva Tarea</span>
-            </button>
+            <a href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'abiertos'])); ?>" class="flex items-center gap-space-xs bg-primary-container hover:bg-primary-fixed-dim text-on-surface px-space-lg py-2.5 rounded-xl font-label-md text-label-md font-semibold transition-all shadow-md transform hover:-translate-y-0.5 cursor-pointer">
+              <span class="material-symbols-outlined text-[20px]">inbox</span>
+              <span>Ir a Gestión de Tareas</span>
+            </a>
           </div>
         </div>
       </section>
@@ -968,17 +982,451 @@ final class CommercialDashboardView
       <!-- Tarjetas de Alertas & KPIs Circulares -->
       <?php echo self::renderHomeCards($slaSummary, $properties, $signs, $baseUrl, $filters); ?>
 
-      <!-- Embudo de Estados (Píldoras interactivas con badges numéricos) -->
-      <?php echo self::renderFunnelPills('abiertos', $counts, $taskTotal, $filters, $baseUrl); ?>
+      <!-- Avisos Operativos de lo Pendiente (Alertas Claras del Día) -->
+      <?php echo self::renderHomePendingSection($taskOverdue, $taskTotal, $taskCompliancePct, $propertyPending, $propertyExpired, $propertyAlert, $signPending, $retouchExpired, $newSignLate, $baseUrl); ?>
 
-      <!-- Filtros Avanzados Multi-Criterio -->
-      <?php echo self::renderFiltersSection('inicio', $filters, $ticketEmployees, $filterOptions, $baseUrl); ?>
+      <!-- Grid de Accesos Rápidos a Módulos -->
+      <?php echo self::renderHomeQuickAccessGrid($tabCounts, $baseUrl, $policy); ?>
 
-      <!-- Tabla de Casos y Tareas en Curso -->
-      <?php echo self::renderTicketsTableSection('inicio', $rows, $pagination, $visibleTotal, $policy, $baseUrl, $filters); ?>
-
-      <!-- Lateral Drawer / Modal de Detalle Crítico -->
+      <!-- Lateral Drawer / Auditoría de Atrasados -->
       <?php echo self::renderSideDrawer($slaSummary, $overdueAdvisors, $baseUrl, $filters); ?>
+
+      <!-- Modales de Asesoría / Popups de Avisos Pendientes -->
+      <?php echo self::renderHomeAdvisoryModals($slaSummary, $properties, $signs, $baseUrl, $filters, $userName); ?>
+    </div>
+<?php
+    return (string) ob_get_clean();
+  }
+
+  private static function renderHomePendingSection(
+    int $taskOverdue,
+    int $taskTotal,
+    int $taskCompliancePct,
+    int $propertyPending,
+    int $propertyExpired,
+    int $propertyAlert,
+    int $signPending,
+    int $retouchExpired,
+    int $newSignLate,
+    string $baseUrl
+  ): string {
+    $hasAlerts = ($taskOverdue > 0 || $propertyPending > 0 || $signPending > 0);
+    ob_start();
+?>
+    <section class="w-full px-margin">
+      <div class="bg-surface-container-lowest p-space-lg rounded-2xl shadow-sm space-y-space-md">
+        <div class="flex items-center justify-between pb-space-xs border-b border-surface-container">
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-[22px] <?php echo $hasAlerts ? 'text-error' : 'text-emerald-600'; ?>">
+              <?php echo $hasAlerts ? 'pending_actions' : 'verified'; ?>
+            </span>
+            <h2 class="font-headline-sm text-headline-sm text-on-surface">Avisos de lo Pendiente &amp; Prioridades del Día</h2>
+          </div>
+          <span class="font-label-sm text-label-sm px-3 py-1 rounded-full <?php echo $hasAlerts ? 'bg-error-container text-on-error-container' : 'bg-emerald-100 text-emerald-800'; ?> font-semibold">
+            <?php echo $hasAlerts ? 'Acción Requerida' : 'Al Día'; ?>
+          </span>
+        </div>
+
+        <?php if (!$hasAlerts): ?>
+          <div class="py-8 px-4 text-center rounded-xl bg-emerald-50/60 border border-emerald-100 space-y-2">
+            <span class="material-symbols-outlined text-[36px] text-emerald-600">check_circle</span>
+            <h3 class="font-headline-sm text-[16px] text-emerald-900 font-bold">¡Todo el módulo comercial se encuentra al día!</h3>
+            <p class="font-body-sm text-body-sm text-emerald-700 max-w-lg mx-auto">
+              No tienes tareas comerciales atrasadas, inmuebles con actualización vencida ni avisos con retoque pendiente.
+            </p>
+          </div>
+        <?php else: ?>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-space-md">
+            <!-- Alerta Tareas -->
+            <div class="p-space-md rounded-2xl <?php echo $taskOverdue > 0 ? 'bg-error-container/30 border border-error/20' : 'bg-surface-container-low border border-surface-container'; ?> flex flex-col justify-between space-y-3">
+              <div class="space-y-1">
+                <div class="flex items-center justify-between">
+                  <span class="font-label-sm text-label-sm uppercase font-bold <?php echo $taskOverdue > 0 ? 'text-error' : 'text-secondary'; ?>">SLA Comercial</span>
+                  <?php if ($taskOverdue > 0): ?>
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-error text-on-error"><?php echo esc_html((string) $taskOverdue); ?> atrasadas</span>
+                  <?php else: ?>
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-surface-container text-secondary">Al día</span>
+                  <?php endif; ?>
+                </div>
+                <h4 class="font-headline-sm text-[15px] font-semibold text-on-surface">Atención de Clientes</h4>
+                <p class="font-body-sm text-body-sm text-on-surface-variant">
+                  <?php if ($taskOverdue > 0): ?>
+                    Hay <strong><?php echo esc_html((string) $taskOverdue); ?> solicitudes</strong> en espera que superaron el tiempo de atención asignado.
+                  <?php else: ?>
+                    Cumplimiento actual del <?php echo esc_html((string) $taskCompliancePct); ?>%. Todas las tareas están dentro del SLA.
+                  <?php endif; ?>
+                </p>
+              </div>
+              <div class="flex items-center justify-between pt-1">
+                <button type="button" data-commercial-open-advisory="task_updates" class="text-xs text-secondary hover:text-on-surface font-semibold underline cursor-pointer">
+                  Ver popup
+                </button>
+                <a href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'abiertos', 'sla_filter' => 'atrasado'])); ?>" class="px-3 py-1.5 rounded-xl text-xs font-semibold <?php echo $taskOverdue > 0 ? 'bg-error text-on-error hover:opacity-90' : 'bg-surface-container text-on-surface hover:bg-surface-container-high'; ?> transition-colors">
+                  Gestionar Tareas
+                </a>
+              </div>
+            </div>
+
+            <!-- Alerta Inmuebles -->
+            <div class="p-space-md rounded-2xl <?php echo $propertyPending > 0 ? 'bg-tertiary-fixed/20 border border-tertiary/20' : 'bg-surface-container-low border border-surface-container'; ?> flex flex-col justify-between space-y-3">
+              <div class="space-y-1">
+                <div class="flex items-center justify-between">
+                  <span class="font-label-sm text-label-sm uppercase font-bold <?php echo $propertyPending > 0 ? 'text-tertiary' : 'text-secondary'; ?>">Vigencia Inventario</span>
+                  <?php if ($propertyPending > 0): ?>
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-tertiary-fixed text-on-tertiary-fixed"><?php echo esc_html((string) $propertyPending); ?> pendientes</span>
+                  <?php else: ?>
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-surface-container text-secondary">Al día</span>
+                  <?php endif; ?>
+                </div>
+                <h4 class="font-headline-sm text-[15px] font-semibold text-on-surface">Actualización Inmuebles</h4>
+                <p class="font-body-sm text-body-sm text-on-surface-variant">
+                  <?php if ($propertyPending > 0): ?>
+                    <strong><?php echo esc_html((string) $propertyExpired); ?> vencidos</strong> y <?php echo esc_html((string) $propertyAlert); ?> en alerta por superar 60 días sin verificar.
+                  <?php else: ?>
+                    Todos los inmuebles públicos tienen vigencia y datos al día.
+                  <?php endif; ?>
+                </p>
+              </div>
+              <div class="flex items-center justify-between pt-1">
+                <button type="button" data-commercial-open-advisory="property_updates" class="text-xs text-secondary hover:text-on-surface font-semibold underline cursor-pointer">
+                  Ver popup
+                </button>
+                <a href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'actualizaciones', 'estado_actualizacion' => ($propertyExpired > 0 ? 'Vencido' : 'Alerta')])); ?>" data-commercial-tab="actualizaciones" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-surface-container hover:bg-surface-container-high text-on-surface transition-colors">
+                  Auditar Inmuebles
+                </a>
+              </div>
+            </div>
+
+            <!-- Alerta Avisos -->
+            <div class="p-space-md rounded-2xl <?php echo $signPending > 0 ? 'bg-secondary-fixed/20 border border-secondary/20' : 'bg-surface-container-low border border-surface-container'; ?> flex flex-col justify-between space-y-3">
+              <div class="space-y-1">
+                <div class="flex items-center justify-between">
+                  <span class="font-label-sm text-label-sm uppercase font-bold text-secondary">Publicidad Exterior</span>
+                  <?php if ($signPending > 0): ?>
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-secondary-fixed text-on-secondary-fixed"><?php echo esc_html((string) $signPending); ?> pendientes</span>
+                  <?php else: ?>
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-surface-container text-secondary">Al día</span>
+                  <?php endif; ?>
+                </div>
+                <h4 class="font-headline-sm text-[15px] font-semibold text-on-surface">Avisos en Fachada</h4>
+                <p class="font-body-sm text-body-sm text-on-surface-variant">
+                  <?php if ($signPending > 0): ?>
+                    <strong><?php echo esc_html((string) $retouchExpired); ?> con retoque vencido</strong> y <?php echo esc_html((string) $newSignLate); ?> nuevos sin instalar.
+                  <?php else: ?>
+                    Todas las rutas de avisos y retoques operativos están al día.
+                  <?php endif; ?>
+                </p>
+              </div>
+              <div class="flex items-center justify-between pt-1">
+                <button type="button" data-commercial-open-advisory="sign_status" class="text-xs text-secondary hover:text-on-surface font-semibold underline cursor-pointer">
+                  Ver popup
+                </button>
+                <a href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'avisos'])); ?>" data-commercial-tab="avisos" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-surface-container hover:bg-surface-container-high text-on-surface transition-colors">
+                  Ver Rutas
+                </a>
+              </div>
+            </div>
+          </div>
+        <?php endif; ?>
+      </div>
+    </section>
+<?php
+    return (string) ob_get_clean();
+  }
+
+  /** @param array<string,int> $tabCounts */
+  private static function renderHomeQuickAccessGrid(array $tabCounts, string $baseUrl, $policy): string
+  {
+    $openCount = (int) ($tabCounts['abiertos'] ?? 0);
+    $myCount = (int) ($tabCounts['mis_tickets'] ?? 0);
+
+    ob_start();
+?>
+    <section class="w-full px-margin pb-space-lg">
+      <div class="bg-surface-container-lowest p-space-lg rounded-2xl shadow-sm space-y-space-md">
+        <div class="flex items-center justify-between pb-space-xs border-b border-surface-container">
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-[22px] text-primary">grid_view</span>
+            <h2 class="font-headline-sm text-headline-sm text-on-surface">Accesos Rápidos a Módulos</h2>
+          </div>
+          <span class="font-label-sm text-label-sm text-secondary font-medium">Navegación directa</span>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-space-md">
+          <!-- Acceso 1: Gestión de Tareas Abiertas -->
+          <a href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'abiertos'])); ?>" class="group p-space-md rounded-2xl bg-surface-container-low hover:bg-surface-container transition-all flex flex-col justify-between space-y-3 border border-transparent hover:border-outline-variant/30 shadow-sm cursor-pointer">
+            <div class="space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="w-10 h-10 rounded-xl bg-primary-container text-on-surface flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform">
+                  <span class="material-symbols-outlined text-[22px]">inbox</span>
+                </span>
+                <span class="px-2 py-0.5 rounded-full font-label-sm text-label-sm bg-surface-container text-on-surface font-bold"><?php echo esc_html(number_format($openCount)); ?></span>
+              </div>
+              <h3 class="font-headline-sm text-[16px] font-semibold text-on-surface group-hover:text-primary transition-colors">Tareas Abiertas</h3>
+              <p class="font-body-sm text-body-sm text-on-surface-variant">
+                Revisa el embudo completo de solicitudes, estados por tema y seguimiento a clientes.
+              </p>
+            </div>
+            <span class="font-label-md text-label-md text-primary font-semibold flex items-center gap-1 pt-1">
+              <span>Abrir tareas</span>
+              <span class="material-symbols-outlined text-[16px] group-hover:translate-x-1 transition-transform">arrow_forward</span>
+            </span>
+          </a>
+
+          <!-- Acceso 2: Mis Tareas -->
+          <a href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'mis_tickets'])); ?>" class="group p-space-md rounded-2xl bg-surface-container-low hover:bg-surface-container transition-all flex flex-col justify-between space-y-3 border border-transparent hover:border-outline-variant/30 shadow-sm cursor-pointer">
+            <div class="space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="w-10 h-10 rounded-xl bg-secondary-container text-on-secondary-container flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform">
+                  <span class="material-symbols-outlined text-[22px]">assignment_ind</span>
+                </span>
+                <span class="px-2 py-0.5 rounded-full font-label-sm text-label-sm bg-primary-container text-on-surface font-bold"><?php echo esc_html(number_format($myCount)); ?></span>
+              </div>
+              <h3 class="font-headline-sm text-[16px] font-semibold text-on-surface group-hover:text-primary transition-colors">Mis Tareas Asignadas</h3>
+              <p class="font-body-sm text-body-sm text-on-surface-variant">
+                Tu cartera operativa individual de tareas asignadas con semáforo SLA de respuesta.
+              </p>
+            </div>
+            <span class="font-label-md text-label-md text-primary font-semibold flex items-center gap-1 pt-1">
+              <span>Ver mi cartera</span>
+              <span class="material-symbols-outlined text-[16px] group-hover:translate-x-1 transition-transform">arrow_forward</span>
+            </span>
+          </a>
+
+          <!-- Acceso 3: Actualizaciones de Inmuebles -->
+          <a href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'actualizaciones'])); ?>" data-commercial-tab="actualizaciones" class="group p-space-md rounded-2xl bg-surface-container-low hover:bg-surface-container transition-all flex flex-col justify-between space-y-3 border border-transparent hover:border-outline-variant/30 shadow-sm cursor-pointer">
+            <div class="space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="w-10 h-10 rounded-xl bg-tertiary-fixed text-on-tertiary-fixed flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform">
+                  <span class="material-symbols-outlined text-[22px]">apartment</span>
+                </span>
+                <span class="material-symbols-outlined text-[18px] text-secondary">open_in_new</span>
+              </div>
+              <h3 class="font-headline-sm text-[16px] font-semibold text-on-surface group-hover:text-primary transition-colors">Actualizar Inmuebles</h3>
+              <p class="font-body-sm text-body-sm text-on-surface-variant">
+                Control de vigencia de inventario público, fichas técnicas y contacto con propietarios.
+              </p>
+            </div>
+            <span class="font-label-md text-label-md text-primary font-semibold flex items-center gap-1 pt-1">
+              <span>Ir a inmuebles</span>
+              <span class="material-symbols-outlined text-[16px] group-hover:translate-x-1 transition-transform">arrow_forward</span>
+            </span>
+          </a>
+
+          <!-- Acceso 4: Avisos en Fachada -->
+          <a href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'avisos'])); ?>" data-commercial-tab="avisos" class="group p-space-md rounded-2xl bg-surface-container-low hover:bg-surface-container transition-all flex flex-col justify-between space-y-3 border border-transparent hover:border-outline-variant/30 shadow-sm cursor-pointer">
+            <div class="space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="w-10 h-10 rounded-xl bg-surface-container-high text-secondary flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform">
+                  <span class="material-symbols-outlined text-[22px]">signpost</span>
+                </span>
+                <span class="material-symbols-outlined text-[18px] text-secondary">open_in_new</span>
+              </div>
+              <h3 class="font-headline-sm text-[16px] font-semibold text-on-surface group-hover:text-primary transition-colors">Avisos en Fachada</h3>
+              <p class="font-body-sm text-body-sm text-on-surface-variant">
+                Control de retoques, colocación de avisos nuevos y hojas de ruta motorizada por barrio.
+              </p>
+            </div>
+            <span class="font-label-md text-label-md text-primary font-semibold flex items-center gap-1 pt-1">
+              <span>Ir a avisos</span>
+              <span class="material-symbols-outlined text-[16px] group-hover:translate-x-1 transition-transform">arrow_forward</span>
+            </span>
+          </a>
+        </div>
+      </div>
+    </section>
+<?php
+    return (string) ob_get_clean();
+  }
+
+  /** @param array<string,mixed> $slaSummary @param array<string,mixed> $properties @param array<string,mixed> $signs @param array<string,mixed> $filters */
+  private static function renderHomeAdvisoryModals(
+    array $slaSummary,
+    array $properties,
+    array $signs,
+    string $baseUrl,
+    array $filters,
+    string $userName = ''
+  ): string {
+    $taskOverdue = (int) ($slaSummary['atrasados'] ?? 0);
+    $taskTotal = (int) ($slaSummary['total'] ?? 0);
+    $taskCompliance = max(0, min(100, (int) ($slaSummary['porcentaje_cumplimiento'] ?? 0)));
+
+    $propertyOk = (int) ($properties['actualizacion_ok'] ?? 0);
+    $propertyAlert = (int) ($properties['actualizacion_alerta'] ?? 0);
+    $propertyExpired = (int) ($properties['actualizacion_vencida'] ?? 0);
+    $propertyPending = $propertyAlert + $propertyExpired;
+
+    $retouchExpired = (int) ($signs['retoque_vencido'] ?? 0);
+    $retouchAlert = (int) ($signs['retoque_alerta'] ?? 0);
+    $newSignLate = (int) ($signs['instalacion_atrasada'] ?? 0);
+    $signPending = $retouchExpired + $retouchAlert + $newSignLate;
+
+    ob_start();
+?>
+    <!-- Modal 1: Tareas Atrasadas -->
+    <div class="fixed inset-0 z-50 items-center justify-center p-4 sm:p-6 bg-[#061D49]/50 backdrop-blur-md commercial-modal commercial-advisory-modal" id="commercial-advisory-modal-task_updates" role="dialog" aria-modal="true" aria-labelledby="commercial-advisory-title-task_updates" aria-hidden="true" data-commercial-advisory-modal="task_updates" data-auto-open="<?php echo $taskOverdue > 0 ? '1' : '0'; ?>">
+      <div class="bg-surface-container-lowest w-full max-w-xl rounded-3xl shadow-modal border border-slate-100 overflow-hidden flex flex-col relative" role="document">
+        <div class="p-6 bg-error-container/30 border-b border-error/10 flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <span class="w-10 h-10 rounded-2xl bg-error text-on-error flex items-center justify-center shadow-sm">
+              <span class="material-symbols-outlined text-[22px]">warning</span>
+            </span>
+            <div>
+              <span class="font-label-sm text-error uppercase font-bold tracking-wider">Aviso de Pendientes</span>
+              <h2 id="commercial-advisory-title-task_updates" class="font-headline-sm text-headline-sm text-on-surface">Tareas Atrasadas de Atención</h2>
+            </div>
+          </div>
+          <button type="button" class="w-8 h-8 rounded-full bg-surface-container-low hover:bg-surface-container text-secondary flex items-center justify-center cursor-pointer transition-colors" data-commercial-close-advisory aria-label="Cerrar aviso">
+            <span class="material-symbols-outlined text-[18px]">close</span>
+          </button>
+        </div>
+        <div class="p-6 space-y-4">
+          <div class="p-4 rounded-2xl bg-surface-container-low space-y-2">
+            <div class="flex items-center justify-between text-body-sm font-semibold">
+              <span class="text-on-surface">Cumplimiento de Atención SLA</span>
+              <span class="<?php echo $taskCompliance >= 80 ? 'text-secondary' : 'text-error font-bold'; ?>"><?php echo esc_html((string) $taskCompliance); ?>%</span>
+            </div>
+            <div class="w-full h-2 rounded-full bg-surface-container overflow-hidden">
+              <div class="h-full rounded-full <?php echo $taskCompliance >= 80 ? 'bg-secondary' : 'bg-error'; ?>" style="width: <?php echo esc_attr((string) $taskCompliance); ?>%;"></div>
+            </div>
+          </div>
+          <div class="grid grid-cols-3 gap-3 text-center">
+            <div class="p-3 rounded-2xl bg-error-container text-on-error-container">
+              <span class="font-headline-md text-[26px] font-bold block"><?php echo esc_html((string) $taskOverdue); ?></span>
+              <span class="font-label-sm text-label-sm uppercase font-semibold">Atrasadas</span>
+            </div>
+            <div class="p-3 rounded-2xl bg-surface-container text-on-surface">
+              <span class="font-headline-md text-[26px] font-bold block"><?php echo esc_html((string) ($slaSummary['al_dia'] ?? 0)); ?></span>
+              <span class="font-label-sm text-label-sm uppercase font-semibold">Al Día</span>
+            </div>
+            <div class="p-3 rounded-2xl bg-surface-container-low text-secondary">
+              <span class="font-headline-md text-[26px] font-bold block"><?php echo esc_html((string) $taskTotal); ?></span>
+              <span class="font-label-sm text-label-sm uppercase font-semibold">Total Abiertas</span>
+            </div>
+          </div>
+          <p class="font-body-sm text-body-sm text-on-surface-variant leading-relaxed">
+            <?php if ($taskOverdue > 0): ?>
+              Hay <strong><?php echo esc_html((string) $taskOverdue); ?> tareas comerciales</strong> que superaron el tiempo máximo de atención permitido. Te sugerimos gestionarlas o reasignarlas de inmediato.
+            <?php else: ?>
+              ¡Excelente! No tienes tareas atrasadas en este momento. Todas las actividades comerciales se encuentran al día.
+            <?php endif; ?>
+          </p>
+        </div>
+        <div class="p-4 bg-surface-container-low border-t border-surface-container flex items-center justify-end gap-3">
+          <button type="button" class="px-4 py-2 rounded-xl text-xs font-semibold text-secondary hover:text-on-surface hover:bg-surface-container transition-colors cursor-pointer" data-commercial-close-advisory>
+            Cerrar
+          </button>
+          <a href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'abiertos', 'sla_filter' => 'atrasado'])); ?>" data-commercial-filter-link class="px-5 py-2 rounded-xl text-xs font-bold text-on-error bg-error hover:opacity-95 transition-all shadow-sm flex items-center gap-1.5 cursor-pointer">
+            <span>Gestionar Tareas Ahora</span>
+            <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal 2: Inmuebles Pendientes por Actualizar -->
+    <div class="fixed inset-0 z-50 items-center justify-center p-4 sm:p-6 bg-[#061D49]/50 backdrop-blur-md commercial-modal commercial-advisory-modal" id="commercial-advisory-modal-property_updates" role="dialog" aria-modal="true" aria-labelledby="commercial-advisory-title-property_updates" aria-hidden="true" data-commercial-advisory-modal="property_updates" data-auto-open="<?php echo $propertyPending > 0 ? '1' : '0'; ?>">
+      <div class="bg-surface-container-lowest w-full max-w-xl rounded-3xl shadow-modal border border-slate-100 overflow-hidden flex flex-col relative" role="document">
+        <div class="p-6 bg-tertiary-fixed/30 border-b border-tertiary-fixed/40 flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <span class="w-10 h-10 rounded-2xl bg-tertiary text-on-tertiary flex items-center justify-center shadow-sm">
+              <span class="material-symbols-outlined text-[22px]">apartment</span>
+            </span>
+            <div>
+              <span class="font-label-sm text-tertiary uppercase font-bold tracking-wider">Inventario Inmobiliario</span>
+              <h2 id="commercial-advisory-title-property_updates" class="font-headline-sm text-headline-sm text-on-surface">Inmuebles por Actualizar</h2>
+            </div>
+          </div>
+          <button type="button" class="w-8 h-8 rounded-full bg-surface-container-low hover:bg-surface-container text-secondary flex items-center justify-center cursor-pointer transition-colors" data-commercial-close-advisory aria-label="Cerrar aviso">
+            <span class="material-symbols-outlined text-[18px]">close</span>
+          </button>
+        </div>
+        <div class="p-6 space-y-4">
+          <div class="grid grid-cols-3 gap-3 text-center">
+            <div class="p-3 rounded-2xl bg-error-container text-on-error-container">
+              <span class="font-headline-md text-[26px] font-bold block"><?php echo esc_html((string) $propertyExpired); ?></span>
+              <span class="font-label-sm text-label-sm uppercase font-semibold">Vencidos</span>
+            </div>
+            <div class="p-3 rounded-2xl bg-tertiary-fixed text-on-tertiary-fixed">
+              <span class="font-headline-md text-[26px] font-bold block"><?php echo esc_html((string) $propertyAlert); ?></span>
+              <span class="font-label-sm text-label-sm uppercase font-semibold">En Alerta</span>
+            </div>
+            <div class="p-3 rounded-2xl bg-surface-container text-on-surface">
+              <span class="font-headline-md text-[26px] font-bold block"><?php echo esc_html((string) $propertyOk); ?></span>
+              <span class="font-label-sm text-label-sm uppercase font-semibold">Al Día</span>
+            </div>
+          </div>
+          <p class="font-body-sm text-body-sm text-on-surface-variant leading-relaxed">
+            <?php if ($propertyPending > 0): ?>
+              Tienes <strong><?php echo esc_html((string) $propertyPending); ?> inmuebles públicos</strong> que superaron el periodo de vigencia o están en ventana de alerta sin contacto verificado con el propietario.
+            <?php else: ?>
+              Todos los inmuebles públicos se encuentran al día con sus actualizaciones.
+            <?php endif; ?>
+          </p>
+        </div>
+        <div class="p-4 bg-surface-container-low border-t border-surface-container flex items-center justify-end gap-3">
+          <button type="button" class="px-4 py-2 rounded-xl text-xs font-semibold text-secondary hover:text-on-surface hover:bg-surface-container transition-colors cursor-pointer" data-commercial-close-advisory>
+            Cerrar
+          </button>
+          <a href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'actualizaciones', 'estado_actualizacion' => ($propertyExpired > 0 ? 'Vencido' : 'Alerta')])); ?>" data-commercial-tab="actualizaciones" class="px-5 py-2 rounded-xl text-xs font-bold text-on-secondary bg-inverse-surface hover:bg-secondary transition-all shadow-sm flex items-center gap-1.5 cursor-pointer">
+            <span>Auditar Inmuebles</span>
+            <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal 3: Avisos en Fachada Pendientes -->
+    <div class="fixed inset-0 z-50 items-center justify-center p-4 sm:p-6 bg-[#061D49]/50 backdrop-blur-md commercial-modal commercial-advisory-modal" id="commercial-advisory-modal-sign_status" role="dialog" aria-modal="true" aria-labelledby="commercial-advisory-title-sign_status" aria-hidden="true" data-commercial-advisory-modal="sign_status" data-auto-open="<?php echo $signPending > 0 ? '1' : '0'; ?>">
+      <div class="bg-surface-container-lowest w-full max-w-xl rounded-3xl shadow-modal border border-slate-100 overflow-hidden flex flex-col relative" role="document">
+        <div class="p-6 bg-surface-container border-b border-surface-container-high flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <span class="w-10 h-10 rounded-2xl bg-secondary text-on-secondary flex items-center justify-center shadow-sm">
+              <span class="material-symbols-outlined text-[22px]">signpost</span>
+            </span>
+            <div>
+              <span class="font-label-sm text-secondary uppercase font-bold tracking-wider">Publicidad Exterior</span>
+              <h2 id="commercial-advisory-title-sign_status" class="font-headline-sm text-headline-sm text-on-surface">Estado de Avisos en Fachada</h2>
+            </div>
+          </div>
+          <button type="button" class="w-8 h-8 rounded-full bg-surface-container-low hover:bg-surface-container text-secondary flex items-center justify-center cursor-pointer transition-colors" data-commercial-close-advisory aria-label="Cerrar aviso">
+            <span class="material-symbols-outlined text-[18px]">close</span>
+          </button>
+        </div>
+        <div class="p-6 space-y-4">
+          <div class="grid grid-cols-3 gap-3 text-center">
+            <div class="p-3 rounded-2xl bg-error-container text-on-error-container">
+              <span class="font-headline-md text-[26px] font-bold block"><?php echo esc_html((string) $retouchExpired); ?></span>
+              <span class="font-label-sm text-label-sm uppercase font-semibold">Retoque Vencido</span>
+            </div>
+            <div class="p-3 rounded-2xl bg-tertiary-fixed text-on-tertiary-fixed">
+              <span class="font-headline-md text-[26px] font-bold block"><?php echo esc_html((string) $retouchAlert); ?></span>
+              <span class="font-label-sm text-label-sm uppercase font-semibold">Por Vencer</span>
+            </div>
+            <div class="p-3 rounded-2xl bg-secondary-fixed text-on-secondary-fixed">
+              <span class="font-headline-md text-[26px] font-bold block"><?php echo esc_html((string) $newSignLate); ?></span>
+              <span class="font-label-sm text-label-sm uppercase font-semibold">Nuevos Atrasados</span>
+            </div>
+          </div>
+          <p class="font-body-sm text-body-sm text-on-surface-variant leading-relaxed">
+            <?php if ($signPending > 0): ?>
+              Hay <strong><?php echo esc_html((string) $signPending); ?> avisos operativos</strong> que requieren mantenimiento o instalación inmediata en ruta.
+            <?php else: ?>
+              Todos los avisos de fachada están instalados y al día con sus retoques.
+            <?php endif; ?>
+          </p>
+        </div>
+        <div class="p-4 bg-surface-container-low border-t border-surface-container flex items-center justify-end gap-3">
+          <button type="button" class="px-4 py-2 rounded-xl text-xs font-semibold text-secondary hover:text-on-surface hover:bg-surface-container transition-colors cursor-pointer" data-commercial-close-advisory>
+            Cerrar
+          </button>
+          <a href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'avisos'])); ?>" data-commercial-tab="avisos" class="px-5 py-2 rounded-xl text-xs font-bold text-on-secondary bg-inverse-surface hover:bg-secondary transition-all shadow-sm flex items-center gap-1.5 cursor-pointer">
+            <span>Ver Rutas de Avisos</span>
+            <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+          </a>
+        </div>
+      </div>
     </div>
 <?php
     return (string) ob_get_clean();
@@ -1054,9 +1502,14 @@ final class CommercialDashboardView
               <span>Ver desglose por asesor</span>
               <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
             </button>
-            <a href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'abiertos', 'sla_filter' => 'atrasado'])); ?>" data-commercial-filter-link class="bg-error text-on-error px-space-md py-2 rounded-xl font-label-md text-label-md font-semibold hover:opacity-95 shadow-sm transition-all cursor-pointer">
-              Gestionar Ahora
-            </a>
+            <div class="flex items-center gap-2">
+              <button type="button" data-commercial-open-advisory="task_updates" class="px-3 py-2 rounded-xl font-label-md text-label-md font-semibold text-secondary hover:text-on-surface hover:bg-surface-container transition-all cursor-pointer">
+                Ver aviso
+              </button>
+              <a href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'abiertos', 'sla_filter' => 'atrasado'])); ?>" data-commercial-filter-link class="bg-error text-on-error px-space-md py-2 rounded-xl font-label-md text-label-md font-semibold hover:opacity-95 shadow-sm transition-all cursor-pointer">
+                Gestionar Ahora
+              </a>
+            </div>
           </div>
         </div>
 
@@ -1113,9 +1566,14 @@ final class CommercialDashboardView
               <span>Filtrar críticos</span>
               <span class="material-symbols-outlined text-[16px]">open_in_new</span>
             </a>
-            <a class="bg-surface-container hover:bg-surface-container-high text-on-surface px-space-md py-2 rounded-xl font-label-md text-label-md font-semibold transition-all cursor-pointer" data-commercial-tab="actualizaciones" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'actualizaciones'])); ?>">
-              Auditar Inmuebles
-            </a>
+            <div class="flex items-center gap-2">
+              <button type="button" data-commercial-open-advisory="property_updates" class="px-3 py-2 rounded-xl font-label-md text-label-md font-semibold text-secondary hover:text-on-surface hover:bg-surface-container transition-all cursor-pointer">
+                Ver aviso
+              </button>
+              <a class="bg-surface-container hover:bg-surface-container-high text-on-surface px-space-md py-2 rounded-xl font-label-md text-label-md font-semibold transition-all cursor-pointer" data-commercial-tab="actualizaciones" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'actualizaciones'])); ?>">
+                Auditar Inmuebles
+              </a>
+            </div>
           </div>
         </div>
 
@@ -1175,9 +1633,14 @@ final class CommercialDashboardView
               <span>Logística motorizada</span>
               <span class="material-symbols-outlined text-[16px]">navigation</span>
             </a>
-            <a class="bg-surface-container hover:bg-surface-container-high text-on-surface px-space-md py-2 rounded-xl font-label-md text-label-md font-semibold transition-all cursor-pointer" data-commercial-tab="avisos" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'avisos'])); ?>">
-              Ver Rutas Operativas
-            </a>
+            <div class="flex items-center gap-2">
+              <button type="button" data-commercial-open-advisory="sign_status" class="px-3 py-2 rounded-xl font-label-md text-label-md font-semibold text-secondary hover:text-on-surface hover:bg-surface-container transition-all cursor-pointer">
+                Ver aviso
+              </button>
+              <a class="bg-surface-container hover:bg-surface-container-high text-on-surface px-space-md py-2 rounded-xl font-label-md text-label-md font-semibold transition-all cursor-pointer" data-commercial-tab="avisos" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'avisos'])); ?>">
+                Ver Rutas Operativas
+              </a>
+            </div>
           </div>
         </div>
       </div>
