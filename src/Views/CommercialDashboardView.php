@@ -501,7 +501,9 @@ final class CommercialDashboardView
           <div class="relative" data-commercial-dropdown="notifications">
             <button type="button" class="relative flex items-center justify-center w-9 h-9 rounded-xl bg-surface-container-lowest/10 text-secondary-fixed hover:text-on-primary cursor-pointer transition-colors" id="btn-notifications-bell" aria-expanded="false" aria-haspopup="true" title="Últimas tareas creadas">
               <span class="material-symbols-outlined text-[20px]">notifications</span>
-              <span class="absolute -top-1 -right-1 px-1.5 py-0.2 bg-[#fbbf24] text-[#1e293b] font-bold text-[10px] rounded-full flex items-center justify-center shadow-sm leading-tight min-w-[18px]"><?php echo esc_html(number_format($recentCount)); ?></span>
+              <?php if ($recentCount > 0): ?>
+                <span class="absolute -top-1 -right-1 px-1.5 py-0.2 bg-[#fbbf24] text-[#1e293b] font-bold text-[10px] rounded-full flex items-center justify-center shadow-sm leading-tight min-w-[18px]"><?php echo esc_html((string) $recentCount); ?></span>
+              <?php endif; ?>
             </button>
             <div id="scm-notifications-dropdown" class="absolute right-0 top-full mt-2 hidden bg-surface-container-lowest shadow-[0_16px_36px_rgba(0,0,0,0.18)] rounded-2xl w-80 sm:w-96 max-w-[92vw] z-50 border border-outline-variant/30 overflow-hidden" role="menu">
               <div class="p-4 bg-surface-container-low border-b border-surface-container flex items-center justify-between">
@@ -706,7 +708,7 @@ final class CommercialDashboardView
 
       <!-- Dropdown Gestión de Tareas (Con despliegue por tema y por estado comercial) -->
       <div class="relative group/nav" data-commercial-dropdown="tareas">
-        <button type="button" class="flex items-center gap-space-xs px-space-md py-space-xs font-label-md text-label-md <?php echo $isTaskActive ? $activeClasses : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-dropdown-trigger="tareas" aria-expanded="false">
+        <button type="button" class="flex items-center gap-space-xs px-space-md py-space-xs font-label-md text-label-md <?php echo $isTaskActive ? ($activeClasses . ' active') : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-tab="tareas" data-commercial-dropdown-trigger="tareas" aria-expanded="false">
           <span>Gestión de Tareas</span>
           <span class="material-symbols-outlined text-[16px] group-hover/nav:rotate-180 transition-transform">expand_more</span>
         </button>
@@ -847,7 +849,7 @@ final class CommercialDashboardView
       <!-- Dropdown Actualizaciones de Inmuebles -->
       <?php if (in_array('actualizaciones', $views, true)): ?>
         <div class="relative group/nav" data-commercial-dropdown="actualizaciones">
-          <button type="button" class="flex items-center gap-space-xs px-space-md py-space-xs font-label-md text-label-md <?php echo $bucket === 'actualizaciones' ? $activeClasses : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-dropdown-trigger="actualizaciones" aria-expanded="false">
+          <button type="button" class="flex items-center gap-space-xs px-space-md py-space-xs font-label-md text-label-md <?php echo $bucket === 'actualizaciones' ? ($activeClasses . ' active') : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-tab="actualizaciones" data-commercial-dropdown-trigger="actualizaciones" aria-expanded="false">
             <span>Actualizaciones de Inmuebles</span>
             <span class="material-symbols-outlined text-[16px] group-hover/nav:rotate-180 transition-transform">expand_more</span>
           </button>
@@ -871,7 +873,7 @@ final class CommercialDashboardView
       <!-- Dropdown Avisos en Fachada -->
       <?php if (in_array('avisos', $views, true)): ?>
         <div class="relative group/nav" data-commercial-dropdown="avisos">
-          <button type="button" class="flex items-center gap-space-xs px-space-md py-space-xs font-label-md text-label-md <?php echo $bucket === 'avisos' ? $activeClasses : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-dropdown-trigger="avisos" aria-expanded="false">
+          <button type="button" class="flex items-center gap-space-xs px-space-md py-space-xs font-label-md text-label-md <?php echo $bucket === 'avisos' ? ($activeClasses . ' active') : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-tab="avisos" data-commercial-dropdown-trigger="avisos" aria-expanded="false">
             <span>Avisos en Fachada</span>
             <span class="material-symbols-outlined text-[16px] group-hover/nav:rotate-180 transition-transform">expand_more</span>
           </button>
@@ -1955,7 +1957,7 @@ final class CommercialDashboardView
       </section>
 
       <?php if ($isUpdates): ?>
-        <section class="w-full px-margin" id="commercial-property-updates-panel" data-commercial-home-control-panel="updates">
+        <section class="w-full px-margin active" id="commercial-property-updates-panel" data-commercial-home-control-panel="updates">
           <div class="bg-surface-container-lowest rounded-2xl shadow-sm p-space-lg space-y-space-md">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-space-sm pb-space-sm border-b border-surface-container">
               <div>
@@ -2026,7 +2028,7 @@ final class CommercialDashboardView
           </div>
         </section>
       <?php else: ?>
-        <section class="w-full px-margin" id="commercial-signs-panel" data-commercial-home-control-panel="signs">
+        <section class="w-full px-margin active" id="commercial-signs-panel" data-commercial-home-control-panel="signs">
           <div class="bg-surface-container-lowest rounded-2xl shadow-sm p-space-lg space-y-space-md">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-space-sm pb-space-sm border-b border-surface-container">
               <div>

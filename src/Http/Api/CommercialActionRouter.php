@@ -39,5 +39,6 @@ final class CommercialActionRouter
       return false;
     }
     $this->controller->{$method}($input);
+    return true;
   }
 }

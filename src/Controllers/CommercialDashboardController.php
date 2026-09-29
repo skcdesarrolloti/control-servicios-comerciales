@@ -86,7 +86,7 @@ final class CommercialDashboardController
     }
     $isNonAdmin = !$policy->canSeeAllCommercialTickets();
     $recentTickets = $repository->latestCreatedTickets($isNonAdmin, $currentEmployeeFilter, 12);
-    $recentCount = $repository->latestCreatedCount($isNonAdmin, $currentEmployeeFilter);
+    $recentCount = count($recentTickets);
     $topicHierarchy = $repository->topicStatusHierarchy($globalCountFilters);
 
     $panelId = $bucket === 'calendario' ? 'scm-panel-actividades-administrativas' : 'scm-panel-' . $bucket;

@@ -475,6 +475,8 @@
       if (typeof window.initCalendarPanel === "function") {
         window.initCalendarPanel(ticketsPanel || root);
       }
+    } else if (tab === "actualizaciones" || tab === "avisos") {
+      window.setTimeout(initHomeControls, 0);
     }
   }
 
@@ -821,7 +823,7 @@
     var total = root.querySelector("[data-commercial-property-total]");
     var stats = root.querySelector("[data-commercial-property-stats]");
     if (!form || !rows) return;
-    rows.innerHTML = '<tr><td colspan="6" class="commercial-control-empty-cell">Cargando inmuebles…</td></tr>';
+    rows.innerHTML = '<tr><td colspan="6" class="py-8 text-center text-secondary font-body-sm">Cargando inmuebles…</td></tr>';
     request("commercial_property_updates", new FormData(form))
       .then(function (response) {
         rows.innerHTML = response.html || "";
@@ -832,7 +834,7 @@
         }
       })
       .catch(function (error) {
-        rows.innerHTML = '<tr><td colspan="6" class="commercial-control-empty-cell">' + escapeHtml(error.message) + "</td></tr>";
+        rows.innerHTML = '<tr><td colspan="6" class="py-8 text-center text-error font-body-sm">' + escapeHtml(error.message) + "</td></tr>";
       });
   }
 
@@ -843,21 +845,31 @@
     if (!form || !rows) return;
     var data = new FormData(form);
     data.set("mode", form.getAttribute("data-mode") || "maintenance");
-    rows.innerHTML = '<div class="commercial-control-table-state">Cargando avisos…</div>';
+    rows.innerHTML = '<div class="py-8 text-center text-secondary font-body-sm">Cargando avisos…</div>';
     request("commercial_signs_control", data)
       .then(function (response) {
         rows.innerHTML = response.html || "";
         if (total) total.textContent = (response.total || 0) + " avisos";
       })
       .catch(function (error) {
-        rows.innerHTML = '<div class="commercial-control-empty-cell">' + escapeHtml(error.message) + "</div>";
+        rows.innerHTML = '<div class="py-8 text-center text-error font-body-sm">' + escapeHtml(error.message) + "</div>";
       });
   }
 
   function initHomeControls() {
-    if (!root.querySelector("[data-commercial-home-controls]")) return;
-    if (homeControlPanel("updates") && homeControlPanel("updates").classList.contains("active")) loadPropertyUpdates();
-    if (homeControlPanel("signs") && homeControlPanel("signs").classList.contains("active")) loadSignsControl();
+    var homeControls = root.querySelector("[data-commercial-home-controls]");
+    if (!homeControls) return;
+    var updatesPanel = homeControlPanel("updates");
+    var signsPanel = homeControlPanel("signs");
+    var tab = activeTab();
+    if (updatesPanel && (updatesPanel.classList.contains("active") || !signsPanel || tab === "actualizaciones")) {
+      updatesPanel.classList.add("active");
+      loadPropertyUpdates();
+    }
+    if (signsPanel && (signsPanel.classList.contains("active") || !updatesPanel || tab === "avisos")) {
+      signsPanel.classList.add("active");
+      loadSignsControl();
+    }
   }
 
   function analyzeCase(button) {
@@ -970,7 +982,14 @@
     if (signTab) {
       event.preventDefault();
       var mode = signTab.getAttribute("data-commercial-sign-tab") || "maintenance";
-      root.querySelectorAll("[data-commercial-sign-tab]").forEach(function (button) { button.classList.toggle("active", button === signTab); });
+      var activeClasses = ["bg-inverse-surface", "text-on-secondary", "shadow-sm"];
+      var inactiveClasses = ["bg-surface-container", "hover:bg-surface-container-high", "text-on-surface"];
+      root.querySelectorAll("[data-commercial-sign-tab]").forEach(function (button) {
+        var isCurrent = button === signTab;
+        button.classList.toggle("active", isCurrent);
+        activeClasses.forEach(function (cls) { button.classList.toggle(cls, isCurrent); });
+        inactiveClasses.forEach(function (cls) { button.classList.toggle(cls, !isCurrent); });
+      });
       var signForm = root.querySelector("[data-commercial-sign-control]");
       if (signForm) signForm.setAttribute("data-mode", mode);
       loadSignsControl();
@@ -1519,5 +1538,7 @@
     }, 0);
   }
   if (activeTab() === "inicio") window.setTimeout(maybeAutoOpenAdvisory, 0);
-  if (root.querySelector("[data-commercial-home-controls]")) window.setTimeout(initHomeControls, 0);
+  if (root.querySelector("[data-commercial-home-controls]") || activeTab() === "actualizaciones" || activeTab() === "avisos") {
+    window.setTimeout(initHomeControls, 0);
+  }
 })();

@@ -301,7 +301,7 @@ final class CommercialApiController
   public function propertyUpdates(array $input): never
   {
     $this->verify($input);
-    if (!$this->policy->canView('inicio')) {
+    if (!$this->policy->canView('actualizaciones') && !$this->policy->canView('inicio')) {
       JsonResponse::error('No tienes permiso para consultar actualizaciones de inmuebles.', 403);
     }
     $filters = $this->propertyControlFilters($input);
@@ -320,7 +320,7 @@ final class CommercialApiController
   public function signsControl(array $input): never
   {
     $this->verify($input);
-    if (!$this->policy->canView('inicio')) {
+    if (!$this->policy->canView('avisos') && !$this->policy->canView('inicio')) {
       JsonResponse::error('No tienes permiso para consultar avisos.', 403);
     }
     $filters = $this->propertyControlFilters($input);
