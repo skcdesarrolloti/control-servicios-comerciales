@@ -448,8 +448,13 @@
   }
 
   function activeTab() {
+    var params = new URLSearchParams(window.location.search);
+    var urlTab = params.get("tab");
+    if (urlTab) return urlTab;
     var active = root.querySelector("[data-commercial-tab].active");
-    return active ? active.getAttribute("data-commercial-tab") || "abiertos" : "abiertos";
+    if (active) return active.getAttribute("data-commercial-tab") || "inicio";
+    if (root.querySelector("[data-commercial-advisory-modal]")) return "inicio";
+    return "inicio";
   }
 
   function topTabFor(tab) {
@@ -530,12 +535,15 @@
   function maybeAutoOpenAdvisory() {
     if (activeTab() !== "inicio") return;
     if (root.querySelector(".commercial-modal.open")) return;
-    window.setTimeout(function () { openNextAdvisoryModal(null); }, 450);
+    window.setTimeout(function () { openNextAdvisoryModal(null); }, 300);
   }
 
   function openNextAdvisoryModal(current) {
     if (activeTab() !== "inicio") return;
     var modals = Array.prototype.slice.call(root.querySelectorAll('[data-commercial-advisory-modal][data-auto-open="1"]'));
+    if (!modals.length) {
+      modals = Array.prototype.slice.call(root.querySelectorAll('[data-commercial-advisory-modal]'));
+    }
     if (!modals.length) return;
     var start = current ? modals.indexOf(current) : -1;
     for (var index = start + 1; index < modals.length; index += 1) {
@@ -560,7 +568,7 @@
   function loadTickets(url, options) {
     options = options || {};
     var nextUrl = normalizedUrl(url);
-    var tab = nextUrl.searchParams.get("tab") || "abiertos";
+    var tab = nextUrl.searchParams.get("tab") || "inicio";
     if (!ticketsPanel) return Promise.resolve();
     if (listRequest) listRequest.abort();
     listRequest = new AbortController();
@@ -1537,7 +1545,13 @@
       }
     }, 0);
   }
-  if (activeTab() === "inicio") window.setTimeout(maybeAutoOpenAdvisory, 0);
+  if (activeTab() === "inicio") {
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", maybeAutoOpenAdvisory);
+    } else {
+      window.setTimeout(maybeAutoOpenAdvisory, 50);
+    }
+  }
   if (root.querySelector("[data-commercial-home-controls]") || activeTab() === "actualizaciones" || activeTab() === "avisos") {
     window.setTimeout(initHomeControls, 0);
   }

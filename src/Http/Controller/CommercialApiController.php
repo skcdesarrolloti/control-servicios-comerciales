@@ -58,7 +58,7 @@ final class CommercialApiController
   public function filterTickets(array $input): never
   {
     $this->verify($input);
-    $bucket = trim((string) ($input['tab'] ?? 'abiertos'));
+    $bucket = trim((string) ($input['tab'] ?? 'inicio'));
     if (!array_key_exists($bucket, CommercialAccessPolicy::VIEWS) || !$this->policy->canView($bucket)) {
       JsonResponse::error('No tienes permiso para consultar esta vista.', 403);
     }

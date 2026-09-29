@@ -704,7 +704,7 @@ final class CommercialDashboardView
     <nav class="flex items-center gap-space-xs lg:gap-space-sm overflow-visible py-space-xs" data-commercial-tabs data-active-classes="<?php echo esc_attr($activeClasses); ?>" aria-label="Navegación principal">
       <!-- Pestaña Inicio -->
       <?php if (in_array('inicio', $views, true)): ?>
-        <a class="px-space-md py-space-xs transition-colors whitespace-nowrap font-label-md text-label-md <?php echo $bucket === 'inicio' ? $activeClasses : $inactiveClasses; ?>" data-commercial-tab="inicio" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'inicio'])); ?>"<?php echo $bucket === 'inicio' ? ' aria-current="page"' : ''; ?>>
+        <a class="px-space-md py-space-xs transition-colors whitespace-nowrap font-label-md text-label-md <?php echo $bucket === 'inicio' ? ($activeClasses . ' active') : $inactiveClasses; ?>" data-commercial-tab="inicio" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'inicio'])); ?>"<?php echo $bucket === 'inicio' ? ' aria-current="page"' : ''; ?>>
           Inicio
         </a>
       <?php endif; ?>
@@ -1265,7 +1265,7 @@ final class CommercialDashboardView
     ob_start();
 ?>
     <!-- Modal 1: Tareas Atrasadas -->
-    <div class="fixed inset-0 z-50 items-center justify-center p-4 sm:p-6 bg-[#061D49]/50 backdrop-blur-md commercial-modal commercial-advisory-modal" id="commercial-advisory-modal-task_updates" role="dialog" aria-modal="true" aria-labelledby="commercial-advisory-title-task_updates" aria-hidden="true" data-commercial-advisory-modal="task_updates" data-auto-open="<?php echo $taskOverdue > 0 ? '1' : '0'; ?>">
+    <div class="fixed inset-0 z-50 items-center justify-center p-4 sm:p-6 bg-[#061D49]/50 backdrop-blur-md commercial-modal commercial-advisory-modal" id="commercial-advisory-modal-task_updates" role="dialog" aria-modal="true" aria-labelledby="commercial-advisory-title-task_updates" aria-hidden="true" data-commercial-advisory-modal="task_updates" data-auto-open="1">
       <div class="bg-surface-container-lowest w-full max-w-xl rounded-3xl shadow-modal border border-slate-100 overflow-hidden flex flex-col relative" role="document">
         <div class="p-6 bg-error-container/30 border-b border-error/10 flex items-center justify-between">
           <div class="flex items-center gap-3">
@@ -1326,7 +1326,7 @@ final class CommercialDashboardView
     </div>
 
     <!-- Modal 2: Inmuebles Pendientes por Actualizar -->
-    <div class="fixed inset-0 z-50 items-center justify-center p-4 sm:p-6 bg-[#061D49]/50 backdrop-blur-md commercial-modal commercial-advisory-modal" id="commercial-advisory-modal-property_updates" role="dialog" aria-modal="true" aria-labelledby="commercial-advisory-title-property_updates" aria-hidden="true" data-commercial-advisory-modal="property_updates" data-auto-open="<?php echo $propertyPending > 0 ? '1' : '0'; ?>">
+    <div class="fixed inset-0 z-50 items-center justify-center p-4 sm:p-6 bg-[#061D49]/50 backdrop-blur-md commercial-modal commercial-advisory-modal" id="commercial-advisory-modal-property_updates" role="dialog" aria-modal="true" aria-labelledby="commercial-advisory-title-property_updates" aria-hidden="true" data-commercial-advisory-modal="property_updates" data-auto-open="1">
       <div class="bg-surface-container-lowest w-full max-w-xl rounded-3xl shadow-modal border border-slate-100 overflow-hidden flex flex-col relative" role="document">
         <div class="p-6 bg-tertiary-fixed/30 border-b border-tertiary-fixed/40 flex items-center justify-between">
           <div class="flex items-center gap-3">
@@ -1378,7 +1378,7 @@ final class CommercialDashboardView
     </div>
 
     <!-- Modal 3: Avisos en Fachada Pendientes -->
-    <div class="fixed inset-0 z-50 items-center justify-center p-4 sm:p-6 bg-[#061D49]/50 backdrop-blur-md commercial-modal commercial-advisory-modal" id="commercial-advisory-modal-sign_status" role="dialog" aria-modal="true" aria-labelledby="commercial-advisory-title-sign_status" aria-hidden="true" data-commercial-advisory-modal="sign_status" data-auto-open="<?php echo $signPending > 0 ? '1' : '0'; ?>">
+    <div class="fixed inset-0 z-50 items-center justify-center p-4 sm:p-6 bg-[#061D49]/50 backdrop-blur-md commercial-modal commercial-advisory-modal" id="commercial-advisory-modal-sign_status" role="dialog" aria-modal="true" aria-labelledby="commercial-advisory-title-sign_status" aria-hidden="true" data-commercial-advisory-modal="sign_status" data-auto-open="1">
       <div class="bg-surface-container-lowest w-full max-w-xl rounded-3xl shadow-modal border border-slate-100 overflow-hidden flex flex-col relative" role="document">
         <div class="p-6 bg-surface-container border-b border-surface-container-high flex items-center justify-between">
           <div class="flex items-center gap-3">
