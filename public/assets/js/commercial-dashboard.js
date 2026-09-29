@@ -931,6 +931,27 @@
     notify("success", "Mensaje sugerido cargado en Responder.");
   }
 
+  function insertTextAtCursor(textarea, textToInsert) {
+    if (!textarea) return;
+    textarea.focus();
+    var start = textarea.selectionStart;
+    var end = textarea.selectionEnd;
+    var value = textarea.value || "";
+    if (typeof start === "number" && typeof end === "number") {
+      var before = value.substring(0, start);
+      var after = value.substring(end);
+      var leadingSep = (before.length > 0 && !/\s$/.test(before)) ? " " : "";
+      var trailingSep = (after.length > 0 && !/^\s/.test(after)) ? " " : "";
+      var fullInsert = leadingSep + textToInsert + trailingSep;
+      textarea.value = before + fullInsert + after;
+      var newPos = start + fullInsert.length;
+      textarea.setSelectionRange(newPos, newPos);
+    } else {
+      textarea.value += (textarea.value ? " " : "") + textToInsert;
+    }
+    textarea.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+
   function deleteAnalysis(button) {
     var ticketPk = button.getAttribute("data-ticket-pk") || currentCasePk || "";
     var analysisId = button.getAttribute("data-analysis-id") || "";
@@ -1300,6 +1321,49 @@
       }
       if (event.target.closest("[data-commercial-close-workflow]")) {
         closeWorkflows();
+        return;
+      }
+      var insertPropertyBtn = event.target.closest("[data-commercial-insert-property]");
+      if (insertPropertyBtn) {
+        event.preventDefault();
+        var propCode = insertPropertyBtn.getAttribute("data-commercial-insert-property") || "";
+        if (propCode) {
+          var formProp = insertPropertyBtn.closest("form");
+          var textareaProp = formProp ? formProp.querySelector('textarea[name="respuesta"]') : null;
+          var urlProp = "https://sucasainmobiliaria.com.co/inmueble/" + encodeURIComponent(propCode);
+          insertTextAtCursor(textareaProp, urlProp);
+        }
+        return;
+      }
+      var insertCustomPropBtn = event.target.closest("[data-commercial-insert-custom-property]");
+      if (insertCustomPropBtn) {
+        event.preventDefault();
+        var code = window.prompt("Ingresa el código del inmueble (ej: 12345):", "");
+        if (code) {
+          code = code.trim().replace(/[^a-zA-Z0-9_-]/g, "");
+          if (code) {
+            var formCustom = insertCustomPropBtn.closest("form");
+            var textareaCustom = formCustom ? formCustom.querySelector('textarea[name="respuesta"]') : null;
+            var urlCustom = "https://sucasainmobiliaria.com.co/inmueble/" + encodeURIComponent(code);
+            insertTextAtCursor(textareaCustom, urlCustom);
+          }
+        }
+        return;
+      }
+      var insertLinkBtn = event.target.closest("[data-commercial-insert-link]");
+      if (insertLinkBtn) {
+        event.preventDefault();
+        var linkUrl = window.prompt("Ingresa la dirección web (URL):", "https://");
+        if (linkUrl) {
+          linkUrl = linkUrl.trim();
+          if (linkUrl && /^https?:\/\//i.test(linkUrl)) {
+            var formLink = insertLinkBtn.closest("form");
+            var textareaLink = formLink ? formLink.querySelector('textarea[name="respuesta"]') : null;
+            insertTextAtCursor(textareaLink, linkUrl);
+          } else if (linkUrl) {
+            notify("error", "La URL debe comenzar con http:// o https://");
+          }
+        }
         return;
       }
       var addDocument = event.target.closest("[data-add-ticket-document]");

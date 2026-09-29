@@ -356,7 +356,18 @@ final class CommercialApiController
       $this->uploadedImages('evidencia'),
       $this->uploadedDocuments()
     );
-    $this->workflowResponse($result, 'Respuesta guardada.');
+    $this->ensureWorkflowSucceeded($result);
+
+    $newStatus = trim((string) ($input['estado'] ?? ''));
+    if ($newStatus !== '' && $newStatus !== '__keep__') {
+      try {
+        $this->tickets->changeStatus($ticketPk, $newStatus);
+      } catch (\InvalidArgumentException $exception) {
+        // Status validation error ignored if response succeeded
+      }
+    }
+
+    JsonResponse::success(['message' => (string) ($result['message'] ?? 'Respuesta guardada.'), 'refresh' => true]);
   }
 
   /** @param array<string,mixed> $input */

@@ -21,6 +21,10 @@ final class CommercialTicketModalView
     $pk = (int) ($ticket['_ID'] ?? 0);
     $logicalId = trim((string) ($ticket['id_ticket'] ?? '')) ?: (string) $pk;
     $status = trim((string) ($ticket['estado_comercial'] ?? '')) ?: 'Sin estado';
+    $generalStatus = trim((string) ($ticket['estado'] ?? ''));
+    $isPostponedOrClosed = CommercialStatusCatalog::isPostponed($status, $generalStatus)
+      || CommercialStatusCatalog::isClosed($status, $generalStatus)
+      || in_array(mb_strtolower($status, 'UTF-8'), ['postergado', 'aplazado', 'cerrado', 'finalizado'], true);
     $subject = trim((string) ($ticket['asunto'] ?? '')) ?: 'Tarea comercial';
     $description = trim(wp_strip_all_tags((string) ($ticket['descripcion'] ?? ''), true));
     $requester = trim((string) ($ticket['solicitante'] ?? '')) ?: 'Sin solicitante';
@@ -216,20 +220,14 @@ final class CommercialTicketModalView
               <span>Postergar</span>
             </button>
           <?php endif; ?>
-          <?php if ($policy->canAct('cambiar_estado')): ?>
-            <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold transition-all group cursor-pointer" data-commercial-open-workflow="status">
-              <span class="material-symbols-outlined text-[16px] text-slate-500 group-hover:text-[#061D49]">sync_alt</span>
-              <span>Cambiar Estado</span>
-            </button>
-          <?php endif; ?>
           <?php if ($policy->canAct('reasignar')): ?>
             <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold transition-all group cursor-pointer" data-commercial-open-workflow="reassign">
               <span class="material-symbols-outlined text-[16px] text-slate-500 group-hover:text-[#061D49]">manage_accounts</span>
               <span>Reasignar</span>
             </button>
           <?php endif; ?>
-          <?php if ($policy->canAct('activar')): ?>
-            <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold transition-all group cursor-pointer" data-commercial-open-workflow="activate">
+          <?php if ($policy->canAct('activar') && $isPostponedOrClosed): ?>
+            <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-semibold transition-all group cursor-pointer" data-commercial-open-workflow="activate">
               <span class="material-symbols-outlined text-[16px] text-emerald-600">play_circle</span>
               <span>Activar</span>
             </button>
@@ -369,7 +367,7 @@ final class CommercialTicketModalView
       <!-- Contenedor de Formularios de Workflow -->
       <div class="commercial-workflow-stack space-y-4" data-commercial-workflow-stack hidden>
         <?php if ($policy->canAct('responder')): ?>
-          <?php echo self::messageForm($pk, 'reply', 'Responder al solicitante', 'Escribe una respuesta clara y profesional para el cliente.', 'respuesta', 'Escribe aquí la respuesta oficial para ' . esc_attr($requester) . ' o actualización del caso…', 'Enviar respuesta al cliente', true, false, true); ?>
+          <?php echo self::replyForm($pk, $requester, $status, $propertyCode); ?>
         <?php endif; ?>
         <?php if ($policy->canAct('agregar_nota')): ?>
           <?php echo self::messageForm($pk, 'note', 'Agregar nota interna privada', 'Esta nota sólo será visible para el equipo interno y auditoría.', 'observacion', 'Escribe los detalles internos confidenciales de la tarea…', 'Guardar nota interna'); ?>
@@ -380,14 +378,11 @@ final class CommercialTicketModalView
         <?php if ($policy->canAct('postergar')): ?>
           <?php echo self::messageForm($pk, 'postpone', 'Postergar tarea', 'La tarea se moverá al estado comercial Postergado hasta la fecha programada.', 'observacion', 'Indica el motivo o justificación de la postergación…', 'Postergar tarea', true, true, true); ?>
         <?php endif; ?>
-        <?php if ($policy->canAct('activar')): ?>
+        <?php if ($policy->canAct('activar') && $isPostponedOrClosed): ?>
           <?php echo self::statusMessageForm($pk, 'activate', 'Activar tarea', 'Selecciona el estado con el que retoma la gestión activa.', 'motivo', CommercialStatusCatalog::OPEN, 'Nuevo', 'Activar tarea ahora', false, true); ?>
         <?php endif; ?>
         <?php if ($policy->canAct('cerrar')): ?>
           <?php echo self::statusMessageForm($pk, 'close', 'Cerrar tarea', 'Selecciona el resultado final del negocio o servicio y registra las observaciones.', 'observacion', CommercialStatusCatalog::CLOSED, 'Finalizado', 'Confirmar cierre de tarea', true); ?>
-        <?php endif; ?>
-        <?php if ($policy->canAct('cambiar_estado')): ?>
-          <?php echo self::selectForm($pk, 'status', 'Cambiar estado comercial', 'estado', CommercialStatusCatalog::all(), $status, 'Actualizar estado'); ?>
         <?php endif; ?>
         <?php if ($policy->canAct('reasignar')): ?>
           <?php echo self::employeeForm($pk, $employees, (string) ($ticket['id_empleado'] ?? '')); ?>
@@ -462,9 +457,9 @@ final class CommercialTicketModalView
                     <span class="text-xs font-semibold text-slate-700"><?php echo esc_html($time); ?></span>
                   </div>
                 </div>
-                <p class="text-xs sm:text-[13px] text-slate-700 leading-relaxed font-normal pl-8 whitespace-pre-wrap">
-                  <?php echo nl2br(esc_html($msg)); ?>
-                </p>
+                <div class="text-xs sm:text-[13px] text-slate-700 leading-relaxed font-normal pl-8">
+                  <?php echo self::renderFormattedMessage($msg); ?>
+                </div>
                 <?php echo self::timelineAttachments($item); ?>
                 <div class="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400 pl-8">
                   <span><?php echo esc_html(self::actorMeta($actorId, $actorEmail)); ?></span>
@@ -582,6 +577,111 @@ final class CommercialTicketModalView
       $parts[] = $actorEmail;
     }
     return $parts !== [] ? implode(' · ', $parts) : 'Autor registrado en historial';
+  }
+
+  private static function replyForm(int $pk, string $requester, string $currentStatus, string $propertyCode): string
+  {
+    ob_start();
+?>
+    <form class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-card space-y-4 commercial-workflow-form" data-commercial-workflow-form="reply" hidden>
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div>
+          <h3 class="text-sm font-bold text-[#061D49] flex items-center gap-2">
+            <span class="material-symbols-outlined text-[18px] text-[#1E3C76]">reply</span>
+            <span>Responder al solicitante</span>
+          </h3>
+          <p class="text-xs text-slate-500 mt-0.5">Escribe la respuesta oficial para <?php echo esc_html($requester); ?>. Puedes actualizar el estado comercial y adjuntar enlaces o archivos.</p>
+        </div>
+        <button type="button" class="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center cursor-pointer transition-colors" data-commercial-close-workflow aria-label="Cerrar formulario">
+          <span class="material-symbols-outlined text-[16px]">close</span>
+        </button>
+      </div>
+      <input type="hidden" name="ticket_pk" value="<?php echo esc_attr((string) $pk); ?>">
+
+      <!-- Selector de Nuevo Estado Comercial -->
+      <div class="space-y-1.5 bg-slate-50/70 p-3 rounded-xl border border-slate-200/80">
+        <div class="flex items-center justify-between">
+          <label class="block text-xs font-bold text-slate-700 flex items-center gap-1.5">
+            <span class="material-symbols-outlined text-[15px] text-[#1E3C76]">sync_alt</span>
+            <span>Estado comercial tras la respuesta:</span>
+          </label>
+          <span class="text-[11px] font-normal text-slate-500">Actual: <strong class="text-[#061D49]"><?php echo esc_html($currentStatus); ?></strong></span>
+        </div>
+        <select name="estado" class="w-full text-xs sm:text-sm rounded-xl border border-slate-200 focus:border-[#1E3C76] focus:ring focus:ring-[#1E3C76]/20 p-2.5 outline-none bg-white font-medium text-slate-800 transition">
+          <option value="__keep__" selected>Mantener estado actual (<?php echo esc_html($currentStatus); ?>)</option>
+          <optgroup label="Gestión Activa (Abiertos)">
+            <?php foreach (CommercialStatusCatalog::OPEN as $st): ?>
+              <?php if ($st !== $currentStatus): ?>
+                <option value="<?php echo esc_attr($st); ?>"><?php echo esc_html($st); ?></option>
+              <?php endif; ?>
+            <?php endforeach; ?>
+          </optgroup>
+          <optgroup label="Postergados">
+            <?php foreach (CommercialStatusCatalog::POSTPONED as $st): ?>
+              <?php if ($st !== $currentStatus): ?>
+                <option value="<?php echo esc_attr($st); ?>"><?php echo esc_html($st); ?></option>
+              <?php endif; ?>
+            <?php endforeach; ?>
+          </optgroup>
+          <optgroup label="Cerrados / Finalizados">
+            <?php foreach (CommercialStatusCatalog::CLOSED as $st): ?>
+              <?php if ($st !== $currentStatus): ?>
+                <option value="<?php echo esc_attr($st); ?>"><?php echo esc_html($st); ?></option>
+              <?php endif; ?>
+            <?php endforeach; ?>
+          </optgroup>
+        </select>
+      </div>
+
+      <!-- Barra de herramientas de enlaces y contenido enriquecido -->
+      <div class="space-y-1.5">
+        <div class="flex items-center justify-between flex-wrap gap-2">
+          <label class="block text-xs font-semibold text-slate-700">
+            Mensaje de respuesta <em class="text-rose-600">*</em>
+          </label>
+          <!-- Botones de inserción rápida de links -->
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <?php if ($propertyCode !== ''): ?>
+              <button type="button" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#EBF1FB] hover:bg-[#d8e5f8] text-[#1E3C76] border border-[#1E3C76]/25 text-[11px] font-semibold transition-all shadow-xs cursor-pointer active:scale-95" data-commercial-insert-property="<?php echo esc_attr($propertyCode); ?>" title="Insertar enlace del inmueble de este caso en la respuesta">
+                <span class="material-symbols-outlined text-[14px]">apartment</span>
+                <span>Inmueble #<?php echo esc_html($propertyCode); ?></span>
+              </button>
+            <?php endif; ?>
+            <button type="button" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-[11px] font-medium transition-all cursor-pointer active:scale-95" data-commercial-insert-custom-property title="Insertar enlace a otro código de inmueble">
+              <span class="material-symbols-outlined text-[14px] text-slate-500">add_home_work</span>
+              <span>Otro inmueble</span>
+            </button>
+            <button type="button" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-[11px] font-medium transition-all cursor-pointer active:scale-95" data-commercial-insert-link title="Insertar cualquier enlace web (URL)">
+              <span class="material-symbols-outlined text-[14px] text-slate-500">link</span>
+              <span>Enlace web</span>
+            </button>
+          </div>
+        </div>
+        <textarea name="respuesta" rows="5" required placeholder="Escribe aquí la respuesta oficial para <?php echo esc_attr($requester); ?>… (puedes usar los botones de arriba para adjuntar links de inmuebles o páginas web)" class="w-full text-xs sm:text-sm rounded-xl border border-slate-200 focus:border-[#1E3C76] focus:ring focus:ring-[#1E3C76]/20 p-3 placeholder-slate-400 outline-none transition font-sans"></textarea>
+        <p class="text-[11px] text-slate-400 flex items-center gap-1">
+          <span class="material-symbols-outlined text-[13px] text-slate-400">info</span>
+          <span>Los links de inmuebles y URLs se convertirán automáticamente en accesos directos interactivos en la cronología.</span>
+        </p>
+      </div>
+
+      <?php echo self::attachmentFields(); ?>
+
+      <label class="flex items-center gap-2 cursor-pointer text-xs text-slate-600 select-none pt-1">
+        <input type="checkbox" name="notificar_solicitante" value="1" checked class="rounded border-slate-300 text-[#1E3C76] focus:ring-[#1E3C76]">
+        <span>Notificar por correo electrónico al solicitante</span>
+      </label>
+
+      <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+        <span class="text-xs text-rose-600 mr-auto font-medium" data-commercial-form-message aria-live="polite"></span>
+        <button type="button" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-colors cursor-pointer" data-commercial-close-workflow>Cancelar</button>
+        <button type="submit" class="px-5 py-2 bg-[#061D49] hover:bg-[#1E3C76] text-white rounded-xl text-xs font-semibold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer">
+          <span class="material-symbols-outlined text-[15px]">send</span>
+          <span>Enviar respuesta</span>
+        </button>
+      </div>
+    </form>
+<?php
+    return (string) ob_get_clean();
   }
 
   private static function messageForm(
@@ -935,5 +1035,41 @@ final class CommercialTicketModalView
     }
     $parsed = strtotime((string) $value);
     return $parsed !== false ? date('d/m/Y · h:i a', $parsed) : 'Sin fecha';
+  }
+
+  private static function renderFormattedMessage(string $message): string
+  {
+    $escaped = esc_html($message);
+    $pattern = '#https?://[^\s<>"\'\(\)]+#i';
+    $formatted = preg_replace_callback($pattern, static function (array $matches): string {
+      $url = $matches[0];
+      $trailing = '';
+      if (preg_match('/[.,;:!]+$/', $url, $punctMatches)) {
+        $trailing = $punctMatches[0];
+        $url = substr($url, 0, -strlen($trailing));
+      }
+
+      if (preg_match('#^https?://(?:www\.)?sucasainmobiliaria\.com\.co/inmueble/([a-zA-Z0-9_-]+)(?:[/?#].*)?$#i', $url, $codeMatches)) {
+        $code = esc_html($codeMatches[1]);
+        $safeUrl = esc_url($url);
+        return sprintf(
+          '<a href="%s" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-2.5 py-1 my-1 rounded-lg bg-[#EBF1FB] hover:bg-[#d5e3f7] text-[#1E3C76] font-semibold text-xs border border-[#1E3C76]/25 transition-all shadow-xs cursor-pointer"><span class="material-symbols-outlined text-[15px] text-[#1E3C76]">apartment</span><span>Ficha Inmueble #%s</span><span class="material-symbols-outlined text-[13px] opacity-60">open_in_new</span></a>%s',
+          $safeUrl,
+          $code,
+          $trailing
+        );
+      }
+
+      $safeUrl = esc_url($url);
+      $displayUrl = strlen($url) > 45 ? esc_html(substr($url, 0, 42) . '…') : esc_html($url);
+      return sprintf(
+        '<a href="%s" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 px-2 py-0.5 my-0.5 rounded-md bg-slate-100 hover:bg-slate-200 text-[#1E3C76] hover:underline font-medium text-xs border border-slate-200 transition-colors break-all cursor-pointer"><span class="material-symbols-outlined text-[14px]">link</span><span>%s</span><span class="material-symbols-outlined text-[12px] opacity-60">open_in_new</span></a>%s',
+        $safeUrl,
+        $displayUrl,
+        $trailing
+      );
+    }, $escaped);
+
+    return nl2br($formatted);
   }
 }
