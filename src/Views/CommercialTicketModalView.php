@@ -982,11 +982,14 @@ final class CommercialTicketModalView
   {
     ob_start();
 ?>
-    <form class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-card space-y-3.5 commercial-workflow-form" data-commercial-workflow-form="reassign" hidden>
+    <form class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-card space-y-4 commercial-workflow-form" data-commercial-workflow-form="reassign" hidden>
       <div class="flex items-center justify-between pb-2 border-b border-slate-100">
         <div>
-          <h3 class="text-sm font-bold text-[#061D49]">Reasignar responsable</h3>
-          <p class="text-xs text-slate-500">Selecciona un integrante habilitado del equipo comercial.</p>
+          <h3 class="text-sm font-bold text-[#061D49] flex items-center gap-2">
+            <span class="material-symbols-outlined text-[18px] text-[#1E3C76]">manage_accounts</span>
+            <span>Reasignar responsable</span>
+          </h3>
+          <p class="text-xs text-slate-500 mt-0.5">Selecciona un integrante habilitado del equipo comercial para transferir la gestión de esta tarea.</p>
         </div>
         <button type="button" class="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center cursor-pointer transition-colors" data-commercial-close-workflow aria-label="Cerrar formulario">
           <span class="material-symbols-outlined text-[16px]">close</span>
@@ -1004,10 +1007,33 @@ final class CommercialTicketModalView
           <?php endforeach; ?>
         </select>
       </div>
+      <div class="space-y-1">
+        <label class="block text-xs font-semibold text-slate-700">Motivo de la reasignación <span class="text-slate-400 font-normal">(Opcional)</span></label>
+        <textarea name="observacion" rows="2" placeholder="Ej: Reasignación por turno, redistribución de carga comercial o rotación de zona…" class="w-full text-xs sm:text-sm rounded-xl border border-slate-200 focus:border-[#1E3C76] p-2.5 outline-none font-medium text-slate-700"></textarea>
+      </div>
+      <div class="space-y-1.5 pt-1 border-t border-slate-100">
+        <label class="flex items-center gap-2 cursor-pointer text-xs text-slate-700 select-none">
+          <input type="checkbox" name="notificar_whatsapp" value="1" checked class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500">
+          <span class="flex items-center gap-1.5">
+            <span class="material-symbols-outlined text-[16px] text-emerald-600">chat</span>
+            <span>Notificar al nuevo responsable por <strong>WhatsApp</strong></span>
+          </span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer text-xs text-slate-700 select-none">
+          <input type="checkbox" name="notificar_correo" value="1" checked class="rounded border-slate-300 text-[#1E3C76] focus:ring-[#1E3C76]">
+          <span class="flex items-center gap-1.5">
+            <span class="material-symbols-outlined text-[16px] text-[#1E3C76]">mail</span>
+            <span>Notificar al nuevo responsable por correo electrónico</span>
+          </span>
+        </label>
+      </div>
       <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
         <span class="text-xs text-rose-600 mr-auto font-medium" data-commercial-form-message aria-live="polite"></span>
         <button type="button" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-colors cursor-pointer" data-commercial-close-workflow>Cancelar</button>
-        <button type="submit" class="px-5 py-2 bg-[#061D49] hover:bg-[#1E3C76] text-white rounded-xl text-xs font-semibold transition-all shadow-sm cursor-pointer">Guardar responsable</button>
+        <button type="submit" class="px-5 py-2 bg-[#061D49] hover:bg-[#1E3C76] text-white rounded-xl text-xs font-semibold transition-all shadow-sm cursor-pointer flex items-center gap-1.5">
+          <span class="material-symbols-outlined text-[15px]">send</span>
+          <span>Reasignar y notificar</span>
+        </button>
       </div>
     </form>
 <?php

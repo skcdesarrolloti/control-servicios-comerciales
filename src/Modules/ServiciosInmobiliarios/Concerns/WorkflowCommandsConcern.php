@@ -708,10 +708,11 @@ trait WorkflowCommandsConcern
     if ($notifyNewEmp && trim($newEmpCelular) !== '') {
       try {
         $tipo = $this->firstNonEmpty([
+          $ticket['tema'] ?? '',
           $ticket['tipo_pqrs'] ?? '',
           $ticket['tema_ayuda'] ?? '',
           $ticket['asunto'] ?? '',
-          'Caso',
+          'Caso comercial',
         ]);
         $destinationName = $newEmpNombre !== '' ? $newEmpNombre : 'Funcionario';
         $previousName = $oldEmpNombre !== '' ? $oldEmpNombre : 'Sin asignar';
@@ -755,10 +756,10 @@ trait WorkflowCommandsConcern
         ]);
         if (!$ok) {
           $detail = trim($smsQueue->lastError());
-          error_log('control-servicios-inmobiliarios: no se pudo encolar WhatsApp de traslado del caso #' . $logicalTicket . ($detail !== '' ? ': ' . $detail : ''));
+          error_log('control-servicios-comerciales: no se pudo encolar WhatsApp de traslado del caso #' . $logicalTicket . ($detail !== '' ? ': ' . $detail : ''));
         }
       } catch (\Throwable $exception) {
-        error_log('control-servicios-inmobiliarios: error preparando WhatsApp de traslado del caso #' . $logicalTicket . ': ' . $exception->getMessage());
+        error_log('control-servicios-comerciales: error preparando WhatsApp de traslado del caso #' . $logicalTicket . ': ' . $exception->getMessage());
       }
     }
 

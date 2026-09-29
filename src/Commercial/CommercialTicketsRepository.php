@@ -2183,8 +2183,11 @@ final class CommercialTicketsRepository
     return array_map(fn(array $row): array => $this->sla->decorateTicket($row), $rows);
   }
 
-  /** @param array<int,string> $allowedCargos */
-  public function reassign(int $ticketPk, string $employeeId, array $allowedCargos): void
+  /**
+   * @param array<int,string> $allowedCargos
+   * @return array{ticket:array<string,mixed>,target:array<string,mixed>,previous_name:string,previous_email:string,previous_phone:string}
+   */
+  public function reassign(int $ticketPk, string $employeeId, array $allowedCargos, string $observacion = ''): array
   {
     if ($ticketPk <= 0 || trim($employeeId) === '') {
       throw new \InvalidArgumentException('Tarea o funcionario inválido.');
@@ -2202,7 +2205,13 @@ final class CommercialTicketsRepository
     }
 
     $ticket = $this->ticket($ticketPk);
-    $previous = trim((string) ($ticket['nombre_empleado'] ?? $ticket['id_empleado'] ?? 'Sin asignar'));
+    $previousName = trim((string) ($ticket['nombre_empleado'] ?? $ticket['empleado'] ?? ''));
+    if ($previousName === '') {
+      $previousName = trim((string) ($ticket['id_empleado'] ?? '')) ?: 'Sin asignar';
+    }
+    $previousEmail = trim((string) ($ticket['correo_empleado'] ?? ''));
+    $previousPhone = trim((string) ($ticket['celular_empleado'] ?? ''));
+
     $pdo = $this->db->pdo();
     $pdo->beginTransaction();
     try {
@@ -2214,7 +2223,12 @@ final class CommercialTicketsRepository
         'celular_empleado' => (string) $target['celular'],
         'fecha_actualizacion' => time(),
       ], ['_ID' => $ticketPk]);
-      $this->insertHistory($ticketPk, sprintf('Responsable comercial actualizado de "%s" a "%s".', $previous, (string) $target['nombre']));
+
+      $histMessage = sprintf('Responsable comercial actualizado de "%s" a "%s".', $previousName, (string) $target['nombre']);
+      if ($observacion !== '') {
+        $histMessage .= ' Motivo: ' . wp_strip_all_tags($observacion);
+      }
+      $this->insertHistory($ticketPk, $histMessage);
       $pdo->commit();
     } catch (\Throwable $exception) {
       if ($pdo->inTransaction()) {
@@ -2222,13 +2236,21 @@ final class CommercialTicketsRepository
       }
       throw $exception;
     }
+
+    return [
+      'ticket' => $ticket,
+      'target' => $target,
+      'previous_name' => $previousName,
+      'previous_email' => $previousEmail,
+      'previous_phone' => $previousPhone,
+    ];
   }
 
   /** @return array<string,mixed> */
   private function ticket(int $ticketPk): array
   {
     $row = $this->db->getRow(
-      "SELECT `_ID`, `estado_comercial`, `id_empleado`, `nombre_empleado` FROM `{$this->db->table('jet_cct_tickets')}` WHERE `_ID` = ? LIMIT 1",
+      "SELECT * FROM `{$this->db->table('jet_cct_tickets')}` WHERE `_ID` = ? LIMIT 1",
       [$ticketPk]
     );
     if (!is_array($row)) {

@@ -731,7 +731,7 @@
     request(action, new FormData(form))
       .then(function (response) {
         notify("success", response.message || "Acción guardada.");
-        var movesTicket = ["postpone", "activate", "close", "status"].indexOf(key) !== -1;
+        var movesTicket = ["postpone", "activate", "close", "status", "reassign"].indexOf(key) !== -1;
         var refreshUrl = window.location.href;
         if (movesTicket) {
           showCaseModal(false);

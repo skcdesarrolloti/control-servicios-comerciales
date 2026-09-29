@@ -265,12 +265,57 @@ final class CommercialApiController
     }
     $ticketPk = (int) ($input['ticket_pk'] ?? 0);
     $this->authorizeTicketScope($ticketPk);
+    $newEmployeeId = trim((string) ($input['id_empleado'] ?? ''));
+    $observacion = trim((string) ($input['observacion'] ?? ''));
+    $notifyWhatsapp = !isset($input['notificar_whatsapp']) || !empty($input['notificar_whatsapp']);
+    $notifyEmail = !isset($input['notificar_correo']) || !empty($input['notificar_correo']);
+
     try {
-      $this->tickets->reassign($ticketPk, trim((string) ($input['id_empleado'] ?? '')), $this->commercialCargos);
+      $reassignData = $this->tickets->reassign($ticketPk, $newEmployeeId, $this->commercialCargos, $observacion);
     } catch (\InvalidArgumentException $exception) {
       JsonResponse::error($exception->getMessage(), 422);
     }
-    JsonResponse::success(['message' => 'El responsable comercial fue actualizado.']);
+
+    $ticket = $reassignData['ticket'];
+    $target = $reassignData['target'];
+    $previousName = $reassignData['previous_name'];
+    $previousEmail = $reassignData['previous_email'];
+
+    $userName = \SCM\Core\Auth::user();
+    if ($userName === '') {
+      $userId = \SCM\Core\Auth::userId();
+      $userName = $userId > 0 ? ('Usuario #' . $userId) : 'Sistema';
+    }
+
+    $newEmpNombre = (string) ($target['nombre'] ?? '');
+    $newEmpCorreo = (string) ($target['correo'] ?? '');
+    $newEmpCelular = $notifyWhatsapp ? (string) ($target['celular'] ?? '') : '';
+    $newEmpId = (string) ($target['id'] ?? $newEmployeeId);
+
+    $this->workflow->notifyTrasladoCaso(
+      $ticket,
+      $newEmpNombre,
+      $newEmpCorreo,
+      $previousName,
+      $previousEmail,
+      $userName,
+      [],
+      false,
+      $notifyEmail,
+      $newEmpCelular,
+      $newEmpId
+    );
+
+    $hasWhatsapp = trim($newEmpCelular) !== '';
+    $message = 'Caso reasignado a ' . ($newEmpNombre ?: 'nuevo responsable') . '.';
+    if ($hasWhatsapp) {
+      $message .= ' Notificación por WhatsApp encolada.';
+    }
+
+    JsonResponse::success([
+      'message' => $message,
+      'refresh' => true,
+    ]);
   }
 
   /** @param array<string,mixed> $input */
