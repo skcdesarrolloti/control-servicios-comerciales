@@ -541,9 +541,6 @@
   function openNextAdvisoryModal(current) {
     if (activeTab() !== "inicio") return;
     var modals = Array.prototype.slice.call(root.querySelectorAll('[data-commercial-advisory-modal][data-auto-open="1"]'));
-    if (!modals.length) {
-      modals = Array.prototype.slice.call(root.querySelectorAll('[data-commercial-advisory-modal]'));
-    }
     if (!modals.length) return;
     var start = current ? modals.indexOf(current) : -1;
     for (var index = start + 1; index < modals.length; index += 1) {

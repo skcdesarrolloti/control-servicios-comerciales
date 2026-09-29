@@ -1265,7 +1265,7 @@ final class CommercialDashboardView
     ob_start();
 ?>
     <!-- Modal 1: Tareas Atrasadas -->
-    <div class="fixed inset-0 z-50 items-center justify-center p-4 sm:p-6 bg-[#061D49]/50 backdrop-blur-md commercial-modal commercial-advisory-modal" id="commercial-advisory-modal-task_updates" role="dialog" aria-modal="true" aria-labelledby="commercial-advisory-title-task_updates" aria-hidden="true" data-commercial-advisory-modal="task_updates" data-auto-open="1">
+    <div class="fixed inset-0 z-50 items-center justify-center p-4 sm:p-6 bg-[#061D49]/50 backdrop-blur-md commercial-modal commercial-advisory-modal" id="commercial-advisory-modal-task_updates" role="dialog" aria-modal="true" aria-labelledby="commercial-advisory-title-task_updates" aria-hidden="true" data-commercial-advisory-modal="task_updates" data-auto-open="<?php echo $taskOverdue > 0 ? '1' : '0'; ?>">
       <div class="bg-surface-container-lowest w-full max-w-xl rounded-3xl shadow-modal border border-slate-100 overflow-hidden flex flex-col relative" role="document">
         <div class="p-6 bg-error-container/30 border-b border-error/10 flex items-center justify-between">
           <div class="flex items-center gap-3">
@@ -1326,7 +1326,7 @@ final class CommercialDashboardView
     </div>
 
     <!-- Modal 2: Inmuebles Pendientes por Actualizar -->
-    <div class="fixed inset-0 z-50 items-center justify-center p-4 sm:p-6 bg-[#061D49]/50 backdrop-blur-md commercial-modal commercial-advisory-modal" id="commercial-advisory-modal-property_updates" role="dialog" aria-modal="true" aria-labelledby="commercial-advisory-title-property_updates" aria-hidden="true" data-commercial-advisory-modal="property_updates" data-auto-open="1">
+    <div class="fixed inset-0 z-50 items-center justify-center p-4 sm:p-6 bg-[#061D49]/50 backdrop-blur-md commercial-modal commercial-advisory-modal" id="commercial-advisory-modal-property_updates" role="dialog" aria-modal="true" aria-labelledby="commercial-advisory-title-property_updates" aria-hidden="true" data-commercial-advisory-modal="property_updates" data-auto-open="<?php echo $propertyPending > 0 ? '1' : '0'; ?>">
       <div class="bg-surface-container-lowest w-full max-w-xl rounded-3xl shadow-modal border border-slate-100 overflow-hidden flex flex-col relative" role="document">
         <div class="p-6 bg-tertiary-fixed/30 border-b border-tertiary-fixed/40 flex items-center justify-between">
           <div class="flex items-center gap-3">
@@ -1378,7 +1378,7 @@ final class CommercialDashboardView
     </div>
 
     <!-- Modal 3: Avisos en Fachada Pendientes -->
-    <div class="fixed inset-0 z-50 items-center justify-center p-4 sm:p-6 bg-[#061D49]/50 backdrop-blur-md commercial-modal commercial-advisory-modal" id="commercial-advisory-modal-sign_status" role="dialog" aria-modal="true" aria-labelledby="commercial-advisory-title-sign_status" aria-hidden="true" data-commercial-advisory-modal="sign_status" data-auto-open="1">
+    <div class="fixed inset-0 z-50 items-center justify-center p-4 sm:p-6 bg-[#061D49]/50 backdrop-blur-md commercial-modal commercial-advisory-modal" id="commercial-advisory-modal-sign_status" role="dialog" aria-modal="true" aria-labelledby="commercial-advisory-title-sign_status" aria-hidden="true" data-commercial-advisory-modal="sign_status" data-auto-open="<?php echo $signPending > 0 ? '1' : '0'; ?>">
       <div class="bg-surface-container-lowest w-full max-w-xl rounded-3xl shadow-modal border border-slate-100 overflow-hidden flex flex-col relative" role="document">
         <div class="p-6 bg-surface-container border-b border-surface-container-high flex items-center justify-between">
           <div class="flex items-center gap-3">
@@ -1702,8 +1702,10 @@ final class CommercialDashboardView
     array $filterOptions,
     string $baseUrl,
     bool $isMyTasks = false,
-    string $effectiveBucket = ''
+    string $effectiveBucket = '',
+    $policy = null
   ): string {
+    $canFilterEmployees = ($policy instanceof CommercialAccessPolicy && $policy->canSeeAllCommercialTickets() && !$isMyTasks);
     $activeFilterKeys = array_filter(
       ['busqueda', 'ticket_id', 'id_empleado', 'medio', 'barrio', 'sla_filter', 'solicitante', 'celular', 'correo', 'fecha_desde', 'fecha_hasta'],
       static fn(string $k): bool => trim((string) ($filters[$k] ?? '')) !== ''
@@ -1737,7 +1739,7 @@ final class CommercialDashboardView
             <input type="hidden" name="mis_bucket" value="<?php echo esc_attr($effectiveBucket); ?>">
           <?php endif; ?>
 
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-space-sm pt-space-xs">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 <?php echo $canFilterEmployees ? 'xl:grid-cols-6' : 'xl:grid-cols-5'; ?> gap-space-sm pt-space-xs">
             <!-- Input Búsqueda Rápida -->
             <div class="space-y-1">
               <label class="block font-label-sm text-label-sm text-secondary font-medium">Búsqueda rápida</label>
@@ -1754,16 +1756,20 @@ final class CommercialDashboardView
             </div>
 
             <!-- Funcionario / Responsable -->
-            <div class="space-y-1">
-              <label class="block font-label-sm text-label-sm text-secondary font-medium">Responsable</label>
-              <select name="id_empleado" class="w-full px-3 py-2 bg-surface-container-low focus:bg-surface-container-lowest rounded-xl font-body-sm text-body-sm text-on-surface outline-none transition-all cursor-pointer border border-transparent focus:border-outline-variant">
-                <option value="">Todos los asesores</option>
-                <?php foreach ($ticketEmployees as $employee): ?>
-                  <?php $empVal = (string) ($employee['id'] ?? ''); ?>
-                  <option value="<?php echo esc_attr($empVal); ?>"<?php selected((string) ($filters['id_empleado'] ?? ''), $empVal); ?>><?php echo esc_html((string) ($employee['name'] ?? '')); ?></option>
-                <?php endforeach; ?>
-              </select>
-            </div>
+            <?php if ($canFilterEmployees): ?>
+              <div class="space-y-1">
+                <label class="block font-label-sm text-label-sm text-secondary font-medium">Responsable</label>
+                <select name="id_empleado" class="w-full px-3 py-2 bg-surface-container-low focus:bg-surface-container-lowest rounded-xl font-body-sm text-body-sm text-on-surface outline-none transition-all cursor-pointer border border-transparent focus:border-outline-variant">
+                  <option value="">Todos los asesores</option>
+                  <?php foreach ($ticketEmployees as $employee): ?>
+                    <?php $empVal = (string) ($employee['id'] ?? ''); ?>
+                    <option value="<?php echo esc_attr($empVal); ?>"<?php selected((string) ($filters['id_empleado'] ?? ''), $empVal); ?>><?php echo esc_html((string) ($employee['name'] ?? '')); ?></option>
+                  <?php endforeach; ?>
+                </select>
+              </div>
+            <?php else: ?>
+              <input type="hidden" name="id_empleado" value="<?php echo esc_attr((string) ($filters['id_empleado'] ?? '')); ?>">
+            <?php endif; ?>
 
             <!-- Tipo Gestión / Medio -->
             <div class="space-y-1">
@@ -2353,7 +2359,7 @@ final class CommercialDashboardView
       <?php echo self::renderFunnelPills($bucket, $counts, $bucketTotal, $filters, $baseUrl, $effectiveBucket); ?>
 
       <!-- Filtros Operativos -->
-      <?php echo self::renderFiltersSection($bucket, $filters, $ticketEmployees, $filterOptions, $baseUrl, $isMyTasks, $effectiveBucket); ?>
+      <?php echo self::renderFiltersSection($bucket, $filters, $ticketEmployees, $filterOptions, $baseUrl, $isMyTasks, $effectiveBucket, $policy); ?>
 
       <!-- Tabla de Tareas -->
       <?php echo self::renderTicketsTableSection($bucket, $rows, $pagination, $visibleTotal, $policy, $baseUrl, $filters); ?>
