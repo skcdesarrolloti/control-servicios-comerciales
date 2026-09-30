@@ -500,9 +500,8 @@ final class CommercialPropertiesRepository
 
     $funcionarioId = trim((string) ($filters['id_funcionario'] ?? ''));
     if ($funcionarioId !== '') {
-      $where[] = '(TRIM(i.`id_funcionario`) = ? OR i.`funcionario` LIKE ?)';
+      $where[] = 'TRIM(i.`id_funcionario`) = ?';
       $args[] = $funcionarioId;
-      $args[] = '%' . $funcionarioId . '%';
     }
 
     return [$where, $args];
@@ -517,7 +516,6 @@ final class CommercialPropertiesRepository
   {
     $userId = Auth::userId();
     $employeeId = trim(Auth::employeeId());
-    $userName = trim(Auth::user());
 
     if ($employeeId === '' && $userId > 0) {
       $funcionarios = $this->db->table('jet_cct_funcionarios');
@@ -525,23 +523,10 @@ final class CommercialPropertiesRepository
       $employeeId = trim((string) $emp);
     }
 
-    $clauses = [];
-    $args = [];
-
-    if ($employeeId !== '') {
-      $clauses[] = 'TRIM(i.`id_funcionario`) = ?';
-      $args[] = $employeeId;
+    if ($employeeId === '') {
+      return ['1 = 0', []];
     }
 
-    if ($userName !== '') {
-      $clauses[] = 'i.`funcionario` LIKE ?';
-      $args[] = '%' . $userName . '%';
-    }
-
-    if ($clauses === []) {
-      return ['', []];
-    }
-
-    return [implode(' OR ', $clauses), $args];
+    return ['TRIM(i.`id_funcionario`) = ?', [$employeeId]];
   }
 }
