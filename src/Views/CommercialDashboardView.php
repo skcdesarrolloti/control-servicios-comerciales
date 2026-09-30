@@ -32,6 +32,10 @@ final class CommercialDashboardView
     $recentCount = (int) ($data['recent_count'] ?? count($recentTickets));
     $baseUrl = rtrim((string) ($data['base_url'] ?? ''), '/');
     $overdueCount = (int) ($homeDashboard['sla_summary']['atrasados'] ?? 0);
+    $propertyResult = is_array($data['property_result'] ?? null) ? $data['property_result'] : ['rows' => [], 'total' => 0, 'pagination' => []];
+    $propertyFilters = is_array($data['property_filters'] ?? null) ? $data['property_filters'] : [];
+    $propertySummaryCounts = is_array($data['property_summary_counts'] ?? null) ? $data['property_summary_counts'] : [];
+    $propertyOptions = is_array($data['property_options'] ?? null) ? $data['property_options'] : [];
 
     $userName = trim(Auth::user());
     if ($userName === '') {
@@ -627,6 +631,8 @@ final class CommercialDashboardView
             echo self::renderSignsPage($filters, $ticketEmployees, $filterOptions, $policy);
           } elseif ($bucket === 'calendario') {
             echo self::renderCalendarPage($runtime['config'] ?? [], $calendarEmployees, $subtab, $policy, $baseUrl);
+          } elseif ($bucket === 'inmuebles') {
+            echo self::renderPropertiesPage($propertyResult, $propertyFilters, $propertySummaryCounts, $propertyOptions, $policy, $baseUrl);
           } else {
             echo self::renderTickets($bucket, $result, $filters, $ticketEmployees, $filterOptions, $tabCounts, $policy, $baseUrl, $homeDashboard);
           }
@@ -640,6 +646,16 @@ final class CommercialDashboardView
         <div class="flex items-center justify-center py-28 text-slate-500 gap-3">
           <span class="w-3 h-3 rounded-full bg-[#1E3C76] animate-ping"></span>
           <p class="font-body-md text-sm font-medium">Cargando información de la tarea…</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Detalle Completo de Inmueble -->
+    <div class="fixed inset-0 z-50 items-center justify-center p-3 sm:p-5 lg:p-7 bg-[#061D49]/60 backdrop-blur-md commercial-modal overflow-y-auto" id="commercial-property-detail-modal" role="dialog" aria-modal="true" aria-labelledby="commercial-property-detail-title" aria-hidden="true">
+      <div class="bg-surface-container-lowest w-full max-w-5xl max-h-[94vh] rounded-3xl shadow-modal border border-slate-200/80 flex flex-col overflow-hidden relative text-on-surface" role="document" data-commercial-property-detail-container>
+        <div class="flex items-center justify-center py-28 text-slate-500 gap-3">
+          <span class="w-3 h-3 rounded-full bg-[#1E3C76] animate-ping"></span>
+          <p class="font-body-md text-sm font-medium">Cargando información del inmueble…</p>
         </div>
       </div>
     </div>
@@ -896,6 +912,48 @@ final class CommercialDashboardView
             <a class="flex items-center justify-between px-space-md py-space-sm font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="avisos" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'avisos'])); ?>">
               <span>Rutas Operativas</span>
               <span class="material-symbols-outlined text-secondary text-[16px]">near_me</span>
+            </a>
+          </div>
+        </div>
+      <?php endif; ?>
+
+      <!-- Dropdown Inmuebles (Públicos, Pendientes por publicar, No públicos, Mis inmuebles) -->
+      <?php if (in_array('inmuebles', $views, true)): ?>
+        <div class="relative group/nav" data-commercial-dropdown="inmuebles">
+          <button type="button" class="flex items-center gap-space-xs px-space-md py-space-xs font-label-md text-label-md <?php echo $bucket === 'inmuebles' ? ($activeClasses . ' active') : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-tab="inmuebles" data-commercial-dropdown-trigger="inmuebles" aria-expanded="false">
+            <span class="material-symbols-outlined text-[16px]">domain</span>
+            <span>Inmuebles</span>
+            <span class="material-symbols-outlined text-[16px] group-hover/nav:rotate-180 transition-transform">expand_more</span>
+          </button>
+          <div class="absolute left-0 top-full hidden group-hover/nav:block bg-surface-container-lowest shadow-[0_12px_32px_rgba(0,0,0,0.14)] rounded-2xl py-space-xs min-w-[260px] z-50 border border-outline-variant/30 text-on-surface" data-commercial-dropdown-menu="inmuebles">
+            <a class="flex items-center justify-between px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="inmuebles" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'inmuebles', 'property_subtab' => 'publicos'])); ?>">
+              <span class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-[18px] text-emerald-600">public</span>
+                <span>Inmuebles públicos</span>
+              </span>
+              <span class="font-label-sm text-[11px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-semibold">Portal</span>
+            </a>
+            <a class="flex items-center justify-between px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="inmuebles" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'inmuebles', 'property_subtab' => 'pendientes'])); ?>">
+              <span class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-[18px] text-amber-600">pending_actions</span>
+                <span>Pendientes por publicar</span>
+              </span>
+              <span class="font-label-sm text-[11px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-semibold">Borrador</span>
+            </a>
+            <a class="flex items-center justify-between px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="inmuebles" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'inmuebles', 'property_subtab' => 'no_publicos'])); ?>">
+              <span class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-[18px] text-slate-600">inventory_2</span>
+                <span>Inmuebles no públicos</span>
+              </span>
+              <span class="font-label-sm text-[11px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full font-semibold">Cerrados</span>
+            </a>
+            <div class="my-1 border-t border-surface-container"></div>
+            <a class="flex items-center justify-between px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="inmuebles" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'inmuebles', 'property_subtab' => 'mis_inmuebles'])); ?>">
+              <span class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-[18px] text-primary">person_pin</span>
+                <span class="font-semibold text-primary">Mis inmuebles</span>
+              </span>
+              <span class="font-label-sm text-[11px] bg-primary-container text-on-surface px-2 py-0.5 rounded-full font-semibold">Personal</span>
             </a>
           </div>
         </div>
@@ -3074,6 +3132,964 @@ final class CommercialDashboardView
         </div>
       </div>
     </div>
+<?php
+    return (string) ob_get_clean();
+  }
+
+  /**
+   * Render the dedicated Inmuebles module page.
+   *
+   * @param array<string,mixed> $result
+   * @param array<string,mixed> $filters
+   * @param array<string,mixed> $summaryCounts
+   * @param array<string,mixed> $options
+   * @param mixed $policy
+   */
+  public static function renderPropertiesPage(
+    array $result,
+    array $filters,
+    array $summaryCounts,
+    array $options,
+    $policy,
+    string $baseUrl
+  ): string {
+    $rows = is_array($result['rows'] ?? null) ? $result['rows'] : [];
+    $total = (int) ($result['total'] ?? 0);
+    $pagination = is_array($result['pagination'] ?? null) ? $result['pagination'] : [];
+    $currentSubtab = trim((string) ($filters['property_subtab'] ?? 'publicos'));
+    if (!in_array($currentSubtab, ['publicos', 'pendientes', 'no_publicos', 'mis_inmuebles'], true)) {
+      $currentSubtab = 'publicos';
+    }
+
+    $canSeeAll = $policy instanceof CommercialAccessPolicy && $policy->canSeeAllCommercialTickets();
+    $publicCount = (int) ($summaryCounts['publicos'] ?? 0);
+    $pendingCount = (int) ($summaryCounts['pendientes'] ?? 0);
+    $nonPublicCount = (int) ($summaryCounts['no_publicos'] ?? 0);
+    $myCount = (int) ($summaryCounts['mis_inmuebles'] ?? 0);
+    $totalCount = (int) ($summaryCounts['total'] ?? ($publicCount + $pendingCount + $nonPublicCount));
+
+    $subtabs = [
+      'publicos' => [
+        'label' => 'Inmuebles públicos',
+        'icon' => 'public',
+        'count' => $publicCount,
+        'badge' => 'Portal',
+        'desc' => 'Activos en portal web',
+      ],
+      'pendientes' => [
+        'label' => 'Pendientes por publicar',
+        'icon' => 'pending_actions',
+        'count' => $pendingCount,
+        'badge' => 'Borrador',
+        'desc' => 'En borrador o por publicar',
+      ],
+      'no_publicos' => [
+        'label' => 'Inmuebles no públicos',
+        'icon' => 'inventory_2',
+        'count' => $nonPublicCount,
+        'badge' => 'Histórico',
+        'desc' => 'Arrendados, vendidos o inactivos',
+      ],
+      'mis_inmuebles' => [
+        'label' => 'Mis inmuebles',
+        'icon' => 'person_pin',
+        'count' => $myCount,
+        'badge' => 'Personal',
+        'desc' => 'Asignados a mi gestión',
+      ],
+    ];
+
+    $selectedTipo = trim((string) ($filters['tipo_inmueble'] ?? ''));
+    $selectedNegocio = trim((string) ($filters['tipo_negocio'] ?? ''));
+    $selectedCiudad = trim((string) ($filters['ciudad'] ?? ''));
+    $selectedBarrio = trim((string) ($filters['barrio'] ?? ''));
+    $selectedEstado = trim((string) ($filters['estado'] ?? ''));
+    $selectedFuncionario = trim((string) ($filters['id_funcionario'] ?? ''));
+    $searchQuery = trim((string) ($filters['busqueda'] ?? ''));
+
+    $tiposInmueble = is_array($options['tipos_inmueble'] ?? null) ? $options['tipos_inmueble'] : [];
+    $tiposNegocio = is_array($options['tipos_negocio'] ?? null) ? $options['tipos_negocio'] : [];
+    $ciudades = is_array($options['ciudades'] ?? null) ? $options['ciudades'] : [];
+    $barrios = is_array($options['barrios'] ?? null) ? $options['barrios'] : [];
+    $estadosNoPublicos = is_array($options['estados_no_publicos'] ?? null) ? $options['estados_no_publicos'] : [];
+    $funcionarios = is_array($options['funcionarios'] ?? null) ? $options['funcionarios'] : [];
+
+    ob_start();
+?>
+    <section class="w-full px-margin py-6 space-y-6" id="commercial-properties-panel" data-commercial-properties-panel>
+      <!-- Encabezado del Módulo de Inmuebles -->
+      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-surface-container-lowest p-6 rounded-3xl border border-surface-container shadow-xs">
+        <div class="flex items-start gap-4">
+          <div class="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+            <span class="material-symbols-outlined text-[28px]">domain</span>
+          </div>
+          <div>
+            <div class="flex items-center gap-2.5 flex-wrap">
+              <h1 class="text-xl sm:text-2xl font-bold text-on-surface">Gestión de Portafolio de Inmuebles</h1>
+              <span class="px-3 py-0.5 rounded-full text-xs font-semibold bg-primary-container text-on-surface">
+                <?php echo esc_html(number_format($total)); ?> inmuebles filtrados
+              </span>
+            </div>
+            <p class="text-sm text-secondary mt-1 max-w-3xl">
+              Consulta integral del portafolio inmobiliario: inmuebles publicados, trámites pendientes, inventario cerrado/histórico y asignación por funcionario.
+            </p>
+          </div>
+        </div>
+
+        <!-- Acceso Rápido / Acciones -->
+        <div class="flex items-center gap-2 self-start lg:self-center shrink-0">
+          <a href="https://sucasainmobiliaria.com.co/inmuebles/" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-surface-container-low hover:bg-surface-container text-on-surface text-xs font-semibold transition-all border border-outline-variant/40 shadow-xs cursor-pointer">
+            <span class="material-symbols-outlined text-[17px]">open_in_new</span>
+            <span>Ver Portal Web</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- Tarjetas Resumen KPI del Portafolio -->
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+        <!-- Públicos -->
+        <a href="<?php echo esc_url(self::url($baseUrl, array_merge($filters, ['tab' => 'inmuebles', 'property_subtab' => 'publicos', 'page' => 1]))); ?>" data-commercial-tab="inmuebles" class="p-4 rounded-2xl border transition-all duration-200 flex flex-col justify-between cursor-pointer <?php echo $currentSubtab === 'publicos' ? 'bg-emerald-500/10 border-emerald-500 shadow-sm ring-1 ring-emerald-500/30' : 'bg-surface-container-lowest border-surface-container hover:border-emerald-400 hover:shadow-xs'; ?>">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold text-secondary uppercase tracking-wider">Públicos</span>
+            <span class="material-symbols-outlined text-[20px] text-emerald-600">public</span>
+          </div>
+          <div class="mt-2.5">
+            <span class="text-2xl font-bold text-on-surface"><?php echo esc_html(number_format($publicCount)); ?></span>
+            <span class="block text-[11px] text-emerald-700 font-medium">En portal web</span>
+          </div>
+        </a>
+
+        <!-- Pendientes por publicar -->
+        <a href="<?php echo esc_url(self::url($baseUrl, array_merge($filters, ['tab' => 'inmuebles', 'property_subtab' => 'pendientes', 'page' => 1]))); ?>" data-commercial-tab="inmuebles" class="p-4 rounded-2xl border transition-all duration-200 flex flex-col justify-between cursor-pointer <?php echo $currentSubtab === 'pendientes' ? 'bg-amber-500/10 border-amber-500 shadow-sm ring-1 ring-amber-500/30' : 'bg-surface-container-lowest border-surface-container hover:border-amber-400 hover:shadow-xs'; ?>">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold text-secondary uppercase tracking-wider">Por Publicar</span>
+            <span class="material-symbols-outlined text-[20px] text-amber-600">pending_actions</span>
+          </div>
+          <div class="mt-2.5">
+            <span class="text-2xl font-bold text-on-surface"><?php echo esc_html(number_format($pendingCount)); ?></span>
+            <span class="block text-[11px] text-amber-700 font-medium">Borradores y revisión</span>
+          </div>
+        </a>
+
+        <!-- No públicos -->
+        <a href="<?php echo esc_url(self::url($baseUrl, array_merge($filters, ['tab' => 'inmuebles', 'property_subtab' => 'no_publicos', 'page' => 1]))); ?>" data-commercial-tab="inmuebles" class="p-4 rounded-2xl border transition-all duration-200 flex flex-col justify-between cursor-pointer <?php echo $currentSubtab === 'no_publicos' ? 'bg-slate-500/10 border-slate-600 shadow-sm ring-1 ring-slate-500/30' : 'bg-surface-container-lowest border-surface-container hover:border-slate-400 hover:shadow-xs'; ?>">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold text-secondary uppercase tracking-wider">No Públicos</span>
+            <span class="material-symbols-outlined text-[20px] text-slate-600">inventory_2</span>
+          </div>
+          <div class="mt-2.5">
+            <span class="text-2xl font-bold text-on-surface"><?php echo esc_html(number_format($nonPublicCount)); ?></span>
+            <span class="block text-[11px] text-slate-600 font-medium">Arrendados / Vendidos</span>
+          </div>
+        </a>
+
+        <!-- Mis Inmuebles -->
+        <a href="<?php echo esc_url(self::url($baseUrl, array_merge($filters, ['tab' => 'inmuebles', 'property_subtab' => 'mis_inmuebles', 'page' => 1]))); ?>" data-commercial-tab="inmuebles" class="p-4 rounded-2xl border transition-all duration-200 flex flex-col justify-between cursor-pointer <?php echo $currentSubtab === 'mis_inmuebles' ? 'bg-primary/10 border-primary shadow-sm ring-1 ring-primary/30' : 'bg-surface-container-lowest border-surface-container hover:border-primary/50 hover:shadow-xs'; ?>">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold text-primary uppercase tracking-wider">Mis Inmuebles</span>
+            <span class="material-symbols-outlined text-[20px] text-primary">person_pin</span>
+          </div>
+          <div class="mt-2.5">
+            <span class="text-2xl font-bold text-primary"><?php echo esc_html(number_format($myCount)); ?></span>
+            <span class="block text-[11px] text-secondary font-medium">Asignados a mi usuario</span>
+          </div>
+        </a>
+
+        <!-- Total General -->
+        <div class="col-span-2 sm:col-span-1 p-4 rounded-2xl border border-surface-container bg-surface-container-low flex flex-col justify-between">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold text-secondary uppercase tracking-wider">Total Portafolio</span>
+            <span class="material-symbols-outlined text-[20px] text-secondary">analytics</span>
+          </div>
+          <div class="mt-2.5">
+            <span class="text-2xl font-bold text-on-surface"><?php echo esc_html(number_format($totalCount)); ?></span>
+            <span class="block text-[11px] text-secondary font-medium">Inmuebles registrados</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Barra de Pestañas / Sub-tabs de Inmuebles -->
+      <div class="flex items-center gap-2 border-b border-surface-container pb-2 overflow-x-auto">
+        <?php foreach ($subtabs as $stKey => $stData): ?>
+          <?php
+            $isActive = $currentSubtab === $stKey;
+            $subtabUrl = self::url($baseUrl, array_merge($filters, [
+              'tab' => 'inmuebles',
+              'property_subtab' => $stKey,
+              'page' => 1,
+            ]));
+          ?>
+          <a href="<?php echo esc_url($subtabUrl); ?>" data-commercial-tab="inmuebles" data-commercial-property-subtab="<?php echo esc_attr($stKey); ?>" class="flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap cursor-pointer select-none <?php echo $isActive ? 'bg-primary text-white font-semibold shadow-xs' : 'bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface border border-outline-variant/30'; ?>">
+            <span class="material-symbols-outlined text-[18px]"><?php echo esc_html($stData['icon']); ?></span>
+            <span><?php echo esc_html($stData['label']); ?></span>
+            <span class="ml-1 px-2 py-0.5 rounded-full text-xs font-semibold <?php echo $isActive ? 'bg-white/20 text-white' : 'bg-surface-container text-on-surface'; ?>">
+              <?php echo esc_html(number_format($stData['count'])); ?>
+            </span>
+          </a>
+        <?php endforeach; ?>
+      </div>
+
+      <!-- Filtros Avanzados -->
+      <form method="GET" action="<?php echo esc_url(self::url($baseUrl, ['tab' => 'inmuebles'])); ?>" data-commercial-properties-filter-form class="bg-surface-container-lowest p-5 rounded-2xl border border-surface-container shadow-xs space-y-4">
+        <input type="hidden" name="tab" value="inmuebles">
+        <input type="hidden" name="property_subtab" value="<?php echo esc_attr($currentSubtab); ?>" data-commercial-property-subtab-input>
+        <input type="hidden" name="page" value="1" data-commercial-property-page-input>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-3">
+          <!-- Búsqueda libre -->
+          <div class="xl:col-span-2 relative">
+            <span class="material-symbols-outlined absolute left-3 top-2.5 text-[18px] text-secondary">search</span>
+            <input type="search" name="busqueda" value="<?php echo esc_attr($searchQuery); ?>" placeholder="Buscar por código, dirección, barrio, propietario..." class="w-full pl-9 pr-3 py-2 rounded-xl border border-outline-variant/40 bg-surface-container-low text-on-surface text-xs focus:bg-white focus:border-primary focus:ring-1 focus:ring-primary transition-all">
+          </div>
+
+          <!-- Tipo de Inmueble -->
+          <div>
+            <select name="tipo_inmueble" class="w-full px-3 py-2 rounded-xl border border-outline-variant/40 bg-surface-container-low text-on-surface text-xs focus:bg-white focus:border-primary transition-all">
+              <option value="">Todos los tipos</option>
+              <?php foreach ($tiposInmueble as $ti): ?>
+                <option value="<?php echo esc_attr($ti); ?>" <?php echo $selectedTipo === $ti ? 'selected' : ''; ?>>
+                  <?php echo esc_html($ti); ?>
+                </option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+
+          <!-- Tipo de Negocio -->
+          <div>
+            <select name="tipo_negocio" class="w-full px-3 py-2 rounded-xl border border-outline-variant/40 bg-surface-container-low text-on-surface text-xs focus:bg-white focus:border-primary transition-all">
+              <option value="">Todos los negocios</option>
+              <?php foreach ($tiposNegocio as $tn): ?>
+                <option value="<?php echo esc_attr($tn); ?>" <?php echo $selectedNegocio === $tn ? 'selected' : ''; ?>>
+                  <?php echo esc_html($tn); ?>
+                </option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+
+          <!-- Ciudad -->
+          <div>
+            <select name="ciudad" class="w-full px-3 py-2 rounded-xl border border-outline-variant/40 bg-surface-container-low text-on-surface text-xs focus:bg-white focus:border-primary transition-all">
+              <option value="">Todas las ciudades</option>
+              <?php foreach ($ciudades as $c): ?>
+                <option value="<?php echo esc_attr($c); ?>" <?php echo $selectedCiudad === $c ? 'selected' : ''; ?>>
+                  <?php echo esc_html($c); ?>
+                </option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+
+          <!-- Barrio -->
+          <div>
+            <select name="barrio" class="w-full px-3 py-2 rounded-xl border border-outline-variant/40 bg-surface-container-low text-on-surface text-xs focus:bg-white focus:border-primary transition-all">
+              <option value="">Todos los barrios</option>
+              <?php foreach ($barrios as $b): ?>
+                <option value="<?php echo esc_attr($b); ?>" <?php echo $selectedBarrio === $b ? 'selected' : ''; ?>>
+                  <?php echo esc_html($b); ?>
+                </option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+
+          <!-- Estado Específico (particularmente en No públicos) -->
+          <div>
+            <select name="estado" class="w-full px-3 py-2 rounded-xl border border-outline-variant/40 bg-surface-container-low text-on-surface text-xs focus:bg-white focus:border-primary transition-all">
+              <option value="">Todos los estados</option>
+              <?php if ($currentSubtab === 'no_publicos'): ?>
+                <?php foreach ($estadosNoPublicos as $enp): ?>
+                  <option value="<?php echo esc_attr($enp); ?>" <?php echo $selectedEstado === $enp ? 'selected' : ''; ?>>
+                    <?php echo esc_html($enp); ?>
+                  </option>
+                <?php endforeach; ?>
+              <?php else: ?>
+                <option value="Publico" <?php echo $selectedEstado === 'Publico' ? 'selected' : ''; ?>>Publico</option>
+                <option value="En borrador" <?php echo $selectedEstado === 'En borrador' ? 'selected' : ''; ?>>En borrador</option>
+                <option value="Arrendado" <?php echo $selectedEstado === 'Arrendado' ? 'selected' : ''; ?>>Arrendado</option>
+                <option value="Vendido" <?php echo $selectedEstado === 'Vendido' ? 'selected' : ''; ?>>Vendido</option>
+                <option value="Desistido" <?php echo $selectedEstado === 'Desistido' ? 'selected' : ''; ?>>Desistido</option>
+              <?php endif; ?>
+            </select>
+          </div>
+
+          <!-- Funcionario Asignado (visible para administradores o filtro personal) -->
+          <?php if ($canSeeAll): ?>
+            <div>
+              <select name="id_funcionario" class="w-full px-3 py-2 rounded-xl border border-outline-variant/40 bg-surface-container-low text-on-surface text-xs focus:bg-white focus:border-primary transition-all">
+                <option value="">Todos los funcionarios</option>
+                <?php foreach ($funcionarios as $func): ?>
+                  <option value="<?php echo esc_attr($func['id']); ?>" <?php echo $selectedFuncionario === $func['id'] ? 'selected' : ''; ?>>
+                    <?php echo esc_html($func['name']); ?>
+                  </option>
+                <?php endforeach; ?>
+              </select>
+            </div>
+          <?php endif; ?>
+
+          <!-- Botones de Acción de Filtro -->
+          <div class="flex items-center gap-2 <?php echo $canSeeAll ? '' : 'sm:col-span-2 lg:col-span-1'; ?>">
+            <button type="submit" class="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-white hover:bg-primary/90 text-xs font-semibold shadow-xs transition-all cursor-pointer">
+              <span class="material-symbols-outlined text-[16px]">filter_list</span>
+              <span>Filtrar</span>
+            </button>
+            <a href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'inmuebles', 'property_subtab' => $currentSubtab])); ?>" data-commercial-tab="inmuebles" class="px-3 py-2 rounded-xl bg-surface-container-low hover:bg-surface-container text-secondary text-xs font-semibold transition-all cursor-pointer border border-outline-variant/30" title="Limpiar filtros">
+              <span class="material-symbols-outlined text-[16px]">restart_alt</span>
+            </a>
+          </div>
+        </div>
+      </form>
+
+      <!-- Resumen de Resultados y Grid -->
+      <div class="space-y-4">
+        <div class="flex items-center justify-between text-xs text-secondary font-medium px-1">
+          <span>Mostrando <strong><?php echo esc_html((string) count($rows)); ?></strong> de <strong><?php echo esc_html(number_format($total)); ?></strong> inmuebles</span>
+          <span class="flex items-center gap-1 text-[11px]">
+            <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+            <span>Sub-pestaña actual: <strong><?php echo esc_html($subtabs[$currentSubtab]['label'] ?? $currentSubtab); ?></strong></span>
+          </span>
+        </div>
+
+        <?php if ($rows === []): ?>
+          <div class="bg-surface-container-lowest rounded-3xl p-12 text-center border border-surface-container shadow-xs space-y-3">
+            <div class="w-16 h-16 rounded-2xl bg-surface-container text-secondary flex items-center justify-center mx-auto">
+              <span class="material-symbols-outlined text-[32px]">home_work</span>
+            </div>
+            <h3 class="text-base font-bold text-on-surface">No se encontraron inmuebles</h3>
+            <p class="text-xs text-secondary max-w-md mx-auto">
+              No hay inmuebles que coincidan con los filtros aplicados en esta sección. Prueba limpiando o cambiando los criterios de búsqueda.
+            </p>
+            <div class="pt-2">
+              <a href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'inmuebles', 'property_subtab' => $currentSubtab])); ?>" data-commercial-tab="inmuebles" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-white text-xs font-semibold hover:bg-primary/90 transition-all cursor-pointer">
+                <span class="material-symbols-outlined text-[16px]">refresh</span>
+                <span>Restablecer filtros</span>
+              </a>
+            </div>
+          </div>
+        <?php else: ?>
+          <!-- Grid Responsivo de Tarjetas de Inmuebles -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5" data-commercial-properties-grid>
+            <?php echo self::renderPropertyCards($rows, $policy); ?>
+          </div>
+
+          <!-- Paginación -->
+          <?php echo self::renderPropertyPagination($filters, $pagination, $baseUrl); ?>
+        <?php endif; ?>
+      </div>
+    </section>
+<?php
+    return (string) ob_get_clean();
+  }
+
+  /**
+   * Render cards for property rows.
+   *
+   * @param array<int,array<string,mixed>> $rows
+   * @param mixed $policy
+   */
+  public static function renderPropertyCards(array $rows, $policy = null): string
+  {
+    if ($rows === []) {
+      return '';
+    }
+
+    ob_start();
+    foreach ($rows as $row) {
+      $id = (int) ($row['_ID'] ?? 0);
+      $codigo = trim((string) ($row['codigo'] ?? ''));
+      if ($codigo === '') {
+        $codigo = (string) $id;
+      }
+      $tipoInmueble = trim((string) ($row['tipo_inmueble'] ?? 'Inmueble'));
+      $tipoNegocio = trim((string) ($row['tipo_negocio'] ?? ''));
+      $estado = trim((string) ($row['estado'] ?? 'Publico'));
+      $barrio = trim((string) ($row['barrio'] ?? ''));
+      $ciudad = trim((string) ($row['ciudad'] ?? ''));
+      $direccion = trim((string) ($row['direccion'] ?? ''));
+      $fotoPortadaUrl = trim((string) ($row['foto_portada_url'] ?? ''));
+
+      $precioArriendo = trim((string) ($row['precio_arriendo'] ?? ''));
+      $precioVenta = trim((string) ($row['precio_venta'] ?? ''));
+      $precioAdmin = trim((string) ($row['precio_admin'] ?? ''));
+
+      $habs = trim((string) ($row['habitaciones'] ?? ''));
+      $banos = trim((string) ($row['banos'] ?? ''));
+      $parqueaderos = trim((string) ($row['parqueaderos'] ?? $row['parqueadero'] ?? ''));
+      $area = trim((string) ($row['area_construida'] ?? $row['area_privada'] ?? ''));
+      $estrato = trim((string) ($row['estrato'] ?? ''));
+
+      $funcionarioNombre = trim((string) ($row['funcionario_nombre'] ?? $row['funcionario'] ?? 'Sin asignar'));
+      $funcionarioCelular = trim((string) ($row['funcionario_celular'] ?? ''));
+
+      // Status color styles
+      $statusBadgeClass = 'bg-slate-700 text-white';
+      if (in_array($estado, ['Publico', 'Publicado'], true)) {
+        $statusBadgeClass = 'bg-emerald-600 text-white shadow-xs';
+      } elseif (in_array($estado, ['En borrador', 'Borrador', 'Por publicar', 'Pendiente por publicar', 'Pendiente'], true)) {
+        $statusBadgeClass = 'bg-amber-600 text-white shadow-xs';
+      } elseif ($estado === 'Arrendado') {
+        $statusBadgeClass = 'bg-sky-600 text-white shadow-xs';
+      } elseif ($estado === 'Vendido') {
+        $statusBadgeClass = 'bg-indigo-600 text-white shadow-xs';
+      } elseif (in_array($estado, ['Desistido', 'Vetado'], true)) {
+        $statusBadgeClass = 'bg-rose-600 text-white shadow-xs';
+      } elseif (in_array($estado, ['Ocupado', 'En cierre', 'En proceso de cierre'], true)) {
+        $statusBadgeClass = 'bg-teal-700 text-white shadow-xs';
+      }
+
+      // Business type badge
+      $businessBadgeClass = 'bg-slate-900/80 text-white';
+      if (str_contains($tipoNegocio, 'Arriendo') && str_contains($tipoNegocio, 'Venta')) {
+        $businessBadgeClass = 'bg-purple-900/85 text-white';
+      } elseif (str_contains($tipoNegocio, 'Arriendo')) {
+        $businessBadgeClass = 'bg-[#061D49]/85 text-white';
+      } elseif (str_contains($tipoNegocio, 'Venta')) {
+        $businessBadgeClass = 'bg-[#1E3C76]/85 text-white';
+      }
+
+      $portalUrl = "https://sucasainmobiliaria.com.co/inmueble/{$codigo}";
+      $title = $tipoInmueble . ($barrio !== '' ? " en {$barrio}" : '');
+      $initials = self::initials($funcionarioNombre);
+?>
+      <article class="group bg-surface-container-lowest rounded-2xl border border-surface-container overflow-hidden shadow-xs hover:shadow-lg hover:border-outline-variant/60 transition-all duration-300 flex flex-col justify-between" data-commercial-property-card="<?php echo esc_attr($codigo); ?>">
+        <!-- Contenedor de Imagen y Badges Superpuestos -->
+        <div>
+          <div class="relative w-full aspect-[16/10] bg-surface-container-high overflow-hidden">
+            <?php if ($fotoPortadaUrl !== ''): ?>
+              <img src="<?php echo esc_url($fotoPortadaUrl); ?>" alt="<?php echo esc_attr($title); ?>" loading="lazy" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out">
+            <?php else: ?>
+              <div class="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-surface-container-high to-surface-container text-secondary gap-1.5">
+                <span class="material-symbols-outlined text-[36px] text-secondary/60">home</span>
+                <span class="text-[11px] font-medium text-secondary/80">Sin fotografía</span>
+              </div>
+            <?php endif; ?>
+
+            <!-- Badges Superpuestos -->
+            <div class="absolute top-2.5 left-2.5 flex items-center gap-1.5 flex-wrap">
+              <span class="px-2 py-0.5 rounded-md font-bold text-[10px] uppercase tracking-wider <?php echo esc_attr($statusBadgeClass); ?>">
+                <?php echo esc_html($estado); ?>
+              </span>
+              <?php if ($tipoNegocio !== ''): ?>
+                <span class="px-2 py-0.5 rounded-md font-semibold text-[10px] backdrop-blur-xs <?php echo esc_attr($businessBadgeClass); ?>">
+                  <?php echo esc_html($tipoNegocio); ?>
+                </span>
+              <?php endif; ?>
+            </div>
+
+            <!-- Código del Inmueble -->
+            <div class="absolute bottom-2.5 left-2.5">
+              <span class="px-2 py-0.5 rounded-md font-bold text-xs bg-surface-container-lowest/90 backdrop-blur-xs text-on-surface shadow-xs border border-surface-container">
+                #<?php echo esc_html($codigo); ?>
+              </span>
+            </div>
+          </div>
+
+          <!-- Cuerpo de la Tarjeta -->
+          <div class="p-4 space-y-3">
+            <div>
+              <h4 class="font-bold text-on-surface text-sm line-clamp-1 group-hover:text-primary transition-colors" title="<?php echo esc_attr($title); ?>">
+                <?php echo esc_html($title); ?>
+              </h4>
+              <div class="flex items-center gap-1 text-xs text-secondary mt-0.5 truncate" title="<?php echo esc_attr($direccion !== '' ? "{$direccion}, {$ciudad}" : $ciudad); ?>">
+                <span class="material-symbols-outlined text-[15px] shrink-0 text-primary">location_on</span>
+                <span class="truncate"><?php echo esc_html($direccion !== '' ? $direccion : ($barrio !== '' ? "{$barrio}, {$ciudad}" : $ciudad)); ?></span>
+              </div>
+            </div>
+
+            <!-- Precios -->
+            <div class="space-y-0.5 pt-1">
+              <?php if ($precioArriendo !== '' && (float) $precioArriendo > 0): ?>
+                <div class="flex items-baseline gap-1">
+                  <span class="text-base font-bold text-on-surface">$ <?php echo esc_html(number_format((float) $precioArriendo, 0, ',', '.')); ?></span>
+                  <span class="text-[11px] text-secondary font-medium">/ mes</span>
+                </div>
+              <?php endif; ?>
+              <?php if ($precioVenta !== '' && (float) $precioVenta > 0): ?>
+                <div class="flex items-baseline gap-1">
+                  <span class="text-base font-bold text-on-surface">$ <?php echo esc_html(number_format((float) $precioVenta, 0, ',', '.')); ?></span>
+                  <span class="text-[11px] text-secondary font-medium">venta</span>
+                </div>
+              <?php endif; ?>
+              <?php if ($precioAdmin !== '' && (float) $precioAdmin > 0): ?>
+                <div class="text-[11px] text-secondary font-medium">
+                  + Admin $ <?php echo esc_html(number_format((float) $precioAdmin, 0, ',', '.')); ?>
+                </div>
+              <?php endif; ?>
+            </div>
+
+            <!-- Fila de Características Clave -->
+            <div class="grid grid-cols-4 gap-1.5 pt-2 border-t border-surface-container text-center font-label-sm text-[11px] text-secondary">
+              <?php if ($habs !== ''): ?>
+                <div class="flex flex-col items-center justify-center p-1 rounded-lg bg-surface-container-low" title="Habitaciones">
+                  <span class="material-symbols-outlined text-[16px] text-primary">bed</span>
+                  <span class="font-bold text-on-surface"><?php echo esc_html($habs); ?></span>
+                  <span class="text-[10px] text-secondary">habs</span>
+                </div>
+              <?php endif; ?>
+              <?php if ($banos !== ''): ?>
+                <div class="flex flex-col items-center justify-center p-1 rounded-lg bg-surface-container-low" title="Baños">
+                  <span class="material-symbols-outlined text-[16px] text-primary">bathtub</span>
+                  <span class="font-bold text-on-surface"><?php echo esc_html($banos); ?></span>
+                  <span class="text-[10px] text-secondary">baños</span>
+                </div>
+              <?php endif; ?>
+              <?php if ($area !== ''): ?>
+                <div class="flex flex-col items-center justify-center p-1 rounded-lg bg-surface-container-low" title="Área construida">
+                  <span class="material-symbols-outlined text-[16px] text-primary">square_foot</span>
+                  <span class="font-bold text-on-surface truncate max-w-full"><?php echo esc_html($area); ?></span>
+                  <span class="text-[10px] text-secondary">m²</span>
+                </div>
+              <?php endif; ?>
+              <?php if ($parqueaderos !== ''): ?>
+                <div class="flex flex-col items-center justify-center p-1 rounded-lg bg-surface-container-low" title="Parqueaderos">
+                  <span class="material-symbols-outlined text-[16px] text-primary">directions_car</span>
+                  <span class="font-bold text-on-surface"><?php echo esc_html($parqueaderos); ?></span>
+                  <span class="text-[10px] text-secondary">parq.</span>
+                </div>
+              <?php elseif ($estrato !== ''): ?>
+                <div class="flex flex-col items-center justify-center p-1 rounded-lg bg-surface-container-low" title="Estrato">
+                  <span class="material-symbols-outlined text-[16px] text-primary">layers</span>
+                  <span class="font-bold text-on-surface">E<?php echo esc_html($estrato); ?></span>
+                  <span class="text-[10px] text-secondary">estrato</span>
+                </div>
+              <?php endif; ?>
+            </div>
+          </div>
+        </div>
+
+        <!-- Pie de Tarjeta: Funcionario y Acciones -->
+        <div class="p-4 pt-2.5 border-t border-surface-container bg-surface-container-lowest/50 flex items-center justify-between gap-2">
+          <div class="flex items-center gap-2 min-w-0">
+            <div class="w-7 h-7 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs shrink-0">
+              <?php echo esc_html($initials); ?>
+            </div>
+            <span class="text-xs text-on-surface-variant truncate font-medium" title="<?php echo esc_attr($funcionarioNombre); ?>">
+              <?php echo esc_html($funcionarioNombre); ?>
+            </span>
+          </div>
+
+          <div class="flex items-center gap-1.5 shrink-0">
+            <a href="<?php echo esc_url($portalUrl); ?>" target="_blank" rel="noopener noreferrer" class="p-1.5 rounded-lg bg-surface-container-low hover:bg-surface-container text-on-surface hover:text-primary transition-colors cursor-pointer" title="Ver en portal sucasainmobiliaria.com.co">
+              <span class="material-symbols-outlined text-[17px]">open_in_new</span>
+            </a>
+            <button type="button" class="px-3 py-1.5 rounded-lg bg-primary text-white hover:bg-primary/90 text-xs font-semibold transition-all shadow-xs cursor-pointer flex items-center gap-1 active:scale-95" data-commercial-property-detail="<?php echo esc_attr($codigo); ?>">
+              <span class="material-symbols-outlined text-[14px]">visibility</span>
+              <span>Ficha</span>
+            </button>
+          </div>
+        </div>
+      </article>
+<?php
+    }
+    return (string) ob_get_clean();
+  }
+
+  /**
+   * Render HTML for the complete property technical sheet inside the modal.
+   *
+   * @param array<string,mixed> $property
+   */
+  public static function renderPropertyDetailModalContent(array $property): string
+  {
+    $codigo = trim((string) ($property['codigo'] ?? $property['_ID'] ?? ''));
+    $tipo = trim((string) ($property['tipo_inmueble'] ?? 'Inmueble'));
+    $tipoNegocio = trim((string) ($property['tipo_negocio'] ?? ''));
+    $estado = trim((string) ($property['estado'] ?? 'Publico'));
+    $barrio = trim((string) ($property['barrio'] ?? ''));
+    $ciudad = trim((string) ($property['ciudad'] ?? ''));
+    $direccion = trim((string) ($property['direccion'] ?? ''));
+    $copropiedad = trim((string) ($property['copropiedad'] ?? ''));
+
+    $coverUrl = trim((string) ($property['foto_portada_url'] ?? ''));
+    $galleryUrls = is_array($property['galeria_urls'] ?? null) ? $property['galeria_urls'] : [];
+
+    $precioArriendo = trim((string) ($property['precio_arriendo'] ?? ''));
+    $precioVenta = trim((string) ($property['precio_venta'] ?? ''));
+    $precioAdmin = trim((string) ($property['precio_admin'] ?? ''));
+
+    $habs = trim((string) ($property['habitaciones'] ?? ''));
+    $banos = trim((string) ($property['banos'] ?? ''));
+    $parqueaderos = trim((string) ($property['parqueaderos'] ?? $property['parqueadero'] ?? ''));
+    $areaConstruida = trim((string) ($property['area_construida'] ?? ''));
+    $areaPrivada = trim((string) ($property['area_privada'] ?? ''));
+    $areaTerreno = trim((string) ($property['area_terreno'] ?? ''));
+    $estrato = trim((string) ($property['estrato'] ?? ''));
+    $edad = trim((string) ($property['edad'] ?? ''));
+    $matricula = trim((string) ($property['matricula_inmobiliaria'] ?? ''));
+    $referencia = trim((string) ($property['referencia_catastral'] ?? ''));
+    $puntoRef = trim((string) ($property['punto_referencia'] ?? ''));
+
+    $propietario = trim((string) ($property['propietario'] ?? ''));
+    $idPropietario = trim((string) ($property['id_propietario'] ?? ''));
+    $arrendatario = trim((string) ($property['arrendatario'] ?? ''));
+    $funcionario = trim((string) ($property['funcionario_nombre'] ?? $property['funcionario'] ?? ''));
+    $funcionarioCel = trim((string) ($property['funcionario_celular'] ?? ''));
+    $funcionarioCorreo = trim((string) ($property['funcionario_correo'] ?? ''));
+
+    $llavesUbi = trim((string) ($property['ubicacion_llaves'] ?? ''));
+    $llavesDonde = trim((string) ($property['en_donde_estan_las_llaves'] ?? ''));
+    $llavesContacto = trim((string) ($property['contacto_llaves'] ?? ''));
+    $llavesTel = trim((string) ($property['telefono_contacto_llaves'] ?? ''));
+
+    $interiores = trim((string) ($property['interiores'] ?? ''));
+    $exteriores = trim((string) ($property['exteriores'] ?? ''));
+    $zonasSociales = trim((string) ($property['zonas_sociales'] ?? ''));
+    $alrededores = trim((string) ($property['alrededores'] ?? ''));
+    $descripcion = trim((string) ($property['descripcion'] ?? ''));
+    $mapsUrl = trim((string) ($property['ubicacion_google_maps'] ?? ''));
+
+    $portalUrl = "https://sucasainmobiliaria.com.co/inmueble/{$codigo}";
+
+    ob_start();
+?>
+    <!-- Modal Header -->
+    <header class="px-6 py-5 border-b border-surface-container flex items-center justify-between gap-4 bg-surface-container-low/40">
+      <div class="flex items-center gap-3 flex-wrap">
+        <div class="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold text-sm">
+          #<?php echo esc_html($codigo); ?>
+        </div>
+        <div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <h2 class="text-lg sm:text-xl font-bold text-on-surface" id="commercial-property-detail-title">
+              <?php echo esc_html($tipo); ?> · Código #<?php echo esc_html($codigo); ?>
+            </h2>
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
+              <?php echo esc_html($estado); ?>
+            </span>
+            <?php if ($tipoNegocio !== ''): ?>
+              <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-primary-container text-on-surface">
+                <?php echo esc_html($tipoNegocio); ?>
+              </span>
+            <?php endif; ?>
+          </div>
+          <p class="text-xs text-secondary mt-0.5">
+            <?php echo esc_html(implode(' · ', array_filter([$barrio, $ciudad, $copropiedad]))); ?>
+          </p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2 shrink-0">
+        <a href="<?php echo esc_url($portalUrl); ?>" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface text-xs font-semibold transition-all cursor-pointer">
+          <span class="material-symbols-outlined text-[16px]">open_in_new</span>
+          <span class="hidden sm:inline">Ver en portal</span>
+        </a>
+        <button type="button" class="w-8 h-8 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface flex items-center justify-center cursor-pointer transition-colors" data-commercial-close-property-detail aria-label="Cerrar modal">
+          <span class="material-symbols-outlined text-[18px]">close</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Modal Scrollable Content -->
+    <div class="p-6 overflow-y-auto max-h-[calc(94vh-80px)] space-y-6">
+      <!-- Galería de Fotos -->
+      <?php if (!empty($galleryUrls) || $coverUrl !== ''): ?>
+        <section class="space-y-3" data-commercial-property-gallery>
+          <?php $allPhotos = !empty($galleryUrls) ? $galleryUrls : [$coverUrl]; ?>
+          <div class="relative w-full aspect-[16/9] max-h-[380px] bg-slate-900 rounded-2xl overflow-hidden shadow-inner flex items-center justify-center">
+            <img src="<?php echo esc_url($allPhotos[0]); ?>" alt="Inmueble #<?php echo esc_attr($codigo); ?>" class="w-full h-full object-contain" data-commercial-gallery-featured>
+          </div>
+          <?php if (count($allPhotos) > 1): ?>
+            <div class="flex items-center gap-2 overflow-x-auto pb-2 pt-1">
+              <?php foreach ($allPhotos as $idx => $photoUrl): ?>
+                <button type="button" class="w-16 h-12 rounded-lg overflow-hidden shrink-0 border-2 transition-all cursor-pointer <?php echo $idx === 0 ? 'border-primary ring-2 ring-primary/30' : 'border-transparent opacity-75 hover:opacity-100'; ?>" data-commercial-gallery-thumb="<?php echo esc_url($photoUrl); ?>">
+                  <img src="<?php echo esc_url($photoUrl); ?>" alt="Miniatura <?php echo $idx + 1; ?>" class="w-full h-full object-cover">
+                </button>
+              <?php endforeach; ?>
+            </div>
+          <?php endif; ?>
+        </section>
+      <?php endif; ?>
+
+      <!-- 2-Column Grid: Valores y Especificaciones -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <!-- Bloque 1: Precios y Valores -->
+        <div class="bg-surface-container-low/50 p-5 rounded-2xl border border-surface-container space-y-3">
+          <div class="flex items-center gap-2 border-b border-surface-container pb-2">
+            <span class="material-symbols-outlined text-[20px] text-primary">payments</span>
+            <h3 class="text-sm font-bold text-on-surface uppercase tracking-wider">Condiciones Comerciales</h3>
+          </div>
+          <div class="grid grid-cols-2 gap-3 text-xs">
+            <div>
+              <span class="text-secondary block">Canon Arriendo:</span>
+              <strong class="text-sm text-on-surface"><?php echo $precioArriendo !== '' && (float) $precioArriendo > 0 ? ('$ ' . number_format((float) $precioArriendo, 0, ',', '.')) : 'No aplica'; ?></strong>
+            </div>
+            <div>
+              <span class="text-secondary block">Valor Venta:</span>
+              <strong class="text-sm text-on-surface"><?php echo $precioVenta !== '' && (float) $precioVenta > 0 ? ('$ ' . number_format((float) $precioVenta, 0, ',', '.')) : 'No aplica'; ?></strong>
+            </div>
+            <div>
+              <span class="text-secondary block">Administración:</span>
+              <strong class="text-on-surface"><?php echo $precioAdmin !== '' && (float) $precioAdmin > 0 ? ('$ ' . number_format((float) $precioAdmin, 0, ',', '.')) : 'Incluida o $0'; ?></strong>
+            </div>
+            <div>
+              <span class="text-secondary block">Tipo Negocio:</span>
+              <strong class="text-on-surface"><?php echo esc_html($tipoNegocio !== '' ? $tipoNegocio : 'No especificado'); ?></strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bloque 2: Ficha Técnica -->
+        <div class="bg-surface-container-low/50 p-5 rounded-2xl border border-surface-container space-y-3">
+          <div class="flex items-center gap-2 border-b border-surface-container pb-2">
+            <span class="material-symbols-outlined text-[20px] text-primary">straighten</span>
+            <h3 class="text-sm font-bold text-on-surface uppercase tracking-wider">Ficha Técnica</h3>
+          </div>
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+            <div>
+              <span class="text-secondary block">Habitaciones:</span>
+              <strong class="text-on-surface"><?php echo esc_html($habs !== '' ? $habs : '-'); ?></strong>
+            </div>
+            <div>
+              <span class="text-secondary block">Baños:</span>
+              <strong class="text-on-surface"><?php echo esc_html($banos !== '' ? $banos : '-'); ?></strong>
+            </div>
+            <div>
+              <span class="text-secondary block">Parqueaderos:</span>
+              <strong class="text-on-surface"><?php echo esc_html($parqueaderos !== '' ? $parqueaderos : '-'); ?></strong>
+            </div>
+            <div>
+              <span class="text-secondary block">Área Construida:</span>
+              <strong class="text-on-surface"><?php echo esc_html($areaConstruida !== '' ? "{$areaConstruida} m²" : '-'); ?></strong>
+            </div>
+            <div>
+              <span class="text-secondary block">Área Privada:</span>
+              <strong class="text-on-surface"><?php echo esc_html($areaPrivada !== '' ? "{$areaPrivada} m²" : '-'); ?></strong>
+            </div>
+            <div>
+              <span class="text-secondary block">Estrato:</span>
+              <strong class="text-on-surface"><?php echo esc_html($estrato !== '' ? $estrato : '-'); ?></strong>
+            </div>
+            <div>
+              <span class="text-secondary block">Edad:</span>
+              <strong class="text-on-surface"><?php echo esc_html($edad !== '' ? "{$edad} años" : '-'); ?></strong>
+            </div>
+            <div>
+              <span class="text-secondary block">Copropiedad:</span>
+              <strong class="text-on-surface"><?php echo esc_html($copropiedad !== '' ? $copropiedad : '-'); ?></strong>
+            </div>
+            <div>
+              <span class="text-secondary block">Matrícula:</span>
+              <strong class="text-on-surface"><?php echo esc_html($matricula !== '' ? $matricula : '-'); ?></strong>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2-Column Grid: Ubicación & Contactos -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <!-- Ubicación -->
+        <div class="bg-surface-container-low/50 p-5 rounded-2xl border border-surface-container space-y-3">
+          <div class="flex items-center gap-2 border-b border-surface-container pb-2">
+            <span class="material-symbols-outlined text-[20px] text-primary">pin_drop</span>
+            <h3 class="text-sm font-bold text-on-surface uppercase tracking-wider">Ubicación</h3>
+          </div>
+          <div class="space-y-2 text-xs">
+            <div>
+              <span class="text-secondary block">Ciudad:</span>
+              <strong class="text-on-surface"><?php echo esc_html($ciudad !== '' ? $ciudad : '-'); ?></strong>
+            </div>
+            <div>
+              <span class="text-secondary block">Barrio:</span>
+              <strong class="text-on-surface"><?php echo esc_html($barrio !== '' ? $barrio : '-'); ?></strong>
+            </div>
+            <div>
+              <span class="text-secondary block">Dirección:</span>
+              <strong class="text-on-surface"><?php echo esc_html($direccion !== '' ? $direccion : '-'); ?></strong>
+            </div>
+            <?php if ($puntoRef !== ''): ?>
+              <div>
+                <span class="text-secondary block">Punto de Referencia:</span>
+                <span class="text-on-surface"><?php echo esc_html($puntoRef); ?></span>
+              </div>
+            <?php endif; ?>
+            <?php if ($mapsUrl !== ''): ?>
+              <div class="pt-2">
+                <a href="<?php echo esc_url($mapsUrl); ?>" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-container text-primary font-semibold text-xs hover:bg-surface-container-high transition-colors">
+                  <span class="material-symbols-outlined text-[16px]">map</span>
+                  <span>Ver en Google Maps</span>
+                </a>
+              </div>
+            <?php endif; ?>
+          </div>
+        </div>
+
+        <!-- Contactos y Gestión -->
+        <div class="bg-surface-container-low/50 p-5 rounded-2xl border border-surface-container space-y-3">
+          <div class="flex items-center gap-2 border-b border-surface-container pb-2">
+            <span class="material-symbols-outlined text-[20px] text-primary">badge</span>
+            <h3 class="text-sm font-bold text-on-surface uppercase tracking-wider">Contactos &amp; Asignación</h3>
+          </div>
+          <div class="space-y-2 text-xs">
+            <div>
+              <span class="text-secondary block">Funcionario Asignado:</span>
+              <strong class="text-on-surface text-sm"><?php echo esc_html($funcionario !== '' ? $funcionario : 'Sin asignar'); ?></strong>
+              <?php if ($funcionarioCel !== ''): ?>
+                <span class="block text-secondary mt-0.5">Celular: <?php echo esc_html($funcionarioCel); ?></span>
+              <?php endif; ?>
+            </div>
+            <div class="pt-1 border-t border-surface-container">
+              <span class="text-secondary block">Propietario:</span>
+              <strong class="text-on-surface"><?php echo esc_html($propietario !== '' ? $propietario : 'No especificado'); ?></strong>
+              <?php if ($idPropietario !== ''): ?>
+                <span class="text-secondary block">ID Propietario: <?php echo esc_html($idPropietario); ?></span>
+              <?php endif; ?>
+            </div>
+            <?php if ($arrendatario !== ''): ?>
+              <div class="pt-1 border-t border-surface-container">
+                <span class="text-secondary block">Arrendatario:</span>
+                <strong class="text-on-surface"><?php echo esc_html($arrendatario); ?></strong>
+              </div>
+            <?php endif; ?>
+            <?php if ($llavesUbi !== '' || $llavesDonde !== '' || $llavesContacto !== ''): ?>
+              <div class="pt-2 border-t border-surface-container">
+                <span class="text-secondary font-semibold block uppercase text-[10px]">Gestión de Llaves:</span>
+                <span class="text-on-surface block"><?php echo esc_html(implode(' · ', array_filter([$llavesUbi, $llavesDonde, $llavesContacto, $llavesTel]))); ?></span>
+              </div>
+            <?php endif; ?>
+          </div>
+        </div>
+      </div>
+
+      <!-- Amenidades y Comodidades -->
+      <?php if ($interiores !== '' || $exteriores !== '' || $zonasSociales !== '' || $alrededores !== ''): ?>
+        <div class="bg-surface-container-low/50 p-5 rounded-2xl border border-surface-container space-y-4">
+          <div class="flex items-center gap-2 border-b border-surface-container pb-2">
+            <span class="material-symbols-outlined text-[20px] text-primary">interests</span>
+            <h3 class="text-sm font-bold text-on-surface uppercase tracking-wider">Amenidades y Características</h3>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+            <?php if ($interiores !== ''): ?>
+              <div>
+                <span class="text-secondary font-semibold block mb-1">Interiores:</span>
+                <div class="flex flex-wrap gap-1.5">
+                  <?php foreach (explode(',', $interiores) as $tag): ?>
+                    <?php if (trim($tag) !== ''): ?>
+                      <span class="px-2.5 py-0.5 rounded-lg bg-surface-container text-on-surface font-medium"><?php echo esc_html(trim($tag)); ?></span>
+                    <?php endif; ?>
+                  <?php endforeach; ?>
+                </div>
+              </div>
+            <?php endif; ?>
+            <?php if ($exteriores !== ''): ?>
+              <div>
+                <span class="text-secondary font-semibold block mb-1">Exteriores:</span>
+                <div class="flex flex-wrap gap-1.5">
+                  <?php foreach (explode(',', $exteriores) as $tag): ?>
+                    <?php if (trim($tag) !== ''): ?>
+                      <span class="px-2.5 py-0.5 rounded-lg bg-surface-container text-on-surface font-medium"><?php echo esc_html(trim($tag)); ?></span>
+                    <?php endif; ?>
+                  <?php endforeach; ?>
+                </div>
+              </div>
+            <?php endif; ?>
+            <?php if ($zonasSociales !== ''): ?>
+              <div>
+                <span class="text-secondary font-semibold block mb-1">Zonas Sociales:</span>
+                <div class="flex flex-wrap gap-1.5">
+                  <?php foreach (explode(',', $zonasSociales) as $tag): ?>
+                    <?php if (trim($tag) !== ''): ?>
+                      <span class="px-2.5 py-0.5 rounded-lg bg-surface-container text-on-surface font-medium"><?php echo esc_html(trim($tag)); ?></span>
+                    <?php endif; ?>
+                  <?php endforeach; ?>
+                </div>
+              </div>
+            <?php endif; ?>
+            <?php if ($alrededores !== ''): ?>
+              <div>
+                <span class="text-secondary font-semibold block mb-1">Alrededores:</span>
+                <div class="flex flex-wrap gap-1.5">
+                  <?php foreach (explode(',', $alrededores) as $tag): ?>
+                    <?php if (trim($tag) !== ''): ?>
+                      <span class="px-2.5 py-0.5 rounded-lg bg-surface-container text-on-surface font-medium"><?php echo esc_html(trim($tag)); ?></span>
+                    <?php endif; ?>
+                  <?php endforeach; ?>
+                </div>
+              </div>
+            <?php endif; ?>
+          </div>
+        </div>
+      <?php endif; ?>
+
+      <!-- Descripción Completa -->
+      <?php if ($descripcion !== ''): ?>
+        <div class="bg-surface-container-low/50 p-5 rounded-2xl border border-surface-container space-y-2">
+          <div class="flex items-center gap-2 border-b border-surface-container pb-2">
+            <span class="material-symbols-outlined text-[20px] text-primary">description</span>
+            <h3 class="text-sm font-bold text-on-surface uppercase tracking-wider">Descripción del Inmueble</h3>
+          </div>
+          <div class="text-xs text-on-surface leading-relaxed whitespace-pre-line">
+            <?php echo nl2br(esc_html($descripcion)); ?>
+          </div>
+        </div>
+      <?php endif; ?>
+    </div>
+<?php
+    return (string) ob_get_clean();
+  }
+
+  /**
+   * Render pagination controls for the Inmuebles grid.
+   *
+   * @param array<string,mixed> $filters
+   * @param array<string,mixed> $pagination
+   */
+  private static function renderPropertyPagination(array $filters, array $pagination, string $baseUrl): string
+  {
+    $page = (int) ($pagination['page'] ?? 1);
+    $totalPages = (int) ($pagination['total_pages'] ?? 1);
+    $totalItems = (int) ($pagination['total_items'] ?? 0);
+    $from = (int) ($pagination['from'] ?? 0);
+    $to = (int) ($pagination['to'] ?? 0);
+
+    if ($totalPages <= 1) {
+      return '';
+    }
+
+    ob_start();
+?>
+    <nav class="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-surface-container" aria-label="Paginación de inmuebles">
+      <div class="text-xs text-secondary font-medium">
+        Mostrando <strong><?php echo esc_html((string) $from); ?></strong> a <strong><?php echo esc_html((string) $to); ?></strong> de <strong><?php echo esc_html(number_format($totalItems)); ?></strong> inmuebles
+      </div>
+
+      <div class="flex items-center gap-1.5 flex-wrap">
+        <!-- Anterior -->
+        <?php if ($page > 1): ?>
+          <a href="<?php echo esc_url(self::url($baseUrl, array_merge($filters, ['tab' => 'inmuebles', 'page' => $page - 1]))); ?>" data-commercial-tab="inmuebles" class="px-3 py-1.5 rounded-xl bg-surface-container-low hover:bg-surface-container text-on-surface text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1">
+            <span class="material-symbols-outlined text-[16px]">chevron_left</span>
+            <span class="hidden sm:inline">Anterior</span>
+          </a>
+        <?php endif; ?>
+
+        <!-- Páginas numéricas -->
+        <?php
+          $start = max(1, $page - 2);
+          $end = min($totalPages, $page + 2);
+          if ($start > 1) {
+            echo '<a href="' . esc_url(self::url($baseUrl, array_merge($filters, ['tab' => 'inmuebles', 'page' => 1]))) . '" data-commercial-tab="inmuebles" class="w-8 h-8 rounded-xl bg-surface-container-low hover:bg-surface-container text-on-surface text-xs font-semibold transition-colors flex items-center justify-center cursor-pointer">1</a>';
+            if ($start > 2) {
+              echo '<span class="text-xs text-secondary px-1">…</span>';
+            }
+          }
+          for ($i = $start; $i <= $end; $i++) {
+            $isCur = $i === $page;
+            $btnClass = $isCur ? 'bg-primary text-white font-bold shadow-xs' : 'bg-surface-container-low hover:bg-surface-container text-on-surface font-semibold';
+            echo '<a href="' . esc_url(self::url($baseUrl, array_merge($filters, ['tab' => 'inmuebles', 'page' => $i]))) . '" data-commercial-tab="inmuebles" class="w-8 h-8 rounded-xl text-xs transition-colors flex items-center justify-center cursor-pointer ' . $btnClass . '">' . $i . '</a>';
+          }
+          if ($end < $totalPages) {
+            if ($end < $totalPages - 1) {
+              echo '<span class="text-xs text-secondary px-1">…</span>';
+            }
+            echo '<a href="' . esc_url(self::url($baseUrl, array_merge($filters, ['tab' => 'inmuebles', 'page' => $totalPages]))) . '" data-commercial-tab="inmuebles" class="w-8 h-8 rounded-xl bg-surface-container-low hover:bg-surface-container text-on-surface text-xs font-semibold transition-colors flex items-center justify-center cursor-pointer">' . $totalPages . '</a>';
+          }
+        ?>
+
+        <!-- Siguiente -->
+        <?php if ($page < $totalPages): ?>
+          <a href="<?php echo esc_url(self::url($baseUrl, array_merge($filters, ['tab' => 'inmuebles', 'page' => $page + 1]))); ?>" data-commercial-tab="inmuebles" class="px-3 py-1.5 rounded-xl bg-surface-container-low hover:bg-surface-container text-on-surface text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1">
+            <span class="hidden sm:inline">Siguiente</span>
+            <span class="material-symbols-outlined text-[16px]">chevron_right</span>
+          </a>
+        <?php endif; ?>
+      </div>
+    </nav>
 <?php
     return (string) ob_get_clean();
   }

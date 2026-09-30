@@ -34,6 +34,7 @@ final class CommercialActionRouter
       'commercial_permissions_save' => 'savePermissions',
       'commercial_property_updates' => 'propertyUpdates',
       'commercial_signs_control' => 'signsControl',
+      'commercial_property_detail' => 'propertyDetail',
     ][$action] ?? null;
     if ($method === null) {
       return false;

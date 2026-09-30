@@ -605,6 +605,11 @@
       "fecha_desde",
       "fecha_hasta",
       "sla_filter",
+      "property_subtab",
+      "tipo_inmueble",
+      "tipo_negocio",
+      "ciudad",
+      "id_funcionario",
       "page",
     ].forEach(function (key) {
       data.append(key, nextUrl.searchParams.get(key) || "");
@@ -996,6 +1001,10 @@
       setStandaloneModal(event.target, false);
       return;
     }
+    if (event.target && event.target.matches && event.target.matches("#commercial-property-detail-modal")) {
+      setStandaloneModal(event.target, false);
+      return;
+    }
     if (controlTab) {
       event.preventDefault();
       var panelName = controlTab.getAttribute("data-commercial-home-control-tab") || "updates";
@@ -1059,6 +1068,53 @@
     if (closeSignDetail) {
       event.preventDefault();
       setStandaloneModal(document.getElementById("commercial-sign-detail-modal"), false);
+      return;
+    }
+    var propertyDetailBtn = event.target.closest("[data-commercial-property-detail]");
+    if (propertyDetailBtn) {
+      event.preventDefault();
+      var propCode = propertyDetailBtn.getAttribute("data-commercial-property-detail") || "";
+      var propModal = document.getElementById("commercial-property-detail-modal");
+      var propContainer = propModal && propModal.querySelector("[data-commercial-property-detail-container]");
+      if (propModal && propContainer) {
+        propContainer.innerHTML = '<div class="flex items-center justify-center py-28 text-slate-500 gap-3"><span class="w-3 h-3 rounded-full bg-[#1E3C76] animate-ping"></span><p class="font-body-md text-sm font-medium">Cargando información del inmueble…</p></div>';
+        setStandaloneModal(propModal, true);
+        request("commercial_property_detail", { codigo: propCode })
+          .then(function (res) {
+            if (res && res.html) {
+              propContainer.innerHTML = res.html;
+            }
+          })
+          .catch(function (err) {
+            notify("error", err.message || "Error al cargar la ficha del inmueble.");
+            setStandaloneModal(propModal, false);
+          });
+      }
+      return;
+    }
+    var closePropDetail = event.target.closest("[data-commercial-close-property-detail]");
+    if (closePropDetail) {
+      event.preventDefault();
+      setStandaloneModal(document.getElementById("commercial-property-detail-modal"), false);
+      return;
+    }
+    var galleryThumb = event.target.closest("[data-commercial-gallery-thumb]");
+    if (galleryThumb) {
+      event.preventDefault();
+      var thumbSrc = galleryThumb.getAttribute("data-commercial-gallery-thumb");
+      var gallerySec = galleryThumb.closest("[data-commercial-property-gallery]");
+      var featuredImg = gallerySec && gallerySec.querySelector("[data-commercial-gallery-featured]");
+      if (featuredImg && thumbSrc) {
+        featuredImg.src = thumbSrc;
+        gallerySec.querySelectorAll("[data-commercial-gallery-thumb]").forEach(function (btn) {
+          var isCurrent = btn === galleryThumb;
+          btn.classList.toggle("border-primary", isCurrent);
+          btn.classList.toggle("ring-2", isCurrent);
+          btn.classList.toggle("ring-primary/30", isCurrent);
+          btn.classList.toggle("border-transparent", !isCurrent);
+          btn.classList.toggle("opacity-75", !isCurrent);
+        });
+      }
       return;
     }
     if (copyTable) {
@@ -1239,6 +1295,20 @@
       loadTickets(globalUrl.href, { focus: false });
       return;
     }
+    var propertiesFilterForm = event.target.closest("[data-commercial-properties-filter-form]");
+    if (propertiesFilterForm) {
+      event.preventDefault();
+      var propUrl = normalizedUrl(propertiesFilterForm.action);
+      propUrl.searchParams.set("tab", "inmuebles");
+      new FormData(propertiesFilterForm).forEach(function (value, key) {
+        if (key === "tab") return;
+        if (String(value).trim() === "") propUrl.searchParams.delete(key);
+        else propUrl.searchParams.set(key, String(value));
+      });
+      propUrl.searchParams.delete("page");
+      loadTickets(propUrl.href, { focus: false });
+      return;
+    }
     var filterForm = event.target.closest("[data-commercial-filter-form]");
     if (!filterForm) return;
     event.preventDefault();
@@ -1255,6 +1325,10 @@
     var form = event.target.closest("[data-commercial-global-filter-form]");
     if (form && event.target.matches('select[name="id_empleado"]')) {
       form.requestSubmit();
+    }
+    var propForm = event.target.closest("[data-commercial-properties-filter-form]");
+    if (propForm && event.target.tagName === "SELECT") {
+      propForm.requestSubmit();
     }
   });
 
@@ -1454,6 +1528,7 @@
     if (modal && modal.classList.contains("open")) setAnalysisModal(false);
     else if (document.getElementById("commercial-property-modal") && document.getElementById("commercial-property-modal").classList.contains("open")) setStandaloneModal(document.getElementById("commercial-property-modal"), false);
     else if (document.getElementById("commercial-sign-detail-modal") && document.getElementById("commercial-sign-detail-modal").classList.contains("open")) setStandaloneModal(document.getElementById("commercial-sign-detail-modal"), false);
+    else if (document.getElementById("commercial-property-detail-modal") && document.getElementById("commercial-property-detail-modal").classList.contains("open")) setStandaloneModal(document.getElementById("commercial-property-detail-modal"), false);
     else if (caseModal && caseModal.classList.contains("open")) showCaseModal(false);
     else if (refreshAdvisoryModalRef() && advisoryModal.classList.contains("open")) showAdvisoryModal(false, advisoryModal, advisoryQueueActive);
     else if (permissionModal && permissionModal.classList.contains("open")) setPermissionModal(false);

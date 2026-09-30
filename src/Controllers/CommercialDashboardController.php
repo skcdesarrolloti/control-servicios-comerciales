@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SCM\Controllers;
 
 use SCM\Commercial\CommercialAccessPolicy;
+use SCM\Commercial\CommercialPropertiesRepository;
 use SCM\Commercial\CommercialStatusCatalog;
 use SCM\Commercial\CommercialTicketsRepository;
 use SCM\Core\Auth;
@@ -61,8 +62,16 @@ final class CommercialDashboardController
     $tabCounts = $repository->bucketCounts($globalCountFilters);
     $myTabCounts = $repository->bucketCounts(['id_empleado' => $currentEmployeeFilter]);
     $tabCounts['mis_tickets'] = (int) ($myTabCounts['mis_tickets'] ?? 0);
-    $result = in_array($bucket, ['actualizaciones', 'avisos', 'calendario', 'sin_acceso'], true) ? ['rows' => [], 'counts' => $repository->statusCounts($filters), 'pagination' => []] : $repository->search($bucket === 'inicio' ? 'abiertos' : $bucket, $filters);
+    $result = in_array($bucket, ['actualizaciones', 'avisos', 'calendario', 'inmuebles', 'sin_acceso'], true) ? ['rows' => [], 'counts' => $repository->statusCounts($filters), 'pagination' => []] : $repository->search($bucket === 'inicio' ? 'abiertos' : $bucket, $filters);
     $homeDashboard = $bucket === 'sin_acceso' ? [] : $repository->homeDashboard($globalCountFilters);
+    $canSeeAll = $policy->canSeeAllCommercialTickets();
+    $propertiesRepository = new CommercialPropertiesRepository($this->db);
+    $propertyFilters = $this->propertyFilters($input, !$canSeeAll);
+    $propertySummaryCounts = $propertiesRepository->summaryCounts($propertyFilters, $canSeeAll);
+    $propertyResult = $bucket === 'inmuebles'
+      ? $propertiesRepository->search($propertyFilters, $canSeeAll, (int) ($propertyFilters['page'] ?? 1), 24)
+      : ['rows' => [], 'total' => 0, 'pagination' => []];
+    $propertyOptions = $propertiesRepository->filterOptions();
     $calendarEmployees = $repository->activeEmployeesByCargos($calendarCargos);
     $currentCalendarEmployeeId = trim(Auth::employeeId());
     if ($currentCalendarEmployeeId === '') {
@@ -125,10 +134,40 @@ final class CommercialDashboardController
       'topic_hierarchy' => $topicHierarchy,
       'recent_tickets' => $recentTickets,
       'recent_count' => $recentCount,
+      'property_result' => $propertyResult,
+      'property_filters' => $propertyFilters,
+      'property_summary_counts' => $propertySummaryCounts,
+      'property_options' => $propertyOptions,
       'runtime' => $runtime,
       'base_url' => (string) SCM_BASE_URL,
       'ticket_url' => (string) ($this->config['ticket_url'] ?? ''),
     ]);
+  }
+
+  /** @param array<string,mixed> $input @return array<string,mixed> */
+  private function propertyFilters(array $input, bool $isNonAdmin): array
+  {
+    $clean = static fn(string $key): string => trim((string) ($input[$key] ?? ''));
+    $subtab = $clean('property_subtab');
+    if ($subtab === '' && isset($input['subtab'])) {
+      $subtab = $clean('subtab');
+    }
+    if (!in_array($subtab, ['publicos', 'pendientes', 'no_publicos', 'mis_inmuebles'], true)) {
+      $subtab = $isNonAdmin ? 'mis_inmuebles' : 'publicos';
+    }
+
+    return [
+      'property_subtab' => $subtab,
+      'busqueda' => $clean('busqueda'),
+      'tipo_inmueble' => $clean('tipo_inmueble'),
+      'tipo_negocio' => $clean('tipo_negocio'),
+      'ciudad' => $clean('ciudad'),
+      'barrio' => $clean('barrio'),
+      'estado' => $clean('estado'),
+      'id_funcionario' => $clean('id_funcionario'),
+      'page' => max(1, (int) ($input['page'] ?? 1)),
+      'per_page' => 24,
+    ];
   }
 
   /** @param array<string,mixed> $input @return array<string,mixed> */

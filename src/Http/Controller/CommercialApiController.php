@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SCM\Http\Controller;
 
 use SCM\Commercial\CommercialAccessPolicy;
+use SCM\Commercial\CommercialPropertiesRepository;
 use SCM\Commercial\CommercialStatusCatalog;
 use SCM\Commercial\CommercialTaskAnalysisRepository;
 use SCM\Commercial\CommercialTaskAssistant;
@@ -23,6 +24,7 @@ use SCM\Views\CommercialTicketModalView;
 
 final class CommercialApiController
 {
+  private Database $db;
   private CommercialTicketsRepository $tickets;
   private CommercialTaskAnalysisRepository $analyses;
   private CommercialAccessPolicy $policy;
@@ -39,6 +41,7 @@ final class CommercialApiController
   /** @param array<string,mixed> $config */
   public function __construct(Database $db, Settings $settings, Csrf $csrf, array $config)
   {
+    $this->db = $db;
     $this->tickets = new CommercialTicketsRepository($db);
     $this->analyses = new CommercialTaskAnalysisRepository($db);
     $this->settings = $settings;
@@ -134,6 +137,21 @@ final class CommercialApiController
         'is_admin' => $this->policy->canManage(),
       ]);
       $html = CommercialDashboardView::renderCalendarPage($calendarConfig, $calendarEmployees, $subtab, $this->policy, $this->baseUrl);
+    } elseif ($bucket === 'inmuebles') {
+      $propertiesRepo = new CommercialPropertiesRepository($this->db);
+      $canSeeAll = $this->policy->canSeeAllCommercialTickets();
+      $propFilters = $this->propertyFilters($input, !$canSeeAll);
+      $propCounts = $propertiesRepo->summaryCounts($propFilters, $canSeeAll);
+      $propResult = $propertiesRepo->search($propFilters, $canSeeAll, (int) ($propFilters['page'] ?? 1), 24);
+      $propOptions = $propertiesRepo->filterOptions();
+      $html = CommercialDashboardView::renderPropertiesPage(
+        $propResult,
+        $propFilters,
+        $propCounts,
+        $propOptions,
+        $this->policy,
+        $this->baseUrl
+      );
     } else {
       $result = $this->tickets->search($bucket, $filters);
       $html = CommercialDashboardView::renderTickets(
@@ -676,5 +694,51 @@ final class CommercialApiController
   {
     $this->ensureWorkflowSucceeded($result);
     JsonResponse::success(['message' => (string) ($result['message'] ?? $fallback), 'refresh' => true]);
+  }
+
+  /** @param array<string,mixed> $input */
+  public function propertyDetail(array $input): never
+  {
+    $this->verify($input);
+    $identifier = trim((string) ($input['codigo'] ?? $input['property_id'] ?? ''));
+    if ($identifier === '') {
+      JsonResponse::error('Identificador de inmueble inválido.', 400);
+    }
+    $repo = new CommercialPropertiesRepository($this->db);
+    $property = $repo->propertyDetail($identifier);
+    if (!is_array($property) || $property === []) {
+      JsonResponse::error('Inmueble no encontrado.', 404);
+    }
+    $html = CommercialDashboardView::renderPropertyDetailModalContent($property);
+    JsonResponse::success([
+      'property' => $property,
+      'html' => $html,
+    ]);
+  }
+
+  /** @param array<string,mixed> $input @return array<string,mixed> */
+  private function propertyFilters(array $input, bool $isNonAdmin): array
+  {
+    $clean = static fn(string $key): string => trim((string) ($input[$key] ?? ''));
+    $subtab = $clean('property_subtab');
+    if ($subtab === '' && isset($input['subtab'])) {
+      $subtab = $clean('subtab');
+    }
+    if (!in_array($subtab, ['publicos', 'pendientes', 'no_publicos', 'mis_inmuebles'], true)) {
+      $subtab = $isNonAdmin ? 'mis_inmuebles' : 'publicos';
+    }
+
+    return [
+      'property_subtab' => $subtab,
+      'busqueda' => $clean('busqueda'),
+      'tipo_inmueble' => $clean('tipo_inmueble'),
+      'tipo_negocio' => $clean('tipo_negocio'),
+      'ciudad' => $clean('ciudad'),
+      'barrio' => $clean('barrio'),
+      'estado' => $clean('estado'),
+      'id_funcionario' => $clean('id_funcionario'),
+      'page' => max(1, (int) ($input['page'] ?? 1)),
+      'per_page' => 24,
+    ];
   }
 }

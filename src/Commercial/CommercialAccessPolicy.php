@@ -19,6 +19,7 @@ final class CommercialAccessPolicy
     'cerrados' => 'Tareas cerradas',
     'mis_tickets' => 'Mis tareas',
     'calendario' => 'Calendario comercial',
+    'inmuebles' => 'Inmuebles',
   ];
 
   public const ACTIONS = [
@@ -64,7 +65,7 @@ final class CommercialAccessPolicy
     if ($this->canManage()) {
       return true;
     }
-    if ($view === 'mis_tickets') {
+    if ($view === 'mis_tickets' || $view === 'inmuebles') {
       return true;
     }
     return in_array($view, $this->allowed('views', array_keys(self::VIEWS)), true);
