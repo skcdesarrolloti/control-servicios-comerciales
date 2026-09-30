@@ -3718,6 +3718,9 @@ final class CommercialDashboardView
 
     $propietario = trim((string) ($property['propietario'] ?? ''));
     $idPropietario = trim((string) ($property['id_propietario'] ?? ''));
+    $propietarioDoc = trim((string) ($property['propietario_documento'] ?? ''));
+    $propietarioCel = trim((string) ($property['propietario_celular'] ?? ''));
+    $propietarioCor = trim((string) ($property['propietario_correo'] ?? ''));
     $arrendatario = trim((string) ($property['arrendatario'] ?? ''));
     $funcionario = trim((string) ($property['funcionario_nombre'] ?? $property['funcionario'] ?? ''));
     $funcionarioCel = trim((string) ($property['funcionario_celular'] ?? ''));
@@ -3918,18 +3921,34 @@ final class CommercialDashboardView
           </div>
           <div class="space-y-2 text-xs">
             <div>
-              <span class="text-secondary block">Funcionario Asignado:</span>
-              <strong class="text-on-surface text-sm"><?php echo esc_html($funcionario !== '' ? $funcionario : 'Sin asignar'); ?></strong>
-              <?php if ($funcionarioCel !== ''): ?>
-                <span class="block text-secondary mt-0.5">Celular: <?php echo esc_html($funcionarioCel); ?></span>
-              <?php endif; ?>
+              <span class="text-secondary block">Asesor / Consultor Asignado:</span>
+              <strong class="text-on-surface text-sm block"><?php echo esc_html($funcionario !== '' ? $funcionario : 'Sin asignar'); ?></strong>
+              <div class="text-xs text-secondary space-y-0.5 mt-1">
+                <?php if ($funcionarioCel !== ''): ?>
+                  <div><span class="font-medium text-on-surface-variant">Celular:</span> <a href="tel:<?php echo esc_attr($funcionarioCel); ?>" class="text-primary hover:underline font-semibold"><?php echo esc_html($funcionarioCel); ?></a></div>
+                <?php endif; ?>
+                <?php if ($funcionarioCorreo !== ''): ?>
+                  <div><span class="font-medium text-on-surface-variant">Correo:</span> <a href="mailto:<?php echo esc_attr($funcionarioCorreo); ?>" class="text-primary hover:underline"><?php echo esc_html($funcionarioCorreo); ?></a></div>
+                <?php endif; ?>
+              </div>
             </div>
-            <div class="pt-1 border-t border-surface-container">
-              <span class="text-secondary block">Propietario:</span>
-              <strong class="text-on-surface"><?php echo esc_html($propietario !== '' ? $propietario : 'No especificado'); ?></strong>
-              <?php if ($idPropietario !== ''): ?>
-                <span class="text-secondary block">ID Propietario: <?php echo esc_html($idPropietario); ?></span>
-              <?php endif; ?>
+            <div class="pt-2 border-t border-surface-container space-y-1">
+              <span class="text-secondary block">Propietario / Dueño:</span>
+              <strong class="text-on-surface text-sm block"><?php echo esc_html($propietario !== '' ? $propietario : 'No especificado'); ?></strong>
+              <div class="text-xs text-secondary space-y-0.5">
+                <?php if ($propietarioDoc !== ''): ?>
+                  <div><span class="font-medium text-on-surface-variant">Documento:</span> <?php echo esc_html($propietarioDoc); ?></div>
+                <?php endif; ?>
+                <?php if ($propietarioCel !== ''): ?>
+                  <div><span class="font-medium text-on-surface-variant">Celular:</span> <a href="tel:<?php echo esc_attr($propietarioCel); ?>" class="text-primary hover:underline font-semibold"><?php echo esc_html($propietarioCel); ?></a></div>
+                <?php endif; ?>
+                <?php if ($propietarioCor !== ''): ?>
+                  <div><span class="font-medium text-on-surface-variant">Correo:</span> <a href="mailto:<?php echo esc_attr($propietarioCor); ?>" class="text-primary hover:underline"><?php echo esc_html($propietarioCor); ?></a></div>
+                <?php endif; ?>
+                <?php if ($idPropietario !== ''): ?>
+                  <div class="text-[11px] opacity-75">ID Propietario: #<?php echo esc_html($idPropietario); ?></div>
+                <?php endif; ?>
+              </div>
             </div>
             <?php if ($arrendatario !== ''): ?>
               <div class="pt-1 border-t border-surface-container">

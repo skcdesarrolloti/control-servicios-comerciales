@@ -94,7 +94,7 @@ final class CommercialPropertiesRepository
                    f.`correo` AS funcionario_correo
               FROM `{$table}` i
          LEFT JOIN `{$funcionarios}` f 
-                ON (CAST(f.`_ID` AS CHAR) = TRIM(i.`id_funcionario`) OR TRIM(f.`id_empleado`) = TRIM(i.`id_funcionario`))
+                ON (TRIM(COALESCE(i.`id_funcionario`, '')) <> '' AND TRIM(f.`id_empleado`) = TRIM(i.`id_funcionario`))
              {$whereSql}
           ORDER BY i.`_ID` DESC
              LIMIT {$perPage} OFFSET {$offset}";
@@ -208,7 +208,7 @@ final class CommercialPropertiesRepository
                         COALESCE(NULLIF(TRIM(f.`nombre`), ''), NULLIF(TRIM(i.`funcionario`), ''), CONCAT('Funcionario #', i.`id_funcionario`)) AS name
                    FROM `{$table}` i
               LEFT JOIN `{$funcionarios}` f 
-                     ON (CAST(f.`_ID` AS CHAR) = TRIM(i.`id_funcionario`) OR TRIM(f.`id_empleado`) = TRIM(i.`id_funcionario`))
+                     ON (TRIM(COALESCE(i.`id_funcionario`, '')) <> '' AND TRIM(f.`id_empleado`) = TRIM(i.`id_funcionario`))
                   WHERE i.`id_funcionario` IS NOT NULL AND TRIM(i.`id_funcionario`) <> ''
                ORDER BY name ASC";
     $funcsRows = $this->db->getResults($funcsSql);
@@ -243,6 +243,7 @@ final class CommercialPropertiesRepository
   {
     $table = $this->db->table('jet_cct_inmuebles');
     $funcionarios = $this->db->table('jet_cct_funcionarios');
+    $propietarios = $this->db->table('jet_cct_propietarios');
 
     $isNumeric = is_numeric($identifier);
     $where = $isNumeric ? '(i.`_ID` = ? OR i.`codigo` = ?)' : 'i.`codigo` = ?';
@@ -252,10 +253,15 @@ final class CommercialPropertiesRepository
                    COALESCE(NULLIF(TRIM(f.`nombre`), ''), i.`funcionario`) AS funcionario_nombre,
                    f.`celular` AS funcionario_celular,
                    f.`correo` AS funcionario_correo,
-                   f.`rol` AS funcionario_rol
+                   f.`rol` AS funcionario_rol,
+                   p.`celular` AS propietario_celular,
+                   p.`correo` AS propietario_correo,
+                   p.`documento` AS propietario_documento
               FROM `{$table}` i
          LEFT JOIN `{$funcionarios}` f 
-                ON (CAST(f.`_ID` AS CHAR) = TRIM(i.`id_funcionario`) OR TRIM(f.`id_empleado`) = TRIM(i.`id_funcionario`))
+                ON (TRIM(COALESCE(i.`id_funcionario`, '')) <> '' AND TRIM(f.`id_empleado`) = TRIM(i.`id_funcionario`))
+         LEFT JOIN `{$propietarios}` p
+                ON (TRIM(COALESCE(i.`id_propietario`, '')) <> '' AND CAST(p.`_ID` AS CHAR) = TRIM(i.`id_propietario`))
              WHERE {$where}
              LIMIT 1";
 
@@ -513,15 +519,16 @@ final class CommercialPropertiesRepository
     $employeeId = trim(Auth::employeeId());
     $userName = trim(Auth::user());
 
+    if ($employeeId === '' && $userId > 0) {
+      $funcionarios = $this->db->table('jet_cct_funcionarios');
+      $emp = $this->db->getVar("SELECT TRIM(COALESCE(`id_empleado`, '')) FROM `{$funcionarios}` WHERE `_ID` = ? LIMIT 1", [$userId]);
+      $employeeId = trim((string) $emp);
+    }
+
     $clauses = [];
     $args = [];
 
-    if ($userId > 0) {
-      $clauses[] = 'TRIM(i.`id_funcionario`) = ?';
-      $args[] = (string) $userId;
-    }
-
-    if ($employeeId !== '' && $employeeId !== (string) $userId) {
+    if ($employeeId !== '') {
       $clauses[] = 'TRIM(i.`id_funcionario`) = ?';
       $args[] = $employeeId;
     }
