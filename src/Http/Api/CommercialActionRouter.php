@@ -36,6 +36,7 @@ final class CommercialActionRouter
       'commercial_signs_control' => 'signsControl',
       'commercial_property_detail' => 'propertyDetail',
       'commercial_highlight_request' => 'requestHighlight',
+      'commercial_highlight_cancel_request' => 'cancelHighlightRequest',
       'commercial_highlight_complete' => 'completeHighlight',
       'commercial_highlight_release' => 'releaseHighlight',
       'commercial_highlight_toggle_premium' => 'togglePremium',

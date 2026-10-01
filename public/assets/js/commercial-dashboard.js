@@ -1158,6 +1158,39 @@
       return;
     }
 
+    var cancelReqBtn = event.target.closest("[data-commercial-cancel-highlight-request]");
+    if (cancelReqBtn) {
+      event.preventDefault();
+      var reqId = cancelReqBtn.getAttribute("data-commercial-cancel-highlight-request") || "";
+      if (!reqId) return;
+      var confirmCancel = function () {
+        request("commercial_highlight_cancel_request", { request_id: reqId })
+          .then(function (res) {
+            notify("success", (res && res.message) || "Solicitud cancelada exitosamente.");
+            window.location.reload();
+          })
+          .catch(function (err) {
+            notify("error", (err && err.message) || "Error al cancelar la solicitud.");
+          });
+      };
+      if (window.Swal) {
+        Swal.fire({
+          title: "¿Cancelar solicitud?",
+          text: "La solicitud de destacado será eliminada.",
+          icon: "warning",
+          showCancelButton: true,
+          confirmButtonText: "Sí, cancelar",
+          cancelButtonText: "Volver",
+          confirmButtonColor: "#ef4444"
+        }).then(function (result) {
+          if (result.isConfirmed) confirmCancel();
+        });
+      } else if (confirm("¿Deseas cancelar esta solicitud de destacado?")) {
+        confirmCancel();
+      }
+      return;
+    }
+
     var galleryThumb = event.target.closest("[data-commercial-gallery-thumb]");
     if (galleryThumb) {
       event.preventDefault();

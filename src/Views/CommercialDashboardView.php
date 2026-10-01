@@ -3180,7 +3180,7 @@ final class CommercialDashboardView
     $total = (int) ($result['total'] ?? 0);
     $pagination = is_array($result['pagination'] ?? null) ? $result['pagination'] : [];
     $currentSubtab = trim((string) ($filters['property_subtab'] ?? 'publicos'));
-    $validSubtabs = ['publicos', 'pendientes', 'no_publicos', 'destacados', 'mis_inmuebles'];
+    $validSubtabs = ['publicos', 'pendientes', 'no_publicos', 'destacados', 'mis_solicitudes', 'mis_inmuebles'];
     if (!in_array($currentSubtab, $validSubtabs, true)) {
       $currentSubtab = 'publicos';
     }
@@ -3191,6 +3191,7 @@ final class CommercialDashboardView
     $pendingCount = (int) ($summaryCounts['pendientes'] ?? 0);
     $nonPublicCount = (int) ($summaryCounts['no_publicos'] ?? 0);
     $destacadosCount = (int) ($summaryCounts['destacados'] ?? 0);
+    $myRequestsCount = (int) ($summaryCounts['mis_solicitudes'] ?? 0);
     $myCount = (int) ($summaryCounts['mis_inmuebles'] ?? 0);
     $totalCount = (int) ($summaryCounts['total'] ?? ($publicCount + $pendingCount + $nonPublicCount));
 
@@ -3222,6 +3223,13 @@ final class CommercialDashboardView
         'count' => $destacadosCount,
         'badge' => 'Portales',
         'desc' => 'Destacados y promocionados en portales',
+      ],
+      'mis_solicitudes' => [
+        'label' => 'Mis solicitudes por destacar',
+        'icon' => 'assignment_turned_in',
+        'count' => $myRequestsCount,
+        'badge' => 'Personal',
+        'desc' => 'Mis solicitudes de destacado en portales',
       ],
       'mis_inmuebles' => [
         'label' => 'Mis inmuebles',
@@ -3283,8 +3291,8 @@ final class CommercialDashboardView
         </div>
       </div>
 
-      <!-- Tarjetas Resumen KPI del Portafolio (6 Tarjetas Responsivas) -->
-      <div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
+      <!-- Tarjetas Resumen KPI del Portafolio (7 Tarjetas Responsivas) -->
+      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-7 gap-3">
         <!-- Públicos -->
         <a href="<?php echo esc_url(self::url($baseUrl, array_merge($filters, ['tab' => 'inmuebles', 'property_subtab' => 'publicos', 'page' => 1]))); ?>" data-commercial-tab="inmuebles" class="p-4 rounded-2xl border transition-all duration-200 flex flex-col justify-between cursor-pointer <?php echo $currentSubtab === 'publicos' ? 'bg-emerald-500/10 border-emerald-500 shadow-sm ring-1 ring-emerald-500/30' : 'bg-surface-container-lowest border-surface-container hover:border-emerald-400 hover:shadow-xs'; ?>">
           <div class="flex items-center justify-between">
@@ -3330,6 +3338,18 @@ final class CommercialDashboardView
           <div class="mt-2.5">
             <span class="text-2xl font-bold text-on-surface"><?php echo esc_html(number_format($destacadosCount)); ?></span>
             <span class="block text-[11px] text-amber-700 font-medium">Activos en portales</span>
+          </div>
+        </a>
+
+        <!-- Mis Solicitudes por Destacar -->
+        <a href="<?php echo esc_url(self::url($baseUrl, array_merge($filters, ['tab' => 'inmuebles', 'property_subtab' => 'mis_solicitudes', 'page' => 1]))); ?>" data-commercial-tab="inmuebles" class="p-4 rounded-2xl border transition-all duration-200 flex flex-col justify-between cursor-pointer <?php echo $currentSubtab === 'mis_solicitudes' ? 'bg-indigo-500/10 border-indigo-500 shadow-sm ring-1 ring-indigo-500/30' : 'bg-surface-container-lowest border-surface-container hover:border-indigo-400 hover:shadow-xs'; ?>">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold text-indigo-700 uppercase tracking-wider">Mis Solicitudes</span>
+            <span class="material-symbols-outlined text-[20px] text-indigo-600">assignment_turned_in</span>
+          </div>
+          <div class="mt-2.5">
+            <span class="text-2xl font-bold text-on-surface"><?php echo esc_html(number_format($myRequestsCount)); ?></span>
+            <span class="block text-[11px] text-indigo-700 font-medium">Por destacar</span>
           </div>
         </a>
 
@@ -3381,8 +3401,11 @@ final class CommercialDashboardView
         <?php endforeach; ?>
       </div>
 
-      <!-- Filtros Avanzados para Inmuebles -->
-      <form method="GET" action="<?php echo esc_url(self::url($baseUrl, ['tab' => 'inmuebles'])); ?>" data-commercial-properties-filter-form class="bg-surface-container-lowest p-5 rounded-2xl border border-surface-container shadow-xs space-y-4">
+      <?php if ($currentSubtab === 'mis_solicitudes'): ?>
+        <?php echo self::renderUserHighlightRequests($options, $baseUrl); ?>
+      <?php else: ?>
+        <!-- Filtros Avanzados para Inmuebles -->
+        <form method="GET" action="<?php echo esc_url(self::url($baseUrl, ['tab' => 'inmuebles'])); ?>" data-commercial-properties-filter-form class="bg-surface-container-lowest p-5 rounded-2xl border border-surface-container shadow-xs space-y-4">
           <input type="hidden" name="tab" value="inmuebles">
           <input type="hidden" name="property_subtab" value="<?php echo esc_attr($currentSubtab); ?>" data-commercial-property-subtab-input>
           <input type="hidden" name="page" value="1" data-commercial-property-page-input>
@@ -3545,10 +3568,265 @@ final class CommercialDashboardView
             <?php echo self::renderPropertyPagination($filters, $pagination, $baseUrl); ?>
           <?php endif; ?>
         </div>
+      <?php endif; ?>
     </section>
 <?php
     return (string) ob_get_clean();
   }
+
+  /**
+   * Render consultant's personal highlight requests and portal quotas.
+   *
+   * @param array<string,mixed> $options
+   */
+  public static function renderUserHighlightRequests(array $options, string $baseUrl): string
+  {
+    $userQuotas = is_array($options['user_quotas'] ?? null) ? $options['user_quotas'] : [];
+    $userRequests = is_array($options['user_requests'] ?? null) ? $options['user_requests'] : [];
+    $pendingRequests = array_values(array_filter($userRequests, static fn(array $r): bool => ($r['estado'] ?? '') === 'pendiente'));
+    $completedRequests = array_values(array_filter($userRequests, static fn(array $r): bool => ($r['estado'] ?? '') === 'destacado'));
+    $pendingCount = count($pendingRequests);
+    $completedCount = count($completedRequests);
+    $totalRequests = count($userRequests);
+
+    ob_start();
+?>
+    <div class="space-y-6">
+      <!-- Tarjeta Resumen de Cupos Personales -->
+      <div class="bg-surface-container-lowest p-5 rounded-2xl border border-surface-container shadow-xs">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-surface-container">
+          <div>
+            <h3 class="text-base font-bold text-on-surface flex items-center gap-2">
+              <span class="material-symbols-outlined text-primary text-[22px]">stars</span>
+              <span>Mis Cupos de Destacados en Portales</span>
+            </h3>
+            <p class="text-xs text-secondary mt-0.5">Cupos asignados a tu cuenta, consumo actual y disponibilidad por portal.</p>
+          </div>
+          <div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary/10 text-primary text-xs font-semibold self-start sm:self-auto">
+            <span class="material-symbols-outlined text-[16px]">verified_user</span>
+            <span>Cupos del Consultor</span>
+          </div>
+        </div>
+
+        <!-- Grid de Portales -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 mt-4">
+          <?php foreach (CommercialPropertiesRepository::PORTALS as $pKey => $pCfg): ?>
+            <?php
+              $q = $userQuotas[$pKey] ?? ['assigned' => 0, 'used' => 0, 'pending' => 0, 'available' => 0];
+              $assigned = (int) ($q['assigned'] ?? 0);
+              $used = (int) ($q['used'] ?? 0);
+              $pending = (int) ($q['pending'] ?? 0);
+              $available = (int) ($q['available'] ?? 0);
+
+              $portalColors = [
+                'fincaraiz' => ['bg' => 'bg-emerald-500/10', 'border' => 'border-emerald-500/30', 'text' => 'text-emerald-800', 'badge' => 'bg-emerald-100 text-emerald-800'],
+                'metrocuadrado' => ['bg' => 'bg-amber-500/10', 'border' => 'border-amber-500/30', 'text' => 'text-amber-800', 'badge' => 'bg-amber-100 text-amber-800'],
+                'ciencuadras' => ['bg' => 'bg-sky-500/10', 'border' => 'border-sky-500/30', 'text' => 'text-sky-800', 'badge' => 'bg-sky-100 text-sky-800'],
+                'web' => ['bg' => 'bg-indigo-500/10', 'border' => 'border-indigo-500/30', 'text' => 'text-indigo-800', 'badge' => 'bg-indigo-100 text-indigo-800'],
+              ];
+              $color = $portalColors[$pKey] ?? ['bg' => 'bg-surface-container', 'border' => 'border-outline-variant/30', 'text' => 'text-primary', 'badge' => 'bg-surface-container text-on-surface'];
+            ?>
+            <div class="p-4 rounded-xl border <?php echo esc_attr($color['border']); ?> <?php echo esc_attr($color['bg']); ?> flex flex-col justify-between">
+              <div class="flex items-center justify-between">
+                <span class="font-bold text-sm <?php echo esc_attr($color['text']); ?>"><?php echo esc_html($pCfg['label']); ?></span>
+                <span class="px-2 py-0.5 rounded-full text-[11px] font-bold <?php echo $available > 0 ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-700'; ?>">
+                  <?php echo esc_html((string) $available); ?> Disp.
+                </span>
+              </div>
+
+              <div class="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-black/5 text-center">
+                <div>
+                  <span class="block text-[10px] text-secondary uppercase font-semibold">Asignados</span>
+                  <span class="text-sm font-bold text-on-surface"><?php echo esc_html((string) $assigned); ?></span>
+                </div>
+                <div>
+                  <span class="block text-[10px] text-secondary uppercase font-semibold">Usados</span>
+                  <span class="text-sm font-bold text-on-surface"><?php echo esc_html((string) $used); ?></span>
+                </div>
+                <div>
+                  <span class="block text-[10px] text-secondary uppercase font-semibold">Pendientes</span>
+                  <span class="text-sm font-bold text-amber-600"><?php echo esc_html((string) $pending); ?></span>
+                </div>
+              </div>
+            </div>
+          <?php endforeach; ?>
+        </div>
+      </div>
+
+      <!-- Sección Mis Solicitudes de Destacado -->
+      <div class="bg-surface-container-lowest p-5 rounded-2xl border border-surface-container shadow-xs space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-surface-container">
+          <div>
+            <h3 class="text-base font-bold text-on-surface flex items-center gap-2">
+              <span class="material-symbols-outlined text-primary text-[22px]">assignment_turned_in</span>
+              <span>Historial de Solicitudes</span>
+            </h3>
+            <p class="text-xs text-secondary mt-0.5">Seguimiento de las solicitudes que has registrado para destacar inmuebles.</p>
+          </div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="px-3 py-1 rounded-full bg-surface-container text-secondary text-xs font-semibold">
+              Total: <strong><?php echo esc_html((string) $totalRequests); ?></strong>
+            </span>
+            <span class="px-3 py-1 rounded-full bg-amber-100 text-amber-800 text-xs font-semibold">
+              Pendientes: <strong><?php echo esc_html((string) $pendingCount); ?></strong>
+            </span>
+            <span class="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-semibold">
+              Destacados: <strong><?php echo esc_html((string) $completedCount); ?></strong>
+            </span>
+          </div>
+        </div>
+
+        <?php if ($userRequests === []): ?>
+          <div class="py-12 text-center space-y-3">
+            <div class="w-16 h-16 rounded-2xl bg-surface-container text-secondary flex items-center justify-center mx-auto">
+              <span class="material-symbols-outlined text-[32px]">assignment_late</span>
+            </div>
+            <h4 class="text-base font-bold text-on-surface">No tienes solicitudes de destacado</h4>
+            <p class="text-xs text-secondary max-w-md mx-auto">
+              Aún no has solicitado destacar ningún inmueble. Puedes ingresar a la pestaña de inmuebles, abrir cualquier inmueble asignado a tu gestión y solicitar su destacado en el portal que desees.
+            </p>
+            <div class="pt-2">
+              <a href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'inmuebles', 'property_subtab' => 'mis_inmuebles'])); ?>" data-commercial-tab="inmuebles" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-white text-xs font-semibold hover:bg-primary/90 transition-all cursor-pointer shadow-xs">
+                <span class="material-symbols-outlined text-[16px]">person_pin</span>
+                <span>Ver mis inmuebles</span>
+              </a>
+            </div>
+          </div>
+        <?php else: ?>
+          <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            <?php foreach ($userRequests as $req): ?>
+              <?php
+                $reqId = (int) ($req['id'] ?? 0);
+                $reqCode = trim((string) ($req['codigo_inmueble'] ?? ''));
+                $reqPortal = (string) ($req['portal'] ?? '');
+                $reqEstado = (string) ($req['estado'] ?? 'pendiente');
+                $portalLabel = CommercialPropertiesRepository::PORTALS[$reqPortal]['label'] ?? ucfirst($reqPortal);
+                $fotoPortadaUrl = trim((string) ($req['foto_portada_url'] ?? ''));
+                $tipoInmueble = trim((string) ($req['tipo_inmueble'] ?? 'Inmueble'));
+                $tipoNegocio = trim((string) ($req['tipo_negocio'] ?? ''));
+                $ciudad = trim((string) ($req['ciudad'] ?? ''));
+                $barrio = trim((string) ($req['barrio'] ?? ''));
+                $direccion = trim((string) ($req['direccion'] ?? ''));
+
+                $precioArriendo = self::parsePrice($req['precio_arriendo'] ?? null);
+                $precioVenta = self::parsePrice($req['precio_venta'] ?? null);
+
+                $portalColorBadge = match ($reqPortal) {
+                  'fincaraiz' => 'bg-emerald-100 text-emerald-800 border-emerald-300',
+                  'metrocuadrado' => 'bg-amber-100 text-amber-800 border-amber-300',
+                  'ciencuadras' => 'bg-sky-100 text-sky-800 border-sky-300',
+                  'web' => 'bg-indigo-100 text-indigo-800 border-indigo-300',
+                  default => 'bg-surface-container text-on-surface border-surface-container-high',
+                };
+
+                $requestedDate = !empty($req['requested_at']) ? date('d/m/Y H:i', strtotime((string) $req['requested_at'])) : '-';
+                $completedDate = !empty($req['completed_at']) ? date('d/m/Y H:i', strtotime((string) $req['completed_at'])) : null;
+              ?>
+              <article class="bg-surface-container-lowest rounded-2xl border border-surface-container p-4 shadow-xs hover:border-primary/50 transition-all flex flex-col justify-between gap-3">
+                <!-- Portal & Estado -->
+                <div class="flex items-center justify-between gap-2">
+                  <span class="px-2.5 py-0.5 rounded-md text-xs font-bold border <?php echo esc_attr($portalColorBadge); ?>">
+                    <?php echo esc_html($portalLabel); ?>
+                  </span>
+                  <?php if ($reqEstado === 'destacado'): ?>
+                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      <span class="material-symbols-outlined text-[14px]">check_circle</span>
+                      <span>Destacado</span>
+                    </span>
+                  <?php else: ?>
+                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                      <span class="material-symbols-outlined text-[14px]">hourglass_top</span>
+                      <span>Pendiente de gestión</span>
+                    </span>
+                  <?php endif; ?>
+                </div>
+
+                <!-- Cabecera de inmueble con imagen y datos -->
+                <div class="flex items-start gap-3">
+                  <div class="w-16 h-16 rounded-xl overflow-hidden bg-surface-container shrink-0 border border-surface-container-high">
+                    <?php if ($fotoPortadaUrl !== ''): ?>
+                      <img src="<?php echo esc_url($fotoPortadaUrl); ?>" alt="<?php echo esc_attr($tipoInmueble); ?>" class="w-full h-full object-cover">
+                    <?php else: ?>
+                      <div class="w-full h-full flex items-center justify-center text-secondary">
+                        <span class="material-symbols-outlined text-[24px]">home</span>
+                      </div>
+                    <?php endif; ?>
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <h4 class="font-bold text-on-surface text-sm truncate">
+                      #<?php echo esc_html($reqCode); ?> · <?php echo esc_html($tipoInmueble); ?>
+                    </h4>
+                    <div class="text-xs text-secondary truncate mt-0.5">
+                      <?php echo esc_html(trim(($barrio !== '' ? "{$barrio}, " : '') . $ciudad)); ?>
+                    </div>
+                    <?php if ($tipoNegocio !== ''): ?>
+                      <div class="mt-1 flex items-center gap-1.5 flex-wrap">
+                        <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-surface-container text-on-surface">
+                          <?php echo esc_html($tipoNegocio); ?>
+                        </span>
+                        <?php if ($precioArriendo > 0): ?>
+                          <span class="text-xs font-bold text-on-surface">
+                            <?php echo esc_html(self::formatPrice($precioArriendo)); ?>/m
+                          </span>
+                        <?php elseif ($precioVenta > 0): ?>
+                          <span class="text-xs font-bold text-on-surface">
+                            <?php echo esc_html(self::formatPrice($precioVenta)); ?>
+                          </span>
+                        <?php endif; ?>
+                      </div>
+                    <?php endif; ?>
+                  </div>
+                </div>
+
+                <!-- Detalles de la solicitud -->
+                <div class="bg-surface-container-low/60 rounded-xl p-2.5 text-xs space-y-1 border border-outline-variant/20">
+                  <?php if (!empty($req['razon'])): ?>
+                    <div class="text-secondary line-clamp-2">
+                      <strong class="text-on-surface font-semibold">Motivo:</strong> <?php echo esc_html($req['razon']); ?>
+                    </div>
+                  <?php endif; ?>
+                  <div class="flex items-center gap-3 text-[11px] text-secondary pt-0.5">
+                    <span>Oportunidad: <strong class="<?php echo ($req['oportunidad'] ?? '') === 'Si' ? 'text-emerald-700 font-bold' : 'text-on-surface'; ?>"><?php echo esc_html($req['oportunidad'] ?? 'No'); ?></strong></span>
+                    <span>·</span>
+                    <span>Negociable: <strong class="<?php echo ($req['negociable'] ?? '') === 'Si' ? 'text-emerald-700 font-bold' : 'text-on-surface'; ?>"><?php echo esc_html($req['negociable'] ?? 'No'); ?></strong></span>
+                  </div>
+                  <div class="text-[11px] text-secondary/80 pt-0.5 flex items-center justify-between">
+                    <span>Solicitado: <?php echo esc_html($requestedDate); ?></span>
+                    <?php if ($completedDate): ?>
+                      <span class="text-emerald-700 font-medium">Gestionado: <?php echo esc_html($completedDate); ?></span>
+                    <?php endif; ?>
+                  </div>
+                </div>
+
+                <!-- Acciones -->
+                <div class="flex items-center justify-between gap-2 pt-1 border-t border-surface-container">
+                  <div class="flex items-center gap-1.5">
+                    <button type="button" data-commercial-property-detail="<?php echo esc_attr($reqCode); ?>" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary text-white hover:bg-primary/90 text-xs font-semibold shadow-xs transition-all cursor-pointer">
+                      <span class="material-symbols-outlined text-[15px]">visibility</span>
+                      <span>Ver ficha</span>
+                    </button>
+                    <a href="https://sucasainmobiliaria.com.co/inmuebles/inmueble-<?php echo esc_attr($reqCode); ?>" target="_blank" rel="noopener noreferrer" class="p-1.5 rounded-xl bg-surface-container-low hover:bg-surface-container text-secondary text-xs transition-all cursor-pointer border border-outline-variant/30" title="Ver en sitio web">
+                      <span class="material-symbols-outlined text-[16px]">open_in_new</span>
+                    </a>
+                  </div>
+
+                  <?php if ($reqEstado === 'pendiente'): ?>
+                    <button type="button" data-commercial-cancel-highlight-request="<?php echo esc_attr((string) $reqId); ?>" class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-red-600 hover:bg-red-50 hover:text-red-700 text-xs font-semibold transition-all cursor-pointer" title="Cancelar solicitud">
+                      <span class="material-symbols-outlined text-[16px]">cancel</span>
+                      <span>Cancelar</span>
+                    </button>
+                  <?php endif; ?>
+                </div>
+              </article>
+            <?php endforeach; ?>
+          </div>
+        <?php endif; ?>
+      </div>
+    </div>
+<?php
+    return (string) ob_get_clean();
+  }
+
 
   /**
    * Render cards for property rows.

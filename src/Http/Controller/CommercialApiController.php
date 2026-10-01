@@ -739,6 +739,24 @@ final class CommercialApiController
   }
 
   /** @param array<string,mixed> $input */
+  public function cancelHighlightRequest(array $input): never
+  {
+    $this->verify($input);
+    $requestId = (int) ($input['request_id'] ?? 0);
+    if ($requestId <= 0) {
+      JsonResponse::error('ID de solicitud no válido.', 400);
+    }
+
+    $employeeId = trim(Auth::employeeId());
+    $repo = new CommercialPropertiesRepository($this->db);
+    $res = $repo->cancelHighlightRequest($requestId, $employeeId);
+    if (!($res['ok'] ?? false)) {
+      JsonResponse::error($res['message'] ?? 'No se pudo cancelar la solicitud.', 422);
+    }
+    JsonResponse::ok($res);
+  }
+
+  /** @param array<string,mixed> $input */
   public function completeHighlight(array $input): never
   {
     $this->verify($input);
@@ -811,7 +829,7 @@ final class CommercialApiController
     if ($subtab === '' && isset($input['subtab'])) {
       $subtab = $clean('subtab');
     }
-    if (!in_array($subtab, ['publicos', 'pendientes', 'no_publicos', 'mis_inmuebles', 'destacados'], true)) {
+    if (!in_array($subtab, ['publicos', 'pendientes', 'no_publicos', 'destacados', 'mis_solicitudes', 'mis_inmuebles'], true)) {
       $subtab = $isNonAdmin ? 'mis_inmuebles' : 'publicos';
     }
 

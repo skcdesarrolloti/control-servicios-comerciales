@@ -197,16 +197,17 @@ final class CommercialPropertiesRepository
 
     $row = $this->db->getRow($sql, $allArgs);
 
-    // Calculate mis_inmuebles count & pending requests count
+    // Calculate mis_inmuebles count & user pending requests count
     $myCount = $this->countMyProperties();
-    $solicitudesCount = $this->countPendingRequests();
+    $currentEmployeeId = trim(Auth::employeeId());
+    $myRequestsCount = $this->countUserPendingRequests($currentEmployeeId);
 
     return [
       'publicos' => (int) ($row['publicos'] ?? 0),
       'pendientes' => (int) ($row['pendientes'] ?? 0),
       'no_publicos' => (int) ($row['no_publicos'] ?? 0),
       'destacados' => (int) ($row['destacados'] ?? 0),
-      'solicitudes' => $solicitudesCount,
+      'mis_solicitudes' => $myRequestsCount,
       'mis_inmuebles' => $myCount,
       'total' => (int) ($row['total'] ?? 0),
     ];
@@ -688,6 +689,22 @@ final class CommercialPropertiesRepository
   }
 
   /**
+   * Pending highlight requests count for a specific employee.
+   */
+  public function countUserPendingRequests(string $employeeId): int
+  {
+    if ($employeeId === '') {
+      return 0;
+    }
+    $table = $this->db->table('skc_destacado_solicitudes');
+    try {
+      return (int) $this->db->getVar("SELECT COUNT(*) FROM `{$table}` WHERE solicitado_por_id = ? AND estado = 'pendiente'", [$employeeId]);
+    } catch (\Throwable) {
+      return 0;
+    }
+  }
+
+  /**
    * Pending highlight requests joined with property info.
    *
    * @return array<int,array<string,mixed>>
@@ -706,21 +723,61 @@ final class CommercialPropertiesRepository
   }
 
   /**
-   * Requests made by a specific employee.
+   * Requests made by a specific employee, joined with property data and resolved photos.
    *
    * @return array<int,array<string,mixed>>
    */
-  public function getUserRequests(string $employeeId, int $limit = 100): array
+  public function getUserRequests(string $employeeId, int $limit = 150): array
   {
+    if ($employeeId === '') {
+      return [];
+    }
     $requestsTable = $this->db->table('skc_destacado_solicitudes');
     $inmueblesTable = $this->db->table('jet_cct_inmuebles');
-    $sql = "SELECT s.*, i.`tipo_inmueble`, i.`tipo_negocio`, i.`ciudad`, i.`barrio`, i.`direccion`, i.`estado` AS inmueble_estado
+    $sql = "SELECT s.*, 
+                   i.`_ID` AS inmueble_id, 
+                   i.`tipo_inmueble`, 
+                   i.`tipo_negocio`, 
+                   i.`ciudad`, 
+                   i.`barrio`, 
+                   i.`direccion`, 
+                   i.`estado` AS inmueble_estado,
+                   i.`precio_arriendo`,
+                   i.`precio_venta`,
+                   i.`foto_portada`,
+                   i.`galeria`
               FROM `{$requestsTable}` s
-         LEFT JOIN `{$inmueblesTable}` i ON i.`codigo` = s.`codigo_inmueble`
+         LEFT JOIN `{$inmueblesTable}` i ON (i.`codigo` = s.`codigo_inmueble` OR CAST(i.`_ID` AS CHAR) = s.`codigo_inmueble`)
              WHERE s.`solicitado_por_id` = ?
           ORDER BY s.`requested_at` DESC
              LIMIT {$limit}";
-    return $this->db->getResults($sql, [$employeeId]);
+    $rows = $this->db->getResults($sql, [$employeeId]);
+    return $this->attachPhotoUrls($rows);
+  }
+
+  /**
+   * Cancel/delete a pending highlight request.
+   *
+   * @return array{ok:bool,message:string}
+   */
+  public function cancelHighlightRequest(int $requestId, string $employeeId): array
+  {
+    if ($requestId <= 0) {
+      return ['ok' => false, 'message' => 'ID de solicitud no válido.'];
+    }
+    $table = $this->db->table('skc_destacado_solicitudes');
+    $req = $this->db->getRow("SELECT * FROM `{$table}` WHERE id = ? LIMIT 1", [$requestId]);
+    if (!$req) {
+      return ['ok' => false, 'message' => 'Solicitud no encontrada.'];
+    }
+    if ($req['estado'] !== 'pendiente') {
+      return ['ok' => false, 'message' => 'Solo se pueden cancelar solicitudes pendientes.'];
+    }
+    if ($employeeId !== '' && trim((string) ($req['solicitado_por_id'] ?? '')) !== $employeeId) {
+      return ['ok' => false, 'message' => 'No tienes permiso para cancelar esta solicitud.'];
+    }
+    $this->db->query("DELETE FROM `{$table}` WHERE id = ?", [$requestId]);
+    return ['ok' => true, 'message' => 'Solicitud cancelada correctamente.'];
   }
 
   /**
