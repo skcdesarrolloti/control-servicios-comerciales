@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SCM\Views;
 
 use SCM\Commercial\CommercialAccessPolicy;
+use SCM\Commercial\CommercialPropertiesRepository;
 use SCM\Commercial\CommercialStatusCatalog;
 use SCM\Core\Auth;
 
@@ -3792,7 +3793,8 @@ final class CommercialDashboardView
       $isDestacado = ($row['destacado'] ?? '') === 'Si' || ($row['marcado_destacado'] ?? '') === 'Si';
       $activePortals = [];
       foreach (CommercialPropertiesRepository::PORTALS as $pKey => $pCfg) {
-        if (($row[$pCfg['column']] ?? '') === 'Si') {
+        $propCol = (string) ($pCfg['property_column'] ?? '');
+        if ($propCol !== '' && (($row[$propCol] ?? '') === 'Si')) {
           $activePortals[] = ['key' => $pKey, 'label' => $pCfg['label']];
         }
       }
