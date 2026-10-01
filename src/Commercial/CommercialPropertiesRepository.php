@@ -33,6 +33,44 @@ final class CommercialPropertiesRepository
     'En proceso de cierre',
   ];
 
+  public const PORTALS = [
+    'mercado_libre_destacados' => [
+      'label' => 'Mercado Libre',
+      'property_column' => 'mercado_libre_destacado',
+      'history_column' => 'mercado_libre_destacados',
+    ],
+    'proppit_promocionados' => [
+      'label' => 'Proppit',
+      'property_column' => 'proppit_promocionado',
+      'history_column' => 'proppit_promocionados',
+    ],
+    'ciencuadras_ascendidos' => [
+      'label' => 'Ciencuadras Ascendido',
+      'property_column' => 'ciencuadras_ascendido',
+      'history_column' => 'ciencuadras_ascendidos',
+    ],
+    'ciencuadras_destacados' => [
+      'label' => 'Ciencuadras Destacado',
+      'property_column' => 'ciencuadras_destacado',
+      'history_column' => 'ciencuadras_destacados',
+    ],
+    'finca_raiz_silver' => [
+      'label' => 'Finca Raiz Silver',
+      'property_column' => 'finca_raiz_silver',
+      'history_column' => 'finca_raiz_silver',
+    ],
+    'finca_raiz_gold' => [
+      'label' => 'Finca Raiz Gold',
+      'property_column' => 'finca_raiz_gold',
+      'history_column' => 'finca_raiz_gold',
+    ],
+    'finca_raiz_black' => [
+      'label' => 'Finca Raiz Black',
+      'property_column' => 'finca_raiz_black',
+      'history_column' => 'finca_raiz_black',
+    ],
+  ];
+
   private Database $db;
   /** @var array<string,string>|null */
   private ?array $amenitiesMapCache = null;
@@ -98,7 +136,9 @@ final class CommercialPropertiesRepository
          LEFT JOIN `{$funcionarios}` f 
                 ON (TRIM(COALESCE(i.`id_funcionario`, '')) <> '' AND TRIM(f.`id_empleado`) = TRIM(i.`id_funcionario`))
              {$whereSql}
-          ORDER BY i.`_ID` DESC
+          ORDER BY (CASE WHEN (i.`destacado` = 'Si' OR i.`marcado_destacado` = 'Si' OR i.`promocion_premium` = 'Si') THEN 1 ELSE 0 END) DESC,
+                   COALESCE(i.`fecha_destacado`, 0) DESC,
+                   i.`_ID` DESC
              LIMIT {$perPage} OFFSET {$offset}";
 
     $rows = $this->db->getResults($sql, $args);
@@ -127,7 +167,7 @@ final class CommercialPropertiesRepository
    * KPI Counts for the subtabs.
    *
    * @param array<string,mixed> $filters
-   * @return array{publicos:int,pendientes:int,no_publicos:int,mis_inmuebles:int,total:int}
+   * @return array{publicos:int,pendientes:int,no_publicos:int,destacados:int,solicitudes:int,mis_inmuebles:int,total:int}
    */
   public function summaryCounts(array $filters = [], bool $canSeeAll = true): array
   {
@@ -150,19 +190,23 @@ final class CommercialPropertiesRepository
               SUM(CASE WHEN TRIM(i.`estado`) IN ({$publicIn}) THEN 1 ELSE 0 END) AS publicos,
               SUM(CASE WHEN TRIM(i.`estado`) IN ({$pendingIn}) THEN 1 ELSE 0 END) AS pendientes,
               SUM(CASE WHEN TRIM(i.`estado`) IN ({$nonPublicIn}) THEN 1 ELSE 0 END) AS no_publicos,
+              SUM(CASE WHEN (i.`destacado` = 'Si' OR i.`marcado_destacado` = 'Si' OR i.`promocion_premium` = 'Si' OR i.`mercado_libre_destacado` = 'Si' OR i.`ciencuadras_destacado` = 'Si' OR i.`ciencuadras_ascendido` = 'Si' OR i.`finca_raiz_silver` = 'Si' OR i.`finca_raiz_gold` = 'Si' OR i.`finca_raiz_black` = 'Si' OR i.`proppit_promocionado` = 'Si') THEN 1 ELSE 0 END) AS destacados,
               COUNT(*) AS total
             FROM `{$table}` i
             WHERE 1=1 {$whereSql}";
 
     $row = $this->db->getRow($sql, $allArgs);
 
-    // Calculate mis_inmuebles count
+    // Calculate mis_inmuebles count & pending requests count
     $myCount = $this->countMyProperties();
+    $solicitudesCount = $this->countPendingRequests();
 
     return [
       'publicos' => (int) ($row['publicos'] ?? 0),
       'pendientes' => (int) ($row['pendientes'] ?? 0),
       'no_publicos' => (int) ($row['no_publicos'] ?? 0),
+      'destacados' => (int) ($row['destacados'] ?? 0),
+      'solicitudes' => $solicitudesCount,
       'mis_inmuebles' => $myCount,
       'total' => (int) ($row['total'] ?? 0),
     ];
@@ -191,6 +235,7 @@ final class CommercialPropertiesRepository
    *   tipos_negocio: array<int,string>,
    *   ciudades: array<int,string>,
    *   barrios: array<int,string>,
+   *   destinaciones: array<int,string>,
    *   estados_no_publicos: array<int,string>,
    *   funcionarios: array<int,array{id:string,name:string}>
    * }
@@ -204,6 +249,7 @@ final class CommercialPropertiesRepository
     $tiposNegocio = $this->db->getCol("SELECT DISTINCT TRIM(tipo_negocio) FROM `{$table}` WHERE tipo_negocio IS NOT NULL AND TRIM(tipo_negocio) <> '' ORDER BY tipo_negocio ASC");
     $ciudades = $this->db->getCol("SELECT DISTINCT TRIM(ciudad) FROM `{$table}` WHERE ciudad IS NOT NULL AND TRIM(ciudad) <> '' ORDER BY ciudad ASC");
     $barrios = $this->db->getCol("SELECT DISTINCT TRIM(barrio) FROM `{$table}` WHERE barrio IS NOT NULL AND TRIM(barrio) <> '' ORDER BY barrio ASC");
+    $destinaciones = $this->db->getCol("SELECT DISTINCT TRIM(destinacion) FROM `{$table}` WHERE destinacion IS NOT NULL AND TRIM(destinacion) <> '' ORDER BY destinacion ASC");
 
     // Officials with assigned properties
     $funcsSql = "SELECT DISTINCT TRIM(i.`id_funcionario`) AS id, 
@@ -230,8 +276,13 @@ final class CommercialPropertiesRepository
       'tipos_negocio' => array_values(array_filter(array_map('strval', $tiposNegocio))),
       'ciudades' => array_values(array_filter(array_map('strval', $ciudades))),
       'barrios' => array_values(array_filter(array_map('strval', $barrios))),
+      'destinaciones' => array_values(array_filter(array_map('strval', $destinaciones))),
       'estados_no_publicos' => self::STATUSES_NON_PUBLIC,
       'funcionarios' => $funcs,
+      'user_quotas' => $this->getUserQuotas(trim(Auth::employeeId())),
+      'all_quotas' => $this->getAllQuotasSummary(),
+      'pending_requests' => $this->getPendingRequests(150),
+      'user_requests' => $this->getUserRequests(trim(Auth::employeeId()), 150),
     ];
   }
 
@@ -320,9 +371,14 @@ final class CommercialPropertiesRepository
       $coverUrl = $galleryUrls[0];
     }
 
+    $propertyCode = (string) ($property['codigo'] ?: $property['_ID']);
     $property['foto_portada_url'] = $coverUrl;
     $property['galeria_urls'] = $galleryUrls;
     $property['amenities_map'] = $this->amenitiesIconMap();
+    $property['active_portals'] = $this->getActivePortalKeys($property);
+    $property['highlight_history'] = $this->getPropertyHighlightHistory($propertyCode);
+    $property['pending_requests'] = $this->getPropertyPendingRequests($propertyCode);
+    $property['user_quotas'] = $this->getUserQuotas(trim(Auth::employeeId()));
 
     return $property;
   }
@@ -485,8 +541,10 @@ final class CommercialPropertiesRepository
         $in = implode(',', array_fill(0, count(self::STATUSES_NON_PUBLIC), '?'));
         $where[] = "TRIM(i.`estado`) IN ({$in})";
         $args = array_merge($args, self::STATUSES_NON_PUBLIC);
+      } elseif ($subtab === 'destacados') {
+        $where[] = "(i.`destacado` = 'Si' OR i.`marcado_destacado` = 'Si' OR i.`promocion_premium` = 'Si' OR i.`mercado_libre_destacado` = 'Si' OR i.`ciencuadras_destacado` = 'Si' OR i.`ciencuadras_ascendido` = 'Si' OR i.`finca_raiz_silver` = 'Si' OR i.`finca_raiz_gold` = 'Si' OR i.`finca_raiz_black` = 'Si' OR i.`proppit_promocionado` = 'Si')";
       }
-      // 'mis_inmuebles' does not restrict by estado, showing all states of the user's properties
+      // 'mis_inmuebles', 'solicitudes', 'cupos' handled separately or without estado restrictions
     }
 
     // Free text search
@@ -538,6 +596,31 @@ final class CommercialPropertiesRepository
       $args[] = $barrio;
     }
 
+    $destinacion = trim((string) ($filters['destinacion'] ?? ''));
+    if ($destinacion !== '') {
+      $where[] = 'TRIM(i.`destinacion`) = ?';
+      $args[] = $destinacion;
+    }
+
+    $destacado = trim((string) ($filters['destacado'] ?? ''));
+    if ($destacado !== '') {
+      if ($destacado === 'destacados' || $destacado === 'Si') {
+        $where[] = "(i.`destacado` = 'Si' OR i.`marcado_destacado` = 'Si' OR i.`promocion_premium` = 'Si' OR i.`mercado_libre_destacado` = 'Si' OR i.`ciencuadras_destacado` = 'Si' OR i.`ciencuadras_ascendido` = 'Si' OR i.`finca_raiz_silver` = 'Si' OR i.`finca_raiz_gold` = 'Si' OR i.`finca_raiz_black` = 'Si' OR i.`proppit_promocionado` = 'Si')";
+      } elseif ($destacado === 'no_destacados' || $destacado === 'No') {
+        $where[] = "(COALESCE(i.`destacado`, 'No') <> 'Si' AND COALESCE(i.`marcado_destacado`, 'No') <> 'Si' AND COALESCE(i.`promocion_premium`, 'No') <> 'Si' AND COALESCE(i.`mercado_libre_destacado`, 'No') <> 'Si' AND COALESCE(i.`ciencuadras_destacado`, 'No') <> 'Si' AND COALESCE(i.`ciencuadras_ascendido`, 'No') <> 'Si' AND COALESCE(i.`finca_raiz_silver`, 'No') <> 'Si' AND COALESCE(i.`finca_raiz_gold`, 'No') <> 'Si' AND COALESCE(i.`finca_raiz_black`, 'No') <> 'Si' AND COALESCE(i.`proppit_promocionado`, 'No') <> 'Si')";
+      } elseif ($destacado === 'premium') {
+        $where[] = "i.`promocion_premium` = 'Si'";
+      } elseif ($destacado === 'portal_mercado_libre') {
+        $where[] = "i.`mercado_libre_destacado` = 'Si'";
+      } elseif ($destacado === 'portal_ciencuadras') {
+        $where[] = "(i.`ciencuadras_destacado` = 'Si' OR i.`ciencuadras_ascendido` = 'Si')";
+      } elseif ($destacado === 'portal_finca_raiz') {
+        $where[] = "(i.`finca_raiz_silver` = 'Si' OR i.`finca_raiz_gold` = 'Si' OR i.`finca_raiz_black` = 'Si')";
+      } elseif ($destacado === 'portal_proppit') {
+        $where[] = "i.`proppit_promocionado` = 'Si'";
+      }
+    }
+
     $estado = trim((string) ($filters['estado'] ?? ''));
     if ($estado !== '') {
       $where[] = 'TRIM(i.`estado`) = ?';
@@ -574,5 +657,393 @@ final class CommercialPropertiesRepository
     }
 
     return ['TRIM(i.`id_funcionario`) = ?', [$employeeId]];
+  }
+
+  /**
+   * Return list of active portal keys for a property.
+   *
+   * @param array<string,mixed> $property
+   * @return array<int,array{key:string,label:string}>
+   */
+  public function getActivePortalKeys(array $property): array
+  {
+    $active = [];
+    foreach (self::PORTALS as $portalKey => $pInfo) {
+      if (trim((string) ($property[$pInfo['property_column']] ?? '')) === 'Si') {
+        $active[] = ['key' => $portalKey, 'label' => $pInfo['label']];
+      }
+    }
+    return $active;
+  }
+
+  /**
+   * Count pending highlight requests.
+   */
+  public function countPendingRequests(): int
+  {
+    $table = $this->db->table('skc_destacado_solicitudes');
+    try {
+      return (int) $this->db->getVar("SELECT COUNT(*) FROM `{$table}` WHERE estado = 'pendiente'");
+    } catch (\Throwable $e) {
+      return 0;
+    }
+  }
+
+  /**
+   * Pending highlight requests joined with property info.
+   *
+   * @return array<int,array<string,mixed>>
+   */
+  public function getPendingRequests(int $limit = 100): array
+  {
+    $requestsTable = $this->db->table('skc_destacado_solicitudes');
+    $inmueblesTable = $this->db->table('jet_cct_inmuebles');
+    $sql = "SELECT s.*, i.`tipo_inmueble`, i.`tipo_negocio`, i.`ciudad`, i.`barrio`, i.`direccion`, i.`estado` AS inmueble_estado, i.`foto_portada`
+              FROM `{$requestsTable}` s
+         LEFT JOIN `{$inmueblesTable}` i ON i.`codigo` = s.`codigo_inmueble`
+             WHERE s.`estado` = 'pendiente'
+          ORDER BY s.`requested_at` ASC, s.`id` ASC
+             LIMIT {$limit}";
+    return $this->db->getResults($sql);
+  }
+
+  /**
+   * Requests made by a specific employee.
+   *
+   * @return array<int,array<string,mixed>>
+   */
+  public function getUserRequests(string $employeeId, int $limit = 100): array
+  {
+    $requestsTable = $this->db->table('skc_destacado_solicitudes');
+    $inmueblesTable = $this->db->table('jet_cct_inmuebles');
+    $sql = "SELECT s.*, i.`tipo_inmueble`, i.`tipo_negocio`, i.`ciudad`, i.`barrio`, i.`direccion`, i.`estado` AS inmueble_estado
+              FROM `{$requestsTable}` s
+         LEFT JOIN `{$inmueblesTable}` i ON i.`codigo` = s.`codigo_inmueble`
+             WHERE s.`solicitado_por_id` = ?
+          ORDER BY s.`requested_at` DESC
+             LIMIT {$limit}";
+    return $this->db->getResults($sql, [$employeeId]);
+  }
+
+  /**
+   * Quotas allocated vs used vs pending for a specific employee.
+   *
+   * @return array<string,array{label:string,assigned:int,used:int,pending:int,available:int}>
+   */
+  public function getUserQuotas(string $employeeId): array
+  {
+    $empty = [];
+    foreach (self::PORTALS as $k => $info) {
+      $empty[$k] = ['label' => $info['label'], 'assigned' => 0, 'used' => 0, 'pending' => 0, 'available' => 0];
+    }
+    if ($employeeId === '') {
+      return $empty;
+    }
+
+    $funcTable = $this->db->table('jet_cct_funcionarios');
+    $inmTable = $this->db->table('jet_cct_inmuebles');
+    $reqTable = $this->db->table('skc_destacado_solicitudes');
+    $cols = implode(', ', array_keys(self::PORTALS));
+    $row = $this->db->getRow("SELECT {$cols} FROM `{$funcTable}` WHERE id_empleado = ? LIMIT 1", [$employeeId]);
+    if (!$row) {
+      return $empty;
+    }
+
+    $res = [];
+    foreach (self::PORTALS as $portalKey => $pInfo) {
+      $assigned = max(0, (int) ($row[$portalKey] ?? 0));
+      $pCol = $pInfo['property_column'];
+      $used = (int) $this->db->getVar("SELECT COUNT(*) FROM `{$inmTable}` WHERE TRIM(id_funcionario) = ? AND `{$pCol}` = 'Si' AND estado = 'Publico'", [$employeeId]);
+      $pending = (int) $this->db->getVar("SELECT COUNT(*) FROM `{$reqTable}` WHERE solicitado_por_id = ? AND portal = ? AND estado = 'pendiente'", [$employeeId, $portalKey]);
+      $available = max(0, $assigned - $used - $pending);
+      $res[$portalKey] = [
+        'label' => $pInfo['label'],
+        'assigned' => $assigned,
+        'used' => $used,
+        'pending' => $pending,
+        'available' => $available,
+      ];
+    }
+    return $res;
+  }
+
+  /**
+   * All active officials and their quota columns.
+   *
+   * @return array<int,array<string,mixed>>
+   */
+  public function getAllQuotasSummary(): array
+  {
+    $funcTable = $this->db->table('jet_cct_funcionarios');
+    $cols = implode(', ', array_keys(self::PORTALS));
+    $sql = "SELECT _ID, id_empleado, nombre, rol, activo, {$cols}
+              FROM `{$funcTable}`
+             WHERE activo = 'Si' AND id_empleado IS NOT NULL AND TRIM(id_empleado) <> ''
+          ORDER BY nombre ASC";
+    return $this->db->getResults($sql);
+  }
+
+  /**
+   * Active pending requests for a specific property.
+   *
+   * @return array<int,array<string,mixed>>
+   */
+  public function getPropertyPendingRequests(string $code): array
+  {
+    if ($code === '') {
+      return [];
+    }
+    $reqTable = $this->db->table('skc_destacado_solicitudes');
+    return $this->db->getResults("SELECT * FROM `{$reqTable}` WHERE codigo_inmueble = ? AND estado = 'pendiente' ORDER BY requested_at DESC", [$code]);
+  }
+
+  /**
+   * Property highlight history from wp_jet_cct_inmuebles_destacados.
+   *
+   * @return array<int,array<string,mixed>>
+   */
+  public function getPropertyHighlightHistory(string $code): array
+  {
+    if ($code === '') {
+      return [];
+    }
+    $histTable = $this->db->table('jet_cct_inmuebles_destacados');
+    return $this->db->getResults("SELECT * FROM `{$histTable}` WHERE id_inmueble = ? ORDER BY _ID DESC LIMIT 20", [$code]);
+  }
+
+  /**
+   * Request property highlight in a portal.
+   *
+   * @return array{ok:bool,message:string}
+   */
+  public function requestHighlight(string $code, string $portal, string $reason, string $oportunidad, string $negociable, string $employeeId, string $employeeName): array
+  {
+    if (!isset(self::PORTALS[$portal])) {
+      return ['ok' => false, 'message' => 'Portal no válido.'];
+    }
+    if ($code === '' || $reason === '') {
+      return ['ok' => false, 'message' => 'Complete el inmueble, portal y motivo.'];
+    }
+
+    $inmTable = $this->db->table('jet_cct_inmuebles');
+    $reqTable = $this->db->table('skc_destacado_solicitudes');
+
+    $pCol = self::PORTALS[$portal]['property_column'];
+    $prop = $this->db->getRow("SELECT _ID, codigo, estado, `{$pCol}` FROM `{$inmTable}` WHERE codigo = ? OR _ID = ? LIMIT 1", [$code, is_numeric($code) ? (int) $code : 0]);
+    if (!$prop) {
+      return ['ok' => false, 'message' => 'Inmueble no encontrado.'];
+    }
+    if (trim((string) ($prop[$pCol] ?? '')) === 'Si') {
+      return ['ok' => false, 'message' => 'El inmueble ya se encuentra destacado en ' . self::PORTALS[$portal]['label'] . '.'];
+    }
+
+    $active = $this->db->getVar("SELECT COUNT(*) FROM `{$reqTable}` WHERE codigo_inmueble = ? AND portal = ? AND estado = 'pendiente'", [$code, $portal]);
+    if ((int) $active > 0) {
+      return ['ok' => false, 'message' => 'Ya existe una solicitud pendiente para este portal.'];
+    }
+
+    $now = date('Y-m-d H:i:s');
+    $this->db->query("INSERT INTO `{$reqTable}` (codigo_inmueble, inmueble_id, portal, razon, oportunidad, negociable, estado, solicitado_por_id, solicitado_por_nombre, quota_consumida, requested_at)
+      VALUES (?, ?, ?, ?, ?, ?, 'pendiente', ?, ?, 'No', ?)", [
+      (string) ($prop['codigo'] ?: $prop['_ID']),
+      (int) $prop['_ID'],
+      $portal,
+      $reason,
+      $oportunidad === 'Si' ? 'Si' : 'No',
+      $negociable === 'Si' ? 'Si' : 'No',
+      $employeeId,
+      $employeeName,
+      $now,
+    ]);
+
+    $this->db->query("UPDATE `{$inmTable}` SET marcado_destacado = 'Si', fecha_destacado = ? WHERE _ID = ?", [time(), $prop['_ID']]);
+
+    return ['ok' => true, 'message' => 'Solicitud de destacado para ' . self::PORTALS[$portal]['label'] . ' enviada con éxito.'];
+  }
+
+  /**
+   * Complete/approve a highlight request.
+   *
+   * @return array{ok:bool,message:string}
+   */
+  public function completeHighlightRequest(int $requestId, string $employeeId, string $employeeName): array
+  {
+    $reqTable = $this->db->table('skc_destacado_solicitudes');
+    $inmTable = $this->db->table('jet_cct_inmuebles');
+    $histTable = $this->db->table('jet_cct_inmuebles_destacados');
+    $opsHistTable = $this->db->table('jet_cct_historial_del_inmueble');
+
+    $req = $this->db->getRow("SELECT * FROM `{$reqTable}` WHERE id = ? AND estado = 'pendiente' LIMIT 1", [$requestId]);
+    if (!$req) {
+      return ['ok' => false, 'message' => 'La solicitud no existe o ya no está pendiente.'];
+    }
+
+    $portal = (string) ($req['portal'] ?? '');
+    if (!isset(self::PORTALS[$portal])) {
+      return ['ok' => false, 'message' => 'Portal inválido.'];
+    }
+    $portalInfo = self::PORTALS[$portal];
+    $code = (string) $req['codigo_inmueble'];
+
+    $prop = $this->db->getRow("SELECT _ID, codigo FROM `{$inmTable}` WHERE codigo = ? OR _ID = ? LIMIT 1", [$code, is_numeric($code) ? (int) $code : 0]);
+    if (!$prop) {
+      return ['ok' => false, 'message' => 'Inmueble asociado no encontrado.'];
+    }
+
+    $now = time();
+    $propId = (int) $prop['_ID'];
+    $propCode = (string) ($prop['codigo'] ?: $prop['_ID']);
+
+    // Update request
+    $this->db->query("UPDATE `{$reqTable}` SET estado = 'destacado', completado_por_id = ?, completado_por_nombre = ?, completed_at = NOW() WHERE id = ?", [
+      $employeeId,
+      $employeeName,
+      $requestId,
+    ]);
+
+    // Update property
+    $this->db->query("UPDATE `{$inmTable}` SET fecha_destacado = ?, oportunidad = ?, negociable = ?, destacado = 'Si', `{$portalInfo['property_column']}` = 'Si' WHERE _ID = ?", [
+      $now,
+      (string) ($req['oportunidad'] ?? 'No'),
+      (string) ($req['negociable'] ?? 'No'),
+      $propId,
+    ]);
+
+    // Check if remaining pending requests
+    $remPending = (int) $this->db->getVar("SELECT COUNT(*) FROM `{$reqTable}` WHERE codigo_inmueble = ? AND estado = 'pendiente'", [$propCode]);
+    if ($remPending === 0) {
+      $this->db->query("UPDATE `{$inmTable}` SET marcado_destacado = 'No' WHERE _ID = ?", [$propId]);
+    }
+
+    // Insert history in wp_jet_cct_inmuebles_destacados
+    $veces = (int) $this->db->getVar("SELECT MAX(CAST(veces_destacado AS UNSIGNED)) FROM `{$histTable}` WHERE id_inmueble = ?", [$propCode]) + 1;
+    $this->db->query("INSERT INTO `{$histTable}` (fecha, id_inmueble, id_empleado, empleado, cct_author_id, cct_created, observacion_destacado, veces_destacado, oportunidad, negociable, `{$portalInfo['history_column']}`)
+      VALUES (?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?, 'Si')", [
+      $now,
+      $propCode,
+      (string) ($req['solicitado_por_id'] ?? $employeeId),
+      (string) ($req['solicitado_por_nombre'] ?? $employeeName),
+      (int) ($employeeId ?: 1),
+      (string) ($req['razon'] ?? 'Destacado'),
+      $veces,
+      (string) ($req['oportunidad'] ?? 'No'),
+      (string) ($req['negociable'] ?? 'No'),
+    ]);
+
+    // Insert into operational history
+    $this->db->query("INSERT INTO `{$opsHistTable}` (fecha, id_inmueble, id_empleado, funcionario, tipo_reporte, observacion, cct_author_id, cct_created, cct_modified)
+      VALUES (?, ?, ?, ?, 'Destacado', ?, ?, NOW(), NOW())", [
+      $now,
+      $propCode,
+      $employeeId,
+      $employeeName,
+      'Se activó el destacado en ' . $portalInfo['label'] . '. Razón: ' . ($req['razon'] ?? 'Aprobado'),
+      (int) ($employeeId ?: 1),
+    ]);
+
+    return ['ok' => true, 'message' => 'Solicitud completada y destacado activado en ' . $portalInfo['label'] . '.'];
+  }
+
+  /**
+   * Release highlight for a property and portal.
+   *
+   * @return array{ok:bool,message:string}
+   */
+  public function releaseHighlight(string $code, string $portal, string $employeeId, string $employeeName): array
+  {
+    if (!isset(self::PORTALS[$portal])) {
+      return ['ok' => false, 'message' => 'Portal no válido.'];
+    }
+    $portalInfo = self::PORTALS[$portal];
+    $inmTable = $this->db->table('jet_cct_inmuebles');
+    $opsHistTable = $this->db->table('jet_cct_historial_del_inmueble');
+
+    $prop = $this->db->getRow("SELECT * FROM `{$inmTable}` WHERE codigo = ? OR _ID = ? LIMIT 1", [$code, is_numeric($code) ? (int) $code : 0]);
+    if (!$prop) {
+      return ['ok' => false, 'message' => 'Inmueble no encontrado.'];
+    }
+
+    $propId = (int) $prop['_ID'];
+    $propCode = (string) ($prop['codigo'] ?: $prop['_ID']);
+
+    // Check if other portals remain active
+    $remaining = false;
+    foreach (self::PORTALS as $k => $info) {
+      if ($k !== $portal && trim((string) ($prop[$info['property_column']] ?? '')) === 'Si') {
+        $remaining = true;
+        break;
+      }
+    }
+
+    $now = time();
+    $this->db->query("UPDATE `{$inmTable}` SET `{$portalInfo['property_column']}` = 'No', destacado = ? WHERE _ID = ?", [
+      $remaining ? 'Si' : 'No',
+      $propId,
+    ]);
+
+    // Insert into operational history
+    $this->db->query("INSERT INTO `{$opsHistTable}` (fecha, id_inmueble, id_empleado, funcionario, tipo_reporte, observacion, cct_author_id, cct_created, cct_modified)
+      VALUES (?, ?, ?, ?, 'Destacado', ?, ?, NOW(), NOW())", [
+      $now,
+      $propCode,
+      $employeeId,
+      $employeeName,
+      'Se liberó el cupo de destacado de ' . $portalInfo['label'] . ($remaining ? '. Los demás portales permanecen activos.' : '.'),
+      (int) ($employeeId ?: 1),
+    ]);
+
+    return ['ok' => true, 'message' => 'Cupo de ' . $portalInfo['label'] . ' liberado correctamente.'];
+  }
+
+  /**
+   * Toggle Promoción Premium for property and sync with WordPress post meta.
+   *
+   * @return array{ok:bool,message:string}
+   */
+  public function togglePremium(string $code, string $value, string $employeeId, string $employeeName): array
+  {
+    $value = $value === 'Si' ? 'Si' : 'No';
+    $inmTable = $this->db->table('jet_cct_inmuebles');
+    $postmetaTable = $this->db->table('postmeta');
+    $opsHistTable = $this->db->table('jet_cct_historial_del_inmueble');
+
+    $prop = $this->db->getRow("SELECT _ID, codigo, estado, estrato, promocion_premium FROM `{$inmTable}` WHERE codigo = ? OR _ID = ? LIMIT 1", [$code, is_numeric($code) ? (int) $code : 0]);
+    if (!$prop) {
+      return ['ok' => false, 'message' => 'Inmueble no encontrado.'];
+    }
+
+    $propId = (int) $prop['_ID'];
+    $propCode = (string) ($prop['codigo'] ?: $prop['_ID']);
+
+    $this->db->query("UPDATE `{$inmTable}` SET promocion_premium = ? WHERE _ID = ?", [$value, $propId]);
+
+    // Sync with WordPress postmeta
+    if (is_numeric($propCode)) {
+      $postId = (int) $propCode;
+      $metaId = (int) $this->db->getVar("SELECT meta_id FROM `{$postmetaTable}` WHERE post_id = ? AND meta_key = 'inmueble-premium' LIMIT 1", [$postId]);
+      if ($metaId > 0) {
+        $this->db->query("UPDATE `{$postmetaTable}` SET meta_value = ? WHERE meta_id = ?", [$value, $metaId]);
+      } else {
+        $this->db->query("INSERT INTO `{$postmetaTable}` (post_id, meta_key, meta_value) VALUES (?, 'inmueble-premium', ?)", [$postId, $value]);
+      }
+    }
+
+    // Insert into operational history
+    $obs = $value === 'Si' ? 'El inmueble fue marcado para Promoción Premium.' : 'El inmueble fue retirado de Promoción Premium.';
+    $this->db->query("INSERT INTO `{$opsHistTable}` (fecha, id_inmueble, id_empleado, funcionario, tipo_reporte, observacion, cct_author_id, cct_created, cct_modified)
+      VALUES (?, ?, ?, ?, 'Promoción premium', ?, ?, NOW(), NOW())", [
+      time(),
+      $propCode,
+      $employeeId,
+      $employeeName,
+      $obs,
+      (int) ($employeeId ?: 1),
+    ]);
+
+    return [
+      'ok' => true,
+      'is_premium' => $value === 'Si',
+      'message' => $value === 'Si' ? 'Inmueble marcado como Promoción Premium.' : 'Inmueble retirado de Promoción Premium.',
+    ];
   }
 }

@@ -979,6 +979,26 @@
     });
   }
 
+  function openPropertyDetail(propCode) {
+    if (!propCode) return;
+    var propModal = document.getElementById("commercial-property-detail-modal");
+    var propContainer = propModal && propModal.querySelector("[data-commercial-property-detail-container]");
+    if (propModal && propContainer) {
+      propContainer.innerHTML = '<div class="flex items-center justify-center py-28 text-slate-500 gap-3"><span class="w-3 h-3 rounded-full bg-[#1E3C76] animate-ping"></span><p class="font-body-md text-sm font-medium">Cargando información del inmueble…</p></div>';
+      setStandaloneModal(propModal, true);
+      request("commercial_property_detail", { codigo: propCode })
+        .then(function (res) {
+          if (res && res.html) {
+            propContainer.innerHTML = res.html;
+          }
+        })
+        .catch(function (err) {
+          notify("error", (err && err.message) || "Error al cargar la ficha del inmueble.");
+          setStandaloneModal(propModal, false);
+        });
+    }
+  }
+
   root.addEventListener("click", function (event) {
     var tab = event.target.closest("[data-commercial-tab]");
     var filterLink = event.target.closest("[data-commercial-filter-link]");
@@ -1074,28 +1094,131 @@
     if (propertyDetailBtn) {
       event.preventDefault();
       var propCode = propertyDetailBtn.getAttribute("data-commercial-property-detail") || "";
-      var propModal = document.getElementById("commercial-property-detail-modal");
-      var propContainer = propModal && propModal.querySelector("[data-commercial-property-detail-container]");
-      if (propModal && propContainer) {
-        propContainer.innerHTML = '<div class="flex items-center justify-center py-28 text-slate-500 gap-3"><span class="w-3 h-3 rounded-full bg-[#1E3C76] animate-ping"></span><p class="font-body-md text-sm font-medium">Cargando información del inmueble…</p></div>';
-        setStandaloneModal(propModal, true);
-        request("commercial_property_detail", { codigo: propCode })
-          .then(function (res) {
-            if (res && res.html) {
-              propContainer.innerHTML = res.html;
-            }
-          })
-          .catch(function (err) {
-            notify("error", err.message || "Error al cargar la ficha del inmueble.");
-            setStandaloneModal(propModal, false);
-          });
-      }
+      openPropertyDetail(propCode);
       return;
     }
     var closePropDetail = event.target.closest("[data-commercial-close-property-detail]");
     if (closePropDetail) {
       event.preventDefault();
       setStandaloneModal(document.getElementById("commercial-property-detail-modal"), false);
+      return;
+    }
+    var videoPoster = event.target.closest("[data-sicv-video-open]");
+    if (videoPoster) {
+      event.preventDefault();
+      var embedUrl = videoPoster.getAttribute("data-embed") || "";
+      var videoFrame = videoPoster.closest(".sicv-video__frame");
+      if (embedUrl && videoFrame) {
+        var vIframe = document.createElement("iframe");
+        vIframe.src = embedUrl;
+        vIframe.title = "Video del inmueble";
+        vIframe.className = "w-full h-full border-0 rounded-2xl";
+        vIframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
+        vIframe.allowFullscreen = true;
+        videoFrame.replaceChildren(vIframe);
+        vIframe.focus();
+      }
+      return;
+    }
+    var releaseBtn = event.target.closest("[data-commercial-release-highlight]");
+    if (releaseBtn) {
+      event.preventDefault();
+      var rCode = releaseBtn.getAttribute("data-code") || "";
+      var rPortal = releaseBtn.getAttribute("data-portal") || "";
+      if (!rCode || !rPortal) return;
+      var confirmRelease = function () {
+        request("commercial_highlight_release", { codigo: rCode, portal: rPortal })
+          .then(function (res) {
+            notify("success", (res && res.message) || "Cupo liberado exitosamente.");
+            var propModal = document.getElementById("commercial-property-detail-modal");
+            if (propModal && propModal.classList.contains("open")) {
+              openPropertyDetail(rCode);
+            } else {
+              window.location.reload();
+            }
+          })
+          .catch(function (err) {
+            notify("error", (err && err.message) || "Error al liberar el cupo.");
+          });
+      };
+      if (window.Swal) {
+        Swal.fire({
+          title: "¿Liberar cupo?",
+          text: "El inmueble #" + rCode + " dejará de estar destacado en el portal seleccionado.",
+          icon: "warning",
+          showCancelButton: true,
+          confirmButtonText: "Sí, liberar",
+          cancelButtonText: "Cancelar"
+        }).then(function (result) {
+          if (result.isConfirmed) confirmRelease();
+        });
+      } else if (confirm("¿Liberar cupo para el inmueble #" + rCode + "?")) {
+        confirmRelease();
+      }
+      return;
+    }
+    var completeBtn = event.target.closest("[data-commercial-complete-highlight]");
+    if (completeBtn) {
+      event.preventDefault();
+      var reqId = completeBtn.getAttribute("data-commercial-complete-highlight") || "";
+      if (!reqId) return;
+      var confirmComplete = function () {
+        request("commercial_highlight_complete", { request_id: reqId })
+          .then(function (res) {
+            notify("success", (res && res.message) || "Solicitud completada. El inmueble ha sido marcado como destacado.");
+            window.location.reload();
+          })
+          .catch(function (err) {
+            notify("error", (err && err.message) || "Error al procesar la solicitud.");
+          });
+      };
+      if (window.Swal) {
+        Swal.fire({
+          title: "¿Marcar como destacado?",
+          text: "Se aplicará la solicitud y se actualizará el cupo del funcionario.",
+          icon: "question",
+          showCancelButton: true,
+          confirmButtonText: "Sí, destacar",
+          cancelButtonText: "Cancelar"
+        }).then(function (result) {
+          if (result.isConfirmed) confirmComplete();
+        });
+      } else if (confirm("¿Aprobar solicitud y destacar inmueble?")) {
+        confirmComplete();
+      }
+      return;
+    }
+    var premBtn = event.target.closest("[data-commercial-toggle-premium]");
+    if (premBtn) {
+      event.preventDefault();
+      var pCode = premBtn.getAttribute("data-code") || "";
+      var curVal = premBtn.getAttribute("data-current") || "No";
+      var newVal = curVal === "Si" ? "No" : "Si";
+      if (!pCode) return;
+      var confirmToggle = function () {
+        request("commercial_highlight_toggle_premium", { codigo: pCode, value: newVal })
+          .then(function (res) {
+            notify("success", (res && res.message) || "Promoción Premium actualizada.");
+            openPropertyDetail(pCode);
+          })
+          .catch(function (err) {
+            notify("error", (err && err.message) || "Error al modificar Promoción Premium.");
+          });
+      };
+      if (window.Swal) {
+        Swal.fire({
+          title: (newVal === "Si" ? "Activar" : "Desactivar") + " Promoción Premium",
+          text: "¿Deseas " + (newVal === "Si" ? "activar" : "desactivar") + " Promoción Premium para el inmueble #" + pCode + "?",
+          icon: "question",
+          showCancelButton: true,
+          confirmButtonText: "Confirmar",
+          cancelButtonText: "Cancelar"
+        }).then(function (result) {
+          if (result.isConfirmed) confirmToggle();
+        });
+      } else if (confirm("¿" + (newVal === "Si" ? "Activar" : "Desactivar") + " Promoción Premium para #" + pCode + "?")) {
+        confirmToggle();
+      }
       return;
     }
     var galleryThumb = event.target.closest("[data-commercial-gallery-thumb]");
@@ -1267,6 +1390,40 @@
   });
 
   root.addEventListener("submit", function (event) {
+    var highlightForm = event.target.closest("[data-commercial-highlight-form]");
+    if (highlightForm) {
+      event.preventDefault();
+      var hData = new FormData(highlightForm);
+      var propCode = hData.get("codigo") || "";
+      var portalVal = hData.get("portal") || "";
+      var razonVal = hData.get("razon") || "";
+      var opVal = hData.get("oportunidad") || "No";
+      var negVal = hData.get("negociable") || "No";
+      if (!portalVal || !razonVal) {
+        notify("error", "Por favor selecciona el portal y la razón.");
+        return;
+      }
+      var submitBtn = highlightForm.querySelector('button[type="submit"]');
+      if (submitBtn) submitBtn.disabled = true;
+      request("commercial_highlight_request", {
+        codigo: propCode,
+        portal: portalVal,
+        razon: razonVal,
+        oportunidad: opVal,
+        negociable: negVal
+      })
+        .then(function (res) {
+          notify("success", (res && res.message) || "Solicitud de destacado enviada con éxito.");
+          if (propCode) openPropertyDetail(propCode);
+        })
+        .catch(function (err) {
+          notify("error", (err && err.message) || "No se pudo enviar la solicitud de destacado.");
+        })
+        .finally(function () {
+          if (submitBtn) submitBtn.disabled = false;
+        });
+      return;
+    }
     var propertyControlForm = event.target.closest("[data-commercial-property-control]");
     if (propertyControlForm) {
       event.preventDefault();

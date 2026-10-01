@@ -152,7 +152,7 @@ final class CommercialDashboardController
     if ($subtab === '' && isset($input['subtab'])) {
       $subtab = $clean('subtab');
     }
-    if (!in_array($subtab, ['publicos', 'pendientes', 'no_publicos', 'mis_inmuebles'], true)) {
+    if (!in_array($subtab, ['publicos', 'pendientes', 'no_publicos', 'mis_inmuebles', 'destacados', 'solicitudes', 'cupos'], true)) {
       $subtab = $isNonAdmin ? 'mis_inmuebles' : 'publicos';
     }
 
@@ -163,6 +163,8 @@ final class CommercialDashboardController
       'tipo_negocio' => $clean('tipo_negocio'),
       'ciudad' => $clean('ciudad'),
       'barrio' => $clean('barrio'),
+      'destinacion' => $clean('destinacion'),
+      'destacado' => $clean('destacado'),
       'estado' => $clean('estado'),
       'id_funcionario' => $clean('id_funcionario'),
       'page' => max(1, (int) ($input['page'] ?? 1)),

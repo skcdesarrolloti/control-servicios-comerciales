@@ -716,6 +716,93 @@ final class CommercialApiController
     ]);
   }
 
+  /** @param array<string,mixed> $input */
+  public function requestHighlight(array $input): never
+  {
+    $this->verify($input);
+    $code = trim((string) ($input['codigo'] ?? ''));
+    $portal = trim((string) ($input['portal'] ?? ''));
+    $reason = trim((string) ($input['razon'] ?? $input['observacion_destacado'] ?? ''));
+    $oportunidad = trim((string) ($input['oportunidad'] ?? 'No'));
+    $negociable = trim((string) ($input['negociable'] ?? 'No'));
+
+    $user = Auth::user();
+    $employeeId = trim((string) ($user['id_empleado'] ?? ''));
+    $employeeName = trim((string) ($user['nombre'] ?? 'Funcionario'));
+
+    $repo = new CommercialPropertiesRepository($this->db);
+    $res = $repo->requestHighlight($code, $portal, $reason, $oportunidad, $negociable, $employeeId, $employeeName);
+    if (!($res['ok'] ?? false)) {
+      JsonResponse::error($res['message'] ?? 'No se pudo procesar la solicitud.', 422);
+    }
+    JsonResponse::ok($res);
+  }
+
+  /** @param array<string,mixed> $input */
+  public function completeHighlight(array $input): never
+  {
+    $this->verify($input);
+    if (!$this->policy->canManage()) {
+      JsonResponse::error('No tienes permisos administrativos para completar solicitudes de destacados.', 403);
+    }
+    $requestId = (int) ($input['request_id'] ?? 0);
+    if ($requestId <= 0) {
+      JsonResponse::error('ID de solicitud inválido.', 400);
+    }
+
+    $user = Auth::user();
+    $employeeId = trim((string) ($user['id_empleado'] ?? ''));
+    $employeeName = trim((string) ($user['nombre'] ?? 'Administrador'));
+
+    $repo = new CommercialPropertiesRepository($this->db);
+    $res = $repo->completeHighlightRequest($requestId, $employeeId, $employeeName);
+    if (!($res['ok'] ?? false)) {
+      JsonResponse::error($res['message'] ?? 'No se pudo completar la solicitud.', 422);
+    }
+    JsonResponse::ok($res);
+  }
+
+  /** @param array<string,mixed> $input */
+  public function releaseHighlight(array $input): never
+  {
+    $this->verify($input);
+    $code = trim((string) ($input['codigo'] ?? ''));
+    $portal = trim((string) ($input['portal'] ?? ''));
+
+    $user = Auth::user();
+    $employeeId = trim((string) ($user['id_empleado'] ?? ''));
+    $employeeName = trim((string) ($user['nombre'] ?? 'Funcionario'));
+
+    $repo = new CommercialPropertiesRepository($this->db);
+    $res = $repo->releaseHighlight($code, $portal, $employeeId, $employeeName);
+    if (!($res['ok'] ?? false)) {
+      JsonResponse::error($res['message'] ?? 'No se pudo liberar el cupo.', 422);
+    }
+    JsonResponse::ok($res);
+  }
+
+  /** @param array<string,mixed> $input */
+  public function togglePremium(array $input): never
+  {
+    $this->verify($input);
+    if (!$this->policy->canManage()) {
+      JsonResponse::error('Solo administradores pueden modificar el estado Premium.', 403);
+    }
+    $code = trim((string) ($input['codigo'] ?? ''));
+    $value = trim((string) ($input['value'] ?? 'No'));
+
+    $user = Auth::user();
+    $employeeId = trim((string) ($user['id_empleado'] ?? ''));
+    $employeeName = trim((string) ($user['nombre'] ?? 'Administrador'));
+
+    $repo = new CommercialPropertiesRepository($this->db);
+    $res = $repo->togglePremium($code, $value, $employeeId, $employeeName);
+    if (!($res['ok'] ?? false)) {
+      JsonResponse::error($res['message'] ?? 'No se pudo actualizar Premium.', 422);
+    }
+    JsonResponse::ok($res);
+  }
+
   /** @param array<string,mixed> $input @return array<string,mixed> */
   private function propertyFilters(array $input, bool $isNonAdmin): array
   {
@@ -724,7 +811,7 @@ final class CommercialApiController
     if ($subtab === '' && isset($input['subtab'])) {
       $subtab = $clean('subtab');
     }
-    if (!in_array($subtab, ['publicos', 'pendientes', 'no_publicos', 'mis_inmuebles'], true)) {
+    if (!in_array($subtab, ['publicos', 'pendientes', 'no_publicos', 'mis_inmuebles', 'destacados', 'solicitudes', 'cupos'], true)) {
       $subtab = $isNonAdmin ? 'mis_inmuebles' : 'publicos';
     }
 
@@ -735,6 +822,8 @@ final class CommercialApiController
       'tipo_negocio' => $clean('tipo_negocio'),
       'ciudad' => $clean('ciudad'),
       'barrio' => $clean('barrio'),
+      'destinacion' => $clean('destinacion'),
+      'destacado' => $clean('destacado'),
       'estado' => $clean('estado'),
       'id_funcionario' => $clean('id_funcionario'),
       'page' => max(1, (int) ($input['page'] ?? 1)),
