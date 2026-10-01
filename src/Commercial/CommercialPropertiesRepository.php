@@ -280,8 +280,6 @@ final class CommercialPropertiesRepository
       'estados_no_publicos' => self::STATUSES_NON_PUBLIC,
       'funcionarios' => $funcs,
       'user_quotas' => $this->getUserQuotas(trim(Auth::employeeId())),
-      'all_quotas' => $this->getAllQuotasSummary(),
-      'pending_requests' => $this->getPendingRequests(150),
       'user_requests' => $this->getUserRequests(trim(Auth::employeeId()), 150),
     ];
   }

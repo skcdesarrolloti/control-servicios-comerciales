@@ -1157,70 +1157,7 @@
       }
       return;
     }
-    var completeBtn = event.target.closest("[data-commercial-complete-highlight]");
-    if (completeBtn) {
-      event.preventDefault();
-      var reqId = completeBtn.getAttribute("data-commercial-complete-highlight") || "";
-      if (!reqId) return;
-      var confirmComplete = function () {
-        request("commercial_highlight_complete", { request_id: reqId })
-          .then(function (res) {
-            notify("success", (res && res.message) || "Solicitud completada. El inmueble ha sido marcado como destacado.");
-            window.location.reload();
-          })
-          .catch(function (err) {
-            notify("error", (err && err.message) || "Error al procesar la solicitud.");
-          });
-      };
-      if (window.Swal) {
-        Swal.fire({
-          title: "¿Marcar como destacado?",
-          text: "Se aplicará la solicitud y se actualizará el cupo del funcionario.",
-          icon: "question",
-          showCancelButton: true,
-          confirmButtonText: "Sí, destacar",
-          cancelButtonText: "Cancelar"
-        }).then(function (result) {
-          if (result.isConfirmed) confirmComplete();
-        });
-      } else if (confirm("¿Aprobar solicitud y destacar inmueble?")) {
-        confirmComplete();
-      }
-      return;
-    }
-    var premBtn = event.target.closest("[data-commercial-toggle-premium]");
-    if (premBtn) {
-      event.preventDefault();
-      var pCode = premBtn.getAttribute("data-code") || "";
-      var curVal = premBtn.getAttribute("data-current") || "No";
-      var newVal = curVal === "Si" ? "No" : "Si";
-      if (!pCode) return;
-      var confirmToggle = function () {
-        request("commercial_highlight_toggle_premium", { codigo: pCode, value: newVal })
-          .then(function (res) {
-            notify("success", (res && res.message) || "Promoción Premium actualizada.");
-            openPropertyDetail(pCode);
-          })
-          .catch(function (err) {
-            notify("error", (err && err.message) || "Error al modificar Promoción Premium.");
-          });
-      };
-      if (window.Swal) {
-        Swal.fire({
-          title: (newVal === "Si" ? "Activar" : "Desactivar") + " Promoción Premium",
-          text: "¿Deseas " + (newVal === "Si" ? "activar" : "desactivar") + " Promoción Premium para el inmueble #" + pCode + "?",
-          icon: "question",
-          showCancelButton: true,
-          confirmButtonText: "Confirmar",
-          cancelButtonText: "Cancelar"
-        }).then(function (result) {
-          if (result.isConfirmed) confirmToggle();
-        });
-      } else if (confirm("¿" + (newVal === "Si" ? "Activar" : "Desactivar") + " Promoción Premium para #" + pCode + "?")) {
-        confirmToggle();
-      }
-      return;
-    }
+
     var galleryThumb = event.target.closest("[data-commercial-gallery-thumb]");
     if (galleryThumb) {
       event.preventDefault();
