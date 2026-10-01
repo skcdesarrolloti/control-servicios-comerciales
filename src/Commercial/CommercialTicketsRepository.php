@@ -1267,7 +1267,7 @@ final class CommercialTicketsRepository
       'punto_referencia' => trim((string) ($row['punto_referencia'] ?? '')),
       'maps_url' => trim((string) ($row['ubicacion_google_maps'] ?? '')),
       'celular_funcionario' => trim((string) ($row['fcel'] ?? '')),
-      'property_url' => $code !== '' ? 'https://sucasainmobiliaria.com.co/inmuebles/inmueble/' . rawurlencode($code) : '',
+      'property_url' => $code !== '' ? 'https://sucasainmobiliaria.com.co/inmuebles/inmueble-' . rawurlencode($code) : '',
       'url_actualizar' => $this->propertyUpdateUrl($row),
       'url_despublicar' => $this->propertyUnpublishUrl($row),
       'detalle' => [

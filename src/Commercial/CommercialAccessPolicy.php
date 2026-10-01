@@ -12,14 +12,14 @@ final class CommercialAccessPolicy
 {
   public const VIEWS = [
     'inicio' => 'Inicio',
-    'actualizaciones' => 'Actualizaciones de inmuebles',
-    'avisos' => 'Avisos en fachada',
+    'calendario' => 'Calendario comercial',
+    'inmuebles' => 'Inmuebles',
     'abiertos' => 'Tareas abiertas',
     'postergados' => 'Tareas postergadas',
     'cerrados' => 'Tareas cerradas',
     'mis_tickets' => 'Mis tareas',
-    'calendario' => 'Calendario comercial',
-    'inmuebles' => 'Inmuebles',
+    'actualizaciones' => 'Actualizaciones de inmuebles',
+    'avisos' => 'Avisos en fachada',
   ];
 
   public const ACTIONS = [

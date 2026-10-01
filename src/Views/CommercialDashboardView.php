@@ -725,6 +725,82 @@ final class CommercialDashboardView
         </a>
       <?php endif; ?>
 
+      <!-- Dropdown Calendario Comercial (Mi calendario, Calendario equipo, Vencimientos) -->
+      <?php if (in_array('calendario', $views, true)): ?>
+        <div class="relative group/nav" data-commercial-dropdown="calendario">
+          <button type="button" class="flex items-center gap-space-xs px-space-md py-space-xs font-label-md text-label-md <?php echo $bucket === 'calendario' ? ($activeClasses . ' active') : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-tab="calendario" data-commercial-dropdown-trigger="calendario" aria-expanded="false">
+            <span class="material-symbols-outlined text-[16px]">calendar_month</span>
+            <span>Calendario</span>
+            <span class="material-symbols-outlined text-[16px] group-hover/nav:rotate-180 transition-transform">expand_more</span>
+          </button>
+          <div class="absolute left-0 top-full hidden group-hover/nav:block bg-surface-container-lowest shadow-[0_12px_32px_rgba(0,0,0,0.14)] rounded-2xl py-space-xs min-w-[240px] z-50 border border-outline-variant/30 text-on-surface" data-commercial-dropdown-menu="calendario">
+            <a class="flex items-center gap-2.5 px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="calendario" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'calendario', 'subtab' => 'mine'])); ?>">
+              <span class="material-symbols-outlined text-[18px] text-primary">calendar_today</span>
+              <div>
+                <span class="block font-semibold text-on-surface">Mi calendario</span>
+                <span class="block text-[11px] text-secondary">Agenda personal operativa</span>
+              </div>
+            </a>
+            <a class="flex items-center gap-2.5 px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="calendario" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'calendario', 'subtab' => 'team'])); ?>">
+              <span class="material-symbols-outlined text-[18px] text-secondary">groups</span>
+              <div>
+                <span class="block font-semibold text-on-surface">Calendario equipo</span>
+                <span class="block text-[11px] text-secondary">Disponibilidad de consultores</span>
+              </div>
+            </a>
+            <a class="flex items-center gap-2.5 px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="calendario" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'calendario', 'subtab' => 'due'])); ?>">
+              <span class="material-symbols-outlined text-[18px] text-error">schedule</span>
+              <div>
+                <span class="block font-semibold text-on-surface">Vencimientos</span>
+                <span class="block text-[11px] text-secondary">Control mensual de atrasos</span>
+              </div>
+            </a>
+          </div>
+        </div>
+      <?php endif; ?>
+
+      <!-- Dropdown Inmuebles (Públicos, Pendientes por publicar, No públicos, Mis inmuebles) -->
+      <?php if (in_array('inmuebles', $views, true)): ?>
+        <div class="relative group/nav" data-commercial-dropdown="inmuebles">
+          <button type="button" class="flex items-center gap-space-xs px-space-md py-space-xs font-label-md text-label-md <?php echo $bucket === 'inmuebles' ? ($activeClasses . ' active') : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-tab="inmuebles" data-commercial-dropdown-trigger="inmuebles" aria-expanded="false">
+            <span class="material-symbols-outlined text-[16px]">domain</span>
+            <span>Inmuebles</span>
+            <span class="material-symbols-outlined text-[16px] group-hover/nav:rotate-180 transition-transform">expand_more</span>
+          </button>
+          <div class="absolute left-0 top-full hidden group-hover/nav:block bg-surface-container-lowest shadow-[0_12px_32px_rgba(0,0,0,0.14)] rounded-2xl py-space-xs min-w-[260px] z-50 border border-outline-variant/30 text-on-surface" data-commercial-dropdown-menu="inmuebles">
+            <a class="flex items-center justify-between px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="inmuebles" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'inmuebles', 'property_subtab' => 'publicos'])); ?>">
+              <span class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-[18px] text-emerald-600">public</span>
+                <span>Inmuebles públicos</span>
+              </span>
+              <span class="font-label-sm text-[11px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-semibold">Portal</span>
+            </a>
+            <a class="flex items-center justify-between px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="inmuebles" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'inmuebles', 'property_subtab' => 'pendientes'])); ?>">
+              <span class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-[18px] text-amber-600">pending_actions</span>
+                <span>Pendientes por publicar</span>
+              </span>
+              <span class="font-label-sm text-[11px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-semibold">Borrador</span>
+            </a>
+            <a class="flex items-center justify-between px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="inmuebles" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'inmuebles', 'property_subtab' => 'no_publicos'])); ?>">
+              <span class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-[18px] text-slate-600">inventory_2</span>
+                <span>Inmuebles no públicos</span>
+              </span>
+              <span class="font-label-sm text-[11px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full font-semibold">Cerrados</span>
+            </a>
+            <div class="my-1 border-t border-surface-container"></div>
+            <a class="flex items-center justify-between px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="inmuebles" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'inmuebles', 'property_subtab' => 'mis_inmuebles'])); ?>">
+              <span class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-[18px] text-primary">person_pin</span>
+                <span class="font-semibold text-primary">Mis inmuebles</span>
+              </span>
+              <span class="font-label-sm text-[11px] bg-primary-container text-on-surface px-2 py-0.5 rounded-full font-semibold">Personal</span>
+            </a>
+          </div>
+        </div>
+      <?php endif; ?>
+
       <!-- Dropdown Gestión de Tareas (Con despliegue por tema y por estado comercial) -->
       <div class="relative group/nav" data-commercial-dropdown="tareas">
         <button type="button" class="flex items-center gap-space-xs px-space-md py-space-xs font-label-md text-label-md <?php echo $isTaskActive ? ($activeClasses . ' active') : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-tab="tareas" data-commercial-dropdown-trigger="tareas" aria-expanded="false">
@@ -831,40 +907,6 @@ final class CommercialDashboardView
         </div>
       </div>
 
-      <!-- Dropdown Calendario Comercial (Mi calendario, Calendario equipo, Vencimientos) -->
-      <?php if (in_array('calendario', $views, true)): ?>
-        <div class="relative group/nav" data-commercial-dropdown="calendario">
-          <button type="button" class="flex items-center gap-space-xs px-space-md py-space-xs font-label-md text-label-md <?php echo $bucket === 'calendario' ? ($activeClasses . ' active') : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-tab="calendario" data-commercial-dropdown-trigger="calendario" aria-expanded="false">
-            <span class="material-symbols-outlined text-[16px]">calendar_month</span>
-            <span>Calendario</span>
-            <span class="material-symbols-outlined text-[16px] group-hover/nav:rotate-180 transition-transform">expand_more</span>
-          </button>
-          <div class="absolute left-0 top-full hidden group-hover/nav:block bg-surface-container-lowest shadow-[0_12px_32px_rgba(0,0,0,0.14)] rounded-2xl py-space-xs min-w-[240px] z-50 border border-outline-variant/30 text-on-surface" data-commercial-dropdown-menu="calendario">
-            <a class="flex items-center gap-2.5 px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="calendario" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'calendario', 'subtab' => 'mine'])); ?>">
-              <span class="material-symbols-outlined text-[18px] text-primary">calendar_today</span>
-              <div>
-                <span class="block font-semibold text-on-surface">Mi calendario</span>
-                <span class="block text-[11px] text-secondary">Agenda personal operativa</span>
-              </div>
-            </a>
-            <a class="flex items-center gap-2.5 px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="calendario" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'calendario', 'subtab' => 'team'])); ?>">
-              <span class="material-symbols-outlined text-[18px] text-secondary">groups</span>
-              <div>
-                <span class="block font-semibold text-on-surface">Calendario equipo</span>
-                <span class="block text-[11px] text-secondary">Disponibilidad de consultores</span>
-              </div>
-            </a>
-            <a class="flex items-center gap-2.5 px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="calendario" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'calendario', 'subtab' => 'due'])); ?>">
-              <span class="material-symbols-outlined text-[18px] text-error">schedule</span>
-              <div>
-                <span class="block font-semibold text-on-surface">Vencimientos</span>
-                <span class="block text-[11px] text-secondary">Control mensual de atrasos</span>
-              </div>
-            </a>
-          </div>
-        </div>
-      <?php endif; ?>
-
       <!-- Dropdown Actualizaciones de Inmuebles -->
       <?php if (in_array('actualizaciones', $views, true)): ?>
         <div class="relative group/nav" data-commercial-dropdown="actualizaciones">
@@ -912,48 +954,6 @@ final class CommercialDashboardView
             <a class="flex items-center justify-between px-space-md py-space-sm font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="avisos" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'avisos'])); ?>">
               <span>Rutas Operativas</span>
               <span class="material-symbols-outlined text-secondary text-[16px]">near_me</span>
-            </a>
-          </div>
-        </div>
-      <?php endif; ?>
-
-      <!-- Dropdown Inmuebles (Públicos, Pendientes por publicar, No públicos, Mis inmuebles) -->
-      <?php if (in_array('inmuebles', $views, true)): ?>
-        <div class="relative group/nav" data-commercial-dropdown="inmuebles">
-          <button type="button" class="flex items-center gap-space-xs px-space-md py-space-xs font-label-md text-label-md <?php echo $bucket === 'inmuebles' ? ($activeClasses . ' active') : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-tab="inmuebles" data-commercial-dropdown-trigger="inmuebles" aria-expanded="false">
-            <span class="material-symbols-outlined text-[16px]">domain</span>
-            <span>Inmuebles</span>
-            <span class="material-symbols-outlined text-[16px] group-hover/nav:rotate-180 transition-transform">expand_more</span>
-          </button>
-          <div class="absolute left-0 top-full hidden group-hover/nav:block bg-surface-container-lowest shadow-[0_12px_32px_rgba(0,0,0,0.14)] rounded-2xl py-space-xs min-w-[260px] z-50 border border-outline-variant/30 text-on-surface" data-commercial-dropdown-menu="inmuebles">
-            <a class="flex items-center justify-between px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="inmuebles" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'inmuebles', 'property_subtab' => 'publicos'])); ?>">
-              <span class="flex items-center gap-2">
-                <span class="material-symbols-outlined text-[18px] text-emerald-600">public</span>
-                <span>Inmuebles públicos</span>
-              </span>
-              <span class="font-label-sm text-[11px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-semibold">Portal</span>
-            </a>
-            <a class="flex items-center justify-between px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="inmuebles" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'inmuebles', 'property_subtab' => 'pendientes'])); ?>">
-              <span class="flex items-center gap-2">
-                <span class="material-symbols-outlined text-[18px] text-amber-600">pending_actions</span>
-                <span>Pendientes por publicar</span>
-              </span>
-              <span class="font-label-sm text-[11px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-semibold">Borrador</span>
-            </a>
-            <a class="flex items-center justify-between px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="inmuebles" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'inmuebles', 'property_subtab' => 'no_publicos'])); ?>">
-              <span class="flex items-center gap-2">
-                <span class="material-symbols-outlined text-[18px] text-slate-600">inventory_2</span>
-                <span>Inmuebles no públicos</span>
-              </span>
-              <span class="font-label-sm text-[11px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full font-semibold">Cerrados</span>
-            </a>
-            <div class="my-1 border-t border-surface-container"></div>
-            <a class="flex items-center justify-between px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="inmuebles" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'inmuebles', 'property_subtab' => 'mis_inmuebles'])); ?>">
-              <span class="flex items-center gap-2">
-                <span class="material-symbols-outlined text-[18px] text-primary">person_pin</span>
-                <span class="font-semibold text-primary">Mis inmuebles</span>
-              </span>
-              <span class="font-label-sm text-[11px] bg-primary-container text-on-surface px-2 py-0.5 rounded-full font-semibold">Personal</span>
             </a>
           </div>
         </div>
@@ -3544,7 +3544,7 @@ final class CommercialDashboardView
         $businessBadgeClass = 'bg-[#1E3C76]/85 text-white';
       }
 
-      $portalUrl = "https://sucasainmobiliaria.com.co/inmueble/{$codigo}";
+      $portalUrl = "https://sucasainmobiliaria.com.co/inmuebles/inmueble-{$codigo}";
       $title = $tipoInmueble . ($barrio !== '' ? " en {$barrio}" : '');
       $initials = self::initials($funcionarioNombre);
 ?>
@@ -3731,14 +3731,17 @@ final class CommercialDashboardView
     $llavesContacto = trim((string) ($property['contacto_llaves'] ?? ''));
     $llavesTel = trim((string) ($property['telefono_contacto_llaves'] ?? ''));
 
-    $interiores = trim((string) ($property['interiores'] ?? ''));
-    $exteriores = trim((string) ($property['exteriores'] ?? ''));
-    $zonasSociales = trim((string) ($property['zonas_sociales'] ?? ''));
-    $alrededores = trim((string) ($property['alrededores'] ?? ''));
+    $interioresList = self::parseFeatureList($property['interiores'] ?? '');
+    $exterioresList = self::parseFeatureList($property['exteriores'] ?? '');
+    $zonasSocialesList = self::parseFeatureList($property['zonas_sociales'] ?? '');
+    $alrededoresList = self::parseFeatureList($property['alrededores'] ?? '');
+    $amenitiesMap = is_array($property['amenities_map'] ?? null) ? $property['amenities_map'] : [];
+    $hasAnyFeatures = !empty($interioresList) || !empty($exterioresList) || !empty($zonasSocialesList) || !empty($alrededoresList);
+
     $descripcion = trim((string) ($property['descripcion'] ?? ''));
     $mapsUrl = trim((string) ($property['ubicacion_google_maps'] ?? ''));
 
-    $portalUrl = "https://sucasainmobiliaria.com.co/inmueble/{$codigo}";
+    $portalUrl = "https://sucasainmobiliaria.com.co/inmuebles/inmueble-{$codigo}";
 
     ob_start();
 ?>
@@ -3966,62 +3969,49 @@ final class CommercialDashboardView
         </div>
       </div>
 
-      <!-- Amenidades y Comodidades -->
-      <?php if ($interiores !== '' || $exteriores !== '' || $zonasSociales !== '' || $alrededores !== ''): ?>
+      <!-- Amenidades y Características -->
+      <?php if ($hasAnyFeatures): ?>
         <div class="bg-surface-container-low/50 p-5 rounded-2xl border border-surface-container space-y-4">
           <div class="flex items-center gap-2 border-b border-surface-container pb-2">
             <span class="material-symbols-outlined text-[20px] text-primary">interests</span>
             <h3 class="text-sm font-bold text-on-surface uppercase tracking-wider">Amenidades y Características</h3>
           </div>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-            <?php if ($interiores !== ''): ?>
-              <div>
-                <span class="text-secondary font-semibold block mb-1">Interiores:</span>
-                <div class="flex flex-wrap gap-1.5">
-                  <?php foreach (explode(',', $interiores) as $tag): ?>
-                    <?php if (trim($tag) !== ''): ?>
-                      <span class="px-2.5 py-0.5 rounded-lg bg-surface-container text-on-surface font-medium"><?php echo esc_html(trim($tag)); ?></span>
-                    <?php endif; ?>
-                  <?php endforeach; ?>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-5 text-xs">
+            <?php
+              $featureSections = [
+                ['title' => 'Interiores', 'icon' => 'chair', 'items' => $interioresList],
+                ['title' => 'Exteriores', 'icon' => 'deck', 'items' => $exterioresList],
+                ['title' => 'Zonas Sociales', 'icon' => 'pool', 'items' => $zonasSocialesList],
+                ['title' => 'Alrededores', 'icon' => 'storefront', 'items' => $alrededoresList],
+              ];
+            ?>
+            <?php foreach ($featureSections as $section): ?>
+              <?php if (!empty($section['items'])): ?>
+                <div class="space-y-2">
+                  <div class="flex items-center gap-1.5 font-semibold text-secondary text-xs uppercase tracking-wider">
+                    <span class="material-symbols-outlined text-[16px] text-primary"><?php echo esc_html($section['icon']); ?></span>
+                    <span><?php echo esc_html($section['title']); ?> (<?php echo count($section['items']); ?>):</span>
+                  </div>
+                  <div class="flex flex-wrap gap-1.5">
+                    <?php foreach ($section['items'] as $item): ?>
+                      <?php
+                        $iconSvg = $amenitiesMap[$item] ?? $amenitiesMap[mb_strtolower($item)] ?? null;
+                      ?>
+                      <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-surface-container text-on-surface font-medium border border-outline-variant/30 text-[11px] shadow-2xs hover:bg-surface-container-high transition-colors">
+                        <?php if ($iconSvg !== null && $iconSvg !== ''): ?>
+                          <span class="w-4 h-4 shrink-0 flex items-center justify-center text-primary [&>svg]:w-3.5 [&>svg]:h-3.5 [&>svg]:max-w-none [&>svg]:inline-block" aria-hidden="true">
+                            <?php echo $iconSvg; ?>
+                          </span>
+                        <?php else: ?>
+                          <span class="material-symbols-outlined text-[14px] text-primary/70 shrink-0" aria-hidden="true">check_circle</span>
+                        <?php endif; ?>
+                        <span><?php echo esc_html($item); ?></span>
+                      </span>
+                    <?php endforeach; ?>
+                  </div>
                 </div>
-              </div>
-            <?php endif; ?>
-            <?php if ($exteriores !== ''): ?>
-              <div>
-                <span class="text-secondary font-semibold block mb-1">Exteriores:</span>
-                <div class="flex flex-wrap gap-1.5">
-                  <?php foreach (explode(',', $exteriores) as $tag): ?>
-                    <?php if (trim($tag) !== ''): ?>
-                      <span class="px-2.5 py-0.5 rounded-lg bg-surface-container text-on-surface font-medium"><?php echo esc_html(trim($tag)); ?></span>
-                    <?php endif; ?>
-                  <?php endforeach; ?>
-                </div>
-              </div>
-            <?php endif; ?>
-            <?php if ($zonasSociales !== ''): ?>
-              <div>
-                <span class="text-secondary font-semibold block mb-1">Zonas Sociales:</span>
-                <div class="flex flex-wrap gap-1.5">
-                  <?php foreach (explode(',', $zonasSociales) as $tag): ?>
-                    <?php if (trim($tag) !== ''): ?>
-                      <span class="px-2.5 py-0.5 rounded-lg bg-surface-container text-on-surface font-medium"><?php echo esc_html(trim($tag)); ?></span>
-                    <?php endif; ?>
-                  <?php endforeach; ?>
-                </div>
-              </div>
-            <?php endif; ?>
-            <?php if ($alrededores !== ''): ?>
-              <div>
-                <span class="text-secondary font-semibold block mb-1">Alrededores:</span>
-                <div class="flex flex-wrap gap-1.5">
-                  <?php foreach (explode(',', $alrededores) as $tag): ?>
-                    <?php if (trim($tag) !== ''): ?>
-                      <span class="px-2.5 py-0.5 rounded-lg bg-surface-container text-on-surface font-medium"><?php echo esc_html(trim($tag)); ?></span>
-                    <?php endif; ?>
-                  <?php endforeach; ?>
-                </div>
-              </div>
-            <?php endif; ?>
+              <?php endif; ?>
+            <?php endforeach; ?>
           </div>
         </div>
       <?php endif; ?>
@@ -4225,6 +4215,36 @@ final class CommercialDashboardView
     $year = date('Y');
     $shift = (int) date('G') < 13 ? 'Turno AM' : 'Turno PM';
     return "{$dayName}, {$dayNum} {$monthName} {$year} • {$shift}";
+  }
+
+  /**
+   * Helper to parse serialized PHP, JSON, or comma-separated lists of features/amenities.
+   *
+   * @param mixed $raw
+   * @return array<int,string>
+   */
+  public static function parseFeatureList(mixed $raw): array
+  {
+    if (is_array($raw)) {
+      return array_values(array_filter(array_map('trim', array_map('strval', $raw))));
+    }
+    $raw = trim((string) $raw);
+    if ($raw === '' || $raw === 'a:0:{}') {
+      return [];
+    }
+    if (str_starts_with($raw, 'a:') || str_starts_with($raw, 's:') || str_starts_with($raw, 'O:')) {
+      $data = @unserialize($raw, ['allowed_classes' => false]);
+      if (is_array($data)) {
+        return array_values(array_filter(array_map('trim', array_map('strval', $data))));
+      }
+    }
+    if (str_starts_with($raw, '[') || str_starts_with($raw, '{')) {
+      $data = json_decode($raw, true);
+      if (is_array($data)) {
+        return array_values(array_filter(array_map('trim', array_map('strval', $data))));
+      }
+    }
+    return array_values(array_filter(array_map('trim', explode(',', $raw))));
   }
 
   private static function initials(string $name): string

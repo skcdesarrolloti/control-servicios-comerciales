@@ -124,7 +124,7 @@ final class CommercialTicketModalView
       <!-- Quick Action Buttons -->
       <div class="flex flex-wrap items-center gap-2 self-start md:self-auto">
         <?php if ($propertyCode !== ''): ?>
-          <a href="https://sucasainmobiliaria.com.co/inmueble/<?php echo esc_attr($propertyCode); ?>" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-[#EBF1FB] text-[#061D49] border border-slate-200 hover:border-[#1E3C76] text-xs font-medium transition-all shadow-sm cursor-pointer">
+          <a href="https://sucasainmobiliaria.com.co/inmuebles/inmueble-<?php echo esc_attr($propertyCode); ?>" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-[#EBF1FB] text-[#061D49] border border-slate-200 hover:border-[#1E3C76] text-xs font-medium transition-all shadow-sm cursor-pointer">
             <span class="material-symbols-outlined text-[16px] text-[#1E3C76]">apartment</span>
             <span>Ficha del inmueble</span>
           </a>
@@ -320,7 +320,7 @@ final class CommercialTicketModalView
             <?php endif; ?>
             <?php if ($propertyCode !== ''): ?>
               <div class="pt-1 flex items-center justify-between">
-                <a href="https://sucasainmobiliaria.com.co/inmueble/<?php echo esc_attr($propertyCode); ?>" target="_blank" rel="noopener noreferrer" class="text-xs font-semibold text-[#1E3C76] hover:text-[#061D49] hover:underline flex items-center gap-1 cursor-pointer">
+                <a href="https://sucasainmobiliaria.com.co/inmuebles/inmueble-<?php echo esc_attr($propertyCode); ?>" target="_blank" rel="noopener noreferrer" class="text-xs font-semibold text-[#1E3C76] hover:text-[#061D49] hover:underline flex items-center gap-1 cursor-pointer">
                   <span>Abrir ficha técnica detallada</span>
                   <span class="material-symbols-outlined text-[14px]">open_in_new</span>
                 </a>

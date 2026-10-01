@@ -34,6 +34,8 @@ final class CommercialPropertiesRepository
   ];
 
   private Database $db;
+  /** @var array<string,string>|null */
+  private ?array $amenitiesMapCache = null;
 
   public function __construct(Database $db)
   {
@@ -320,8 +322,52 @@ final class CommercialPropertiesRepository
 
     $property['foto_portada_url'] = $coverUrl;
     $property['galeria_urls'] = $galleryUrls;
+    $property['amenities_map'] = $this->amenitiesIconMap();
 
     return $property;
+  }
+
+  /**
+   * Load map of all property amenities/features to their SVG icons from the 4 CCT tables:
+   * wp_jet_cct_caract_internas, wp_jet_cct_caract_externas, wp_jet_cct_zonas_sociales, wp_jet_cct_alrededores.
+   *
+   * @return array<string,string>
+   */
+  public function amenitiesIconMap(): array
+  {
+    if ($this->amenitiesMapCache !== null) {
+      return $this->amenitiesMapCache;
+    }
+
+    $map = [];
+    $tables = [
+      $this->db->table('jet_cct_caract_internas'),
+      $this->db->table('jet_cct_caract_externas'),
+      $this->db->table('jet_cct_zonas_sociales'),
+      $this->db->table('jet_cct_alrededores'),
+    ];
+
+    foreach ($tables as $table) {
+      $rows = $this->db->getResults("SELECT `valor`, `etiqueta` FROM `{$table}` WHERE `valor` IS NOT NULL AND TRIM(`valor`) <> ''");
+      foreach ($rows as $row) {
+        $valor = trim((string) ($row['valor'] ?? ''));
+        $etiqueta = (string) ($row['etiqueta'] ?? '');
+        if ($valor === '') {
+          continue;
+        }
+        if (preg_match('/<svg[\s\S]*?<\/svg>/i', $etiqueta, $m)) {
+          $svg = $m[0];
+          // Strip out fixed dimensions and legacy classes so our UI classes apply cleanly
+          $svg = preg_replace('/\s*(width|height|class)="[^"]*"/i', '', $svg) ?? $svg;
+          $svg = preg_replace('/<svg\b/i', '<svg class="w-4 h-4 shrink-0 inline-block text-primary"', $svg, 1) ?? $svg;
+          $map[$valor] = $svg;
+          $map[mb_strtolower($valor)] = $svg;
+        }
+      }
+    }
+
+    $this->amenitiesMapCache = $map;
+    return $map;
   }
 
   /**
