@@ -3516,7 +3516,7 @@ final class CommercialDashboardView
             <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
               <div class="p-3.5 rounded-xl bg-primary/10 border border-primary/20 text-primary flex flex-col justify-between">
                 <span class="text-[11px] font-bold uppercase tracking-wider">Total General</span>
-                <strong class="text-xl font-bold mt-1 text-on-surface"><?php echo esc_html($grandTotal); ?> / <?php echo esc_html($grandLimit); ?></strong>
+                <strong class="text-xl font-bold mt-1 text-on-surface"><?php echo number_format($grandTotal); ?> / <?php echo number_format($grandLimit); ?></strong>
               </div>
               <?php foreach (CommercialPropertiesRepository::PORTALS as $pKey => $pCfg): ?>
                 <?php
@@ -3527,7 +3527,7 @@ final class CommercialDashboardView
                   <span class="text-[10px] font-semibold text-secondary uppercase tracking-wider truncate" title="<?php echo esc_attr($pCfg['label']); ?>">
                     <?php echo esc_html($pCfg['label']); ?>
                   </span>
-                  <strong class="text-base font-bold mt-1 text-on-surface"><?php echo esc_html($used); ?> / <?php echo esc_html($lim); ?></strong>
+                  <strong class="text-base font-bold mt-1 text-on-surface"><?php echo number_format($used); ?> / <?php echo number_format($lim); ?></strong>
                 </div>
               <?php endforeach; ?>
             </div>
@@ -3563,7 +3563,7 @@ final class CommercialDashboardView
                     <tr class="hover:bg-surface-container-low/50 transition-colors">
                       <td class="p-3 font-semibold text-on-surface"><?php echo esc_html($emp['nombre'] ?? '-'); ?></td>
                       <td class="p-3 text-secondary"><?php echo esc_html(($emp['rol'] ?? '') . ' · ' . ($emp['gestion'] ?? '')); ?></td>
-                      <td class="p-3 text-center font-bold text-primary"><?php echo esc_html($empTotal); ?></td>
+                      <td class="p-3 text-center font-bold text-primary"><?php echo number_format($empTotal); ?></td>
                       <?php foreach (CommercialPropertiesRepository::PORTALS as $pKey => $pCfg): ?>
                         <td class="p-3 text-center font-medium <?php echo (int) ($emp[$pKey] ?? 0) > 0 ? 'text-emerald-700 font-bold bg-emerald-500/5' : 'text-secondary/50'; ?>">
                           <?php echo (int) ($emp[$pKey] ?? 0); ?>

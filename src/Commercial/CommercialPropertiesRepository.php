@@ -407,12 +407,12 @@ final class CommercialPropertiesRepository
       $rows = $this->db->getResults("SELECT `valor`, `etiqueta` FROM `{$table}` WHERE `valor` IS NOT NULL AND TRIM(`valor`) <> ''");
       foreach ($rows as $row) {
         $valor = trim((string) ($row['valor'] ?? ''));
-        $etiqueta = (string) ($row['etiqueta'] ?? '');
+        $etiqueta = stripslashes((string) ($row['etiqueta'] ?? ''));
         if ($valor === '') {
           continue;
         }
         if (preg_match('/<svg[\s\S]*?<\/svg>/i', $etiqueta, $m)) {
-          $svg = $m[0];
+          $svg = stripslashes($m[0]);
           // Strip out fixed dimensions and legacy classes so our UI classes apply cleanly
           $svg = preg_replace('/\s*(width|height|class)="[^"]*"/i', '', $svg) ?? $svg;
           $svg = preg_replace('/<svg\b/i', '<svg class="w-4 h-4 shrink-0 inline-block text-primary"', $svg, 1) ?? $svg;
@@ -768,19 +768,50 @@ final class CommercialPropertiesRepository
   }
 
   /**
-   * All active officials and their quota columns.
+   * All active officials and their quota columns, plus totals and configured limits.
    *
-   * @return array<int,array<string,mixed>>
+   * @return array<string,mixed>
    */
   public function getAllQuotasSummary(): array
   {
     $funcTable = $this->db->table('jet_cct_funcionarios');
     $cols = implode(', ', array_keys(self::PORTALS));
-    $sql = "SELECT _ID, id_empleado, nombre, rol, activo, {$cols}
+    $sql = "SELECT _ID, id_empleado, nombre, rol, gestion, activo, {$cols}
               FROM `{$funcTable}`
              WHERE activo = 'Si' AND id_empleado IS NOT NULL AND TRIM(id_empleado) <> ''
           ORDER BY nombre ASC";
-    return $this->db->getResults($sql);
+    $quotas = $this->db->getResults($sql);
+
+    $totals = array_fill_keys(array_keys(self::PORTALS), 0);
+    foreach ($quotas as $emp) {
+      foreach (array_keys(self::PORTALS) as $k) {
+        $totals[$k] += (int) ($emp[$k] ?? 0);
+      }
+    }
+
+    $limits = array_fill_keys(array_keys(self::PORTALS), 0);
+    try {
+      $confTable = $this->db->table('jet_cct_confi_sistema');
+      $keys = array_keys(self::PORTALS);
+      $placeholders = implode(',', array_fill(0, count($keys), '?'));
+      $rows = $this->db->getResults("SELECT funcion, valor FROM `{$confTable}` WHERE funcion IN ({$placeholders})", $keys);
+      foreach ($rows as $r) {
+        $k = (string) ($r['funcion'] ?? '');
+        if (array_key_exists($k, $limits)) {
+          $limits[$k] = max(0, (int) ($r['valor'] ?? 0));
+        }
+      }
+    } catch (\Throwable) {
+      // Fallback
+    }
+
+    return [
+      'quotas' => $quotas,
+      'totals' => $totals,
+      'limits' => $limits,
+      'grand_total' => array_sum($totals),
+      'grand_limit' => array_sum($limits),
+    ];
   }
 
   /**
