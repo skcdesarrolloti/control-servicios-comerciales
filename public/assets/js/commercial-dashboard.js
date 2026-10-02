@@ -1368,9 +1368,14 @@
       var portalVal = hData.get("portal") || "";
       var razonVal = hData.get("razon") || "";
       var opVal = hData.get("oportunidad") || "No";
-      var negVal = hData.get("negociable") || "No";
+      var portalSelect = highlightForm.querySelector('select[name="portal"]');
+      var selectedOption = portalSelect ? portalSelect.options[portalSelect.selectedIndex] : null;
       if (!portalVal || !razonVal) {
         notify("error", "Por favor selecciona el portal y la razón.");
+        return;
+      }
+      if (selectedOption && selectedOption.disabled) {
+        notify("error", "El portal seleccionado no tiene cupo disponible o se encuentra inhabilitado.");
         return;
       }
       var submitBtn = highlightForm.querySelector('button[type="submit"]');

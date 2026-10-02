@@ -4540,24 +4540,43 @@ final class CommercialDashboardView
                 $k = is_array($ap) ? (string) ($ap['key'] ?? '') : (string) $ap;
                 if ($k !== '') $activeKeySet[$k] = true;
               }
+
+              $hasAnyAvailableQuota = false;
+              foreach (CommercialPropertiesRepository::PORTALS as $pKey => $pCfg) {
+                $qInfo = $userQuotas[$pKey] ?? null;
+                $quota = is_array($qInfo) ? (int) ($qInfo['available'] ?? 0) : (int) $qInfo;
+                $isActiveP = isset($activeKeySet[$pKey]);
+                $isPendingP = in_array($pKey, $pendingKeys, true);
+                if (!$isActiveP && !$isPendingP && $quota > 0) {
+                  $hasAnyAvailableQuota = true;
+                  break;
+                }
+              }
             ?>
+            <?php if (!$hasAnyAvailableQuota): ?>
+              <div class="flex items-center gap-2.5 p-3.5 bg-amber-50 rounded-xl border border-amber-200 text-amber-900 text-xs mb-3 shadow-2xs">
+                <span class="material-symbols-outlined text-[20px] text-amber-600 shrink-0">info</span>
+                <span>No tienes cupos disponibles en ningún portal para este inmueble (los portales ya se encuentran activos, en trámite pendiente o no cuentan con cupos libres asignados a tu cuenta).</span>
+              </div>
+            <?php endif; ?>
             <form class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5 items-end bg-surface-container-lowest p-3.5 rounded-xl border border-surface-container" data-commercial-highlight-form>
               <input type="hidden" name="codigo" value="<?php echo esc_attr($codigo); ?>">
 
               <div>
                 <label class="block text-[11px] font-semibold text-secondary mb-1">Portal</label>
-                <select name="portal" class="w-full px-2.5 py-1.5 rounded-lg border border-outline-variant/40 bg-surface-container-low text-on-surface text-xs" required>
-                  <option value="">Selecciona portal</option>
+                <select name="portal" class="w-full px-2.5 py-1.5 rounded-lg border border-outline-variant/40 bg-surface-container-low text-on-surface text-xs disabled:opacity-60 disabled:cursor-not-allowed" required <?php echo !$hasAnyAvailableQuota ? 'disabled' : ''; ?>>
+                  <option value=""><?php echo $hasAnyAvailableQuota ? 'Selecciona portal' : 'Sin cupos disponibles'; ?></option>
                   <?php foreach (CommercialPropertiesRepository::PORTALS as $pKey => $pCfg): ?>
                     <?php
                       $qInfo = $userQuotas[$pKey] ?? null;
                       $quota = is_array($qInfo) ? (int) ($qInfo['available'] ?? 0) : (int) $qInfo;
                       $isActiveP = isset($activeKeySet[$pKey]);
                       $isPendingP = in_array($pKey, $pendingKeys, true);
-                      $disabled = $isActiveP || $isPendingP;
-                      $suffix = $isActiveP ? ' (Activo)' : ($isPendingP ? ' (Pendiente)' : " ({$quota} libres)");
+                      $hasNoQuota = $quota <= 0;
+                      $disabled = $isActiveP || $isPendingP || $hasNoQuota;
+                      $suffix = $isActiveP ? ' (Activo)' : ($isPendingP ? ' (Pendiente)' : ($hasNoQuota ? ' (Sin cupo)' : " ({$quota} libres)"));
                     ?>
-                    <option value="<?php echo esc_attr($pKey); ?>" <?php echo $disabled ? 'disabled' : ''; ?>>
+                    <option value="<?php echo esc_attr($pKey); ?>" <?php echo $disabled ? 'disabled' : ''; ?> class="<?php echo $disabled ? 'text-slate-400 bg-slate-50' : 'text-on-surface'; ?>">
                       <?php echo esc_html($pCfg['label'] . $suffix); ?>
                     </option>
                   <?php endforeach; ?>
@@ -4566,7 +4585,7 @@ final class CommercialDashboardView
 
               <div>
                 <label class="block text-[11px] font-semibold text-secondary mb-1">Razón</label>
-                <select name="razon" class="w-full px-2.5 py-1.5 rounded-lg border border-outline-variant/40 bg-surface-container-low text-on-surface text-xs" required>
+                <select name="razon" class="w-full px-2.5 py-1.5 rounded-lg border border-outline-variant/40 bg-surface-container-low text-on-surface text-xs disabled:opacity-60 disabled:cursor-not-allowed" required <?php echo !$hasAnyAvailableQuota ? 'disabled' : ''; ?>>
                   <option value="">Selecciona razón</option>
                   <option value="Precio">Precio</option>
                   <option value="Ubicacion">Ubicación</option>
@@ -4578,7 +4597,7 @@ final class CommercialDashboardView
 
               <div>
                 <label class="block text-[11px] font-semibold text-secondary mb-1">¿Oportunidad?</label>
-                <select name="oportunidad" class="w-full px-2.5 py-1.5 rounded-lg border border-outline-variant/40 bg-surface-container-low text-on-surface text-xs">
+                <select name="oportunidad" class="w-full px-2.5 py-1.5 rounded-lg border border-outline-variant/40 bg-surface-container-low text-on-surface text-xs disabled:opacity-60 disabled:cursor-not-allowed" <?php echo !$hasAnyAvailableQuota ? 'disabled' : ''; ?>>
                   <option value="No">No</option>
                   <option value="Si">Si</option>
                 </select>
@@ -4586,14 +4605,14 @@ final class CommercialDashboardView
 
               <div>
                 <label class="block text-[11px] font-semibold text-secondary mb-1">¿Negociable?</label>
-                <select name="negociable" class="w-full px-2.5 py-1.5 rounded-lg border border-outline-variant/40 bg-surface-container-low text-on-surface text-xs">
+                <select name="negociable" class="w-full px-2.5 py-1.5 rounded-lg border border-outline-variant/40 bg-surface-container-low text-on-surface text-xs disabled:opacity-60 disabled:cursor-not-allowed" <?php echo !$hasAnyAvailableQuota ? 'disabled' : ''; ?>>
                   <option value="No">No</option>
                   <option value="Si">Si</option>
                 </select>
               </div>
 
               <div>
-                <button type="submit" class="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer">
+                <button type="submit" class="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed" <?php echo !$hasAnyAvailableQuota ? 'disabled' : ''; ?> title="<?php echo !$hasAnyAvailableQuota ? 'Sin cupos disponibles para solicitar' : 'Solicitar destacado'; ?>">
                   <span class="material-symbols-outlined text-[15px]">send</span>
                   <span>Solicitar</span>
                 </button>

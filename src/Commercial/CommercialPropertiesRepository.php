@@ -386,8 +386,13 @@ final class CommercialPropertiesRepository
     $property['amenities_map'] = $this->amenitiesIconMap();
     $property['active_portals'] = $this->getActivePortalKeys($property);
     $property['highlight_history'] = $this->getPropertyHighlightHistory($propertyCode);
-    $property['pending_requests'] = $this->getPropertyPendingRequests($propertyCode);
-    $property['user_quotas'] = $this->getUserQuotas(trim(Auth::employeeId()));
+    $employeeId = trim(Auth::employeeId());
+    if ($employeeId === '' && Auth::userId() > 0) {
+      $funcionarios = $this->db->table('jet_cct_funcionarios');
+      $emp = $this->db->getVar("SELECT TRIM(COALESCE(`id_empleado`, '')) FROM `{$funcionarios}` WHERE `_ID` = ? LIMIT 1", [Auth::userId()]);
+      $employeeId = trim((string) $emp);
+    }
+    $property['user_quotas'] = $this->getUserQuotas($employeeId);
 
     return $property;
   }
@@ -954,6 +959,21 @@ final class CommercialPropertiesRepository
     $active = $this->db->getVar("SELECT COUNT(*) FROM `{$reqTable}` WHERE codigo_inmueble = ? AND portal = ? AND estado = 'pendiente'", [$code, $portal]);
     if ((int) $active > 0) {
       return ['ok' => false, 'message' => 'Ya existe una solicitud pendiente para este portal.'];
+    }
+
+    if ($employeeId === '') {
+      $employeeId = trim(Auth::employeeId());
+      if ($employeeId === '' && Auth::userId() > 0) {
+        $funcionarios = $this->db->table('jet_cct_funcionarios');
+        $emp = $this->db->getVar("SELECT TRIM(COALESCE(`id_empleado`, '')) FROM `{$funcionarios}` WHERE `_ID` = ? LIMIT 1", [Auth::userId()]);
+        $employeeId = trim((string) $emp);
+      }
+    }
+
+    $quotas = $this->getUserQuotas($employeeId);
+    $avail = (int) ($quotas[$portal]['available'] ?? 0);
+    if ($avail <= 0) {
+      return ['ok' => false, 'message' => 'No cuentas con cupos disponibles en ' . self::PORTALS[$portal]['label'] . '.'];
     }
 
     $now = date('Y-m-d H:i:s');
