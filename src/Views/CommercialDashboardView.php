@@ -602,7 +602,7 @@ final class CommercialDashboardView
 
       <!-- Second Row: Navegación de Pestañas con Dropdowns -->
       <div class="h-12 bg-surface-container-lowest shadow-[0_1px_8px_rgba(0,0,0,0.04)] px-margin flex items-center justify-between overflow-visible relative z-30">
-        <?php echo self::renderTabs($views, $bucket, $filters, $tabCounts, $baseUrl, $topicHierarchy); ?>
+        <?php echo self::renderTabs($views, $bucket, $filters, $tabCounts, $baseUrl, $topicHierarchy, $policy); ?>
         <div class="hidden md:flex items-center gap-space-xs font-label-sm text-label-sm text-on-surface-variant">
           <span class="w-2 h-2 rounded-full bg-primary-container animate-pulse"></span>
           <span>Red Operativa Online</span>
@@ -703,13 +703,17 @@ final class CommercialDashboardView
    * @param array<string,mixed> $filters
    * @param array<string,int> $tabCounts
    * @param array<int,array<string,mixed>> $topicHierarchy
+   * @param mixed $policy
    */
-  public static function renderTabs(array $views, string $bucket, array $filters, array $tabCounts, string $baseUrl, array $topicHierarchy = []): string
+  public static function renderTabs(array $views, string $bucket, array $filters, array $tabCounts, string $baseUrl, array $topicHierarchy = [], $policy = null): string
   {
     $taskViews = ['abiertos', 'mis_tickets', 'postergados', 'cerrados'];
     $isTaskActive = in_array($bucket, $taskViews, true);
     $activeClasses = 'bg-primary-container text-on-surface font-semibold rounded-lg shadow-sm';
     $inactiveClasses = 'text-on-surface-variant hover:text-on-surface rounded-lg transition-colors whitespace-nowrap';
+
+    $canManage = $policy instanceof CommercialAccessPolicy && $policy->canManage();
+    $canSeeAll = $policy instanceof CommercialAccessPolicy && $policy->canSeeAllCommercialTickets();
 
     $openCount = (int) ($tabCounts['abiertos'] ?? 0);
     $myCount = (int) ($tabCounts['mis_tickets'] ?? 0);
@@ -794,24 +798,26 @@ final class CommercialDashboardView
             <a class="flex items-center justify-between px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="inmuebles" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'inmuebles', 'property_subtab' => 'destacados'])); ?>">
               <span class="flex items-center gap-2">
                 <span class="material-symbols-outlined text-[18px] text-amber-500">star</span>
-                <span>Inmuebles destacados</span>
+                <span><?php echo $canSeeAll ? 'Inmuebles destacados' : 'Mis inmuebles destacados'; ?></span>
               </span>
               <span class="font-label-sm text-[11px] bg-amber-100 text-amber-900 px-2 py-0.5 rounded-full font-semibold">Portales</span>
             </a>
-            <a class="flex items-center justify-between px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="inmuebles" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'inmuebles', 'property_subtab' => 'solicitudes'])); ?>">
+            <a class="flex items-center justify-between px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="inmuebles" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'inmuebles', 'property_subtab' => 'mis_solicitudes'])); ?>">
               <span class="flex items-center gap-2">
                 <span class="material-symbols-outlined text-[18px] text-indigo-600">assignment_turned_in</span>
-                <span>Solicitudes por destacar</span>
+                <span><?php echo $canSeeAll ? 'Solicitudes por destacar' : 'Mis solicitudes por destacar'; ?></span>
               </span>
               <span class="font-label-sm text-[11px] bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full font-semibold">Cola</span>
             </a>
-            <a class="flex items-center justify-between px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="inmuebles" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'inmuebles', 'property_subtab' => 'cupos'])); ?>">
-              <span class="flex items-center gap-2">
-                <span class="material-symbols-outlined text-[18px] text-teal-600">pie_chart</span>
-                <span>Cupos por funcionario</span>
-              </span>
-              <span class="font-label-sm text-[11px] bg-teal-100 text-teal-800 px-2 py-0.5 rounded-full font-semibold">Cupos</span>
-            </a>
+            <?php if ($canManage): ?>
+              <a class="flex items-center justify-between px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="inmuebles" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'inmuebles', 'property_subtab' => 'cupos'])); ?>">
+                <span class="flex items-center gap-2">
+                  <span class="material-symbols-outlined text-[18px] text-teal-600">pie_chart</span>
+                  <span>Cupos por funcionario</span>
+                </span>
+                <span class="font-label-sm text-[11px] bg-teal-100 text-teal-800 px-2 py-0.5 rounded-full font-semibold">Cupos</span>
+              </a>
+            <?php endif; ?>
             <div class="my-1 border-t border-surface-container"></div>
             <a class="flex items-center justify-between px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="inmuebles" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'inmuebles', 'property_subtab' => 'mis_inmuebles'])); ?>">
               <span class="flex items-center gap-2">
@@ -3218,18 +3224,18 @@ final class CommercialDashboardView
         'desc' => 'Arrendados, vendidos o inactivos',
       ],
       'destacados' => [
-        'label' => 'Inmuebles destacados',
+        'label' => $canSeeAll ? 'Inmuebles destacados' : 'Mis inmuebles destacados',
         'icon' => 'star',
         'count' => $destacadosCount,
         'badge' => 'Portales',
-        'desc' => 'Destacados y promocionados en portales',
+        'desc' => $canSeeAll ? 'Destacados y promocionados en portales' : 'Mis inmuebles destacados en portales',
       ],
       'mis_solicitudes' => [
-        'label' => 'Mis solicitudes por destacar',
+        'label' => $canSeeAll ? 'Solicitudes por destacar' : 'Mis solicitudes por destacar',
         'icon' => 'assignment_turned_in',
         'count' => $myRequestsCount,
-        'badge' => 'Personal',
-        'desc' => 'Mis solicitudes de destacado en portales',
+        'badge' => 'Cola',
+        'desc' => $canSeeAll ? 'Solicitudes de destacado en portales' : 'Mis solicitudes de destacado en portales',
       ],
       'mis_inmuebles' => [
         'label' => 'Mis inmuebles',
@@ -3332,19 +3338,19 @@ final class CommercialDashboardView
         <!-- Destacados -->
         <a href="<?php echo esc_url(self::url($baseUrl, array_merge($filters, ['tab' => 'inmuebles', 'property_subtab' => 'destacados', 'page' => 1]))); ?>" data-commercial-tab="inmuebles" class="p-4 rounded-2xl border transition-all duration-200 flex flex-col justify-between cursor-pointer <?php echo $currentSubtab === 'destacados' ? 'bg-amber-500/10 border-amber-500 shadow-sm ring-1 ring-amber-500/30' : 'bg-surface-container-lowest border-surface-container hover:border-amber-400 hover:shadow-xs'; ?>">
           <div class="flex items-center justify-between">
-            <span class="text-xs font-semibold text-amber-700 uppercase tracking-wider">Destacados</span>
+            <span class="text-xs font-semibold text-amber-700 uppercase tracking-wider"><?php echo $canSeeAll ? 'Destacados' : 'Mis Destacados'; ?></span>
             <span class="material-symbols-outlined text-[20px] text-amber-500">star</span>
           </div>
           <div class="mt-2.5">
             <span class="text-2xl font-bold text-on-surface"><?php echo esc_html(number_format($destacadosCount)); ?></span>
-            <span class="block text-[11px] text-amber-700 font-medium">Activos en portales</span>
+            <span class="block text-[11px] text-amber-700 font-medium"><?php echo $canSeeAll ? 'Activos en portales' : 'Mis activos en portales'; ?></span>
           </div>
         </a>
 
-        <!-- Mis Solicitudes por Destacar -->
+        <!-- Solicitudes por Destacar -->
         <a href="<?php echo esc_url(self::url($baseUrl, array_merge($filters, ['tab' => 'inmuebles', 'property_subtab' => 'mis_solicitudes', 'page' => 1]))); ?>" data-commercial-tab="inmuebles" class="p-4 rounded-2xl border transition-all duration-200 flex flex-col justify-between cursor-pointer <?php echo $currentSubtab === 'mis_solicitudes' ? 'bg-indigo-500/10 border-indigo-500 shadow-sm ring-1 ring-indigo-500/30' : 'bg-surface-container-lowest border-surface-container hover:border-indigo-400 hover:shadow-xs'; ?>">
           <div class="flex items-center justify-between">
-            <span class="text-xs font-semibold text-indigo-700 uppercase tracking-wider">Mis Solicitudes</span>
+            <span class="text-xs font-semibold text-indigo-700 uppercase tracking-wider"><?php echo $canSeeAll ? 'Solicitudes' : 'Mis Solicitudes'; ?></span>
             <span class="material-symbols-outlined text-[20px] text-indigo-600">assignment_turned_in</span>
           </div>
           <div class="mt-2.5">
@@ -3619,10 +3625,13 @@ final class CommercialDashboardView
               $available = (int) ($q['available'] ?? 0);
 
               $portalColors = [
-                'fincaraiz' => ['bg' => 'bg-emerald-500/10', 'border' => 'border-emerald-500/30', 'text' => 'text-emerald-800', 'badge' => 'bg-emerald-100 text-emerald-800'],
-                'metrocuadrado' => ['bg' => 'bg-amber-500/10', 'border' => 'border-amber-500/30', 'text' => 'text-amber-800', 'badge' => 'bg-amber-100 text-amber-800'],
-                'ciencuadras' => ['bg' => 'bg-sky-500/10', 'border' => 'border-sky-500/30', 'text' => 'text-sky-800', 'badge' => 'bg-sky-100 text-sky-800'],
-                'web' => ['bg' => 'bg-indigo-500/10', 'border' => 'border-indigo-500/30', 'text' => 'text-indigo-800', 'badge' => 'bg-indigo-100 text-indigo-800'],
+                'finca_raiz_silver' => ['bg' => 'bg-slate-500/10', 'border' => 'border-slate-500/30', 'text' => 'text-slate-800', 'badge' => 'bg-slate-100 text-slate-800'],
+                'finca_raiz_gold' => ['bg' => 'bg-amber-500/10', 'border' => 'border-amber-500/30', 'text' => 'text-amber-800', 'badge' => 'bg-amber-100 text-amber-800'],
+                'finca_raiz_black' => ['bg' => 'bg-stone-500/10', 'border' => 'border-stone-500/30', 'text' => 'text-stone-900', 'badge' => 'bg-stone-200 text-stone-900'],
+                'ciencuadras_destacados' => ['bg' => 'bg-sky-500/10', 'border' => 'border-sky-500/30', 'text' => 'text-sky-800', 'badge' => 'bg-sky-100 text-sky-800'],
+                'ciencuadras_ascendidos' => ['bg' => 'bg-blue-500/10', 'border' => 'border-blue-500/30', 'text' => 'text-blue-800', 'badge' => 'bg-blue-100 text-blue-800'],
+                'proppit_promocionados' => ['bg' => 'bg-purple-500/10', 'border' => 'border-purple-500/30', 'text' => 'text-purple-800', 'badge' => 'bg-purple-100 text-purple-800'],
+                'mercado_libre_destacados' => ['bg' => 'bg-yellow-500/10', 'border' => 'border-yellow-500/30', 'text' => 'text-yellow-900', 'badge' => 'bg-yellow-100 text-yellow-900'],
               ];
               $color = $portalColors[$pKey] ?? ['bg' => 'bg-surface-container', 'border' => 'border-outline-variant/30', 'text' => 'text-primary', 'badge' => 'bg-surface-container text-on-surface'];
             ?>
@@ -3712,10 +3721,13 @@ final class CommercialDashboardView
                 $precioVenta = self::parsePrice($req['precio_venta'] ?? null);
 
                 $portalColorBadge = match ($reqPortal) {
-                  'fincaraiz' => 'bg-emerald-100 text-emerald-800 border-emerald-300',
-                  'metrocuadrado' => 'bg-amber-100 text-amber-800 border-amber-300',
-                  'ciencuadras' => 'bg-sky-100 text-sky-800 border-sky-300',
-                  'web' => 'bg-indigo-100 text-indigo-800 border-indigo-300',
+                  'finca_raiz_silver' => 'bg-slate-100 text-slate-800 border-slate-300',
+                  'finca_raiz_gold' => 'bg-amber-100 text-amber-900 border-amber-300',
+                  'finca_raiz_black' => 'bg-stone-200 text-stone-900 border-stone-400',
+                  'ciencuadras_destacados' => 'bg-sky-100 text-sky-800 border-sky-300',
+                  'ciencuadras_ascendidos' => 'bg-blue-100 text-blue-800 border-blue-300',
+                  'proppit_promocionados' => 'bg-purple-100 text-purple-800 border-purple-300',
+                  'mercado_libre_destacados' => 'bg-yellow-100 text-yellow-900 border-yellow-300',
                   default => 'bg-surface-container text-on-surface border-surface-container-high',
                 };
 
@@ -3870,14 +3882,15 @@ final class CommercialDashboardView
       $funcionarioCelular = trim((string) ($row['funcionario_celular'] ?? ''));
 
       $isPremium = ($row['promocion_premium'] ?? '') === 'Si';
-      $isDestacado = ($row['destacado'] ?? '') === 'Si' || ($row['marcado_destacado'] ?? '') === 'Si';
       $activePortals = [];
       foreach (CommercialPropertiesRepository::PORTALS as $pKey => $pCfg) {
         $propCol = (string) ($pCfg['property_column'] ?? '');
-        if ($propCol !== '' && (($row[$propCol] ?? '') === 'Si')) {
+        if ($propCol !== '' && CommercialPropertiesRepository::isAffirmative($row[$propCol] ?? '')) {
           $activePortals[] = ['key' => $pKey, 'label' => $pCfg['label']];
         }
       }
+      $hasPendingRequest = CommercialPropertiesRepository::isAffirmative($row['marcado_destacado'] ?? '') && empty($activePortals);
+      $isDestacado = !empty($activePortals) || CommercialPropertiesRepository::isAffirmative($row['destacado'] ?? '');
 
       // Feature slots: decoupled to ensure estrato ALWAYS displays
       $featureSlots = [];
@@ -3961,9 +3974,21 @@ final class CommercialDashboardView
                   <span>PREMIUM</span>
                 </span>
               <?php endif; ?>
-              <?php if ($isDestacado || !empty($activePortals)): ?>
-                <span class="px-2 py-0.5 rounded-md font-bold text-[10px] bg-primary text-white shadow-xs flex items-center gap-0.5">
-                  <span class="material-symbols-outlined text-[13px]">star</span>
+              <?php if (!empty($activePortals)): ?>
+                <?php foreach ($activePortals as $ap): ?>
+                  <span class="px-2 py-0.5 rounded-md font-bold text-[10px] bg-amber-500 text-white shadow-xs flex items-center gap-0.5" title="Destacado activo en <?php echo esc_attr($ap['label']); ?>">
+                    <span class="material-symbols-outlined text-[12px]">star</span>
+                    <span><?php echo esc_html($ap['label']); ?></span>
+                  </span>
+                <?php endforeach; ?>
+              <?php elseif ($hasPendingRequest): ?>
+                <span class="px-2 py-0.5 rounded-md font-bold text-[10px] bg-indigo-600 text-white shadow-xs flex items-center gap-0.5" title="Tiene solicitud de destacado pendiente de gestión">
+                  <span class="material-symbols-outlined text-[12px]">hourglass_top</span>
+                  <span>SOLICITADO</span>
+                </span>
+              <?php elseif ($isDestacado): ?>
+                <span class="px-2 py-0.5 rounded-md font-bold text-[10px] bg-amber-600 text-white shadow-xs flex items-center gap-0.5">
+                  <span class="material-symbols-outlined text-[12px]">star</span>
                   <span>DESTACADO</span>
                 </span>
               <?php endif; ?>
@@ -3988,12 +4013,19 @@ final class CommercialDashboardView
                 <span class="truncate"><?php echo esc_html($direccion !== '' ? $direccion : ($barrio !== '' ? "{$barrio}, {$ciudad}" : $ciudad)); ?></span>
               </div>
               <?php if (!empty($activePortals)): ?>
-                <div class="flex flex-wrap gap-1 mt-1.5">
+                <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
+                  <span class="text-[10px] font-semibold text-secondary uppercase tracking-wider">Destacado en:</span>
                   <?php foreach ($activePortals as $ap): ?>
-                    <span class="px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-200 text-[10px] font-semibold">
-                      <?php echo esc_html($ap['label']); ?>
+                    <span class="px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300 text-[10px] font-bold flex items-center gap-0.5 shadow-2xs">
+                      <span class="material-symbols-outlined text-[11px] text-amber-700">star</span>
+                      <span><?php echo esc_html($ap['label']); ?></span>
                     </span>
                   <?php endforeach; ?>
+                </div>
+              <?php elseif ($hasPendingRequest): ?>
+                <div class="flex items-center gap-1 mt-1.5 text-[11px] text-indigo-700 font-medium">
+                  <span class="material-symbols-outlined text-[13px] text-indigo-600">hourglass_top</span>
+                  <span>Solicitud pendiente por gestionar</span>
                 </div>
               <?php endif; ?>
             </div>
@@ -4034,13 +4066,16 @@ final class CommercialDashboardView
           </div>
         </div>
 
-        <?php if ($currentSubtab === 'destacados' && !empty($activePortals)): ?>
+        <?php if (!empty($activePortals)): ?>
           <!-- Barra rápida para liberar cupos de portales -->
           <div class="px-4 py-2 bg-amber-50 border-t border-amber-200/60 flex flex-wrap items-center justify-between gap-1.5 text-[11px]">
-            <span class="font-semibold text-amber-900">Liberar:</span>
+            <span class="font-semibold text-amber-900 flex items-center gap-1">
+              <span class="material-symbols-outlined text-[14px] text-amber-600">stars</span>
+              <span>Liberar:</span>
+            </span>
             <div class="flex items-center gap-1 flex-wrap">
               <?php foreach ($activePortals as $ap): ?>
-                <button type="button" class="px-2 py-0.5 rounded-md bg-amber-200/80 hover:bg-rose-600 hover:text-white text-amber-900 font-semibold transition-colors cursor-pointer" data-commercial-release-highlight data-code="<?php echo esc_attr($codigo); ?>" data-portal="<?php echo esc_attr($ap['key']); ?>">
+                <button type="button" class="px-2 py-0.5 rounded-md bg-amber-200/80 hover:bg-rose-600 hover:text-white text-amber-900 font-semibold transition-colors cursor-pointer text-xs" data-commercial-release-highlight data-code="<?php echo esc_attr($codigo); ?>" data-portal="<?php echo esc_attr($ap['key']); ?>" title="Liberar cupo de <?php echo esc_attr($ap['label']); ?>">
                   <?php echo esc_html($ap['label']); ?>
                 </button>
               <?php endforeach; ?>
@@ -4473,12 +4508,16 @@ final class CommercialDashboardView
             </div>
           <?php else: ?>
             <div class="flex flex-wrap gap-2">
-              <?php foreach ($activePortals as $pKey): ?>
-                <?php $pCfg = CommercialPropertiesRepository::PORTALS[$pKey] ?? ['label' => $pKey]; ?>
+              <?php foreach ($activePortals as $ap): ?>
+                <?php
+                  $pKey = is_array($ap) ? (string) ($ap['key'] ?? '') : (string) $ap;
+                  $pLabel = is_array($ap) ? (string) ($ap['label'] ?? '') : (CommercialPropertiesRepository::PORTALS[$pKey]['label'] ?? $pKey);
+                  if ($pKey === '') continue;
+                ?>
                 <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-semibold shadow-2xs">
                   <span class="material-symbols-outlined text-[16px] text-amber-600">star</span>
-                  <span><?php echo esc_html($pCfg['label']); ?></span>
-                  <button type="button" class="ml-1 px-2 py-0.5 rounded-lg bg-amber-200/80 hover:bg-rose-600 hover:text-white text-amber-900 text-[11px] font-semibold transition-colors cursor-pointer" data-commercial-release-highlight data-code="<?php echo esc_attr($codigo); ?>" data-portal="<?php echo esc_attr($pKey); ?>" title="Liberar cupo de este portal">
+                  <span class="font-bold"><?php echo esc_html($pLabel); ?></span>
+                  <button type="button" class="ml-1 px-2.5 py-1 rounded-lg bg-red-100 hover:bg-red-600 hover:text-white text-red-700 text-xs font-semibold transition-colors cursor-pointer" data-commercial-release-highlight data-code="<?php echo esc_attr($codigo); ?>" data-portal="<?php echo esc_attr($pKey); ?>" title="Liberar cupo de este portal">
                     Liberar cupo
                   </button>
                 </div>
@@ -4495,6 +4534,13 @@ final class CommercialDashboardView
               Solo se pueden solicitar destacados para inmuebles en estado <strong>Publico</strong>.
             </p>
           <?php else: ?>
+            <?php
+              $activeKeySet = [];
+              foreach ($activePortals as $ap) {
+                $k = is_array($ap) ? (string) ($ap['key'] ?? '') : (string) $ap;
+                if ($k !== '') $activeKeySet[$k] = true;
+              }
+            ?>
             <form class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5 items-end bg-surface-container-lowest p-3.5 rounded-xl border border-surface-container" data-commercial-highlight-form>
               <input type="hidden" name="codigo" value="<?php echo esc_attr($codigo); ?>">
 
@@ -4504,8 +4550,9 @@ final class CommercialDashboardView
                   <option value="">Selecciona portal</option>
                   <?php foreach (CommercialPropertiesRepository::PORTALS as $pKey => $pCfg): ?>
                     <?php
-                      $quota = (int) ($userQuotas[$pKey] ?? 0);
-                      $isActiveP = in_array($pKey, $activePortals, true);
+                      $qInfo = $userQuotas[$pKey] ?? null;
+                      $quota = is_array($qInfo) ? (int) ($qInfo['available'] ?? 0) : (int) $qInfo;
+                      $isActiveP = isset($activeKeySet[$pKey]);
                       $isPendingP = in_array($pKey, $pendingKeys, true);
                       $disabled = $isActiveP || $isPendingP;
                       $suffix = $isActiveP ? ' (Activo)' : ($isPendingP ? ' (Pendiente)' : " ({$quota} libres)");

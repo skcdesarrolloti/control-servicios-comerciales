@@ -12,6 +12,12 @@ final class JsonResponse
     self::send(['success' => true, 'data' => $data], $status);
   }
 
+  /** @param array<string,mixed> $data */
+  public static function ok(array $data, int $status = 200): never
+  {
+    self::success($data, $status);
+  }
+
   public static function error(string $message, int $status = 400): never
   {
     self::send(['success' => false, 'data' => ['message' => $message]], $status);
