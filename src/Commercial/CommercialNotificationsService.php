@@ -14,7 +14,7 @@ final class CommercialNotificationsService extends AdministrativeNotificationsSe
 {
   public const PROJECT_CODE = 'control-servicios-comerciales';
   public const SOURCE_MODULE = 'commercial_notifications';
-  public const TEMPLATE_BODY = "Hola {{1}}, recibe un cordial saludo de SKC SuCasa Inmobiliaria.\n\nTe compartimos la siguiente información:\n{{2}}\n\n{{3}}\n\nGracias por confiar en SKC SuCasa Inmobiliaria.";
+  public const TEMPLATE_BODY = "Hola {{1}}, recibe un cordial saludo de SKC SuCasa Inmobiliaria.\n\nTe compartimos la siguiente información:\n{{2}}\n\nAtentamente,\n{{3}}\n\nGracias por confiar en SKC SuCasa Inmobiliaria.";
 
   private CommercialAccessPolicy $policy;
   /** @var array<string,string> */
@@ -107,10 +107,21 @@ final class CommercialNotificationsService extends AdministrativeNotificationsSe
   {
     return [self::DEFAULT_EMAIL_TEMPLATE => [
       'name' => self::DEFAULT_EMAIL_TEMPLATE, 'label' => 'Mensaje general', 'subject' => 'Información de SKC SuCasa Inmobiliaria',
-      'body' => '<p>Hola <strong>{{nombre}}</strong>, recibe un cordial saludo de SKC SuCasa Inmobiliaria.</p><div>{{mensaje}}</div><p><strong>{{firma_funcionario_linea}}</strong></p>',
+      'body' => '<p>Hola <strong>{{nombre}}</strong>, recibe un cordial saludo de SKC SuCasa Inmobiliaria.</p><div>{{mensaje}}</div><p>Atentamente,<br><strong>{{firma_funcionario_linea}}</strong></p>',
       'message_only' => false, 'editable_message' => '', 'source' => 'commercial',
       'description' => 'Mensaje con saludo y firma personalizada del funcionario.',
     ]];
+  }
+
+  public function search(string $type, string $query, int $page = 1, int $perPage = 20, string $contractStatus = '', string $inmuebleSimi = '', string $contractNumber = ''): array
+  {
+    $result = parent::search($type, $query, $page, $perPage, $contractStatus, $inmuebleSimi, $contractNumber);
+    foreach ($result['rows'] as &$row) {
+      // La interfaz y el envío usan la misma validación; no requiere consultas adicionales.
+      $row['available_channels'] = array_values(array_filter(['whatsapp', 'email', 'sms'], fn(string $channel): bool => $this->destination($row, $channel) !== ''));
+    }
+    unset($row);
+    return $result;
   }
 
   /** El envío y la vista previa comparten el mismo documento y banner de correo. @param array<string,string> $media */
@@ -118,7 +129,7 @@ final class CommercialNotificationsService extends AdministrativeNotificationsSe
   {
     $escape = static fn(string $value): string => htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     $content = '<p>Hola <strong>' . $escape($name) . '</strong>, recibe un cordial saludo de SKC SuCasa Inmobiliaria.</p><div>'
-      . nl2br($escape($message)) . '</div><p><strong>' . $escape($this->senderProfile()['signature_line']) . '</strong></p>';
+      . nl2br($escape($message)) . '</div><p>Atentamente,<br><strong>' . $escape($this->senderProfile()['signature_line']) . '</strong></p>';
     if ($media !== []) {
       $content .= '<p><a href="' . $escape($media['url']) . '">Ver archivo: ' . $escape($media['name']) . '</a></p>';
     }
@@ -250,7 +261,7 @@ final class CommercialNotificationsService extends AdministrativeNotificationsSe
       return false;
     }
     if ($channel === 'email') {
-      $text = "Hola {$name}, recibe un cordial saludo de SKC SuCasa Inmobiliaria.\n\n{$this->messageText}\n\n{$signature}";
+      $text = "Hola {$name}, recibe un cordial saludo de SKC SuCasa Inmobiliaria.\n\n{$this->messageText}\n\nAtentamente,\n{$signature}";
       $message = $this->emailDocument($name, $subject, $this->messageText, $this->media);
     }
     $now = gmdate('Y-m-d H:i:s');

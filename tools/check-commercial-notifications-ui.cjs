@@ -1,9 +1,10 @@
 // Ejecutar después de preview-commercial-notifications.php y servir el repo en 127.0.0.1:8769.
 const path = require('path');
 const { chromium } = require(process.argv[2] ? path.join(process.argv[2], 'playwright') : 'playwright');
+let browser;
 
 (async () => {
-  const browser = await chromium.launch({ headless: true, channel: 'msedge' });
+  browser = await chromium.launch({ headless: true, channel: 'msedge' });
   const page = await browser.newPage({ viewport: { width: 1440, height: 1050 } });
   const errors = [];
   let recipientRequests = 0;
@@ -21,20 +22,29 @@ const { chromium } = require(process.argv[2] ? path.join(process.argv[2], 'playw
   await page.locator('[data-notif-type="arrendatarios_activos"]').click();
   await page.locator('[data-notif-recipient][value="20"]').waitFor();
   if ((await page.locator('[data-notif-recipient][value="21"]').count()) !== 0) throw new Error('Los arrendatarios no activos aparecen en activos');
+  if (!(await page.locator('[data-notif-single-channel="all"][data-id="20"]').isDisabled())) throw new Error('Un contacto sin datos permite envío individual');
   await page.locator('[data-notif-type="propietarios_activos"]').click();
   await page.locator('[data-notif-recipient][value="10"]').waitFor();
+  if (!(await page.locator('[data-notif-single-channel="email"][data-id="14"]').isDisabled())) throw new Error('Un contacto sin correo permite Email');
+  if (!(await page.locator('[data-notif-single-channel="whatsapp"][data-id="15"]').isDisabled()) || !(await page.locator('[data-notif-single-channel="sms"][data-id="15"]').isDisabled())) throw new Error('Un contacto sin celular permite WhatsApp/SMS');
+  await page.locator('[data-notif-recipient][value="15"]').check();
+  if (!(await page.locator('[data-notif-open-channel="whatsapp"]').isDisabled()) || await page.locator('[data-notif-open-channel="email"]').isDisabled()) throw new Error('La selección no respeta los datos disponibles');
+  await page.locator('[data-notif-single-channel="all"][data-id="15"]').click();
+  if ((await page.locator('[data-notif-compose] [name="channels[]"]:checked').count()) !== 1 || !(await page.locator('[data-notif-compose] [value="sms"]').isDisabled())) throw new Error('El popup permite canales sin destino');
+  await page.locator('[data-notif-close]').click();
+  await page.locator('[data-notif-recipient][value="15"]').uncheck();
   await page.locator('[data-notif-recipient][value="10"]').check();
   await page.locator('[data-notif-open-channel="whatsapp"]').click();
   await page.locator('#notif-message').fill('Tu asesoría está agendada para mañana a las 10:00 a. m.');
   const preview = await page.locator('[data-notif-preview]').textContent();
-  if (!preview.includes('Propietario 10') || !preview.includes('Ana Pérez') || !preview.includes('3001234567')) throw new Error('La vista previa perdió el saludo o firma');
+  if (!preview.includes('Propietario 10') || !preview.includes('Atentamente,\nAna Pérez') || !preview.includes('3001234567')) throw new Error('La vista previa perdió el saludo o firma');
   await page.screenshot({ path: 'output/notifications-desktop.png', fullPage: true });
   await page.locator('[data-notif-close]').click();
   // El botón individual preserva la selección masiva y abre el canal elegido.
   await page.locator('[data-notif-single-channel="email"][data-id="10"]').click();
   const mail = page.frameLocator('[data-notif-email-preview]');
   await mail.locator('img').waitFor();
-  if (!(await mail.locator('img').getAttribute('src')).includes('banner-sitio-web') || !(await mail.locator('body').textContent()).includes('Propietario 10')) throw new Error('El correo pierde banner o saludo');
+  if (!(await mail.locator('img').getAttribute('src')).includes('banner-sitio-web') || !(await mail.locator('body').textContent()).includes('Propietario 10') || !(await mail.locator('body').textContent()).includes('Atentamente,')) throw new Error('El correo pierde banner, saludo o cierre');
   await page.screenshot({ path: 'output/notifications-email.png', fullPage: true });
   await page.locator('[data-notif-close]').click();
   if (!(await page.locator('[data-notif-recipient][value="10"]').isChecked())) throw new Error('El envío individual altera la selección masiva');
@@ -66,6 +76,7 @@ const { chromium } = require(process.argv[2] ? path.join(process.argv[2], 'playw
   page.on('dialog', dialog => dialog.accept());
   await page.locator('[data-notif-send]').click();
   await page.locator('[data-notif-feedback]').filter({ hasText: '1 notificaciones en cola' }).waitFor();
+  if (!(await page.locator('[data-notif-single-channel="email"][data-id="14"]').isDisabled())) throw new Error('Un envío vuelve a habilitar canales inválidos');
   await page.locator('[data-notif-type="club_pph"]').click();
   await page.locator('[data-notif-recipients]').getByText('Club PPH 40', { exact: true }).waitFor();
   if (await page.locator('[data-notif-contract-filters]').isVisible()) throw new Error('Club PPH muestra filtros de contrato');
@@ -115,4 +126,4 @@ const { chromium } = require(process.argv[2] ? path.join(process.argv[2], 'playw
   if (errors.length) throw new Error(errors.join('\n'));
   console.log('UI: carga por actor sin duplicados, caché, popup por canal e individual, banner de correo, límites SMS, envío aislado, permisos y responsive: OK');
   await browser.close();
-})().catch(error => { console.error(error); process.exitCode = 1; });
+})().catch(async error => { console.error(error); await browser?.close(); process.exitCode = 1; });

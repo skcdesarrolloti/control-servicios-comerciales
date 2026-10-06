@@ -56,6 +56,8 @@ final class CommercialNotificationsFixture
     foreach ([10 => '900', 11 => '901', 12 => '901', 13 => '901', 14 => '900', 15 => '900'] as $id => $author) {
       $db->insert('wp_jet_cct_propietarios', ['_ID' => $id, 'id_propietario' => '20' . $id, 'nombre' => 'Propietario ' . $id, 'correo' => 'persona' . $id . '@example.test', 'celular' => '3001234567', 'indicativo' => '57', 'cct_author_id' => $author, 'bloqueo_whatsapp' => $id === 14 ? 1 : 0, 'permite_marketing_whatsapp' => $id === 15 ? 0 : 1]);
     }
+    $db->update('wp_jet_cct_propietarios', ['correo' => ''], ['_ID' => 14]);
+    $db->update('wp_jet_cct_propietarios', ['celular' => ''], ['_ID' => 15]);
     foreach ([20 => '901', 21 => '901', 22 => '900', 23 => '901'] as $id => $author) {
       $db->insert('wp_jet_cct_arrendatarios', ['_ID' => $id, 'id_arrendatario' => '20' . $id, 'nombre' => 'Arrendatario ' . $id, 'cct_author_id' => $author]);
     }

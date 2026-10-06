@@ -1637,7 +1637,7 @@ class AdministrativeNotificationsService
     return array_values($out);
   }
 
-  private function destination(array $recipient, string $channel): string
+  protected function destination(array $recipient, string $channel): string
   {
     if ($channel === 'email') {
       $email = trim((string) ($recipient['correo'] ?? ''));

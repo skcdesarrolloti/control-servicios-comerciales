@@ -10,6 +10,7 @@
     var search = panel.querySelector("[data-notif-search]");
     var compose = panel.querySelector("[data-notif-compose]");
     var selected = new Map();
+    var recipientDetails = new Map();
     var excluded = new Set();
     var type = "", page = 1, pages = 1, total = 0, allFiltered = false;
     var queuePage = 1, queuePages = 1, sequence = 0, busy = false, lastFingerprint = "";
@@ -42,6 +43,14 @@
       return json.data;
     }
     function targetCount() { return singleTarget ? 1 : (allFiltered ? total - excluded.size : selected.size); }
+    function availableChannels() {
+      if (singleTarget) return (recipientDetails.get(singleTarget.id) || {}).available_channels || [];
+      // La selección total puede abarcar otras páginas. El servidor valida cada destino al enviar.
+      if (allFiltered) return ["whatsapp", "email", "sms"];
+      var available = new Set();
+      selected.forEach(function (_name, id) { ((recipientDetails.get(id) || {}).available_channels || []).forEach(function (channel) { available.add(channel); }); });
+      return Array.from(available);
+    }
     function smsMetrics(text) {
       var chars = Array.from(text), units = 0, unicode = false;
       chars.forEach(function (char) { if (config.sms.basic.includes(char)) units++; else if (config.sms.extended.includes(char)) units += 2; else unicode = true; });
@@ -51,10 +60,15 @@
     function openComposer(channel, recipient) {
       singleTarget = recipient || null;
       if (!config.can_send || loading || !targetCount()) { feedback("Selecciona destinatarios para preparar el mensaje.", true); return; }
-      compose.querySelectorAll('[name="channels[]"]').forEach(function (node) { node.checked = channel === "all" || node.value === channel; });
+      var available = availableChannels();
+      if (!available.length || (channel !== "all" && !available.includes(channel))) { feedback("No hay datos de contacto válidos para el canal elegido.", true); return; }
+      compose.querySelectorAll('[name="channels[]"]').forEach(function (node) { node.checked = available.includes(node.value) && (channel === "all" || node.value === channel); });
       previewChannel = channel === "all" ? "whatsapp" : channel;
-      feedback(""); preview();
-      modal.showModal();
+      feedback(""); modal.showModal();
+      // Recrear el iframe evita que conserve un documento sin pintar tras cerrar el dialog.
+      var emailPreview = el("[data-notif-email-preview]"), freshEmailPreview = emailPreview.cloneNode(false);
+      freshEmailPreview.removeAttribute("srcdoc"); emailPreview.replaceWith(freshEmailPreview);
+      preview();
       compose.elements.message.focus();
     }
     modal.addEventListener("cancel", function (event) { if (busy) event.preventDefault(); });
@@ -67,13 +81,18 @@
       var count = Array.from(checks).filter(function (check) { return check.checked; }).length;
       el("[data-notif-select-page]").checked = checks.length > 0 && count === checks.length;
       el("[data-notif-select-page]").indeterminate = count > 0 && count < checks.length;
-      panel.querySelectorAll("[data-notif-open-channel]").forEach(function (button) { button.disabled = !config.can_send || busy || loading || !selectedCount; });
+      var available = availableChannels();
+      panel.querySelectorAll("[data-notif-open-channel]").forEach(function (button) { var channel = button.dataset.notifOpenChannel; button.disabled = !config.can_send || busy || loading || !selectedCount || (channel === "all" ? !available.length : !available.includes(channel)); });
       preview();
     }
     function renderRows(rows) {
       el("[data-notif-recipients]").innerHTML = rows.length ? rows.map(function (row) {
+        recipientDetails.set(String(row._ID), row);
+        var available = row.available_channels || [];
         var actions = Object.entries({whatsapp: "WhatsApp", email: "Correo", sms: "SMS", all: "Todos los canales"}).map(function (entry) {
-          return '<button type="button" data-notif-single-channel="' + entry[0] + '" data-id="' + esc(row._ID) + '" data-name="' + esc(row.nombre) + '" ' + (!config.can_send ? 'disabled ' : '') + 'class="min-h-[44px] rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium hover:bg-surface-container-low disabled:opacity-50">' + entry[1] + '</button>';
+          var unavailable = entry[0] === "all" ? !available.length : !available.includes(entry[0]);
+          var reason = !config.can_send ? "No tienes permiso para enviar" : (unavailable ? (entry[0] === "email" ? "Sin correo válido" : (entry[0] === "all" ? "Sin datos de contacto válidos" : "Sin celular válido")) : "Enviar a este contacto");
+          return '<button type="button" data-notif-single-channel="' + entry[0] + '" data-id="' + esc(row._ID) + '" data-name="' + esc(row.nombre) + '" title="' + esc(reason) + '" ' + (!config.can_send || unavailable ? 'disabled ' : '') + 'class="min-h-[44px] rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium hover:bg-surface-container-low disabled:opacity-50 disabled:cursor-not-allowed">' + entry[1] + '</button>';
         }).join("");
         return '<div class="p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4 hover:bg-surface-container-low"><label class="flex min-w-0 flex-1 items-start gap-3 cursor-pointer"><input type="checkbox" class="mt-1 w-4 h-4 accent-[#735c00]" data-notif-recipient value="' + esc(row._ID) + '" data-name="' + esc(row.nombre) + '"><span class="flex items-center justify-center w-9 h-9 shrink-0 rounded-full bg-surface-container-low text-secondary font-semibold" aria-hidden="true">' + esc(String(row.nombre || "?").slice(0, 1).toUpperCase()) + '</span><span class="min-w-0 flex-1"><strong class="block text-sm break-words">' + esc(row.nombre) + '</strong><span class="block text-xs text-secondary mt-1 break-all">' + esc(row.correo || "Sin correo") + ' · ' + esc(row.celular_normalizado || row.celular || "Sin celular") + '</span>' + (row.contrato_arrendamiento_estado ? '<span class="block text-xs text-secondary mt-1">' + esc(row.contrato_arrendamiento_estado) + '</span>' : '') + '</span></label><div class="flex shrink-0 flex-wrap gap-2 md:justify-end" aria-label="Enviar a ' + esc(row.nombre) + '">' + actions + '</div></div>';
       }).join("") : '<div class="p-10 text-center"><span class="material-symbols-outlined text-secondary text-[32px]" aria-hidden="true">person_search</span><p class="text-sm font-medium mt-2">No hay destinatarios con estos filtros.</p><p class="text-xs text-secondary mt-1">Prueba otra búsqueda o cambia de categoría.</p></div>';
@@ -126,7 +145,10 @@
       var message = compose.elements.message.value.trim();
       var text = template().body.replace("{{1}}", function () { return name; }).replace("{{2}}", function () { return message || "[Tu mensaje aparecerá aquí]"; }).replace("{{3}}", function () { return config.sender.signature_line; });
       el("[data-notif-length]").textContent = Array.from(compose.elements.message.value).length + "/700";
+      var available = availableChannels();
+      compose.querySelectorAll('[name="channels[]"]').forEach(function (node) { node.disabled = busy || !available.includes(node.value); if (!available.includes(node.value)) node.checked = false; });
       var chosen = channels();
+      el("[data-notif-channel-help]").textContent = singleTarget ? "Solo puedes usar los canales que tienen datos de contacto válidos." : "En envíos masivos se omiten los contactos sin datos válidos para cada canal; los demás continúan.";
       el("[data-notif-message-help]").textContent = chosen.length === 1 && chosen[0] === "sms" ? "SMS agrega el prefijo de la empresa al texto escrito." : "WhatsApp y correo agregan el saludo y tu firma automáticamente.";
       if (!chosen.includes(previewChannel)) previewChannel = chosen[0] || "whatsapp";
       panel.querySelectorAll("[data-notif-preview-channel]").forEach(function (button) { button.hidden = !chosen.includes(button.dataset.notifPreviewChannel); button.setAttribute("aria-pressed", String(button.dataset.notifPreviewChannel === previewChannel)); button.classList.toggle("bg-primary-container", button.dataset.notifPreviewChannel === previewChannel); });
@@ -189,6 +211,7 @@
       if (button.hasAttribute("data-notif-close")) modal.close();
       if (button.hasAttribute("data-notif-preview-channel")) { previewChannel = button.dataset.notifPreviewChannel; preview(); }
       if (button.dataset.notifType) {
+        recipientDetails.clear();
         type = button.dataset.notifType; page = 1; suppressReset = true; search.reset(); suppressReset = false; appliedFilters = {q: "", contract_status: "", inmueble_simi: "", contract_number: ""}; resetSelection();
         el("[data-notif-search-controls]").disabled = false; el("[data-notif-recipient-refresh]").disabled = false;
         el("[data-notif-actor-title]").textContent = button.querySelector("span span").textContent;
