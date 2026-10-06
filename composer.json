@@ -35,7 +35,7 @@
     ],
     "lint": "php tools/lint.php",
     "analyse": "phpstan analyse --memory-limit=512M",
-    "test": "phpunit"
+    "test": ["phpunit", "@php tools/check-commercial-notifications.php"]
   },
   "config": {
     "sort-packages": true

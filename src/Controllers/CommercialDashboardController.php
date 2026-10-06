@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SCM\Controllers;
 
 use SCM\Commercial\CommercialAccessPolicy;
+use SCM\Commercial\CommercialNotificationsService;
 use SCM\Commercial\CommercialPropertiesRepository;
 use SCM\Commercial\CommercialStatusCatalog;
 use SCM\Commercial\CommercialTicketsRepository;
@@ -62,7 +63,7 @@ final class CommercialDashboardController
     $tabCounts = $repository->bucketCounts($globalCountFilters);
     $myTabCounts = $repository->bucketCounts(['id_empleado' => $currentEmployeeFilter]);
     $tabCounts['mis_tickets'] = (int) ($myTabCounts['mis_tickets'] ?? 0);
-    $result = in_array($bucket, ['actualizaciones', 'avisos', 'calendario', 'inmuebles', 'sin_acceso'], true) ? ['rows' => [], 'counts' => $repository->statusCounts($filters), 'pagination' => []] : $repository->search($bucket === 'inicio' ? 'abiertos' : $bucket, $filters);
+    $result = in_array($bucket, ['actualizaciones', 'avisos', 'calendario', 'inmuebles', 'notificaciones', 'sin_acceso'], true) ? ['rows' => [], 'counts' => $repository->statusCounts($filters), 'pagination' => []] : $repository->search($bucket === 'inicio' ? 'abiertos' : $bucket, $filters);
     $homeDashboard = $bucket === 'sin_acceso' ? [] : $repository->homeDashboard($globalCountFilters);
     $canSeeAll = $policy->canSeeAllCommercialTickets();
     $propertiesRepository = new CommercialPropertiesRepository($this->db);
@@ -124,6 +125,7 @@ final class CommercialDashboardController
       'home_dashboard' => $homeDashboard,
       'tab_counts' => $tabCounts,
       'policy' => $policy,
+      'notifications_service' => $bucket === 'notificaciones' ? new CommercialNotificationsService($this->db, $policy) : null,
       'visible_views' => $visibleViews,
       'ticket_employees' => $ticketEmployees,
       'commercial_employee_cargos' => $commercialEmployeeCargos,

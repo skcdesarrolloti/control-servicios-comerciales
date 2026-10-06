@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SCM\Http\Controller;
 
 use SCM\Commercial\CommercialAccessPolicy;
+use SCM\Commercial\CommercialNotificationsService;
 use SCM\Commercial\CommercialPropertiesRepository;
 use SCM\Commercial\CommercialStatusCatalog;
 use SCM\Commercial\CommercialTaskAnalysisRepository;
@@ -20,6 +21,7 @@ use SCM\Support\EmailQueue;
 use SCM\Support\SchemaInspector;
 use SCM\Support\StoredFileService;
 use SCM\Views\CommercialDashboardView;
+use SCM\Views\CommercialNotificationsView;
 use SCM\Views\CommercialTicketModalView;
 
 final class CommercialApiController
@@ -137,6 +139,8 @@ final class CommercialApiController
         'is_admin' => $this->policy->canManage(),
       ]);
       $html = CommercialDashboardView::renderCalendarPage($calendarConfig, $calendarEmployees, $subtab, $this->policy, $this->baseUrl);
+    } elseif ($bucket === 'notificaciones') {
+      $html = CommercialNotificationsView::render(new CommercialNotificationsService($this->db, $this->policy), $this->policy);
     } elseif ($bucket === 'inmuebles') {
       $propertiesRepo = new CommercialPropertiesRepository($this->db);
       $canSeeAll = $this->policy->canSeeAllCommercialTickets();
@@ -168,7 +172,7 @@ final class CommercialApiController
     $topicHierarchy = $this->tickets->topicStatusHierarchy($globalCountFilters);
     JsonResponse::success([
       'html' => $html,
-      'tabs_html' => CommercialDashboardView::renderTabs($visibleViews, $bucket, $filters, $tabCounts, $this->baseUrl, $topicHierarchy),
+      'tabs_html' => CommercialDashboardView::renderTabs($visibleViews, $bucket, $filters, $tabCounts, $this->baseUrl, $topicHierarchy, $this->policy),
       'tab' => $bucket,
     ]);
   }
@@ -542,6 +546,84 @@ final class CommercialApiController
   }
 
   /** @param array<string,mixed> $input */
+  private function notificationService(array $input, bool $sending = false): CommercialNotificationsService
+  {
+    $this->verify($input);
+    if (!$this->policy->canView('notificaciones') || ($sending && !$this->policy->canAct('enviar_notificacion'))) {
+      JsonResponse::error('No tienes permiso para usar esta función de Notificaciones.', 403);
+    }
+    return new CommercialNotificationsService($this->db, $this->policy);
+  }
+
+  public function notificationRecipients(array $input): never
+  {
+    $service = $this->notificationService($input);
+    try {
+      $result = $service->search(
+        (string) ($input['type'] ?? 'propietarios'), mb_substr(trim((string) ($input['q'] ?? '')), 0, 150),
+        max(1, (int) ($input['page'] ?? 1)), 20, (string) ($input['contract_status'] ?? ''),
+        mb_substr(trim((string) ($input['inmueble_simi'] ?? '')), 0, 50), mb_substr(trim((string) ($input['contract_number'] ?? '')), 0, 50)
+      );
+      $result['stats'] = $service->stats();
+      JsonResponse::success($result);
+    } catch (\InvalidArgumentException | \RuntimeException $exception) {
+      if ($exception instanceof \PDOException) { throw $exception; }
+      JsonResponse::error($exception->getMessage(), 422);
+    }
+  }
+
+  public function importNotificationRecipients(array $input): never
+  {
+    $service = $this->notificationService($input);
+    try {
+      $file = (array) ($_FILES['file'] ?? []);
+      $path = (string) ($file['tmp_name'] ?? '');
+      if (!is_uploaded_file($path) || filesize($path) > 10485760) {
+        throw new \InvalidArgumentException('Sube un archivo de importación de hasta 10 MB.');
+      }
+      JsonResponse::success($service->importRecipientsFromFile((string) ($input['type'] ?? 'propietarios'), $file));
+    } catch (\InvalidArgumentException | \RuntimeException $exception) {
+      if ($exception instanceof \PDOException) { throw $exception; }
+      JsonResponse::error($exception->getMessage(), 422);
+    }
+  }
+
+  public function notificationQueue(array $input): never
+  {
+    $service = $this->notificationService($input);
+    JsonResponse::success($service->notificationQueue($input));
+  }
+
+  public function sendNotifications(array $input): never
+  {
+    $service = $this->notificationService($input, true);
+    try {
+      $type = (string) ($input['type'] ?? 'propietarios');
+      $ids = (array) ($input['ids'] ?? []);
+      if ((string) ($input['all_filtered'] ?? '') === '1') {
+        $ids = $service->idsForFilter($type, (string) ($input['q'] ?? ''), 501, (string) ($input['contract_status'] ?? ''), (string) ($input['inmueble_simi'] ?? ''), (string) ($input['contract_number'] ?? ''));
+        if (count($ids) > 500) {
+          throw new \InvalidArgumentException('Ajusta los filtros a un máximo de 500 contactos.');
+        }
+        $ids = array_values(array_diff($ids, array_map('intval', (array) ($input['exclude_ids'] ?? []))));
+      }
+      if (count($ids) > 500) {
+        throw new \InvalidArgumentException('Selecciona hasta 500 destinatarios por envío. Ajusta los filtros.');
+      }
+      $media = [];
+      $file = (array) ($_FILES['media'] ?? []);
+      if ((int) ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+        $media = StoredFileService::fromRuntime()->storeNotificationMedia($file, (string) ($input['media_type'] ?? ''));
+      }
+      $service->prepareDelivery((string) ($input['request_id'] ?? ''), $media);
+      $result = $service->enqueue($type, $ids, (array) ($input['channels'] ?? []), trim((string) ($input['subject'] ?? '')), trim((string) ($input['message'] ?? '')), (string) ($input['whatsapp_template'] ?? ''));
+      JsonResponse::success($result + ['message' => sprintf('%d notificaciones en cola; %d sin contacto válido, %d bloqueadas por preferencias y %d con error.', $result['queued'], $result['invalid'], $result['filtered'], $result['failed'])]);
+    } catch (\InvalidArgumentException | \RuntimeException $exception) {
+      if ($exception instanceof \PDOException) { throw $exception; }
+      JsonResponse::error($exception->getMessage(), 422);
+    }
+  }
+
   private function verify(array $input): void
   {
     if (!$this->csrf->verify('commercial_nonce', (string) ($input['nonce'] ?? ''), false)) {

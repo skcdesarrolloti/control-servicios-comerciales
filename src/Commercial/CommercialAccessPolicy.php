@@ -20,6 +20,7 @@ final class CommercialAccessPolicy
     'mis_tickets' => 'Mis tareas',
     'actualizaciones' => 'Actualizaciones de inmuebles',
     'avisos' => 'Avisos en fachada',
+    'notificaciones' => 'Notificaciones comerciales',
   ];
 
   public const ACTIONS = [
@@ -32,6 +33,7 @@ final class CommercialAccessPolicy
     'cerrar' => 'Cerrar tareas',
     'cambiar_estado' => 'Cambiar estado comercial',
     'reasignar' => 'Reasignar responsable',
+    'enviar_notificacion' => 'Enviar notificaciones comerciales',
   ];
 
   private Settings $settings;

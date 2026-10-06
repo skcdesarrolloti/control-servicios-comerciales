@@ -9,7 +9,7 @@ use SCM\Core\Database;
 use SCM\Support\EmailTemplate;
 use SCM\Support\SchemaInspector;
 
-final class AdministrativeNotificationsService
+class AdministrativeNotificationsService
 {
   public const PROJECT_CODE = 'control-servicios-inmobiliarios';
   public const SOURCE_MODULE = 'admin_notifications';
@@ -19,8 +19,8 @@ final class AdministrativeNotificationsService
   public const DEFAULT_EMAIL_TEMPLATE = 'scm_email_generica_v1';
   public const DEFAULT_WHATSAPP_TEMPLATE = 'scm_notificacion_general_v1';
 
-  private Database $db;
-  private SchemaInspector $schema;
+  protected Database $db;
+  protected SchemaInspector $schema;
   /** @var array{name:string,cargo:string,phone:string,signature:string}|null */
   private ?array $senderProfile = null;
 
@@ -529,6 +529,9 @@ final class AdministrativeNotificationsService
     }
 
     $recipients = $this->recipients($type, $ids, $recipientMetaMap);
+    if (count($recipients) !== count($ids)) {
+      throw new \RuntimeException('Uno o más destinatarios no están disponibles para tu usuario. Actualiza la selección.');
+    }
     $batchId = bin2hex(random_bytes(8));
     $queued = 0;
     $failed = 0;
@@ -983,7 +986,7 @@ final class AdministrativeNotificationsService
       }
     }
     $rows = $this->db->getResults(
-      'SELECT ' . implode(', ', $select) . " FROM `{$table}` WHERE `_ID` IN ({$placeholders})",
+      'SELECT ' . implode(', ', $select) . " FROM `{$table}` WHERE (" . $this->baseWhere($config) . ") AND `_ID` IN ({$placeholders})",
       $ids
     );
     foreach ($rows as &$row) {
@@ -999,7 +1002,7 @@ final class AdministrativeNotificationsService
     return $rows;
   }
 
-  private function isBlockedByPreference(array $recipient, string $channel, string $type): bool
+  protected function isBlockedByPreference(array $recipient, string $channel, string $type): bool
   {
     if ($type === 'funcionarios') {
       return false;
@@ -1103,7 +1106,7 @@ final class AdministrativeNotificationsService
    * @param array<string,mixed> $recipient
    * @return array{label:string,summary:string}
    */
-  private function contractActivityInfo(string $type, array $config, array $recipient, string $contractStatus = '', string $inmuebleSimi = '', string $contractNumber = ''): array
+  protected function contractActivityInfo(string $type, array $config, array $recipient, string $contractStatus = '', string $inmuebleSimi = '', string $contractNumber = ''): array
   {
     if (empty($config['contract_actor_column'])) {
       return ['label' => '', 'summary' => ''];
@@ -1310,7 +1313,7 @@ final class AdministrativeNotificationsService
   }
 
   /** @param array<string,mixed> $whatsappTemplateConfig */
-  private function insertQueueRow(string $channel, string $destination, array $recipient, string $subject, string $message, string $batchId, array $whatsappTemplateConfig = [], array $emailTemplateConfig = []): bool
+  protected function insertQueueRow(string $channel, string $destination, array $recipient, string $subject, string $message, string $batchId, array $whatsappTemplateConfig = [], array $emailTemplateConfig = []): bool
   {
     $now = gmdate('Y-m-d H:i:s');
     $actorId = (int) ($recipient['_ID'] ?? 0);
@@ -1797,7 +1800,7 @@ final class AdministrativeNotificationsService
   }
 
   /** @param array<string,mixed> $config */
-  private function baseWhere(array $config): string
+  protected function baseWhere(array $config): string
   {
     $table = (string) $config['table'];
     if (!empty($config['only_active']) && $this->schema->columnExists($table, 'activo')) {

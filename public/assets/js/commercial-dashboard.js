@@ -627,6 +627,9 @@
         if (options.history !== false) updateHistory(nextUrl, !!options.replace);
         maybeAutoOpenAdvisory();
         initHomeControls();
+        if (typeof window.initCommercialNotifications === "function") {
+          window.initCommercialNotifications(ticketsPanel);
+        }
         if (tab === "calendario" || ticketsPanel.querySelector("[data-scm-calendar-panel]")) {
           if (typeof window.initCalendarPanel === "function") {
             window.initCalendarPanel(ticketsPanel);

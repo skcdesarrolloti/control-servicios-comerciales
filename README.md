@@ -54,6 +54,26 @@ La configuración compartida está en `tailwind.config.cjs` y la entrada en `res
 
 Las fuentes de Google, Font Awesome y SweetAlert siguen usando sus proveedores externos; este cambio elimina la dependencia externa de Tailwind.
 
+## Notificaciones comerciales
+
+La pestaña **Notificaciones** reutiliza la búsqueda, filtros por contrato, importación SIMI y preferencias del módulo inmobiliario. Incluye propietarios, arrendatarios, copropiedades y Club PPH. No incluye proveedores.
+
+En **Configurar permisos** se puede habilitar la vista **Notificaciones comerciales** y la acción **Enviar notificaciones comerciales** por cargo. Los cargos con acceso total ven todos los contactos y envíos. Los demás solo ven contactos creados por su `id_empleado`, contactos relacionados por `id_propietario`, `id_arrendatario` o `id_copropiedad` con inmuebles/contratos asignados al funcionario y miembros de Club PPH con su `id_empleado`. La misma restricción se aplica en el servidor al buscar, importar, seleccionar todos y enviar. Su cola solo muestra sus propios envíos.
+
+Los mensajes van a `skc_notification_queue` con `project_code=control-servicios-comerciales` y `source_module=commercial_notifications`. Los procesa el worker global existente; no hay envíos directos ni un cron nuevo. Se respetan bloqueos por canal y preferencias de notificaciones; WhatsApp también respeta `permite_marketing_whatsapp`. El identificador del envío y un bloqueo de MySQL/MariaDB impiden duplicados ante reintentos.
+
+WhatsApp dispone de cuatro plantillas genéricas con saludo y firma automática (nombre, cargo y celular reales del funcionario). Se requiere registrar las plantillas y obtener aprobación en Meta antes del primer envío. La guía con nombres, idioma, encabezados, cuerpo y ejemplos está dentro de la pestaña. Email incluye saludo y firma; SMS conserva el límite de 160 caracteres del módulo original.
+
+Los encabezados aceptan JPG/PNG, PDF y MP4. Los límites son 5 MB para imágenes, 100 MB para documentos y 16 MB para videos, sujetos al límite `UPLOAD_MAX_BYTES` de la app y a `upload_max_filesize`/`post_max_size` de PHP. Los archivos se guardan en `storage/uploads` y se sirven mediante `public/file.php` con firma HMAC, sin acceso por nombre solamente. El correo incluye un enlace firmado al archivo. El servidor debe poder servir esos enlaces por HTTPS al worker y a Meta.
+
+Verificación aislada, sin contactos ni envíos reales:
+
+```bash
+php tools/check-commercial-notifications.php
+```
+
+Para revisar la interfaz con datos ficticios, genera `output/notifications-preview.html` con `php tools/preview-commercial-notifications.php` y sirve el repositorio localmente en `127.0.0.1:8769`. La prueba opcional `tools/check-commercial-notifications-ui.cjs` usa Playwright/Edge y comprueba vista previa, encabezados, selección, cola, API y diseño móvil. Su API de pruebas funciona solo en el servidor CLI local con una base SQLite en memoria.
+
 ## Autologin firmado
 
 El autologin está desactivado por defecto. Para habilitarlo configura:

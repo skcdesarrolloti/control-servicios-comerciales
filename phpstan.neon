@@ -10,5 +10,6 @@ parameters:
     - src/Views/CommercialDashboardView.php
     - src/Views/CommercialGuideView.php
     - src/Views/CommercialTicketModalView.php
+    - src/Views/CommercialNotificationsView.php
   bootstrapFiles:
     - tests/phpstan-bootstrap.php

@@ -72,6 +72,37 @@ final class StoredFileService
       . '&s=' . rawurlencode($this->signature($name));
   }
 
+  /** @param array<string,mixed> $file @return array{type:string,url:string,name:string} */
+  public function storeNotificationMedia(array $file, string $type): array
+  {
+    $limits = ['image' => 5 * 1024 * 1024, 'document' => 100 * 1024 * 1024, 'video' => 16 * 1024 * 1024];
+    if (!isset($limits[$type]) || !$this->isAcceptableUpload($file)) {
+      throw new \InvalidArgumentException('No se pudo recibir el archivo. Verifica su tamaño y vuelve a intentarlo.');
+    }
+    $path = (string) $file['tmp_name'];
+    $bytes = filesize($path);
+    if ($bytes === false || $bytes > min($limits[$type], $this->maxBytes)) {
+      throw new \InvalidArgumentException('El archivo excede el tamaño permitido.');
+    }
+    $mime = $this->detectMime($path);
+    $formats = [
+      'image' => ['image/jpeg' => 'jpg', 'image/png' => 'png'],
+      'document' => ['application/pdf' => 'pdf'],
+      'video' => ['video/mp4' => 'mp4'],
+    ];
+    if (!isset($formats[$type][$mime]) || ($type === 'image' && @getimagesize($path) === false)) {
+      throw new \InvalidArgumentException('Formato inválido: usa JPG/PNG, PDF o video MP4 según la plantilla.');
+    }
+    if (!$this->ensureDirectory()) {
+      throw new \RuntimeException('No se pudo crear el directorio de archivos.');
+    }
+    $stored = $this->moveUpload($path, $formats[$type][$mime]);
+    if ($stored === '') {
+      throw new \RuntimeException('No se pudo guardar el archivo.');
+    }
+    return ['type' => $type, 'url' => $this->urlFor($stored), 'name' => basename((string) $file['name'])];
+  }
+
   public function isValidSignature(string $name, string $signature): bool
   {
     $name = basename($name);
