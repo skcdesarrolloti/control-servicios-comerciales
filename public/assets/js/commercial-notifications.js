@@ -236,7 +236,6 @@
       if (button.hasAttribute("data-notif-queue-prev")) { queuePage--; loadQueue(); }
       if (button.hasAttribute("data-notif-queue-next")) { queuePage++; loadQueue(); }
       if (button.hasAttribute("data-notif-queue-refresh")) loadQueue();
-      if (button.hasAttribute("data-notif-copy-template")) navigator.clipboard.writeText(el("[data-notif-template-body]").textContent).then(function () { feedback("Cuerpo de plantilla copiado."); }).catch(function () { feedback("No se pudo copiar automáticamente. Selecciona el texto de la plantilla y cópialo.", true); });
     });
     panel.addEventListener("change", function (event) {
       var target = event.target;
