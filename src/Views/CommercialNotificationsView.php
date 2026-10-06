@@ -37,11 +37,6 @@ final class CommercialNotificationsView
   </div>
   <p data-notif-feedback role="status" aria-live="polite" class="text-sm font-medium text-secondary" hidden></p>
   <div id="notif-recipients-panel" role="tabpanel" aria-labelledby="notif-recipients-tab" data-notif-panel="recipients" class="space-y-5">
-    <div class="flex flex-wrap gap-2" aria-label="Enviar a los destinatarios seleccionados">
-      <?php foreach (['whatsapp' => 'WhatsApp', 'email' => 'Correo', 'sms' => 'SMS', 'all' => 'Todos los canales'] as $channel => $label): ?>
-      <button type="button" data-notif-open-channel="<?php echo $channel; ?>" disabled class="<?php echo $secondary; ?> <?php echo $channel === 'all' ? 'bg-primary-container' : 'bg-white'; ?>"><span class="material-symbols-outlined text-[18px]" aria-hidden="true"><?php echo ['whatsapp' => 'chat', 'email' => 'mail', 'sms' => 'sms', 'all' => 'send'][$channel]; ?></span><?php echo $label; ?></button>
-      <?php endforeach; ?>
-    </div>
     <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
       <?php foreach ($types as $key => $type): ?>
       <button type="button" data-notif-type="<?php echo esc_attr($key); ?>" aria-pressed="false" class="p-4 rounded-2xl bg-white border border-slate-200 text-left hover:shadow-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-container transition-shadow">
@@ -53,7 +48,18 @@ final class CommercialNotificationsView
     <p class="text-xs text-secondary">Activos: con contrato Entregado. No activos: con contrato Recibido y sin contratos Entregados.</p>
     <div class="rounded-2xl bg-white border border-slate-200 shadow-card overflow-hidden">
         <div class="p-5 border-b border-slate-100 space-y-4">
-          <div class="flex flex-wrap items-center justify-between gap-3"><h3 class="font-semibold text-title-md" data-notif-actor-title>Selecciona una categoría</h3><div class="flex gap-2 items-center"><span class="text-xs bg-primary-container/30 text-on-surface px-3 py-1.5 rounded-full" data-notif-selected>0 seleccionados</span><button type="button" data-notif-recipient-refresh disabled class="<?php echo $secondary; ?>" aria-label="Actualizar destinatarios"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">refresh</span></button></div></div>
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <h3 class="font-semibold text-title-md" data-notif-actor-title>Selecciona una categoría</h3>
+            <div class="flex flex-wrap gap-2 items-center">
+              <span class="shrink-0 text-xs bg-primary-container/30 text-on-surface px-3 py-1.5 rounded-full" data-notif-selected>0 seleccionados</span>
+              <div class="flex flex-wrap gap-2" aria-label="Enviar a los destinatarios seleccionados">
+                <?php foreach (['whatsapp' => 'WhatsApp', 'email' => 'Correo', 'sms' => 'SMS', 'all' => 'Todos los canales'] as $channel => $label): ?>
+                <button type="button" data-notif-open-channel="<?php echo $channel; ?>" disabled class="<?php echo $secondary; ?> <?php echo $channel === 'all' ? 'bg-primary-container' : 'bg-white'; ?>"><span class="material-symbols-outlined text-[18px]" aria-hidden="true"><?php echo ['whatsapp' => 'chat', 'email' => 'mail', 'sms' => 'sms', 'all' => 'send'][$channel]; ?></span><?php echo $label; ?></button>
+                <?php endforeach; ?>
+              </div>
+              <button type="button" data-notif-recipient-refresh disabled class="<?php echo $secondary; ?>" aria-label="Actualizar destinatarios"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">refresh</span></button>
+            </div>
+          </div>
           <form data-notif-search class="space-y-3">
             <fieldset disabled data-notif-search-controls class="space-y-3">
             <div><label for="notif-search" class="block text-xs font-medium mb-1.5">Nombre, documento, correo o celular</label><input id="notif-search" name="q" type="search" maxlength="150" class="<?php echo $field; ?>" placeholder="Buscar contacto…"></div>
