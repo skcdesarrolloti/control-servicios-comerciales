@@ -985,9 +985,12 @@ class AdministrativeNotificationsService
         $select[] = "`{$preferenceColumn}`";
       }
     }
+    $where = $this->baseWhere($config);
+    $args = [];
+    $this->applyContractFilters($where, $args, $type, $config, $this->effectiveContractStatus($config, ''));
     $rows = $this->db->getResults(
-      'SELECT ' . implode(', ', $select) . " FROM `{$table}` WHERE (" . $this->baseWhere($config) . ") AND `_ID` IN ({$placeholders})",
-      $ids
+      'SELECT ' . implode(', ', $select) . " FROM `{$table}` WHERE ({$where}) AND `_ID` IN ({$placeholders})",
+      array_merge($args, $ids)
     );
     foreach ($rows as &$row) {
       $row['tipo_actor'] = $type;

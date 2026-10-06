@@ -11,7 +11,7 @@
     var compose = panel.querySelector("[data-notif-compose]");
     var selected = new Map();
     var excluded = new Set();
-    var type = "propietarios", page = 1, pages = 1, total = 0, allFiltered = false;
+    var type = "propietarios_activos", page = 1, pages = 1, total = 0, allFiltered = false;
     var queuePage = 1, queuePages = 1, sequence = 0, busy = false, lastFingerprint = "";
     var appliedFilters = {q: "", contract_status: "", inmueble_simi: "", contract_number: ""};
     var mediaPreviewUrl = "";
@@ -139,7 +139,10 @@
       if (button.dataset.notifType) {
         type = button.dataset.notifType; page = 1; search.reset(); appliedFilters = {q: "", contract_status: "", inmueble_simi: "", contract_number: ""}; resetSelection();
         panel.querySelectorAll("[data-notif-type]").forEach(function (node) { var active = node === button; node.setAttribute("aria-pressed", String(active)); node.classList.toggle("ring-2", active); node.classList.toggle("ring-primary-container", active); node.classList.toggle("border-primary-container", active); });
-        el("[data-notif-contract-filters]").hidden = type === "club_pph"; el("[data-notif-import-wrap]").hidden = type === "club_pph";
+        el("[data-notif-contract-filters]").hidden = type === "club_pph";
+        el("[data-notif-contract-status-wrap]").hidden = type !== "copropiedades";
+        el("[data-notif-contract-filters]").classList.toggle("sm:grid-cols-3", type === "copropiedades");
+        el("[data-notif-contract-filters]").classList.toggle("sm:grid-cols-2", type !== "copropiedades");
         feedback(""); loadRecipients();
       }
       if (button.dataset.notifView) {
@@ -183,11 +186,6 @@
       page = 1; resetSelection(); feedback(""); loadRecipients();
     });
     search.addEventListener("reset", function () { if (busy) return; setTimeout(function () { appliedFilters = Object.fromEntries(new FormData(search).entries()); page = 1; resetSelection(); loadRecipients(); }, 0); });
-    el("[data-notif-import]").addEventListener("submit", async function (event) {
-      event.preventDefault(); var form = event.target, button = form.querySelector("button"), importType = type, importSequence = sequence; button.disabled = true;
-      try { var data = new FormData(form); data.set("type", importType); var result = await api("commercial_notifications_import", data); if (!panel.isConnected || type !== importType || sequence !== importSequence) return; selected.clear(); allFiltered = false; result.rows.forEach(function (row) { selected.set(String(row._ID), row.nombre); }); updateSelection(); feedback(result.matched + " contactos seleccionados; " + result.unmatched + " filas sin coincidencia y " + result.duplicates + " duplicadas."); }
-      catch (error) { feedback(error.message, true); } finally { button.disabled = false; }
-    });
     compose.addEventListener("submit", async function (event) {
       event.preventDefault(); if (busy) return;
       var chosen = channels(), count = allFiltered ? total - excluded.size : selected.size;

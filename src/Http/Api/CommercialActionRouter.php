@@ -35,7 +35,6 @@ final class CommercialActionRouter
       'commercial_notifications_recipients' => 'notificationRecipients',
       'commercial_notifications_send' => 'sendNotifications',
       'commercial_notifications_queue' => 'notificationQueue',
-      'commercial_notifications_import' => 'importNotificationRecipients',
       'commercial_property_updates' => 'propertyUpdates',
       'commercial_signs_control' => 'signsControl',
       'commercial_property_detail' => 'propertyDetail',

@@ -8,7 +8,7 @@ use SCM\Core\Auth;
 use SCM\Core\Database;
 use SCM\Modules\AdministrativeNotifications\AdministrativeNotificationsService;
 
-/** Reutiliza búsqueda, contratos, importación y preferencias del módulo inmobiliario. */
+/** Reutiliza búsqueda, contratos y preferencias del módulo inmobiliario. */
 final class CommercialNotificationsService extends AdministrativeNotificationsService
 {
   public const PROJECT_CODE = 'control-servicios-comerciales';
@@ -67,12 +67,12 @@ final class CommercialNotificationsService extends AdministrativeNotificationsSe
   {
     $original = parent::types();
     $types = [];
-    foreach (['propietarios', 'arrendatarios', 'copropiedades'] as $key) {
-      $config = $original[$key . ($key === 'copropiedades' ? '_activas' : '_activos')];
-      unset($config['contract_status_fixed']);
-      $config['label'] = ucfirst($key);
-      $types[$key] = $config;
+    foreach (['propietarios_activos', 'propietarios_no_activos', 'arrendatarios_activos', 'arrendatarios_no_activos'] as $key) {
+      $types[$key] = $original[$key];
     }
+    $types['copropiedades'] = $original['copropiedades_activas'];
+    unset($types['copropiedades']['contract_status_fixed']);
+    $types['copropiedades']['label'] = 'Copropiedades';
     $types['club_pph'] = [
       'label' => 'Club PPH', 'role' => 'Club PPH', 'table' => $this->db->table('jet_cct_club_pph'),
       'name' => ['nombre'], 'email' => ['correo'], 'phone' => ['telefono'], 'indicator' => ['indicativo'],
@@ -108,7 +108,7 @@ final class CommercialNotificationsService extends AdministrativeNotificationsSe
     ]];
   }
 
-  /** Todos los accesos (búsqueda, estadísticas, selección total, importación y envío) usan esta misma regla. */
+  /** Todos los accesos (búsqueda, estadísticas, selección total y envío) usan esta misma regla. */
   protected function baseWhere(array $config): string
   {
     $where = parent::baseWhere($config);

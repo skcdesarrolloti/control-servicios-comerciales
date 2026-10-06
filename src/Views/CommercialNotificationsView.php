@@ -33,33 +33,28 @@ final class CommercialNotificationsView
   </div>
   <p data-notif-feedback role="status" aria-live="polite" class="text-sm font-medium text-secondary" hidden></p>
   <div id="notif-recipients-panel" role="tabpanel" aria-labelledby="notif-recipients-tab" data-notif-panel="recipients" class="space-y-5">
-    <div class="grid grid-cols-2 xl:grid-cols-4 gap-3">
+    <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
       <?php foreach ($types as $key => $type): ?>
-      <button type="button" data-notif-type="<?php echo esc_attr($key); ?>" aria-pressed="<?php echo $key === 'propietarios' ? 'true' : 'false'; ?>" class="p-4 rounded-2xl bg-white border <?php echo $key === 'propietarios' ? 'border-primary-container ring-2 ring-primary-container' : 'border-slate-200'; ?> text-left hover:shadow-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-container transition-shadow">
-        <span class="flex items-center justify-between gap-2 text-sm font-medium"><span><?php echo esc_html($type['label']); ?></span><span class="material-symbols-outlined text-secondary text-[20px]" aria-hidden="true"><?php echo ['propietarios' => 'home_work', 'arrendatarios' => 'key', 'copropiedades' => 'apartment', 'club_pph' => 'loyalty'][$key]; ?></span></span>
+      <button type="button" data-notif-type="<?php echo esc_attr($key); ?>" aria-pressed="<?php echo $key === 'propietarios_activos' ? 'true' : 'false'; ?>" class="p-4 rounded-2xl bg-white border <?php echo $key === 'propietarios_activos' ? 'border-primary-container ring-2 ring-primary-container' : 'border-slate-200'; ?> text-left hover:shadow-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-container transition-shadow">
+        <span class="flex min-h-[40px] items-start justify-between gap-2 text-sm font-medium"><span><?php echo esc_html($type['label']); ?></span><span class="material-symbols-outlined shrink-0 text-secondary text-[20px]" aria-hidden="true"><?php echo ['Propietario' => 'home_work', 'Arrendatario' => 'key', 'Copropiedad' => 'apartment', 'Club PPH' => 'loyalty'][$type['role']]; ?></span></span>
         <strong class="block text-2xl mt-2" data-notif-total="<?php echo esc_attr($key); ?>">—</strong><span class="block text-xs text-secondary mt-1" data-notif-contact="<?php echo esc_attr($key); ?>">Cargando contactos…</span>
       </button>
       <?php endforeach; ?>
     </div>
+    <p class="text-xs text-secondary">Activos: con contrato Entregado. No activos: con contrato Recibido y sin contratos Entregados.</p>
     <div class="grid grid-cols-1 xl:grid-cols-12 gap-5 items-start">
       <div class="xl:col-span-7 rounded-2xl bg-white border border-slate-200 shadow-card overflow-hidden">
         <div class="p-5 border-b border-slate-100 space-y-4">
           <div class="flex items-center justify-between gap-3"><h3 class="font-semibold text-title-md">1. Selecciona destinatarios</h3><span class="text-xs bg-primary-container/30 text-on-surface px-3 py-1.5 rounded-full" data-notif-selected>0 seleccionados</span></div>
           <form data-notif-search class="space-y-3">
             <div><label for="notif-search" class="block text-xs font-medium mb-1.5">Nombre, documento, correo o celular</label><input id="notif-search" name="q" type="search" maxlength="150" class="<?php echo $field; ?>" placeholder="Buscar contacto…"></div>
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3" data-notif-contract-filters>
-              <div><label for="notif-contract-status" class="block text-xs font-medium mb-1.5">Estado del contrato</label><select id="notif-contract-status" name="contract_status" class="<?php echo $field; ?>"><option value="">Todos</option value="activos">Activo</option><option value="no_activos">No activo</option></select></div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3" data-notif-contract-filters>
+              <div data-notif-contract-status-wrap hidden><label for="notif-contract-status" class="block text-xs font-medium mb-1.5">Estado del contrato</label><select id="notif-contract-status" name="contract_status" class="<?php echo $field; ?>"><option value="">Todos</option><option value="activos">Activo</option><option value="no_activos">No activo</option></select></div>
               <div><label for="notif-property" class="block text-xs font-medium mb-1.5">Inmueble SIMI</label><input id="notif-property" name="inmueble_simi" maxlength="50" class="<?php echo $field; ?>" placeholder="Código del inmueble"></div>
               <div><label for="notif-contract" class="block text-xs font-medium mb-1.5">Contrato</label><input id="notif-contract" name="contract_number" maxlength="50" class="<?php echo $field; ?>" placeholder="Número de contrato"></div>
             </div>
             <div class="flex flex-wrap gap-2"><button type="submit" class="<?php echo $secondary; ?> bg-inverse-surface text-white hover:bg-secondary"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">search</span>Buscar</button><button type="reset" class="<?php echo $secondary; ?>">Limpiar filtros</button></div>
           </form>
-          <details data-notif-import-wrap class="text-sm rounded-xl bg-surface-container-low p-3">
-            <summary class="cursor-pointer font-medium">Seleccionar desde Excel SIMI</summary>
-            <p class="mt-2 text-xs text-secondary">Cruza contratos o inmuebles con los contactos de esta categoría. Solo se incluyen los que tienes disponibles.</p>
-            <form data-notif-import class="flex flex-wrap gap-2 mt-3"><input name="file" type="file" accept=".xlsx,.csv" aria-label="Archivo Excel o CSV SIMI" required class="min-w-0 w-full text-xs"><button type="submit" class="<?php echo $secondary; ?>">Importar y seleccionar</button></form>
-            <a href="<?php echo esc_url(SCM_BASE_URL . '/assets/examples/notificaciones-importacion-simi.xlsx'); ?>" download class="inline-block mt-2 text-xs text-secondary underline">Descargar ejemplo XLSX</a>
-          </details>
         </div>
         <div class="px-5 py-3 flex flex-wrap items-center gap-3 border-b border-slate-100 text-xs"><label class="inline-flex items-center gap-2 min-h-[44px]"><input type="checkbox" data-notif-select-page class="accent-[#735c00] w-4 h-4">Seleccionar página</label><button type="button" data-notif-select-all class="underline text-secondary min-h-[44px]">Seleccionar todos los resultados</button><button type="button" data-notif-clear class="underline text-secondary min-h-[44px]">Quitar selección</button></div>
         <div data-notif-recipients aria-live="polite" aria-busy="true" class="divide-y divide-slate-100"><p class="p-8 text-center text-sm text-secondary">Cargando destinatarios…</p></div>

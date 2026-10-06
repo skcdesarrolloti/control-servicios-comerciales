@@ -560,28 +560,12 @@ final class CommercialApiController
     $service = $this->notificationService($input);
     try {
       $result = $service->search(
-        (string) ($input['type'] ?? 'propietarios'), mb_substr(trim((string) ($input['q'] ?? '')), 0, 150),
+        (string) ($input['type'] ?? 'propietarios_activos'), mb_substr(trim((string) ($input['q'] ?? '')), 0, 150),
         max(1, (int) ($input['page'] ?? 1)), 20, (string) ($input['contract_status'] ?? ''),
         mb_substr(trim((string) ($input['inmueble_simi'] ?? '')), 0, 50), mb_substr(trim((string) ($input['contract_number'] ?? '')), 0, 50)
       );
       $result['stats'] = $service->stats();
       JsonResponse::success($result);
-    } catch (\InvalidArgumentException | \RuntimeException $exception) {
-      if ($exception instanceof \PDOException) { throw $exception; }
-      JsonResponse::error($exception->getMessage(), 422);
-    }
-  }
-
-  public function importNotificationRecipients(array $input): never
-  {
-    $service = $this->notificationService($input);
-    try {
-      $file = (array) ($_FILES['file'] ?? []);
-      $path = (string) ($file['tmp_name'] ?? '');
-      if (!is_uploaded_file($path) || filesize($path) > 10485760) {
-        throw new \InvalidArgumentException('Sube un archivo de importación de hasta 10 MB.');
-      }
-      JsonResponse::success($service->importRecipientsFromFile((string) ($input['type'] ?? 'propietarios'), $file));
     } catch (\InvalidArgumentException | \RuntimeException $exception) {
       if ($exception instanceof \PDOException) { throw $exception; }
       JsonResponse::error($exception->getMessage(), 422);
@@ -598,7 +582,7 @@ final class CommercialApiController
   {
     $service = $this->notificationService($input, true);
     try {
-      $type = (string) ($input['type'] ?? 'propietarios');
+      $type = (string) ($input['type'] ?? 'propietarios_activos');
       $ids = (array) ($input['ids'] ?? []);
       if ((string) ($input['all_filtered'] ?? '') === '1') {
         $ids = $service->idsForFilter($type, (string) ($input['q'] ?? ''), 501, (string) ($input['contract_status'] ?? ''), (string) ($input['inmueble_simi'] ?? ''), (string) ($input['contract_number'] ?? ''));

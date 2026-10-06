@@ -31,7 +31,7 @@ final class CommercialNotificationsFixture
       'wp_jet_cct_copropiedades' => '_ID INTEGER PRIMARY KEY, copropiedad TEXT, correo TEXT, contacto TEXT, indicativo TEXT, cct_author_id TEXT',
       'wp_jet_cct_club_pph' => '_ID INTEGER PRIMARY KEY, nombre TEXT, correo TEXT, telefono TEXT, indicativo TEXT, cct_author_id TEXT, id_empleado TEXT',
       'wp_jet_cct_inmuebles' => '_ID INTEGER PRIMARY KEY, id_funcionario TEXT, id_propietario TEXT, id_arrendatario TEXT, id_copropiedad TEXT',
-      'wp_jet_cct_contratos_arrendamiento' => '_ID INTEGER PRIMARY KEY, id_empleado TEXT, id_propietario TEXT, id_arrendatario TEXT, id_copropiedad TEXT',
+      'wp_jet_cct_contratos_arrendamiento' => '_ID INTEGER PRIMARY KEY, id_empleado TEXT, id_propietario TEXT, id_arrendatario TEXT, id_copropiedad TEXT, estado TEXT',
       'skc_notification_queue' => 'id INTEGER PRIMARY KEY AUTOINCREMENT, project_code TEXT, source_module TEXT, channel TEXT, provider TEXT, destination TEXT, destination_name TEXT, subject TEXT, message_text TEXT, message_html TEXT, template_name TEXT, template_language TEXT, payload_json TEXT, meta_json TEXT, status TEXT, priority INTEGER, max_attempts INTEGER, scheduled_at TEXT, created_at TEXT, updated_at TEXT, created_by TEXT, dedupe_key TEXT, attempts INTEGER DEFAULT 0, sent_at TEXT, last_error TEXT',
     ];
     foreach ($tables as $table => $definition) {
@@ -44,7 +44,14 @@ final class CommercialNotificationsFixture
     $pdo->exec("INSERT INTO wp_jet_cct_funcionarios VALUES (1,'900','Ana Pérez','Consultora','9','3001234567','ana@example.test','Si'),(2,'901','Otro usuario','Consultor','9','3007654321','otro@example.test','Si'),(3,'999','Administrador','Administrador','11','3005555555','admin@example.test','Si')");
     $pdo->exec("INSERT INTO wp_jet_cct_cargos VALUES (9,'Consultora de Arriendo'),(11,'Administrador')");
     $pdo->exec("INSERT INTO wp_jet_cct_inmuebles VALUES (1,'900','2011','2020','30')");
-    $pdo->exec("INSERT INTO wp_jet_cct_contratos_arrendamiento VALUES (1,'900','2012','2021','31')");
+    $pdo->exec("INSERT INTO wp_jet_cct_contratos_arrendamiento VALUES
+      (1,'900','2012','2021','31','Recibido'),
+      (2,'901','2010','2022','','Entregado'),
+      (3,'901','2011','2020','','Recibido'),
+      (4,'901','2013','2023','','Entregado'),
+      (5,'901','2014','','','Entregado'),
+      (6,'901','2015','','','Entregado'),
+      (7,'901','2010','2020','','Entregado')");
     $db = new Database($pdo);
     foreach ([10 => '900', 11 => '901', 12 => '901', 13 => '901', 14 => '900', 15 => '900'] as $id => $author) {
       $db->insert('wp_jet_cct_propietarios', ['_ID' => $id, 'id_propietario' => '20' . $id, 'nombre' => 'Propietario ' . $id, 'correo' => 'persona' . $id . '@example.test', 'celular' => '3001234567', 'indicativo' => '57', 'cct_author_id' => $author, 'bloqueo_whatsapp' => $id === 14 ? 1 : 0, 'permite_marketing_whatsapp' => $id === 15 ? 0 : 1]);
