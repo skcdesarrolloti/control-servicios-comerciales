@@ -5,6 +5,7 @@
 /.phpunit.cache/
 /.phpunit.result.cache
 /vendor/
+/node_modules/
 /.vendor-test-junction
 /storage/data/*
 /storage/logs/*

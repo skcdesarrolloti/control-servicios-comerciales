@@ -1,0 +1,10 @@
+{
+  "name": "control-servicios-comerciales-assets",
+  "private": true,
+  "scripts": {
+    "build:css": "tailwindcss -c tailwind.config.cjs -i resources/css/tailwind.css -o public/assets/css/tailwind.css --minify"
+  },
+  "devDependencies": {
+    "tailwindcss": "3.4.17"
+  }
+}

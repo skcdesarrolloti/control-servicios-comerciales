@@ -39,6 +39,21 @@ Panel PHP para consultar y gestionar tickets por `estado_comercial`, administrar
 
 4. Da permisos de escritura al proceso PHP únicamente sobre `storage/data`, `storage/logs` y `storage/uploads`.
 
+## Estilos locales del login y dashboard
+
+Ambas pantallas cargan `public/assets/css/tailwind.css` desde el mismo servidor, sin depender de `cdn.tailwindcss.com`. El CSS compilado se incluye en el repositorio y debe subirse junto con los archivos PHP; el servidor de producción no necesita Node.js.
+
+Si se agregan o cambian clases de Tailwind en PHP o JavaScript, regenera el archivo antes de desplegar:
+
+```bash
+npm ci
+npm run build:css
+```
+
+La configuración compartida está en `tailwind.config.cjs` y la entrada en `resources/css/tailwind.css`. Se incluyen las clases de las vistas PHP y de los elementos creados por JavaScript. Usa nombres de clase completos en las condiciones; evita construirlos concatenando fragmentos. La URL del CSS usa su fecha de modificación para renovar la caché al actualizarlo.
+
+Las fuentes de Google, Font Awesome y SweetAlert siguen usando sus proveedores externos; este cambio elimina la dependencia externa de Tailwind.
+
 ## Autologin firmado
 
 El autologin está desactivado por defecto. Para habilitarlo configura:
