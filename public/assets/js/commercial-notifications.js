@@ -18,6 +18,7 @@
     var mediaPreviewUrl = "";
     var originalSendDisabled = panel.querySelector("[data-notif-send]").disabled;
     var modal = panel.querySelector("[data-notif-modal]"), singleTarget = null, previewChannel = "whatsapp";
+    var confirmationModal = panel.querySelector("[data-notif-confirm-modal]"), resultModal = panel.querySelector("[data-notif-result-modal]"), confirming = false;
     var loading = false, suppressReset = false, recipientRequest = null, recipientCache = new Map();
     var statusLabels = {pending: "Pendiente", processing: "Procesando", sent: "Enviado", failed: "Fallido", cancelled: "Cancelado"};
     function newRequestId() { return Array.from(crypto.getRandomValues(new Uint8Array(16)), function (byte) { return byte.toString(16).padStart(2, "0"); }).join(""); }
@@ -73,6 +74,32 @@
     }
     modal.addEventListener("cancel", function (event) { if (busy) event.preventDefault(); });
     modal.addEventListener("close", function () { singleTarget = null; updateSelection(); });
+    confirmationModal.addEventListener("cancel", function (event) { if (busy) event.preventDefault(); });
+    function confirmSend(count, chosen) {
+      el("[data-notif-confirm-target]").textContent = singleTarget ? singleTarget.name : count + (count === 1 ? " destinatario seleccionado" : " destinatarios seleccionados");
+      el("[data-notif-confirm-channels]").textContent = chosen.map(function (channel) { return {whatsapp: "WhatsApp", email: "Correo", sms: "SMS"}[channel]; }).join(" · ");
+      el("[data-notif-confirm-progress]").hidden = true;
+      var yes = el("[data-notif-confirm-send]"), cancel = el("[data-notif-confirm-cancel]");
+      yes.disabled = false; cancel.disabled = false;
+      return new Promise(function (resolve) {
+        function finish(confirmed) { yes.removeEventListener("click", accept); cancel.removeEventListener("click", back); confirmationModal.removeEventListener("close", dismissed); resolve(confirmed); }
+        function accept() { finish(true); }
+        function back() { confirmationModal.close(); finish(false); }
+        function dismissed() { finish(false); }
+        yes.addEventListener("click", accept); cancel.addEventListener("click", back); confirmationModal.addEventListener("close", dismissed);
+        confirmationModal.showModal(); cancel.focus();
+      });
+    }
+    function showSendResult(result, error) {
+      var queued = result ? result.queued : 0, failed = result ? result.failed : 0;
+      el("[data-notif-result-title]").textContent = error ? "No se pudo confirmar el encolado" : (queued ? (failed ? "Encolado parcial" : "Mensajes encolados") : "No se encolaron mensajes");
+      el("[data-notif-result-description]").textContent = error ? error + " · Consulta la cola antes de volver a intentarlo." : (queued ? "Los mensajes quedaron en la cola para su envío. Puedes consultar su estado y los resultados de entrega." : "Revisa los datos de contacto, las preferencias y la cantidad de errores antes de volver a intentarlo.");
+      el("[data-notif-result-icon]").textContent = error || !queued || failed ? "info" : "task_alt";
+      el("[data-notif-result-counts]").hidden = !!error; el("[data-notif-result-help]").hidden = !!error;
+      panel.querySelectorAll("[data-notif-result-count]").forEach(function (node) { node.textContent = result ? result[node.dataset.notifResultCount].toLocaleString("es-CO") : "0"; });
+      el("[data-notif-result-queue]").hidden = !error && !queued;
+      resultModal.showModal(); el("[data-notif-result-close]").focus();
+    }
     function updateSelection() {
       var selectedCount = allFiltered ? total - excluded.size : selected.size;
       el("[data-notif-selected]").textContent = selectedCount + " seleccionados";
@@ -159,7 +186,7 @@
         var emailHtml = config.email_document.replaceAll("__SCM_NAME__", function () { return esc(name); }).replaceAll("__SCM_SUBJECT__", function () { return esc(compose.elements.subject.value.trim() || "Información de SKC SuCasa Inmobiliaria"); }).replaceAll("__SCM_MESSAGE__", function () { return esc(message || "[Tu mensaje]").replace(/\n/g, "<br>"); });
         if (el("[data-notif-email-preview]").srcdoc !== emailHtml) el("[data-notif-email-preview]").srcdoc = emailHtml;
       }
-      el("[data-notif-modal-target]").textContent = singleTarget ? "Destinatario: " + singleTarget.name : targetCount() + " destinatarios seleccionados";
+      el("[data-notif-modal-target]").textContent = singleTarget ? "Destinatario: " + singleTarget.name : targetCount() + (targetCount() === 1 ? " destinatario seleccionado" : " destinatarios seleccionados");
       el("[data-notif-email-fields]").hidden = !chosen.includes("email");
       el("[data-notif-whatsapp-fields]").hidden = !chosen.includes("whatsapp");
       el("[data-notif-media-fields]").hidden = !mediaType() || (!chosen.includes("whatsapp") && !chosen.includes("email"));
@@ -209,6 +236,8 @@
       if (button.hasAttribute("data-notif-open-channel")) openComposer(button.dataset.notifOpenChannel);
       if (button.hasAttribute("data-notif-single-channel")) openComposer(button.dataset.notifSingleChannel, {id: button.dataset.id, name: button.dataset.name});
       if (button.hasAttribute("data-notif-close")) modal.close();
+      if (button.hasAttribute("data-notif-result-close")) resultModal.close();
+      if (button.hasAttribute("data-notif-result-queue")) { resultModal.close(); if (modal.open) modal.close(); queuePage = 1; el("[data-notif-queue-status]").value = ""; el('[data-notif-view="queue"]').click(); }
       if (button.hasAttribute("data-notif-preview-channel")) { previewChannel = button.dataset.notifPreviewChannel; preview(); }
       if (button.dataset.notifType) {
         recipientDetails.clear();
@@ -257,14 +286,14 @@
     });
     compose.addEventListener("input", preview);
     search.addEventListener("submit", function (event) {
-      event.preventDefault(); if (busy) return;
+      event.preventDefault(); if (busy || confirming) return;
       var data = new FormData(search); appliedFilters = Object.fromEntries(data.entries());
       if (type === "club_pph") { appliedFilters.contract_status = ""; appliedFilters.inmueble_simi = ""; appliedFilters.contract_number = ""; }
       page = 1; resetSelection(); feedback(""); loadRecipients();
     });
     search.addEventListener("reset", function () { if (busy || suppressReset || !type) return; setTimeout(function () { appliedFilters = Object.fromEntries(new FormData(search).entries()); page = 1; resetSelection(); loadRecipients(); }, 0); });
     compose.addEventListener("submit", async function (event) {
-      event.preventDefault(); if (busy) return;
+      event.preventDefault(); if (busy || confirming) return;
       var chosen = channels(), count = targetCount();
       if (!chosen.length || !count) { feedback("Selecciona destinatarios y al menos un canal.", true); return; }
       if (count > 500) { feedback("Ajusta tu selección a un máximo de 500 destinatarios.", true); return; }
@@ -272,7 +301,10 @@
       var file = compose.elements.media.files[0];
       var max = Math.min({image: 5242880, document: 104857600, video: 16777216}[mediaType()] || config.max_bytes, config.max_bytes);
       if (file && file.size > max) { feedback("El archivo excede el tamaño permitido.", true); return; }
-      if (!window.confirm("Se encolarán mensajes para " + count + " destinatarios por " + chosen.join(", ") + ".\n\nEl saludo y la firma se personalizarán. ¿Confirmas el envío?")) return;
+      confirming = true;
+      var confirmed = await confirmSend(count, chosen);
+      confirming = false;
+      if (!confirmed) return;
       var data = new FormData(compose); data.set("type", type); data.set("all_filtered", !singleTarget && allFiltered ? "1" : "0"); data.set("media_type", mediaType());
       Object.entries(appliedFilters).forEach(function (entry) { data.set(entry[0], entry[1]); });
       if (singleTarget) data.append("ids[]", singleTarget.id);
@@ -282,13 +314,18 @@
       if (lastFingerprint && fingerprint !== lastFingerprint) config.request_id = newRequestId();
       lastFingerprint = fingerprint; data.set("request_id", config.request_id);
       busy = true; updateSelection(); el("[data-notif-send]").textContent = "Encolando mensajes…";
+      el("[data-notif-confirm-progress]").hidden = false;
+      el("[data-notif-confirm-send]").disabled = true; el("[data-notif-confirm-cancel]").disabled = true;
+      confirmationModal.setAttribute("aria-busy", "true");
       // Evitar cambiar la selección durante el envío.
       panel.querySelectorAll("input, select, textarea").forEach(function (node) { node.disabled = true; });
+      var result = null, sendError = "";
       try {
-        var result = await api("commercial_notifications_send", data); feedback(result.message, result.failed > 0 || !result.queued);
+        result = await api("commercial_notifications_send", data); feedback(result.message, result.failed > 0 || !result.queued);
         if (result.failed === 0 && result.queued > 0) { config.request_id = newRequestId(); lastFingerprint = ""; if (!singleTarget) resetSelection(); modal.close(); }
-      } catch (error) { feedback(error.message, true); }
-      finally { busy = false; panel.querySelectorAll("input, select, textarea").forEach(function (node) { node.disabled = false; }); el("[data-notif-send]").textContent = "Revisar y enviar"; updateSelection(); }
+      } catch (error) { sendError = error.message; feedback(sendError, true); }
+      finally { busy = false; confirmationModal.setAttribute("aria-busy", "false"); confirmationModal.close(); panel.querySelectorAll("input, select, textarea").forEach(function (node) { node.disabled = false; }); el("[data-notif-send]").textContent = "Revisar y enviar"; updateSelection(); }
+      showSendResult(result, sendError);
     });
     panel.querySelectorAll('[role="tab"]').forEach(function (tab) { tab.addEventListener("keydown", function (event) { if (event.key === "ArrowLeft" || event.key === "ArrowRight") { event.preventDefault(); var next = panel.querySelector('[role="tab"]:not(#' + tab.id + ')'); next.focus(); next.click(); } }); });
     panel.querySelectorAll("[data-notif-select-all], [data-notif-select-page]").forEach(function (button) { button.disabled = true; });

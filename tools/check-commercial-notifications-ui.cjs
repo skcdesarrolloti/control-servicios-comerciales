@@ -7,9 +7,11 @@ let browser;
   browser = await chromium.launch({ headless: true, channel: 'msedge' });
   const page = await browser.newPage({ viewport: { width: 1440, height: 1050 } });
   const errors = [];
-  let recipientRequests = 0;
+  let recipientRequests = 0, sendRequests = 0;
   page.on('pageerror', error => errors.push(error.message));
+  page.on('dialog', async dialog => { errors.push('El módulo abrió una alerta nativa'); await dialog.dismiss(); });
   page.on('request', request => { if (request.url().includes('notifications-api.php') && request.postData()?.includes('commercial_notifications_recipients')) recipientRequests++; });
+  page.on('request', request => { if (request.url().includes('notifications-api.php') && request.postData()?.includes('commercial_notifications_send')) sendRequests++; });
   await page.goto('http://127.0.0.1:8769/output/notifications-preview.html');
   if (recipientRequests !== 0 || await page.locator('[data-notif-modal]').isVisible()) throw new Error('Se carga un actor o editor sin abrirlo');
   if ((await page.locator('[data-notif-type]').count()) !== 6 || (await page.locator('[data-notif-import]').count()) !== 0) throw new Error('Categorías o selección SIMI incorrectas');
@@ -73,9 +75,35 @@ let browser;
   if (!(await page.locator('[data-notif-media-fields]').isVisible())) throw new Error('El encabezado PDF no solicita archivo');
   await page.locator('#notif-template').selectOption('scm_marketing_generica_texto_v1');
   if (await page.locator('[data-notif-media-fields]').isVisible()) throw new Error('Texto muestra un archivo innecesario');
-  page.on('dialog', dialog => dialog.accept());
+  let releaseSend;
+  const holdSend = route => {
+    if (!route.request().postData()?.includes('commercial_notifications_send')) return route.continue();
+    return new Promise(resolve => { releaseSend = resolve; }).then(() => route.continue());
+  };
+  await page.route('**/tests/Fixtures/notifications-api.php', holdSend);
   await page.locator('[data-notif-send]').click();
+  await page.locator('[data-notif-confirm-modal]').waitFor();
+  if (!(await page.locator('[data-notif-confirm-channels]').textContent()).includes('WhatsApp') || sendRequests !== 0) throw new Error('La confirmación omite canales o envía sin aprobación');
+  await page.screenshot({ path: 'output/notifications-confirm.png', fullPage: true });
+  await page.locator('[data-notif-confirm-cancel]').click();
+  if (sendRequests !== 0 || !(await page.locator('[data-notif-modal]').isVisible())) throw new Error('Cancelar envía mensajes o pierde el editor');
+  await page.locator('[data-notif-send]').click();
+  await page.keyboard.press('Escape');
+  if (sendRequests !== 0 || await page.locator('[data-notif-confirm-modal]').isVisible()) throw new Error('Escape no cancela la confirmación');
+  await page.locator('[data-notif-send]').click();
+  await page.locator('[data-notif-confirm-send]').click();
+  await page.locator('[data-notif-confirm-progress]').waitFor();
+  if (!(await page.locator('[data-notif-confirm-send]').isDisabled()) || !(await page.locator('[data-notif-confirm-cancel]').isDisabled())) throw new Error('Se puede confirmar de nuevo durante el encolado');
+  await page.keyboard.press('Escape');
+  if (!(await page.locator('[data-notif-confirm-modal]').isVisible())) throw new Error('Se cierra la confirmación durante el encolado');
+  if (!releaseSend) throw new Error('No se inició la solicitud de encolado');
+  releaseSend();
   await page.locator('[data-notif-feedback]').filter({ hasText: '1 notificaciones en cola' }).waitFor();
+  await page.unroute('**/tests/Fixtures/notifications-api.php', holdSend);
+  await page.locator('[data-notif-result-modal]').waitFor();
+  if ((await page.locator('[data-notif-result-count="queued"]').textContent()) !== '1' || !(await page.locator('[data-notif-result-title]').textContent()).includes('Mensajes encolados') || sendRequests !== 1) throw new Error('Falta el resultado del encolado o hay un envío duplicado');
+  await page.screenshot({ path: 'output/notifications-result.png', fullPage: true });
+  await page.locator('[data-notif-result-close]').click();
   if (!(await page.locator('[data-notif-single-channel="email"][data-id="14"]').isDisabled())) throw new Error('Un envío vuelve a habilitar canales inválidos');
   await page.locator('[data-notif-type="club_pph"]').click();
   await page.locator('[data-notif-recipients]').getByText('Club PPH 40', { exact: true }).waitFor();
@@ -123,7 +151,40 @@ let browser;
   if (await page.locator('[data-notif-modal]').evaluate(node => node.scrollWidth > node.clientWidth)) throw new Error('El popup desborda en móvil');
   await page.keyboard.press('Escape');
   if (await page.locator('[data-notif-modal]').isVisible()) throw new Error('Escape no cierra el editor');
+  // Respuestas controladas para cubrir encolado parcial, omisiones y error del servidor.
+  let simulatedResult;
+  await page.route('**/tests/Fixtures/notifications-api.php', route => {
+    if (!route.request().postData()?.includes('commercial_notifications_send')) return route.continue();
+    return route.fulfill({ status: simulatedResult.success ? 200 : 500, contentType: 'application/json', body: JSON.stringify(simulatedResult) });
+  });
+  for (const scenario of [
+    { success: true, data: { queued: 1, failed: 1, invalid: 2, filtered: 3, message: 'Resultado parcial' }, title: 'Encolado parcial' },
+    { success: true, data: { queued: 0, failed: 0, invalid: 1, filtered: 0, message: 'Sin destinos' }, title: 'No se encolaron mensajes' },
+    { success: false, data: { message: 'Error de prueba del servidor' }, title: 'No se pudo confirmar el encolado' }
+  ]) {
+    simulatedResult = scenario;
+    await page.locator('[data-notif-single-channel="whatsapp"][data-id="10"]').click();
+    await page.locator('#notif-message').fill('Mensaje de prueba');
+    await page.locator('[data-notif-send]').click();
+    await page.locator('[data-notif-confirm-send]').click();
+    await page.locator('[data-notif-result-modal]').waitFor();
+    if ((await page.locator('[data-notif-result-title]').textContent()) !== scenario.title) throw new Error('El popup no distingue el resultado del envío');
+    if (await page.locator('[data-notif-result-modal]').evaluate(node => node.scrollWidth > node.clientWidth)) throw new Error('El resultado desborda en móvil');
+    if (scenario.success && (await page.locator('[data-notif-result-count="invalid"]').textContent()) !== String(scenario.data.invalid)) throw new Error('El resultado omite contactos sin datos');
+    if (!scenario.success && !(await page.locator('[data-notif-result-description]').textContent()).includes(scenario.data.message)) throw new Error('No se muestra el error del servidor');
+    await page.screenshot({ path: 'output/notifications-result-mobile.png', fullPage: true });
+    await page.locator('[data-notif-result-close]').click();
+    await page.locator('[data-notif-close]').click();
+  }
+  // La acción del resultado abre la cola y cierra los diálogos.
+  simulatedResult = { success: true, data: { queued: 1, failed: 0, invalid: 0, filtered: 0, message: '1 notificaciones en cola' } };
+  await page.locator('[data-notif-single-channel="whatsapp"][data-id="10"]').click();
+  await page.locator('[data-notif-send]').click();
+  await page.locator('[data-notif-confirm-send]').click();
+  await page.locator('[data-notif-result-queue]').click();
+  await page.locator('[data-notif-queue-rows]').getByText('Todavía no hay notificaciones en este estado.').waitFor();
+  if (await page.locator('[data-notif-result-modal]').isVisible() || await page.locator('[data-notif-modal]').isVisible()) throw new Error('Ver cola deja un popup abierto');
   if (errors.length) throw new Error(errors.join('\n'));
-  console.log('UI: carga por actor sin duplicados, caché, popup por canal e individual, banner de correo, límites SMS, envío aislado, permisos y responsive: OK');
+  console.log('UI: confirmación sin alertas, cancelación, resultados completos/parciales/error, acceso a cola, canales, SMS, permisos y responsive: OK');
   await browser.close();
 })().catch(async error => { console.error(error); await browser?.close(); process.exitCode = 1; });

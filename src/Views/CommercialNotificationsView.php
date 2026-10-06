@@ -97,6 +97,27 @@ final class CommercialNotificationsView
       <div class="rounded-2xl border border-slate-200 bg-surface-container-low p-4 space-y-3"><h3 class="text-xs font-semibold text-secondary uppercase tracking-wide">Vista previa del mensaje</h3><div class="flex flex-wrap gap-2" aria-label="Canal de vista previa"><?php foreach (['whatsapp' => 'WhatsApp', 'email' => 'Correo', 'sms' => 'SMS'] as $channel => $label): ?><button type="button" data-notif-preview-channel="<?php echo $channel; ?>" class="<?php echo $secondary; ?> bg-white"><?php echo $label; ?></button><?php endforeach; ?></div><div data-notif-text-preview class="rounded-xl bg-white p-4 shadow-sm"><div data-notif-media-preview class="mb-3" hidden></div><p data-notif-preview class="whitespace-pre-wrap break-words text-sm leading-relaxed"></p></div><iframe data-notif-email-preview title="Vista previa del correo con banner" sandbox="" referrerpolicy="no-referrer" class="w-full h-[560px] rounded-xl border border-slate-200 bg-white" hidden></iframe><p class="text-xs text-secondary">Cada destinatario recibe su mensaje personalizado. SMS utiliza el prefijo de la empresa y el texto escrito, dentro de 160 caracteres.</p></div>
     </div>
   </dialog>
+  <dialog data-notif-confirm-modal aria-labelledby="notif-confirm-title" aria-describedby="notif-confirm-description" class="m-auto w-[calc(100%-2rem)] max-w-lg max-h-[90dvh] p-6 sm:p-7 rounded-2xl border-0 bg-white text-on-surface shadow-modal backdrop:bg-slate-900/50">
+    <div class="w-12 h-12 rounded-2xl bg-primary-container flex items-center justify-center mb-4"><span class="material-symbols-outlined" aria-hidden="true">schedule_send</span></div>
+    <h3 id="notif-confirm-title" class="text-headline-md font-semibold">Confirma el envío</h3>
+    <p id="notif-confirm-description" class="mt-2 text-sm text-secondary">Revisa los destinatarios y los canales antes de continuar.</p>
+    <dl class="mt-5 rounded-xl bg-surface-container-low p-4 space-y-3 text-sm"><div><dt class="text-xs text-secondary">Destinatarios</dt><dd data-notif-confirm-target class="font-semibold mt-1 break-words"></dd></div><div><dt class="text-xs text-secondary">Canales</dt><dd data-notif-confirm-channels class="font-semibold mt-1"></dd></div></dl>
+    <p class="mt-4 text-xs text-secondary">Se personalizarán el saludo y la firma de WhatsApp y correo. Los contactos sin datos válidos o bloqueados por preferencias se omiten por canal.</p>
+    <p data-notif-confirm-progress role="status" aria-live="polite" class="mt-4 flex items-center gap-2 text-sm font-medium" hidden><span class="material-symbols-outlined motion-safe:animate-spin" aria-hidden="true">progress_activity</span>Encolando mensajes…</p>
+    <div class="mt-6 flex flex-col-reverse sm:flex-row sm:justify-end gap-2"><button type="button" data-notif-confirm-cancel autofocus class="<?php echo $secondary; ?>">Volver al mensaje</button><button type="button" data-notif-confirm-send class="<?php echo $secondary; ?> bg-primary-container hover:bg-primary-fixed-dim"><span class="material-symbols-outlined text-[20px]" aria-hidden="true">send</span>Confirmar y encolar</button></div>
+  </dialog>
+  <dialog data-notif-result-modal aria-labelledby="notif-result-title" aria-describedby="notif-result-description" class="m-auto w-[calc(100%-2rem)] max-w-lg max-h-[90dvh] p-6 sm:p-7 rounded-2xl border-0 bg-white text-on-surface shadow-modal backdrop:bg-slate-900/50">
+    <div class="w-12 h-12 rounded-2xl bg-surface-container-low flex items-center justify-center mb-4"><span data-notif-result-icon class="material-symbols-outlined text-secondary" aria-hidden="true">task_alt</span></div>
+    <h3 id="notif-result-title" data-notif-result-title class="text-headline-md font-semibold"></h3>
+    <p id="notif-result-description" data-notif-result-description class="mt-2 text-sm text-secondary break-words"></p>
+    <dl data-notif-result-counts class="mt-5 grid grid-cols-2 gap-3">
+      <?php foreach (['queued' => 'Encolados', 'invalid' => 'Sin datos válidos', 'filtered' => 'Por preferencias', 'failed' => 'Con error'] as $metric => $label): ?>
+      <div class="rounded-xl bg-surface-container-low p-3"><dt class="text-xs text-secondary"><?php echo $label; ?></dt><dd data-notif-result-count="<?php echo $metric; ?>" class="mt-1 text-2xl font-semibold">0</dd></div>
+      <?php endforeach; ?>
+    </dl>
+    <p data-notif-result-help class="mt-4 text-xs text-secondary">Las cantidades corresponden a mensajes por canal. Encolado significa pendiente de envío; consulta su estado en la cola.</p>
+    <div class="mt-6 flex flex-col-reverse sm:flex-row sm:justify-end gap-2"><button type="button" data-notif-result-close autofocus class="<?php echo $secondary; ?>">Cerrar</button><button type="button" data-notif-result-queue class="<?php echo $secondary; ?> bg-primary-container hover:bg-primary-fixed-dim"><span class="material-symbols-outlined text-[20px]" aria-hidden="true">schedule_send</span>Ver cola</button></div>
+  </dialog>
   <div id="notif-queue-panel" role="tabpanel" aria-labelledby="notif-queue-tab" data-notif-panel="queue" hidden class="space-y-4">
     <div class="grid grid-cols-2 sm:grid-cols-5 gap-3" data-notif-queue-stats></div>
     <div class="bg-white border border-slate-200 rounded-2xl shadow-card overflow-hidden">
