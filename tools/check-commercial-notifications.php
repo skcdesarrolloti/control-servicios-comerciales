@@ -50,14 +50,14 @@ $service->enqueue('propietarios_activos', [10], ['whatsapp'], '', 'Información 
 $check((int) $db->getVar('SELECT COUNT(*) FROM skc_notification_queue') === 1, 'El reintento duplicó el envío');
 foreach (['image' => 'imagen', 'document' => 'documento', 'video' => 'video'] as $header => $kind) {
   $service->prepareDelivery(md5($kind), ['type' => $header, 'url' => 'https://example.test/file.php?n=example&s=signature', 'name' => 'Archivo de prueba']);
-  $service->enqueue('propietarios_activos', [10], ['whatsapp'], '', 'Mensaje con archivo', 'scm_comercial_generica_' . $kind . '_v1');
+  $service->enqueue('propietarios_activos', [10], ['whatsapp'], '', 'Mensaje con archivo', 'scm_marketing_generica_' . $kind . '_v1');
   $payload = json_decode($db->getVar('SELECT payload_json FROM skc_notification_queue ORDER BY id DESC LIMIT 1'), true);
   $check($payload['components'][0]['type'] === 'header' && $payload['components'][0]['parameters'][0]['type'] === $header, 'Encabezado incorrecto: ' . $kind);
   $check(count($payload['components'][1]['parameters']) === 3, 'Cuerpo incorrecto con archivo');
 }
 $service->prepareDelivery(md5('missing'), []);
 try {
-  $service->enqueue('propietarios_activos', [10], ['whatsapp'], '', 'Mensaje', 'scm_comercial_generica_imagen_v1');
+  $service->enqueue('propietarios_activos', [10], ['whatsapp'], '', 'Mensaje', 'scm_marketing_generica_imagen_v1');
   throw new RuntimeException('Se permitió un encabezado sin archivo');
 } catch (InvalidArgumentException $error) { $check(str_contains($error->getMessage(), 'Adjunta'), 'Error inesperado'); }
 $db->insert('skc_notification_queue', ['project_code' => 'control-servicios-comerciales', 'source_module' => 'commercial_notifications', 'status' => 'pending', 'meta_json' => '{"commercial_notifications":{"employee_id":"901"}}']);
@@ -74,8 +74,23 @@ $emailDb->pdo()->exec("UPDATE wp_jet_cct_propietarios SET nombre = '<img src=x o
 $emailService->prepareDelivery(md5('email'), []);
 $emailResult = $emailService->enqueue('propietarios_activos', [10], ['email'], 'Información comercial', 'Mensaje <de prueba>');
 $emailHtml = (string) $emailDb->getVar('SELECT message_html FROM skc_notification_queue');
-$check($emailResult['queued'] === 1 && str_contains($emailHtml, '&lt;img') && !str_contains($emailHtml, '<img'), 'Email permite HTML del contacto');
+$check($emailResult['queued'] === 1 && str_contains($emailHtml, '&lt;img') && !str_contains($emailHtml, '<img src=x'), 'Email permite HTML del contacto');
 $check(str_contains($emailHtml, '&lt;de prueba&gt;') && str_contains($emailHtml, 'Ana Pérez'), 'Email perdió mensaje o firma');
+$check(str_contains($emailHtml, '<!DOCTYPE html>') && str_contains($emailHtml, 'banner-sitio-web'), 'El correo enviado no incluye el banner');
+$check(!str_contains(SCM\Commercial\CommercialNotificationsService::TEMPLATE_BODY, 'Atentamente') && !str_contains(SCM\Commercial\CommercialNotificationsService::TEMPLATE_BODY, 'inquietud'), 'La plantilla conserva el cierre retirado');
+[$smsDb, $smsPolicy, $smsService] = CommercialNotificationsFixture::make();
+$smsService->prepareDelivery(md5('sms'), []);
+$remainingSms = 160 - mb_strlen(SCM\Commercial\CommercialSmsMessage::PREFIX);
+$smsResult = $smsService->enqueue('propietarios_activos', [10], ['sms'], '', str_repeat('A', $remainingSms));
+$check($smsResult['queued'] === 1 && mb_strlen($smsDb->getVar('SELECT message_text FROM skc_notification_queue')) === 160, 'SMS de 160 caracteres rechazado o cambiado');
+try {
+  $smsService->enqueue('propietarios_activos', [10], ['sms'], '', str_repeat('A', $remainingSms + 1));
+  throw new RuntimeException('Se acepta SMS de 161 caracteres');
+} catch (InvalidArgumentException $error) { $check(str_contains($error->getMessage(), '160'), 'Error de longitud inesperado'); }
+$check(SCM\Commercial\CommercialSmsMessage::metrics(str_repeat('A', 160))['segments'] === 1, 'Conteo GSM incorrecto');
+$check(SCM\Commercial\CommercialSmsMessage::metrics(str_repeat('^', 81))['segments'] === 2, 'Los caracteres extendidos no cuentan doble');
+$unicodeSms = SCM\Commercial\CommercialSmsMessage::metrics(str_repeat('😀', 36));
+$check($unicodeSms['characters'] === 36 && $unicodeSms['units'] === 72 && $unicodeSms['segments'] === 2, 'Conteo Unicode incorrecto');
 [$inactiveDb, $inactivePolicy, $inactiveService] = CommercialNotificationsFixture::make();
 $inactiveService->prepareDelivery(md5('inactive'), []);
 $inactiveResult = $inactiveService->enqueue('propietarios_no_activos', [11,12], ['whatsapp'], '', 'Información comercial', array_key_first($templates));

@@ -7,13 +7,14 @@ namespace SCM\Commercial;
 use SCM\Core\Auth;
 use SCM\Core\Database;
 use SCM\Modules\AdministrativeNotifications\AdministrativeNotificationsService;
+use SCM\Support\EmailTemplate;
 
 /** Reutiliza búsqueda, contratos y preferencias del módulo inmobiliario. */
 final class CommercialNotificationsService extends AdministrativeNotificationsService
 {
   public const PROJECT_CODE = 'control-servicios-comerciales';
   public const SOURCE_MODULE = 'commercial_notifications';
-  public const TEMPLATE_BODY = "Hola {{1}}, recibe un cordial saludo de SKC SuCasa Inmobiliaria.\n\nTe compartimos la siguiente información:\n{{2}}\n\nSi tienes alguna inquietud, puedes comunicarte con nuestro equipo.\nAtentamente,\n{{3}}\n\nGracias por confiar en SKC SuCasa Inmobiliaria.";
+  public const TEMPLATE_BODY = "Hola {{1}}, recibe un cordial saludo de SKC SuCasa Inmobiliaria.\n\nTe compartimos la siguiente información:\n{{2}}\n\n{{3}}\n\nGracias por confiar en SKC SuCasa Inmobiliaria.";
 
   private CommercialAccessPolicy $policy;
   /** @var array<string,string> */
@@ -61,6 +62,10 @@ final class CommercialNotificationsService extends AdministrativeNotificationsSe
   {
     parent::__construct($db);
     $this->policy = $policy;
+    $this->schema->preloadColumns(array_map(fn(string $table): string => $db->table($table), [
+      'jet_cct_propietarios', 'jet_cct_arrendatarios', 'jet_cct_copropiedades', 'jet_cct_club_pph',
+      'jet_cct_inmuebles', 'jet_cct_contratos_arrendamiento', 'jet_cct_funcionarios', 'jet_cct_cargos',
+    ]));
   }
 
   public function types(): array
@@ -86,7 +91,7 @@ final class CommercialNotificationsService extends AdministrativeNotificationsSe
   {
     $out = [];
     foreach (['texto' => 'Texto', 'imagen' => 'Imagen', 'documento' => 'Documento PDF', 'video' => 'Video'] as $kind => $label) {
-      $name = 'scm_comercial_generica_' . $kind . '_v1';
+      $name = 'scm_marketing_generica_' . $kind . '_v1';
       $out[$name] = [
         'name' => $name, 'label' => $label, 'language' => 'es_CO', 'body' => self::TEMPLATE_BODY,
         'description' => 'Mensaje comercial genérico con saludo y firma del funcionario.',
@@ -102,10 +107,22 @@ final class CommercialNotificationsService extends AdministrativeNotificationsSe
   {
     return [self::DEFAULT_EMAIL_TEMPLATE => [
       'name' => self::DEFAULT_EMAIL_TEMPLATE, 'label' => 'Mensaje general', 'subject' => 'Información de SKC SuCasa Inmobiliaria',
-      'body' => '<p>Hola <strong>{{nombre}}</strong>, recibe un cordial saludo de SKC SuCasa Inmobiliaria.</p><div>{{mensaje}}</div><p>Atentamente,<br><strong>{{firma_funcionario_linea}}</strong></p>',
+      'body' => '<p>Hola <strong>{{nombre}}</strong>, recibe un cordial saludo de SKC SuCasa Inmobiliaria.</p><div>{{mensaje}}</div><p><strong>{{firma_funcionario_linea}}</strong></p>',
       'message_only' => false, 'editable_message' => '', 'source' => 'commercial',
       'description' => 'Mensaje con saludo y firma personalizada del funcionario.',
     ]];
+  }
+
+  /** El envío y la vista previa comparten el mismo documento y banner de correo. @param array<string,string> $media */
+  public function emailDocument(string $name, string $subject, string $message, array $media = []): string
+  {
+    $escape = static fn(string $value): string => htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    $content = '<p>Hola <strong>' . $escape($name) . '</strong>, recibe un cordial saludo de SKC SuCasa Inmobiliaria.</p><div>'
+      . nl2br($escape($message)) . '</div><p><strong>' . $escape($this->senderProfile()['signature_line']) . '</strong></p>';
+    if ($media !== []) {
+      $content .= '<p><a href="' . $escape($media['url']) . '">Ver archivo: ' . $escape($media['name']) . '</a></p>';
+    }
+    return EmailTemplate::render($subject, $content);
   }
 
   /** Todos los accesos (búsqueda, estadísticas, selección total y envío) usan esta misma regla. */
@@ -149,10 +166,9 @@ final class CommercialNotificationsService extends AdministrativeNotificationsSe
 
   protected function contractActivityInfo(string $type, array $config, array $recipient, string $contractStatus = '', string $inmuebleSimi = '', string $contractNumber = ''): array
   {
-    // Un contacto puede participar en contratos de otros funcionarios: no exponer sus resúmenes.
-    return $this->policy->canManage()
-      ? parent::contractActivityInfo($type, $config, $recipient, $contractStatus, $inmuebleSimi, $contractNumber)
-      : ['label' => '', 'summary' => ''];
+    // La lista necesita el estado de la categoría; evita una consulta de contratos por cada contacto.
+    $status = (string) ($config['contract_status_fixed'] ?? '');
+    return ['label' => ['activos' => 'Activo', 'no_activos' => 'No activo'][$status] ?? '', 'summary' => ''];
   }
 
   /** @param array<string,string> $media */
@@ -176,6 +192,9 @@ final class CommercialNotificationsService extends AdministrativeNotificationsSe
     }
     if (mb_strlen(trim($message)) > 700) {
       throw new \InvalidArgumentException('El mensaje admite hasta 700 caracteres.');
+    }
+    if (in_array('sms', $channels, true) && mb_strlen(CommercialSmsMessage::PREFIX . trim($message), 'UTF-8') > CommercialSmsMessage::MAX_CHARACTERS) {
+      throw new \InvalidArgumentException('El SMS supera 160 caracteres, incluido el prefijo SKC SuCasa Inmobiliaria. Acorta el mensaje o desmarca SMS.');
     }
     $template = $this->whatsappTemplates()[$whatsappTemplate] ?? [];
     if (in_array('whatsapp', $channels, true) && !empty($template['header_type']) && ($this->media['type'] ?? '') !== $template['header_type']) {
@@ -204,11 +223,6 @@ final class CommercialNotificationsService extends AdministrativeNotificationsSe
     $sender = $this->senderProfile();
     $name = trim((string) $recipient['nombre']);
     $signature = $sender['signature_line'];
-    if ($channel === 'email') {
-      $escape = static fn(string $value): string => htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
-      $message = '<p>Hola <strong>' . $escape($name) . '</strong>, recibe un cordial saludo de SKC SuCasa Inmobiliaria.</p><div>'
-        . nl2br($escape($this->messageText)) . '</div><p>Atentamente,<br><strong>' . $escape($signature) . '</strong></p>';
-    }
     $components = [];
     if ($channel === 'whatsapp' && !empty($whatsappTemplateConfig['header_type'])) {
       $mediaType = (string) $whatsappTemplateConfig['header_type'];
@@ -235,8 +249,9 @@ final class CommercialNotificationsService extends AdministrativeNotificationsSe
       error_log('[commercial-notifications:enqueue] El mensaje personalizado supera 1024 caracteres.');
       return false;
     }
-    if ($channel === 'email' && $this->media !== []) {
-      $message .= '<p><a href="' . htmlspecialchars($this->media['url'], ENT_QUOTES, 'UTF-8') . '">Ver archivo: ' . htmlspecialchars($this->media['name'], ENT_QUOTES, 'UTF-8') . '</a></p>';
+    if ($channel === 'email') {
+      $text = "Hola {$name}, recibe un cordial saludo de SKC SuCasa Inmobiliaria.\n\n{$this->messageText}\n\n{$signature}";
+      $message = $this->emailDocument($name, $subject, $this->messageText, $this->media);
     }
     $now = gmdate('Y-m-d H:i:s');
     $data = [
@@ -249,7 +264,7 @@ final class CommercialNotificationsService extends AdministrativeNotificationsSe
       'meta_json' => json_encode(['commercial_notifications' => [
         'batch_id' => $this->requestId, 'id_actor' => (int) $recipient['_ID'], 'tipo_actor' => $recipient['tipo_actor'],
         'employee_id' => $this->currentEmployeeId(), 'nombre_funcionario' => $sender['name'], 'cargo' => $sender['cargo'], 'celular' => $sender['phone'],
-      ]], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+      ], 'sms' => $channel === 'sms' ? CommercialSmsMessage::metrics($text) : null], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
       'status' => 'pending', 'priority' => 100, 'max_attempts' => 3, 'scheduled_at' => $now,
       'created_at' => $now, 'updated_at' => $now, 'created_by' => self::PROJECT_CODE, 'dedupe_key' => $dedupe,
     ];

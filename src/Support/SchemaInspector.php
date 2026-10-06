@@ -14,10 +14,26 @@ final class SchemaInspector
 
   /** @var array<string,bool> */
   private array $columnExistsCache = [];
+  /** @var array<string,array<string,bool>> */
+  private array $preloadedColumns = [];
 
   public function __construct(Database $db)
   {
     $this->db = $db;
+  }
+
+  /** @param string[] $tables */
+  public function preloadColumns(array $tables): void
+  {
+    $tables = array_values(array_unique($tables));
+    if ($tables === []) { return; }
+    $placeholders = implode(',', array_fill(0, count($tables), '?'));
+    $rows = $this->db->getResults("SELECT TABLE_NAME, COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ({$placeholders})", $tables);
+    foreach ($tables as $table) { $this->preloadedColumns[$table] = []; }
+    foreach ($rows as $row) {
+      $this->preloadedColumns[(string) $row['TABLE_NAME']][(string) $row['COLUMN_NAME']] = true;
+    }
+    foreach ($tables as $table) { $this->tableExistsCache[$table] = $this->preloadedColumns[$table] !== []; }
   }
 
   public function tableExists(string $table): bool
@@ -42,6 +58,9 @@ final class SchemaInspector
 
   public function columnExists(string $table, string $column): bool
   {
+    if (array_key_exists($table, $this->preloadedColumns)) {
+      return isset($this->preloadedColumns[$table][$column]);
+    }
     $key = $table . '::' . $column;
     if (array_key_exists($key, $this->columnExistsCache)) {
       return (bool) $this->columnExistsCache[$key];

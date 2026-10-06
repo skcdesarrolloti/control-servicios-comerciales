@@ -564,7 +564,6 @@ final class CommercialApiController
         max(1, (int) ($input['page'] ?? 1)), 20, (string) ($input['contract_status'] ?? ''),
         mb_substr(trim((string) ($input['inmueble_simi'] ?? '')), 0, 50), mb_substr(trim((string) ($input['contract_number'] ?? '')), 0, 50)
       );
-      $result['stats'] = $service->stats();
       JsonResponse::success($result);
     } catch (\InvalidArgumentException | \RuntimeException $exception) {
       if ($exception instanceof \PDOException) { throw $exception; }

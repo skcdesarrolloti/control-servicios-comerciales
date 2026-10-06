@@ -6,6 +6,7 @@ namespace SCM\Views;
 
 use SCM\Commercial\CommercialAccessPolicy;
 use SCM\Commercial\CommercialNotificationsService;
+use SCM\Commercial\CommercialSmsMessage;
 
 final class CommercialNotificationsView
 {
@@ -14,7 +15,10 @@ final class CommercialNotificationsView
     $types = $service->types();
     $templates = $service->whatsappTemplates();
     $sender = $service->senderProfile();
-    $config = ['templates' => $templates, 'sender' => $sender, 'request_id' => bin2hex(random_bytes(16)), 'max_bytes' => (int) SCM_UPLOAD_MAX_BYTES];
+    $config = ['templates' => $templates, 'sender' => $sender, 'request_id' => bin2hex(random_bytes(16)), 'max_bytes' => (int) SCM_UPLOAD_MAX_BYTES,
+      'can_send' => $policy->canAct('enviar_notificacion') && $sender['phone'] !== '',
+      'email_document' => $service->emailDocument('__SCM_NAME__', '__SCM_SUBJECT__', '__SCM_MESSAGE__'),
+      'sms' => ['prefix' => CommercialSmsMessage::PREFIX, 'max' => CommercialSmsMessage::MAX_CHARACTERS, 'basic' => CommercialSmsMessage::GSM_BASIC, 'extended' => CommercialSmsMessage::GSM_EXTENDED]];
     $field = 'w-full rounded-xl border border-slate-200 bg-surface-container-lowest px-3 py-2.5 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary-container';
     $secondary = 'inline-flex items-center justify-center gap-2 min-h-[44px] rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium hover:bg-surface-container-low focus-visible:ring-2 focus-visible:ring-primary-container disabled:opacity-50 disabled:cursor-not-allowed';
     ob_start();
@@ -33,20 +37,25 @@ final class CommercialNotificationsView
   </div>
   <p data-notif-feedback role="status" aria-live="polite" class="text-sm font-medium text-secondary" hidden></p>
   <div id="notif-recipients-panel" role="tabpanel" aria-labelledby="notif-recipients-tab" data-notif-panel="recipients" class="space-y-5">
+    <div class="flex flex-wrap gap-2" aria-label="Enviar a los destinatarios seleccionados">
+      <?php foreach (['whatsapp' => 'WhatsApp', 'email' => 'Correo', 'sms' => 'SMS', 'all' => 'Todos los canales'] as $channel => $label): ?>
+      <button type="button" data-notif-open-channel="<?php echo $channel; ?>" disabled class="<?php echo $secondary; ?> <?php echo $channel === 'all' ? 'bg-primary-container' : 'bg-white'; ?>"><span class="material-symbols-outlined text-[18px]" aria-hidden="true"><?php echo ['whatsapp' => 'chat', 'email' => 'mail', 'sms' => 'sms', 'all' => 'send'][$channel]; ?></span><?php echo $label; ?></button>
+      <?php endforeach; ?>
+    </div>
     <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
       <?php foreach ($types as $key => $type): ?>
-      <button type="button" data-notif-type="<?php echo esc_attr($key); ?>" aria-pressed="<?php echo $key === 'propietarios_activos' ? 'true' : 'false'; ?>" class="p-4 rounded-2xl bg-white border <?php echo $key === 'propietarios_activos' ? 'border-primary-container ring-2 ring-primary-container' : 'border-slate-200'; ?> text-left hover:shadow-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-container transition-shadow">
+      <button type="button" data-notif-type="<?php echo esc_attr($key); ?>" aria-pressed="false" class="p-4 rounded-2xl bg-white border border-slate-200 text-left hover:shadow-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-container transition-shadow">
         <span class="flex min-h-[40px] items-start justify-between gap-2 text-sm font-medium"><span><?php echo esc_html($type['label']); ?></span><span class="material-symbols-outlined shrink-0 text-secondary text-[20px]" aria-hidden="true"><?php echo ['Propietario' => 'home_work', 'Arrendatario' => 'key', 'Copropiedad' => 'apartment', 'Club PPH' => 'loyalty'][$type['role']]; ?></span></span>
-        <strong class="block text-2xl mt-2" data-notif-total="<?php echo esc_attr($key); ?>">—</strong><span class="block text-xs text-secondary mt-1" data-notif-contact="<?php echo esc_attr($key); ?>">Cargando contactos…</span>
+        <strong class="block text-2xl mt-2" data-notif-total="<?php echo esc_attr($key); ?>">—</strong><span class="block text-xs text-secondary mt-1" data-notif-contact="<?php echo esc_attr($key); ?>">Abrir para consultar</span>
       </button>
       <?php endforeach; ?>
     </div>
     <p class="text-xs text-secondary">Activos: con contrato Entregado. No activos: con contrato Recibido y sin contratos Entregados.</p>
-    <div class="grid grid-cols-1 xl:grid-cols-12 gap-5 items-start">
-      <div class="xl:col-span-7 rounded-2xl bg-white border border-slate-200 shadow-card overflow-hidden">
+    <div class="rounded-2xl bg-white border border-slate-200 shadow-card overflow-hidden">
         <div class="p-5 border-b border-slate-100 space-y-4">
-          <div class="flex items-center justify-between gap-3"><h3 class="font-semibold text-title-md">1. Selecciona destinatarios</h3><span class="text-xs bg-primary-container/30 text-on-surface px-3 py-1.5 rounded-full" data-notif-selected>0 seleccionados</span></div>
+          <div class="flex flex-wrap items-center justify-between gap-3"><h3 class="font-semibold text-title-md" data-notif-actor-title>Selecciona una categoría</h3><div class="flex gap-2 items-center"><span class="text-xs bg-primary-container/30 text-on-surface px-3 py-1.5 rounded-full" data-notif-selected>0 seleccionados</span><button type="button" data-notif-recipient-refresh disabled class="<?php echo $secondary; ?>" aria-label="Actualizar destinatarios"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">refresh</span></button></div></div>
           <form data-notif-search class="space-y-3">
+            <fieldset disabled data-notif-search-controls class="space-y-3">
             <div><label for="notif-search" class="block text-xs font-medium mb-1.5">Nombre, documento, correo o celular</label><input id="notif-search" name="q" type="search" maxlength="150" class="<?php echo $field; ?>" placeholder="Buscar contacto…"></div>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3" data-notif-contract-filters>
               <div data-notif-contract-status-wrap hidden><label for="notif-contract-status" class="block text-xs font-medium mb-1.5">Estado del contrato</label><select id="notif-contract-status" name="contract_status" class="<?php echo $field; ?>"><option value="">Todos</option><option value="activos">Activo</option><option value="no_activos">No activo</option></select></div>
@@ -54,28 +63,34 @@ final class CommercialNotificationsView
               <div><label for="notif-contract" class="block text-xs font-medium mb-1.5">Contrato</label><input id="notif-contract" name="contract_number" maxlength="50" class="<?php echo $field; ?>" placeholder="Número de contrato"></div>
             </div>
             <div class="flex flex-wrap gap-2"><button type="submit" class="<?php echo $secondary; ?> bg-inverse-surface text-white hover:bg-secondary"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">search</span>Buscar</button><button type="reset" class="<?php echo $secondary; ?>">Limpiar filtros</button></div>
+            </fieldset>
           </form>
         </div>
         <div class="px-5 py-3 flex flex-wrap items-center gap-3 border-b border-slate-100 text-xs"><label class="inline-flex items-center gap-2 min-h-[44px]"><input type="checkbox" data-notif-select-page class="accent-[#735c00] w-4 h-4">Seleccionar página</label><button type="button" data-notif-select-all class="underline text-secondary min-h-[44px]">Seleccionar todos los resultados</button><button type="button" data-notif-clear class="underline text-secondary min-h-[44px]">Quitar selección</button></div>
-        <div data-notif-recipients aria-live="polite" aria-busy="true" class="divide-y divide-slate-100"><p class="p-8 text-center text-sm text-secondary">Cargando destinatarios…</p></div>
+        <div data-notif-recipients aria-live="polite" aria-busy="false" class="divide-y divide-slate-100"><p class="p-8 text-center text-sm text-secondary">Abre una categoría para consultar sus destinatarios.</p></div>
         <div class="flex items-center justify-between gap-2 p-4 border-t border-slate-100"><button type="button" data-notif-prev class="<?php echo $secondary; ?>" disabled>Anterior</button><span data-notif-pagination class="text-xs text-secondary">Página 1</span><button type="button" data-notif-next class="<?php echo $secondary; ?>" disabled>Siguiente</button></div>
-      </div>
-      <div class="xl:col-span-5 space-y-4">
+    </div>
+  </div>
+  <dialog data-notif-modal aria-labelledby="notif-modal-title" class="m-auto w-[calc(100%-2rem)] max-w-6xl max-h-[90dvh] p-0 rounded-2xl border-0 bg-background text-on-surface shadow-modal backdrop:bg-slate-900/50">
+    <div class="sticky top-0 z-10 bg-white border-b border-slate-200 px-5 py-4 flex justify-between items-start gap-4"><div><h3 id="notif-modal-title" class="text-title-lg font-semibold">Enviar notificación</h3><p data-notif-modal-target class="text-sm text-secondary mt-1"></p></div><button type="button" data-notif-close class="<?php echo $secondary; ?>" aria-label="Cerrar editor"><span class="material-symbols-outlined" aria-hidden="true">close</span></button></div>
+    <p data-notif-modal-feedback role="status" class="px-5 pt-3 text-sm text-error" hidden></p>
+    <div class="p-4 sm:p-5 grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
+      <div>
         <form data-notif-compose class="p-5 rounded-2xl bg-white border border-slate-200 shadow-card space-y-4">
-          <h3 class="font-semibold text-title-md">2. Prepara el mensaje</h3>
+          <h3 class="font-semibold text-title-md">Prepara el mensaje</h3>
           <fieldset><legend class="text-xs font-medium mb-2">Canales de envío</legend><div class="flex flex-wrap gap-3 text-sm"><?php foreach (['whatsapp' => 'WhatsApp', 'email' => 'Email', 'sms' => 'SMS'] as $channel => $label): ?><label class="inline-flex gap-2 items-center min-h-[44px]"><input name="channels[]" value="<?php echo $channel; ?>" type="checkbox" <?php echo $channel === 'whatsapp' ? 'checked' : ''; ?> class="w-4 h-4 accent-[#735c00]"><?php echo $label; ?></label><?php endforeach; ?></div></fieldset>
           <div data-notif-whatsapp-fields><label for="notif-template" class="block text-xs font-medium mb-1.5">Plantilla de WhatsApp</label><select name="whatsapp_template" id="notif-template" class="<?php echo $field; ?>"><?php foreach ($templates as $template): ?><option value="<?php echo esc_attr($template['name']); ?>"><?php echo esc_html($template['label']); ?></option><?php endforeach; ?></select><p class="text-xs text-secondary mt-2">Utiliza una plantilla aprobada en Meta y contactos que autorizaron recibir tus mensajes.</p></div>
           <div data-notif-email-fields hidden><label for="notif-subject" class="block text-xs font-medium mb-1.5">Asunto del correo</label><input id="notif-subject" name="subject" maxlength="150" value="Información de SKC SuCasa Inmobiliaria" class="<?php echo $field; ?>"></div>
           <div data-notif-media-fields hidden><label for="notif-media" class="block text-xs font-medium mb-1.5">Archivo del encabezado</label><input type="file" name="media" id="notif-media" class="w-full text-xs file:mr-3 file:rounded-lg file:border-0 file:bg-surface-container-low file:p-2 file:text-on-surface"><p data-notif-media-help class="text-xs text-secondary mt-2"></p></div>
-          <div><label for="notif-message" class="block text-xs font-medium mb-1.5">Mensaje</label><textarea id="notif-message" name="message" rows="5" maxlength="700" required class="<?php echo $field; ?> resize-y" placeholder="Escribe la información que deseas compartir…"></textarea><div class="flex justify-between text-xs text-secondary mt-1"><span>El saludo y tu firma se agregan automáticamente.</span><span data-notif-length>0/700</span></div><p data-notif-sms-length class="text-xs text-secondary mt-1" hidden></p></div>
+          <div><label for="notif-message" class="block text-xs font-medium mb-1.5">Mensaje</label><textarea id="notif-message" name="message" rows="5" maxlength="700" required class="<?php echo $field; ?> resize-y" placeholder="Escribe la información que deseas compartir…"></textarea><div class="flex justify-between text-xs text-secondary mt-1"><span data-notif-message-help>El saludo y tu firma se agregan automáticamente.</span><span data-notif-length>0/700</span></div><p data-notif-sms-length class="text-xs text-secondary mt-1" hidden></p></div>
           <div class="rounded-xl bg-surface-container-low p-3 text-xs text-secondary"><span class="font-semibold text-on-surface block mb-1">Tu firma</span><?php echo esc_html($sender['name']); ?><br><?php echo esc_html($sender['cargo']); ?><br><?php echo esc_html($sender['phone'] !== '' ? 'Cel. ' . $sender['phone'] : 'Falta registrar tu celular para enviar.'); ?></div>
           <button type="submit" data-notif-send class="w-full flex items-center justify-center gap-2 min-h-[44px] rounded-xl bg-primary-container hover:bg-primary-fixed-dim px-4 py-3 font-semibold text-on-surface focus-visible:ring-2 focus-visible:ring-inverse-surface disabled:opacity-50 disabled:cursor-not-allowed" <?php echo !$policy->canAct('enviar_notificacion') || $sender['phone'] === '' ? 'disabled' : ''; ?>><span class="material-symbols-outlined text-[20px]" aria-hidden="true">send</span>Revisar y enviar</button>
           <?php if (!$policy->canAct('enviar_notificacion')): ?><p class="text-xs text-secondary">Tu cargo puede consultar, pero no tiene permiso para enviar notificaciones.</p><?php endif; ?>
         </form>
-        <div class="rounded-2xl border border-slate-200 bg-surface-container-low p-4"><h3 class="text-xs font-semibold text-secondary mb-3 uppercase tracking-wide">Vista previa del mensaje</h3><div class="rounded-xl bg-white p-4 shadow-sm"><div data-notif-media-preview class="mb-3" hidden></div><p data-notif-preview class="whitespace-pre-wrap break-words text-sm leading-relaxed"></p></div><p class="text-xs text-secondary mt-2">Ejemplo con el nombre de un destinatario. Cada mensaje llevará el saludo personalizado.</p></div>
       </div>
+      <div class="rounded-2xl border border-slate-200 bg-surface-container-low p-4 space-y-3"><h3 class="text-xs font-semibold text-secondary uppercase tracking-wide">Vista previa del mensaje</h3><div class="flex flex-wrap gap-2" aria-label="Canal de vista previa"><?php foreach (['whatsapp' => 'WhatsApp', 'email' => 'Correo', 'sms' => 'SMS'] as $channel => $label): ?><button type="button" data-notif-preview-channel="<?php echo $channel; ?>" class="<?php echo $secondary; ?> bg-white"><?php echo $label; ?></button><?php endforeach; ?></div><div data-notif-text-preview class="rounded-xl bg-white p-4 shadow-sm"><div data-notif-media-preview class="mb-3" hidden></div><p data-notif-preview class="whitespace-pre-wrap break-words text-sm leading-relaxed"></p></div><iframe data-notif-email-preview title="Vista previa del correo con banner" sandbox="" referrerpolicy="no-referrer" class="w-full h-[560px] rounded-xl border border-slate-200 bg-white" hidden></iframe><p class="text-xs text-secondary">Cada destinatario recibe su mensaje personalizado. SMS utiliza el prefijo de la empresa y el texto escrito, dentro de 160 caracteres.</p></div>
     </div>
-  </div>
+  </dialog>
   <div id="notif-queue-panel" role="tabpanel" aria-labelledby="notif-queue-tab" data-notif-panel="queue" hidden class="space-y-4">
     <div class="grid grid-cols-2 sm:grid-cols-5 gap-3" data-notif-queue-stats></div>
     <div class="bg-white border border-slate-200 rounded-2xl shadow-card overflow-hidden">
