@@ -440,7 +440,9 @@
           throw new Error(clean ? clean.slice(0, 220) : "El servidor devolvió una respuesta vacía.");
         }
         if (!response.ok || !json || !json.success) {
-          throw new Error((json && json.data && json.data.message) || "La operación no pudo completarse.");
+          var error = new Error((json && json.data && json.data.message) || "La operación no pudo completarse.");
+          error.status = response.status; error.data = json && json.data;
+          throw error;
         }
         return json.data || {};
       });
@@ -646,7 +648,13 @@
         }
       })
       .catch(function (error) {
-        if (error.name !== "AbortError") notify("error", error.message);
+        if (error.status === 403 && error.data && error.data.page_denied && error.data.html) {
+          ticketsPanel.innerHTML = error.data.html;
+          globalFilter = null;
+          if (options.history !== false) updateHistory(nextUrl, !!options.replace);
+          var heading = ticketsPanel.querySelector("h2");
+          if (heading) { heading.setAttribute("tabindex", "-1"); heading.focus({ preventScroll: true }); }
+        } else if (error.name !== "AbortError") notify("error", error.message);
       })
       .finally(function () {
         ticketsPanel.classList.remove("is-loading");

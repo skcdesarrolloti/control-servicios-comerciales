@@ -18,9 +18,10 @@ final class JsonResponse
     self::success($data, $status);
   }
 
-  public static function error(string $message, int $status = 400): never
+  /** @param array<string,mixed> $data */
+  public static function error(string $message, int $status = 400, array $data = []): never
   {
-    self::send(['success' => false, 'data' => ['message' => $message]], $status);
+    self::send(['success' => false, 'data' => ['message' => $message] + $data], $status);
   }
 
   /** @param array<string,mixed> $payload */

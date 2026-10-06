@@ -65,7 +65,9 @@ final class CommercialApiController
     $this->verify($input);
     $bucket = trim((string) ($input['tab'] ?? 'inicio'));
     if (!array_key_exists($bucket, CommercialAccessPolicy::VIEWS) || !$this->policy->canView($bucket)) {
-      JsonResponse::error('No tienes permiso para consultar esta vista.', 403);
+      JsonResponse::error('No tienes permiso para entrar a esta página.', 403, [
+        'page_denied' => true, 'html' => CommercialDashboardView::renderAccessDenied($this->baseUrl),
+      ]);
     }
     $filters = $this->ticketFilters($input);
     $filters['tab'] = $bucket;

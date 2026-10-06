@@ -44,7 +44,15 @@ final class CommercialDashboardController
 
     $visibleViews = array_values(array_filter(array_keys(CommercialAccessPolicy::VIEWS), static fn(string $view): bool => $policy->canView($view)));
     $requested = trim((string) ($input['tab'] ?? 'inicio'));
-    $bucket = $visibleViews === [] ? 'sin_acceso' : (in_array($requested, $visibleViews, true) ? $requested : $visibleViews[0]);
+    if ($visibleViews === [] || (isset($input['tab']) && $requested !== '' && !in_array($requested, $visibleViews, true))) {
+      http_response_code(403);
+      return CommercialDashboardView::render([
+        'bucket' => 'sin_acceso', 'policy' => $policy, 'visible_views' => $visibleViews,
+        'base_url' => (string) SCM_BASE_URL,
+        'runtime' => ['ajaxUrl' => rtrim((string) SCM_BASE_URL, '/') . '/api.php', 'nonce' => $this->csrf->token('commercial_nonce'), 'initialTab' => 'scm-panel-sin_acceso'],
+      ]);
+    }
+    $bucket = in_array($requested, $visibleViews, true) ? $requested : $visibleViews[0];
     $ticketEmployees = $repository->ticketEmployees($commercialEmployeeCargos);
     $filters = $this->ticketFilters($input);
     $filters['tab'] = $bucket;
@@ -63,8 +71,8 @@ final class CommercialDashboardController
     $tabCounts = $repository->bucketCounts($globalCountFilters);
     $myTabCounts = $repository->bucketCounts(['id_empleado' => $currentEmployeeFilter]);
     $tabCounts['mis_tickets'] = (int) ($myTabCounts['mis_tickets'] ?? 0);
-    $result = in_array($bucket, ['actualizaciones', 'avisos', 'calendario', 'inmuebles', 'notificaciones', 'sin_acceso'], true) ? ['rows' => [], 'counts' => $repository->statusCounts($filters), 'pagination' => []] : $repository->search($bucket === 'inicio' ? 'abiertos' : $bucket, $filters);
-    $homeDashboard = $bucket === 'sin_acceso' ? [] : $repository->homeDashboard($globalCountFilters);
+    $result = in_array($bucket, ['actualizaciones', 'avisos', 'calendario', 'inmuebles', 'notificaciones'], true) ? ['rows' => [], 'counts' => $repository->statusCounts($filters), 'pagination' => []] : $repository->search($bucket === 'inicio' ? 'abiertos' : $bucket, $filters);
+    $homeDashboard = $repository->homeDashboard($globalCountFilters);
     $canSeeAll = $policy->canSeeAllCommercialTickets();
     $propertiesRepository = new CommercialPropertiesRepository($this->db);
     $propertyFilters = $this->propertyFilters($input, !$canSeeAll);

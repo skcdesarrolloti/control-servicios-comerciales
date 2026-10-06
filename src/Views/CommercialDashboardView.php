@@ -56,7 +56,7 @@ final class CommercialDashboardView
   <meta charset="utf-8">
   <meta content="width=device-width, initial-scale=1.0" name="viewport">
   <meta content="web_standard" name="shell-type">
-  <title>Control Operativo de Tareas Comerciales · SuCasa Inmobiliaria</title>
+  <title><?php echo $bucket === 'sin_acceso' ? 'Acceso denegado' : 'Control Operativo de Tareas Comerciales'; ?> · SuCasa Inmobiliaria</title>
   <link rel="icon" href="<?php echo esc_url(system_image('portal_favicon_url', SCM_DEFAULT_PORTAL_FAVICON_URL)); ?>" sizes="32x32">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
@@ -492,18 +492,11 @@ final class CommercialDashboardView
 
   <!-- Contenedor Principal -->
   <main class="w-full pt-28 bg-background min-h-screen flex-1">
-    <?php if ($bucket === 'sin_acceso'): ?>
-      <section class="w-full px-margin py-16 flex flex-col items-center justify-center text-center space-y-space-md" id="scm-panel-sin_acceso">
-        <div class="w-16 h-16 rounded-2xl bg-error-container text-on-error-container flex items-center justify-center">
-          <span class="material-symbols-outlined text-[32px]">lock</span>
-        </div>
-        <h2 class="font-headline-lg text-headline-lg text-on-surface">Sin vistas habilitadas</h2>
-        <p class="font-body-lg text-body-lg text-on-surface-variant max-w-md">Tu cargo no tiene secciones visibles en este panel. Solicita acceso a un administrador.</p>
-      </section>
-    <?php else: ?>
       <div class="scm-tab-panel commercial-panel active" id="commercial-tickets-panel" data-commercial-tickets-panel aria-live="polite">
         <?php
-          if ($bucket === 'inicio') {
+          if ($bucket === 'sin_acceso') {
+            echo self::renderAccessDenied($baseUrl);
+          } elseif ($bucket === 'inicio') {
             echo self::renderHome($homeDashboard, $filters, $policy, $baseUrl, $ticketEmployees, $filterOptions, $result, $tabCounts, $userName);
           } elseif ($bucket === 'actualizaciones') {
             echo self::renderPropertyUpdatesPage($filters, $ticketEmployees, $filterOptions, $policy);
@@ -520,7 +513,6 @@ final class CommercialDashboardView
           }
         ?>
       </div>
-    <?php endif; ?>
 
     <!-- Modal de Caso / Tarea -->
     <div class="fixed inset-0 z-50 items-center justify-center p-3 sm:p-5 lg:p-7 bg-[#061D49]/50 backdrop-blur-md commercial-modal overflow-y-auto" id="commercial-case-modal" role="dialog" aria-modal="true" aria-labelledby="commercial-case-title" aria-hidden="true">
@@ -576,6 +568,23 @@ final class CommercialDashboardView
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-notifications.js?v=' . SCM_VERSION); ?>"></script>
 </body>
 </html>
+<?php
+    return (string) ob_get_clean();
+  }
+
+  public static function renderAccessDenied(string $baseUrl): string
+  {
+    ob_start();
+?>
+    <section data-commercial-access-denied class="px-4 md:px-margin py-12 sm:py-16">
+      <div class="mx-auto max-w-xl rounded-2xl border border-slate-200 bg-white p-6 sm:p-10 shadow-card text-center">
+        <div class="mx-auto w-16 h-16 rounded-2xl bg-primary-container flex items-center justify-center text-on-surface"><span class="material-symbols-outlined text-[32px]" aria-hidden="true">lock</span></div>
+        <p class="mt-5 text-xs font-semibold text-secondary uppercase tracking-wide">Acceso restringido · 403</p>
+        <h2 class="mt-2 text-headline-md font-semibold text-on-surface focus:outline-none">No tienes permiso para entrar a esta página</h2>
+        <p class="mt-3 text-sm text-secondary leading-relaxed">Tu cargo no tiene acceso a esta sección. Puedes volver al inicio o solicitar el permiso a un administrador.</p>
+        <a data-commercial-denied-home href="<?php echo esc_url(rtrim($baseUrl, '/') . '/index.php'); ?>" class="mt-6 inline-flex items-center justify-center gap-2 min-h-[44px] rounded-xl bg-primary-container hover:bg-primary-fixed-dim px-5 py-3 text-sm font-semibold text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inverse-surface"><span class="material-symbols-outlined text-[20px]" aria-hidden="true">home</span>Ir al inicio</a>
+      </div>
+    </section>
 <?php
     return (string) ob_get_clean();
   }

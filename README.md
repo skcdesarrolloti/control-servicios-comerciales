@@ -66,6 +66,8 @@ Los botones superiores de WhatsApp, Correo, SMS y Todos los canales abren el edi
 
 La confirmación de envío usa un popup con destinatarios y canales, permite volver al mensaje y muestra el progreso del encolado. Al terminar, otro popup informa mensajes encolados, sin datos válidos, omitidos por preferencias y con error, y permite abrir la cola. Los errores conservan el editor; encolado indica pendiente de envío, no entrega confirmada.
 
+Las URLs directas de secciones sin permiso muestran una página HTTP 403 con el mensaje «No tienes permiso para entrar a esta página» y el botón «Ir al inicio». La navegación interna muestra la misma vista al recibir una denegación del servidor. El bloqueo ocurre antes de cargar los datos de la sección. El botón vuelve a la entrada del dashboard; si Inicio está deshabilitado para ese cargo, la entrada abre su primera sección permitida.
+
 Las cuatro plantillas son `scm_marketing_generica_texto_v1`, `scm_marketing_generica_imagen_v1`, `scm_marketing_generica_documento_v1` y `scm_marketing_generica_video_v1`. Se requiere registrarlas y obtener aprobación en Meta antes del primer envío. El cuerpo conserva los parámetros de nombre, mensaje y firma, con «Atentamente,» antes de `{{3}}` y sin la frase de consultas.
 
 Los botones individuales y las casillas del popup se deshabilitan si falta un destino válido: Email requiere correo y WhatsApp/SMS requieren celular. Todos los canales activa únicamente los disponibles. Para una selección manual, los botones masivos se habilitan si algún contacto dispone del canal. La selección de todos los resultados puede abarcar otras páginas; el servidor vuelve a comprobar cada destino y omite los inválidos por canal sin interrumpir los demás, informando la cantidad omitida.
