@@ -42,9 +42,9 @@ final class CommercialDashboardView
     if ($userName === '') {
       $userName = 'Usuario';
     }
-    $userRole = trim(Auth::userRol());
-    if ($userRole === '') {
-      $userRole = 'Gestor Operativo';
+    $userCargo = $policy instanceof CommercialAccessPolicy ? $policy->userCargoName() : '';
+    if ($userCargo === '') {
+      $userCargo = Auth::userCargo() !== '' ? 'Cargo ' . Auth::userCargo() : 'Sin cargo asignado';
     }
     $userInitials = self::initials($userName);
 
@@ -464,7 +464,7 @@ final class CommercialDashboardView
           <div class="flex items-center gap-space-sm pl-space-xs">
             <div class="text-right hidden sm:block">
               <span class="block font-label-md text-label-md text-on-primary font-semibold leading-tight"><?php echo esc_html($userName); ?></span>
-              <span class="block font-label-sm text-label-sm text-secondary-fixed opacity-70"><?php echo esc_html($userRole); ?></span>
+              <span class="block font-label-sm text-label-sm text-secondary-fixed opacity-70"><?php echo esc_html($userCargo); ?></span>
             </div>
             <div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center font-semibold text-on-primary font-label-sm text-label-sm">
               <?php echo esc_html($userInitials); ?>
@@ -632,6 +632,7 @@ final class CommercialDashboardView
             <span class="material-symbols-outlined text-[16px] group-hover/nav:rotate-180 transition-transform">expand_more</span>
           </button>
           <div class="absolute left-0 top-full hidden group-hover/nav:block bg-surface-container-lowest shadow-[0_12px_32px_rgba(0,0,0,0.14)] rounded-2xl py-space-xs min-w-[240px] z-50 border border-outline-variant/30 text-on-surface" data-commercial-dropdown-menu="calendario">
+            <?php if (!$policy instanceof CommercialAccessPolicy || $policy->canSubview('calendario', 'mine')): ?>
             <a class="flex items-center gap-2.5 px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="calendario" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'calendario', 'subtab' => 'mine'])); ?>">
               <span class="material-symbols-outlined text-[18px] text-primary">calendar_today</span>
               <div>
@@ -639,6 +640,8 @@ final class CommercialDashboardView
                 <span class="block text-[11px] text-secondary">Agenda personal operativa</span>
               </div>
             </a>
+            <?php endif; ?>
+            <?php if (!$policy instanceof CommercialAccessPolicy || $policy->canSubview('calendario', 'team')): ?>
             <a class="flex items-center gap-2.5 px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="calendario" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'calendario', 'subtab' => 'team'])); ?>">
               <span class="material-symbols-outlined text-[18px] text-secondary">groups</span>
               <div>
@@ -646,6 +649,8 @@ final class CommercialDashboardView
                 <span class="block text-[11px] text-secondary">Disponibilidad de consultores</span>
               </div>
             </a>
+            <?php endif; ?>
+            <?php if (!$policy instanceof CommercialAccessPolicy || $policy->canSubview('calendario', 'due')): ?>
             <a class="flex items-center gap-2.5 px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="calendario" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'calendario', 'subtab' => 'due'])); ?>">
               <span class="material-symbols-outlined text-[18px] text-error">schedule</span>
               <div>
@@ -653,6 +658,7 @@ final class CommercialDashboardView
                 <span class="block text-[11px] text-secondary">Control mensual de atrasos</span>
               </div>
             </a>
+            <?php endif; ?>
           </div>
         </div>
       <?php endif; ?>
@@ -666,6 +672,7 @@ final class CommercialDashboardView
             <span class="material-symbols-outlined text-[16px] group-hover/nav:rotate-180 transition-transform">expand_more</span>
           </button>
           <div class="absolute left-0 top-full hidden group-hover/nav:block bg-surface-container-lowest shadow-[0_12px_32px_rgba(0,0,0,0.14)] rounded-2xl py-space-xs min-w-[270px] z-50 border border-outline-variant/30 text-on-surface" data-commercial-dropdown-menu="inmuebles">
+            <?php if (!$policy instanceof CommercialAccessPolicy || $policy->canSubview('inmuebles', 'publicos')): ?>
             <a class="flex items-center justify-between px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="inmuebles" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'inmuebles', 'property_subtab' => 'publicos'])); ?>">
               <span class="flex items-center gap-2">
                 <span class="material-symbols-outlined text-[18px] text-emerald-600">public</span>
@@ -673,6 +680,8 @@ final class CommercialDashboardView
               </span>
               <span class="font-label-sm text-[11px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-semibold">Portal</span>
             </a>
+            <?php endif; ?>
+            <?php if (!$policy instanceof CommercialAccessPolicy || $policy->canSubview('inmuebles', 'pendientes')): ?>
             <a class="flex items-center justify-between px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="inmuebles" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'inmuebles', 'property_subtab' => 'pendientes'])); ?>">
               <span class="flex items-center gap-2">
                 <span class="material-symbols-outlined text-[18px] text-amber-600">pending_actions</span>
@@ -680,6 +689,8 @@ final class CommercialDashboardView
               </span>
               <span class="font-label-sm text-[11px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-semibold">Borrador</span>
             </a>
+            <?php endif; ?>
+            <?php if (!$policy instanceof CommercialAccessPolicy || $policy->canSubview('inmuebles', 'no_publicos')): ?>
             <a class="flex items-center justify-between px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="inmuebles" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'inmuebles', 'property_subtab' => 'no_publicos'])); ?>">
               <span class="flex items-center gap-2">
                 <span class="material-symbols-outlined text-[18px] text-slate-600">inventory_2</span>
@@ -687,7 +698,9 @@ final class CommercialDashboardView
               </span>
               <span class="font-label-sm text-[11px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full font-semibold">Cerrados</span>
             </a>
+            <?php endif; ?>
             <div class="my-1 border-t border-surface-container"></div>
+            <?php if (!$policy instanceof CommercialAccessPolicy || $policy->canSubview('inmuebles', 'destacados')): ?>
             <a class="flex items-center justify-between px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="inmuebles" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'inmuebles', 'property_subtab' => 'destacados'])); ?>">
               <span class="flex items-center gap-2">
                 <span class="material-symbols-outlined text-[18px] text-amber-500">star</span>
@@ -695,6 +708,8 @@ final class CommercialDashboardView
               </span>
               <span class="font-label-sm text-[11px] bg-amber-100 text-amber-900 px-2 py-0.5 rounded-full font-semibold">Portales</span>
             </a>
+            <?php endif; ?>
+            <?php if (!$policy instanceof CommercialAccessPolicy || $policy->canSubview('inmuebles', 'mis_solicitudes')): ?>
             <a class="flex items-center justify-between px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="inmuebles" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'inmuebles', 'property_subtab' => 'mis_solicitudes'])); ?>">
               <span class="flex items-center gap-2">
                 <span class="material-symbols-outlined text-[18px] text-indigo-600">assignment_turned_in</span>
@@ -702,6 +717,7 @@ final class CommercialDashboardView
               </span>
               <span class="font-label-sm text-[11px] bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full font-semibold">Cola</span>
             </a>
+            <?php endif; ?>
             <?php if ($canManage): ?>
               <a class="flex items-center justify-between px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="inmuebles" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'inmuebles', 'property_subtab' => 'cupos'])); ?>">
                 <span class="flex items-center gap-2">
@@ -712,6 +728,7 @@ final class CommercialDashboardView
               </a>
             <?php endif; ?>
             <div class="my-1 border-t border-surface-container"></div>
+            <?php if (!$policy instanceof CommercialAccessPolicy || $policy->canSubview('inmuebles', 'mis_inmuebles')): ?>
             <a class="flex items-center justify-between px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="inmuebles" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'inmuebles', 'property_subtab' => 'mis_inmuebles'])); ?>">
               <span class="flex items-center gap-2">
                 <span class="material-symbols-outlined text-[18px] text-primary">person_pin</span>
@@ -719,11 +736,13 @@ final class CommercialDashboardView
               </span>
               <span class="font-label-sm text-[11px] bg-primary-container text-on-surface px-2 py-0.5 rounded-full font-semibold">Personal</span>
             </a>
+            <?php endif; ?>
           </div>
         </div>
       <?php endif; ?>
 
       <!-- Dropdown Gestión de Tareas (Con despliegue por tema y por estado comercial) -->
+      <?php if (array_intersect($taskViews, $views) !== []): ?>
       <div class="relative group/nav" data-commercial-dropdown="tareas">
         <button type="button" class="flex items-center gap-space-xs px-2 lg:px-3 py-space-xs font-label-md text-label-md <?php echo $isTaskActive ? ($activeClasses . ' active') : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-tab="tareas" data-commercial-dropdown-trigger="tareas" aria-expanded="false">
           <span class="material-symbols-outlined text-[16px]" aria-hidden="true">task_alt</span>
@@ -772,7 +791,7 @@ final class CommercialDashboardView
           </div>
 
           <!-- Desglose por Tema de Ayuda y Estado Comercial -->
-          <?php if (!empty($topicHierarchy)): ?>
+          <?php if (in_array('abiertos', $views, true) && !empty($topicHierarchy)): ?>
             <div class="my-1 border-t border-surface-container"></div>
             <div class="px-3 py-1 font-label-sm uppercase font-semibold text-secondary flex items-center justify-between">
               <span>Por Tema de Ayuda</span>
@@ -831,6 +850,7 @@ final class CommercialDashboardView
       </div>
 
       <!-- Dropdown Actualizaciones de Inmuebles -->
+      <?php endif; ?>
       <?php if (in_array('actualizaciones', $views, true)): ?>
         <div class="relative group/nav" data-commercial-dropdown="actualizaciones">
           <button type="button" class="flex items-center gap-space-xs px-2 lg:px-3 py-space-xs font-label-md text-label-md <?php echo $bucket === 'actualizaciones' ? ($activeClasses . ' active') : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-tab="actualizaciones" data-commercial-dropdown-trigger="actualizaciones" aria-expanded="false">
@@ -2765,24 +2785,30 @@ final class CommercialDashboardView
       <!-- Subtab bar superior del calendario -->
       <div class="flex items-center justify-between flex-wrap gap-space-sm pb-space-xs border-b border-surface-container">
         <div class="flex items-center gap-1.5 p-1 bg-surface-container-low rounded-2xl border border-surface-container/60">
+          <?php if (!$policy instanceof CommercialAccessPolicy || $policy->canSubview('calendario', 'mine')): ?>
           <a href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'calendario', 'subtab' => 'mine'])); ?>"
              class="flex items-center gap-2 px-space-md py-1.5 rounded-xl font-label-md transition-all <?php echo $subtab === 'mine' ? 'bg-surface-container-lowest text-on-surface font-semibold shadow-sm' : 'text-secondary hover:text-on-surface'; ?>"
              data-commercial-tab="calendario" data-subtab="mine">
             <span class="material-symbols-outlined text-[18px] text-primary">calendar_today</span>
             <span>Mi calendario</span>
           </a>
+          <?php endif; ?>
+          <?php if (!$policy instanceof CommercialAccessPolicy || $policy->canSubview('calendario', 'team')): ?>
           <a href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'calendario', 'subtab' => 'team'])); ?>"
              class="flex items-center gap-2 px-space-md py-1.5 rounded-xl font-label-md transition-all <?php echo $subtab === 'team' ? 'bg-surface-container-lowest text-on-surface font-semibold shadow-sm' : 'text-secondary hover:text-on-surface'; ?>"
              data-commercial-tab="calendario" data-subtab="team">
             <span class="material-symbols-outlined text-[18px] text-secondary">groups</span>
             <span>Calendario equipo</span>
           </a>
+          <?php endif; ?>
+          <?php if (!$policy instanceof CommercialAccessPolicy || $policy->canSubview('calendario', 'due')): ?>
           <a href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'calendario', 'subtab' => 'due'])); ?>"
              class="flex items-center gap-2 px-space-md py-1.5 rounded-xl font-label-md transition-all <?php echo $subtab === 'due' ? 'bg-surface-container-lowest text-on-surface font-semibold shadow-sm' : 'text-secondary hover:text-on-surface'; ?>"
              data-commercial-tab="calendario" data-subtab="due">
             <span class="material-symbols-outlined text-[18px] text-error">schedule</span>
             <span>Vencimientos</span>
           </a>
+          <?php endif; ?>
         </div>
 
         <div class="flex items-center gap-2">
@@ -3214,6 +3240,7 @@ final class CommercialDashboardView
       <!-- Tarjetas Resumen KPI del Portafolio (7 Tarjetas Responsivas) -->
       <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-7 gap-3">
         <!-- Públicos -->
+        <?php if (!$policy instanceof CommercialAccessPolicy || $policy->canSubview('inmuebles', 'publicos')): ?>
         <a href="<?php echo esc_url(self::url($baseUrl, array_merge($filters, ['tab' => 'inmuebles', 'property_subtab' => 'publicos', 'page' => 1]))); ?>" data-commercial-tab="inmuebles" class="p-4 rounded-2xl border transition-all duration-200 flex flex-col justify-between cursor-pointer <?php echo $currentSubtab === 'publicos' ? 'bg-emerald-500/10 border-emerald-500 shadow-sm ring-1 ring-emerald-500/30' : 'bg-surface-container-lowest border-surface-container hover:border-emerald-400 hover:shadow-xs'; ?>">
           <div class="flex items-center justify-between">
             <span class="text-xs font-semibold text-secondary uppercase tracking-wider">Públicos</span>
@@ -3224,8 +3251,10 @@ final class CommercialDashboardView
             <span class="block text-[11px] text-emerald-700 font-medium">En portal web</span>
           </div>
         </a>
+        <?php endif; ?>
 
         <!-- Pendientes por publicar -->
+        <?php if (!$policy instanceof CommercialAccessPolicy || $policy->canSubview('inmuebles', 'pendientes')): ?>
         <a href="<?php echo esc_url(self::url($baseUrl, array_merge($filters, ['tab' => 'inmuebles', 'property_subtab' => 'pendientes', 'page' => 1]))); ?>" data-commercial-tab="inmuebles" class="p-4 rounded-2xl border transition-all duration-200 flex flex-col justify-between cursor-pointer <?php echo $currentSubtab === 'pendientes' ? 'bg-amber-500/10 border-amber-500 shadow-sm ring-1 ring-amber-500/30' : 'bg-surface-container-lowest border-surface-container hover:border-amber-400 hover:shadow-xs'; ?>">
           <div class="flex items-center justify-between">
             <span class="text-xs font-semibold text-secondary uppercase tracking-wider">Por Publicar</span>
@@ -3236,8 +3265,10 @@ final class CommercialDashboardView
             <span class="block text-[11px] text-amber-700 font-medium">Borrador y revisión</span>
           </div>
         </a>
+        <?php endif; ?>
 
         <!-- No públicos -->
+        <?php if (!$policy instanceof CommercialAccessPolicy || $policy->canSubview('inmuebles', 'no_publicos')): ?>
         <a href="<?php echo esc_url(self::url($baseUrl, array_merge($filters, ['tab' => 'inmuebles', 'property_subtab' => 'no_publicos', 'page' => 1]))); ?>" data-commercial-tab="inmuebles" class="p-4 rounded-2xl border transition-all duration-200 flex flex-col justify-between cursor-pointer <?php echo $currentSubtab === 'no_publicos' ? 'bg-slate-500/10 border-slate-600 shadow-sm ring-1 ring-slate-500/30' : 'bg-surface-container-lowest border-surface-container hover:border-slate-400 hover:shadow-xs'; ?>">
           <div class="flex items-center justify-between">
             <span class="text-xs font-semibold text-secondary uppercase tracking-wider">No Públicos</span>
@@ -3248,8 +3279,10 @@ final class CommercialDashboardView
             <span class="block text-[11px] text-slate-600 font-medium">Arrendados / Vendidos</span>
           </div>
         </a>
+        <?php endif; ?>
 
         <!-- Destacados -->
+        <?php if (!$policy instanceof CommercialAccessPolicy || $policy->canSubview('inmuebles', 'destacados')): ?>
         <a href="<?php echo esc_url(self::url($baseUrl, array_merge($filters, ['tab' => 'inmuebles', 'property_subtab' => 'destacados', 'page' => 1]))); ?>" data-commercial-tab="inmuebles" class="p-4 rounded-2xl border transition-all duration-200 flex flex-col justify-between cursor-pointer <?php echo $currentSubtab === 'destacados' ? 'bg-amber-500/10 border-amber-500 shadow-sm ring-1 ring-amber-500/30' : 'bg-surface-container-lowest border-surface-container hover:border-amber-400 hover:shadow-xs'; ?>">
           <div class="flex items-center justify-between">
             <span class="text-xs font-semibold text-amber-700 uppercase tracking-wider"><?php echo $canSeeAll ? 'Destacados' : 'Mis Destacados'; ?></span>
@@ -3260,8 +3293,10 @@ final class CommercialDashboardView
             <span class="block text-[11px] text-amber-700 font-medium"><?php echo $canSeeAll ? 'Activos en portales' : 'Mis activos en portales'; ?></span>
           </div>
         </a>
+        <?php endif; ?>
 
         <!-- Solicitudes por Destacar -->
+        <?php if (!$policy instanceof CommercialAccessPolicy || $policy->canSubview('inmuebles', 'mis_solicitudes')): ?>
         <a href="<?php echo esc_url(self::url($baseUrl, array_merge($filters, ['tab' => 'inmuebles', 'property_subtab' => 'mis_solicitudes', 'page' => 1]))); ?>" data-commercial-tab="inmuebles" class="p-4 rounded-2xl border transition-all duration-200 flex flex-col justify-between cursor-pointer <?php echo $currentSubtab === 'mis_solicitudes' ? 'bg-indigo-500/10 border-indigo-500 shadow-sm ring-1 ring-indigo-500/30' : 'bg-surface-container-lowest border-surface-container hover:border-indigo-400 hover:shadow-xs'; ?>">
           <div class="flex items-center justify-between">
             <span class="text-xs font-semibold text-indigo-700 uppercase tracking-wider"><?php echo $canSeeAll ? 'Solicitudes' : 'Mis Solicitudes'; ?></span>
@@ -3272,8 +3307,10 @@ final class CommercialDashboardView
             <span class="block text-[11px] text-indigo-700 font-medium">Por destacar</span>
           </div>
         </a>
+        <?php endif; ?>
 
         <!-- Mis Inmuebles -->
+        <?php if (!$policy instanceof CommercialAccessPolicy || $policy->canSubview('inmuebles', 'mis_inmuebles')): ?>
         <a href="<?php echo esc_url(self::url($baseUrl, array_merge($filters, ['tab' => 'inmuebles', 'property_subtab' => 'mis_inmuebles', 'page' => 1]))); ?>" data-commercial-tab="inmuebles" class="p-4 rounded-2xl border transition-all duration-200 flex flex-col justify-between cursor-pointer <?php echo $currentSubtab === 'mis_inmuebles' ? 'bg-primary/10 border-primary shadow-sm ring-1 ring-primary/30' : 'bg-surface-container-lowest border-surface-container hover:border-primary/50 hover:shadow-xs'; ?>">
           <div class="flex items-center justify-between">
             <span class="text-xs font-semibold text-primary uppercase tracking-wider">Mis Inmuebles</span>
@@ -3284,6 +3321,7 @@ final class CommercialDashboardView
             <span class="block text-[11px] text-secondary font-medium">Asignados a mi gestión</span>
           </div>
         </a>
+        <?php endif; ?>
 
         <!-- Total General -->
         <div class="p-4 rounded-2xl border border-surface-container bg-surface-container-low flex flex-col justify-between">
@@ -3301,6 +3339,7 @@ final class CommercialDashboardView
       <!-- Barra de Pestañas / Sub-tabs de Inmuebles -->
       <div class="flex items-center gap-2 border-b border-surface-container pb-2 overflow-x-auto">
         <?php foreach ($subtabs as $stKey => $stData): ?>
+          <?php if ($policy instanceof CommercialAccessPolicy && !$policy->canSubview('inmuebles', $stKey)) continue; ?>
           <?php
             $isActive = $currentSubtab === $stKey;
             $subtabUrl = self::url($baseUrl, array_merge($filters, [
@@ -3322,7 +3361,7 @@ final class CommercialDashboardView
       </div>
 
       <?php if ($currentSubtab === 'mis_solicitudes'): ?>
-        <?php echo self::renderUserHighlightRequests($options, $baseUrl); ?>
+        <?php echo self::renderUserHighlightRequests($options, $baseUrl, $policy); ?>
       <?php else: ?>
         <!-- Filtros Avanzados para Inmuebles -->
         <form method="GET" action="<?php echo esc_url(self::url($baseUrl, ['tab' => 'inmuebles'])); ?>" data-commercial-properties-filter-form class="bg-surface-container-lowest p-5 rounded-2xl border border-surface-container shadow-xs space-y-4">
@@ -3499,7 +3538,7 @@ final class CommercialDashboardView
    *
    * @param array<string,mixed> $options
    */
-  public static function renderUserHighlightRequests(array $options, string $baseUrl): string
+  public static function renderUserHighlightRequests(array $options, string $baseUrl, $policy = null): string
   {
     $userQuotas = is_array($options['user_quotas'] ?? null) ? $options['user_quotas'] : [];
     $userRequests = is_array($options['user_requests'] ?? null) ? $options['user_requests'] : [];
@@ -3609,10 +3648,12 @@ final class CommercialDashboardView
               Aún no has solicitado destacar ningún inmueble. Puedes ingresar a la pestaña de inmuebles, abrir cualquier inmueble asignado a tu gestión y solicitar su destacado en el portal que desees.
             </p>
             <div class="pt-2">
+              <?php if (!$policy instanceof CommercialAccessPolicy || $policy->canSubview('inmuebles', 'mis_inmuebles')): ?>
               <a href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'inmuebles', 'property_subtab' => 'mis_inmuebles'])); ?>" data-commercial-tab="inmuebles" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-white text-xs font-semibold hover:bg-primary/90 transition-all cursor-pointer shadow-xs">
                 <span class="material-symbols-outlined text-[16px]">person_pin</span>
                 <span>Ver mis inmuebles</span>
               </a>
+              <?php endif; ?>
             </div>
           </div>
         <?php else: ?>
@@ -4773,6 +4814,21 @@ final class CommercialDashboardView
                     <?php endforeach; ?>
                   </div>
                 </div>
+                <p class="text-[11px] text-secondary pt-1">Las subpestañas requieren habilitar su vista principal.</p>
+                <?php foreach (CommercialAccessPolicy::SUBVIEWS as $parentView => $subviews): ?>
+                  <div class="pt-1">
+                    <span class="block font-label-sm text-secondary font-semibold">Subpestañas de <?php echo esc_html(CommercialAccessPolicy::VIEWS[$parentView]); ?>:</span>
+                    <input type="hidden" name="permissions[<?php echo esc_attr($cargo['id']); ?>][subviews][<?php echo esc_attr($parentView); ?>][]" value="">
+                    <div class="grid grid-cols-2 gap-1 pt-1">
+                      <?php foreach ($subviews as $key => $label): ?>
+                        <label class="flex items-center gap-1.5 text-[11px] text-on-surface cursor-pointer">
+                          <input type="checkbox" name="permissions[<?php echo esc_attr($cargo['id']); ?>][subviews][<?php echo esc_attr($parentView); ?>][]" value="<?php echo esc_attr($key); ?>"<?php checked(in_array($key, $current['subviews'][$parentView] ?? array_keys($subviews), true)); ?> class="rounded text-primary">
+                          <span><?php echo esc_html($label); ?></span>
+                        </label>
+                      <?php endforeach; ?>
+                    </div>
+                  </div>
+                <?php endforeach; ?>
                 <div class="pt-1">
                   <span class="block font-label-sm text-secondary font-semibold">Acciones Operativas:</span>
                   <div class="grid grid-cols-2 gap-1 pt-1">

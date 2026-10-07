@@ -36,6 +36,22 @@ final class CommercialAccessPolicy
     'enviar_notificacion' => 'Enviar notificaciones comerciales',
   ];
 
+  public const SUBVIEWS = [
+    'inmuebles' => [
+      'publicos' => 'Inmuebles públicos',
+      'pendientes' => 'Pendientes por publicar',
+      'no_publicos' => 'Inmuebles no públicos',
+      'destacados' => 'Inmuebles destacados',
+      'mis_solicitudes' => 'Solicitudes por destacar',
+      'mis_inmuebles' => 'Mis inmuebles',
+    ],
+    'calendario' => [
+      'mine' => 'Mi calendario',
+      'team' => 'Calendario del equipo',
+      'due' => 'Vencimientos',
+    ],
+  ];
+
   private Settings $settings;
   private Database $db;
   /** @var array<int,string> */
@@ -67,10 +83,58 @@ final class CommercialAccessPolicy
     if ($this->canManage()) {
       return true;
     }
-    if ($view === 'mis_tickets' || $view === 'inmuebles') {
-      return true;
+    if (!in_array($view, $this->allowed('views', array_keys(self::VIEWS)), true)) {
+      return false;
     }
-    return in_array($view, $this->allowed('views', array_keys(self::VIEWS)), true);
+    return !isset(self::SUBVIEWS[$view]) || $this->allowedSubviews($view) !== [];
+  }
+
+  /** @return array<int,string> */
+  public function allowedSubviews(string $view): array
+  {
+    $defaults = array_keys(self::SUBVIEWS[$view] ?? []);
+    if ($this->canManage()) {
+      return $defaults;
+    }
+    $permissions = $this->permissions();
+    return $permissions[Auth::userCargo()]['subviews'][$view] ?? $defaults;
+  }
+
+  public function canSubview(string $view, string $subview): bool
+  {
+    return $this->canView($view) && in_array($subview, $this->allowedSubviews($view), true);
+  }
+
+  /** Resolve the default subtab and reject explicitly denied subtabs before querying data.
+   * @param array<string,mixed> $input
+   * @return array<string,mixed>
+   */
+  public function resolveNavigation(string $view, array $input): array
+  {
+    if (!isset(self::SUBVIEWS[$view])) {
+      return $input;
+    }
+    $key = $view === 'inmuebles' ? 'property_subtab' : 'subtab';
+    $requested = trim((string) ($input[$key] ?? ($view === 'inmuebles' ? ($input['subtab'] ?? '') : '')));
+    $allowed = $this->allowedSubviews($view);
+    if ($requested === '') {
+      $preferred = $view === 'inmuebles' ? ($this->canManage() ? 'publicos' : 'mis_inmuebles') : 'mine';
+      $requested = in_array($preferred, $allowed, true) ? $preferred : ($allowed[0] ?? '');
+    }
+    if (!$this->canSubview($view, $requested)) {
+      throw new \RuntimeException('No tienes permiso para entrar a esta subpestaña.');
+    }
+    $input[$key] = $requested;
+    return $input;
+  }
+
+  public function userCargoName(): string
+  {
+    $table = $this->db->table('jet_cct_cargos');
+    return trim((string) $this->db->getVar(
+      "SELECT `nombre_cargo` FROM `{$table}` WHERE `_ID` = ? LIMIT 1",
+      [Auth::userCargo()]
+    ));
   }
 
   public function canAct(string $action): bool
@@ -84,7 +148,7 @@ final class CommercialAccessPolicy
     return in_array($action, $this->allowed('actions', array_keys(self::ACTIONS)), true);
   }
 
-  /** @return array<string,array{views:array<int,string>,actions:array<int,string>}> */
+  /** @return array<string,array{views:array<int,string>,actions:array<int,string>,subviews:array<string,array<int,string>>}> */
   public function permissions(): array
   {
     $raw = $this->settings->get('commercial_permissions', []);
@@ -154,7 +218,7 @@ final class CommercialAccessPolicy
     return array_values($values);
   }
 
-  /** @param array<string,mixed> $raw @return array<string,array{views:array<int,string>,actions:array<int,string>}> */
+  /** @param array<string,mixed> $raw @return array<string,array{views:array<int,string>,actions:array<int,string>,subviews:array<string,array<int,string>>}> */
   private function sanitize(array $raw): array
   {
     $out = [];
@@ -166,7 +230,15 @@ final class CommercialAccessPolicy
       $out[$cargo] = [
         'views' => array_values(array_intersect(array_keys(self::VIEWS), array_map('strval', (array) ($definition['views'] ?? [])))),
         'actions' => array_values(array_intersect(array_keys(self::ACTIONS), array_map('strval', (array) ($definition['actions'] ?? [])))),
+        'subviews' => [],
       ];
+      foreach (self::SUBVIEWS as $view => $subviews) {
+        // Existing configurations inherit their parent permission until subviews are saved.
+        $configured = is_array($definition['subviews'] ?? null) && array_key_exists($view, $definition['subviews']);
+        $out[$cargo]['subviews'][$view] = $configured
+          ? array_values(array_intersect(array_keys($subviews), array_map('strval', (array) $definition['subviews'][$view])))
+          : array_keys($subviews);
+      }
     }
     return $out;
   }

@@ -44,7 +44,14 @@ final class CommercialDashboardController
 
     $visibleViews = array_values(array_filter(array_keys(CommercialAccessPolicy::VIEWS), static fn(string $view): bool => $policy->canView($view)));
     $requested = trim((string) ($input['tab'] ?? 'inicio'));
-    if ($visibleViews === [] || (isset($input['tab']) && $requested !== '' && !in_array($requested, $visibleViews, true))) {
+    $bucket = in_array($requested, $visibleViews, true) ? $requested : ($visibleViews[0] ?? 'sin_acceso');
+    $subviewDenied = false;
+    try {
+      $input = $policy->resolveNavigation($bucket, $input);
+    } catch (\RuntimeException $exception) {
+      $subviewDenied = true;
+    }
+    if ($subviewDenied || $visibleViews === [] || (isset($input['tab']) && $requested !== '' && !in_array($requested, $visibleViews, true))) {
       http_response_code(403);
       return CommercialDashboardView::render([
         'bucket' => 'sin_acceso', 'policy' => $policy, 'visible_views' => $visibleViews,
@@ -52,7 +59,6 @@ final class CommercialDashboardController
         'runtime' => ['ajaxUrl' => rtrim((string) SCM_BASE_URL, '/') . '/api.php', 'nonce' => $this->csrf->token('commercial_nonce'), 'initialTab' => 'scm-panel-sin_acceso'],
       ]);
     }
-    $bucket = in_array($requested, $visibleViews, true) ? $requested : $visibleViews[0];
     $ticketEmployees = $repository->ticketEmployees($commercialEmployeeCargos);
     $filters = $this->ticketFilters($input);
     $filters['tab'] = $bucket;

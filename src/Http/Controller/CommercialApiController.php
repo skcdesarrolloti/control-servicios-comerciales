@@ -64,6 +64,13 @@ final class CommercialApiController
   {
     $this->verify($input);
     $bucket = trim((string) ($input['tab'] ?? 'inicio'));
+    try {
+      $input = $this->policy->resolveNavigation($bucket, $input);
+    } catch (\RuntimeException $exception) {
+      JsonResponse::error($exception->getMessage(), 403, [
+        'page_denied' => true, 'html' => CommercialDashboardView::renderAccessDenied($this->baseUrl),
+      ]);
+    }
     if (!array_key_exists($bucket, CommercialAccessPolicy::VIEWS) || !$this->policy->canView($bucket)) {
       JsonResponse::error('No tienes permiso para entrar a esta página.', 403, [
         'page_denied' => true, 'html' => CommercialDashboardView::renderAccessDenied($this->baseUrl),
@@ -767,6 +774,9 @@ final class CommercialApiController
   public function propertyDetail(array $input): never
   {
     $this->verify($input);
+    if (!$this->policy->canView('inmuebles')) {
+      JsonResponse::error('No tienes permiso para consultar inmuebles.', 403);
+    }
     $identifier = trim((string) ($input['codigo'] ?? $input['property_id'] ?? ''));
     if ($identifier === '') {
       JsonResponse::error('Identificador de inmueble inválido.', 400);
@@ -787,6 +797,9 @@ final class CommercialApiController
   public function requestHighlight(array $input): never
   {
     $this->verify($input);
+    if (!$this->policy->canView('inmuebles')) {
+      JsonResponse::error('No tienes permiso para gestionar inmuebles.', 403);
+    }
     $code = trim((string) ($input['codigo'] ?? ''));
     $portal = trim((string) ($input['portal'] ?? ''));
     $reason = trim((string) ($input['razon'] ?? $input['observacion_destacado'] ?? ''));
@@ -809,6 +822,9 @@ final class CommercialApiController
   public function cancelHighlightRequest(array $input): never
   {
     $this->verify($input);
+    if (!$this->policy->canView('inmuebles')) {
+      JsonResponse::error('No tienes permiso para gestionar inmuebles.', 403);
+    }
     $requestId = (int) ($input['request_id'] ?? 0);
     if ($requestId <= 0) {
       JsonResponse::error('ID de solicitud no válido.', 400);
@@ -851,6 +867,9 @@ final class CommercialApiController
   public function releaseHighlight(array $input): never
   {
     $this->verify($input);
+    if (!$this->policy->canView('inmuebles')) {
+      JsonResponse::error('No tienes permiso para gestionar inmuebles.', 403);
+    }
     $code = trim((string) ($input['codigo'] ?? ''));
     $portal = trim((string) ($input['portal'] ?? ''));
 
