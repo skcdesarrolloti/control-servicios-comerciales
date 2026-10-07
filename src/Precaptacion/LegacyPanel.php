@@ -124,6 +124,7 @@ final class LegacyPanel
             <div class="precap-metrics" data-precap-metrics><?php self::render_metrics($table, $filters, $is_control); ?></div>
             <nav class="precap-contact-tabs" aria-label="Filtrar por contacto"><?php foreach ([''=>'Todos','por_llamar'=>'Por llamar','no_contesto'=>'No contestó','contactado'=>'Contactados','seguimiento'=>'En seguimiento'] as $value => $label): ?><button type="button" data-precap-contact-filter="<?php echo esc_attr($value); ?>"<?php echo $value === '' ? ' class="is-active" aria-pressed="true"' : ' aria-pressed="false"'; ?>><?php echo esc_html($label); ?></button><?php endforeach; ?></nav>
             <?php self::render_filters($table, $filters, $is_control); ?>
+            <details class="precap-state-help"><summary>¿Qué significa cada estado?</summary><dl><div><dt>Todos</dt><dd>Muestra todos los registros, sin filtrar por contacto.</dd></div><div><dt>Por llamar / Sin llamada registrada</dt><dd>No está marcado como contactado y no tiene resultado, razón ni seguimiento de gestión guardados.</dd></div><div><dt>No contestó</dt><dd>El resultado, la razón o las observaciones indican que no contestó, no respondió o dejó la llamada en buzón. Este estado tiene prioridad.</dd></div><div><dt>Contactados</dt><dd>El registro está marcado como contactado y no contiene una indicación de falta de respuesta.</dd></div><div><dt>En seguimiento</dt><dd>Tiene resultado, razón o seguimiento guardados, pero no está marcado como contactado ni como una llamada sin respuesta.</dd></div></dl></details>
 
             <div class="precaptaciones__estado" data-precaptaciones-status aria-live="polite"></div>
             <div data-precaptaciones-results>
@@ -202,9 +203,6 @@ final class LegacyPanel
         $rows_sql = "SELECT * FROM {$table} {$where_sql} {$order_sql} LIMIT %d OFFSET %d";
         $rows_values = array_merge($where_values, [$per_page, $offset]);
         $rows = $wpdb->get_results($wpdb->prepare($rows_sql, $rows_values), ARRAY_A);
-        $dates = (new ResponseDates(Module::db()))->forIds(array_map(static fn(array $row): int => (int) $row['_ID'], $rows ?: []));
-        foreach ($rows as &$row) $row['_scm_responded_at'] = $dates[(int) $row['_ID']] ?? '';
-        unset($row);
 
         return [
             'rows' => $rows ?: [],
@@ -427,7 +425,7 @@ final class LegacyPanel
                 <?php endif; ?>
             </td>
             <td><?php echo self::render_evidence($table, $row); ?></td>
-            <td class="precap-dates"><small>Registro</small><time><?php echo esc_html(self::registration_date($table, $row)); ?></time><small>Última respuesta</small><time><?php echo esc_html(self::response_date($table, $row)); ?></time></td>
+            <td class="precap-dates"><div class="precap-date-group"><div><small>Registro</small></div><div><time><?php echo esc_html(self::registration_date($table, $row)); ?></time></div></div><div class="precap-date-group"><div><small>Última respuesta</small></div><div><time><?php echo esc_html(self::response_date($table, $row)); ?></time></div></div></td>
             <?php if ($is_control) : ?>
                 <td><div class="precap-employee"><span class="precap-avatar" aria-hidden="true"><?php echo esc_html(mb_strtoupper(mb_substr(self::employee_name($employee_id), 0, 1))); ?></span><strong><?php echo esc_html(self::employee_name($employee_id)); ?></strong></div></td>
             <?php endif; ?>
@@ -464,13 +462,7 @@ final class LegacyPanel
 
     private static function response_date(string $table, array $row): string
     {
-        $formatted = self::format_date((string) ($row['_scm_responded_at'] ?? ''));
-        if ($formatted !== '') return $formatted;
-        foreach (['fecha_respuesta', 'fecha_respuesta_precat', 'fecha_respuesta_precap'] as $column) {
-            $formatted = self::format_date(self::row_value($table, $row, [$column]));
-            if ($formatted !== '') return $formatted;
-        }
-        return 'No registrada';
+        return self::format_date(self::row_value($table, $row, ['cct_modified'])) ?: 'No registrada';
     }
 
     private static function render_detail_modal(string $table, array $row, bool $is_control): void

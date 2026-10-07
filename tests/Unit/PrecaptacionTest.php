@@ -147,15 +147,13 @@ final class PrecaptacionTest extends TestCase
     self::assertSame('a:0:{}', $this->db->getVar('SELECT competencia FROM wp_jet_cct_precaptaciones WHERE _ID = 1'));
   }
 
-  public function testResponseDatesAreTransactionalAndDoNotReplaceRegistrationDate(): void
+  public function testResponseDateUsesCctModifiedAndPreservesRegistrationDate(): void
   {
-    $dates = new \SCM\Precaptacion\ResponseDates($this->db);
     $registered = $this->db->getVar('SELECT fecha FROM wp_jet_cct_precaptaciones WHERE _ID = 1');
-    $this->db->pdo()->beginTransaction(); $dates->record(1); $this->db->pdo()->rollBack();
-    self::assertSame([], $dates->forIds([1]));
-    $dates->record(1); $dates->record(1);
-    self::assertCount(1, $dates->forIds([1]));
+    $this->db->update('wp_jet_cct_precaptaciones', ['cct_modified'=>'2026-10-07 10:15:00'], ['_ID'=>1]);
     $html = LegacyPanel::render_shortcode(['modo'=>'mis']);
+    self::assertStringContainsString('07/10/2026 10:15', $html);
+    self::assertStringContainsString('class="precap-date-group"', $html);
     self::assertStringContainsString('Última respuesta', $html);
     self::assertStringContainsString('Fecha de registro', $html);
     self::assertSame($registered, $this->db->getVar('SELECT fecha FROM wp_jet_cct_precaptaciones WHERE _ID = 1'));

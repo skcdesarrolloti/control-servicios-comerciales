@@ -123,6 +123,11 @@ body{background:#faf8ff}
 .precap-contact-tabs{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 15px}
 .precap-contact-tabs button{background:#fff;border:1px solid #e2e8f0;color:#514b3b;font-size:12px;min-height:34px;padding:7px 16px;border-radius:10px;font-weight:500}
 .precap-contact-tabs button.is-active{background:#735c00;border-color:#735c00;color:#fff}
+.precap-state-help{font-size:11px;color:#56709b;margin:-8px 0 20px}
+.precap-state-help summary{cursor:pointer;width:fit-content;color:#1e3c76;padding:6px 0}
+.precap-state-help dl{display:grid;gap:10px;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin:7px 0 0}
+.precap-state-help dt{font-weight:600;color:#061d49;margin-bottom:3px}
+.precap-state-help dd{margin:0;line-height:1.6}
 .precaptaciones .precaptaciones__filtros{padding:20px;border-radius:20px;box-shadow:none}
 .precap-primary-filters{display:grid;grid-template-columns:2fr repeat(4,minmax(0,1fr));gap:12px;align-items:end}
 .precaptaciones .precap-primary-filters .precap-search{min-width:0}
@@ -136,6 +141,9 @@ body{background:#faf8ff}
 .precap-dates small{font-size:9px;color:#56709b;margin:7px 0 3px}
 .precap-dates small:first-child{margin-top:0}
 .precap-dates time{font-size:11px;color:#061d49}
+.precaptaciones .precap-dates .precap-date-group{display:block;margin-bottom:10px}
+.precaptaciones .precap-dates .precap-date-group:last-child{margin-bottom:0}
+.precaptaciones .precap-dates .precap-date-group>div{display:block}
 .precap-contact-badge{display:inline-flex;align-items:center;gap:5px;padding:5px 9px;border-radius:999px;white-space:nowrap;font-size:10px;border:1px solid #e0e5f0;color:#56709b;background:#f3f5fa;font-weight:500}
 .precap-contact-badge:before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor}
 .precap-contact-badge--no_contesto{background:#fff5e5;border-color:#ffdda0;color:#a35b00}
