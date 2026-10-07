@@ -78,7 +78,7 @@ final class Repository
       $out[$field] = array_map(static fn(array $row): array => ['value'=>(string) ($row[$column] ?? ''),'label'=>(string) ($row[$column] ?? '')], $this->rows($table));
       usort($out[$field], static fn(array $a, array $b): int => strcasecmp($a['label'], $b['label']));
     }
-    $out['id_pph'] = array_map(static fn(array $row): array => ['value'=>(string) $row['_ID'],'label'=>(string) ($row['tarjeta_bienvenida'] ?? $row['nombre'] ?? $row['_ID'])], $this->rows('jet_cct_club_pph'));
+    $out['id_pph'] = array_map(static fn(array $row): array => ['value'=>(string) $row['_ID'],'label'=>trim((string) ($row['nombre'] ?? '')) . ' · #' . $row['_ID'] . ' · ' . (string) ($row['tarjeta_bienvenida'] ?? '')], $this->rows('jet_cct_club_pph'));
     $out['indicativo'] = [];
     foreach ($this->rows('jet_cct_paises') as $row) {
       $out['indicativo'][] = ['value'=>(string) ($row['codigo'] ?? $row['indicativo'] ?? ''),'label'=>(string) ($row['pais'] ?? $row['nombre'] ?? '')];

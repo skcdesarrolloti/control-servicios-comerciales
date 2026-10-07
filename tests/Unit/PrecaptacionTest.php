@@ -120,6 +120,18 @@ final class PrecaptacionTest extends TestCase
     self::assertMatchesRegularExpression('/Tarea creada\s*<\/option>/', $html);
   }
 
+  public function testHistoricalNoAnswerIsSeparateFromUncalledAndContacted(): void
+  {
+    $this->db->update('wp_jet_cct_precaptaciones', ['observaciones'=>'No contestó','contactado'=>'No'], ['_ID'=>1]);
+    $html = LegacyPanel::render_shortcode(['modo'=>'mis']);
+    self::assertStringContainsString('precap-contact-badge--no_contesto', $html);
+    self::assertStringContainsString('name="precaptaciones_estado_contacto"', $html);
+    $this->db->update('wp_jet_cct_precaptaciones', ['observaciones'=>'','resultado'=>'Hablamos con el propietario','contactado'=>'Si'], ['_ID'=>1]);
+    $html = LegacyPanel::render_shortcode(['modo'=>'mis']);
+    self::assertStringContainsString('precap-contact-badge--contactado', $html);
+    self::assertMatchesRegularExpression('/precap-metric--pending.*?<strong>0<\/strong>/s', $html);
+  }
+
   public function testPreparedQueriesHandleQuotedPlaceholdersAndUntrustedNames(): void
   {
     $adapter = new DatabaseAdapter($this->db);

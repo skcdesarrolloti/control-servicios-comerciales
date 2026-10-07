@@ -10,37 +10,46 @@ final class FormView
   {
     $config = json_decode((string) file_get_contents(dirname(__DIR__, 2) . '/resources/precaptacion-form.json'), true);
     $options = $repository->options();
+    $steps = [
+      ['title'=>'Inmueble','description'=>'Origen y características de la oportunidad.','fields'=>['origen','id_pph','tipo_inmueble','categoria']],
+      ['title'=>'Ubicación','description'=>'Identifica dónde se encuentra el inmueble.','fields'=>['barrio','direccion','punto_referencia']],
+      ['title'=>'Contacto','description'=>'Datos del contacto y quién promociona el inmueble.','fields'=>['tipo_contacto','contacto','telefono','indicativo','celular','promocionado_por','competencia']],
+      ['title'=>'Evidencias','description'=>'Adjunta las fotografías y revisa antes de registrar.','fields'=>['fotos','observaciones']],
+    ];
     ob_start();
     ?>
     <?php if (Module::policy()->canAct('precaptacion_crear')): ?>
-    <dialog id="precap-create" aria-labelledby="precap-create-title">
-      <form id="precap-create-form" enctype="multipart/form-data">
-        <header><h2 id="precap-create-title">Registrar precaptación</h2><button type="button" data-precap-close aria-label="Cerrar formulario">×</button></header>
-        <p>Completa los datos de la oportunidad. Los campos con * son obligatorios.</p>
+    <dialog id="precap-create" class="rounded-3xl border border-brand-border bg-white shadow-modal" aria-labelledby="precap-create-title">
+      <form id="precap-create-form" enctype="multipart/form-data" novalidate>
+        <header class="precap-wizard-header"><div><span class="precap-eyebrow">ACTIVIDADES COMERCIALES</span><h2 id="precap-create-title">Registrar precaptación</h2><p>Una nueva oportunidad, paso a paso.</p></div><button type="button" data-precap-close aria-label="Cerrar formulario">×</button></header>
+        <nav class="precap-steps" aria-label="Pasos del registro"><?php foreach ($steps as $index => $step): ?><button type="button" data-precap-step-go="<?php echo $index; ?>"<?php echo $index === 0 ? ' aria-current="step"' : ''; ?>><span><?php echo $index + 1; ?></span><?php echo esc_html($step['title']); ?></button><?php endforeach; ?></nav>
+        <div class="precap-wizard-body">
+        <?php foreach ($steps as $index => $step): ?>
+        <section data-precap-step="<?php echo $index; ?>" aria-labelledby="precap-step-title-<?php echo $index; ?>"<?php echo $index ? ' hidden' : ''; ?>>
+        <div class="precap-step-heading"><h3 id="precap-step-title-<?php echo $index; ?>"><?php echo esc_html($step['title']); ?></h3><p><?php echo esc_html($step['description']); ?> <span>Los campos con * son obligatorios.</span></p></div>
         <div class="precap-fields">
           <?php foreach ($config['fields'] as $field): ?>
-            <?php if ($field['type'] === 'hidden-field') continue;
+            <?php if ($field['type'] === 'hidden-field' || !in_array($field['name'], $step['fields'], true)) continue;
               $name = $field['name'];
               $required = !empty($field['required']);
               $multiple = !empty($field['multiple']);
             ?>
-            <div class="precap-field <?php echo $name === 'observaciones' ? 'precap-wide' : ''; ?>"<?php echo in_array($name, ['id_pph','competencia'], true) ? ' data-precap-conditional="' . esc_attr($name) . '" hidden' : ''; ?>>
-              <label for="precap-<?php echo esc_attr($name); ?>"><?php echo esc_html($name === 'fotos' ? 'Registro fotográfico' : ($field['label'] ?? $name)); ?><?php echo $required ? ' *' : ''; ?></label>
+            <div class="precap-field <?php echo in_array($name, ['observaciones','fotos'], true) ? 'precap-wide' : ''; ?>"<?php echo in_array($name, ['id_pph','competencia'], true) ? ' data-precap-conditional="' . esc_attr($name) . '" hidden' : ''; ?>>
+              <label id="precap-label-<?php echo esc_attr($name); ?>" for="precap-<?php echo esc_attr($name); ?>"><?php echo esc_html($name === 'fotos' ? 'Registro fotográfico' : ($field['label'] ?? $name)); ?><?php echo $required ? ' *' : ''; ?></label>
               <?php if ($field['type'] === 'media-field'): ?>
-                <input id="precap-fotos" name="fotos[]" type="file" accept="image/jpeg,image/png,image/gif,image/webp,image/bmp,image/heic,image/heif,image/tiff" multiple required>
+                <label class="precap-upload" for="precap-fotos"><span aria-hidden="true">＋</span><strong>Agregar fotografías del inmueble</strong><small>Selecciona una o dos imágenes de tu dispositivo</small><input id="precap-fotos" name="fotos[]" type="file" accept="image/jpeg,image/png,image/gif,image/webp,image/bmp,image/heic,image/heif,image/tiff" multiple required></label>
+                <div class="precap-photo-preview" data-precap-photo-preview></div>
                 <small>Una o dos fotografías, hasta 10 MB por archivo.</small>
               <?php elseif ($field['type'] === 'textarea-field'): ?>
                 <textarea id="precap-<?php echo esc_attr($name); ?>" name="<?php echo esc_attr($name); ?>" rows="3"></textarea>
               <?php elseif ($name === 'barrio'): ?>
-                <input id="precap-barrio" name="barrio" list="precap-barrios" autocomplete="off" placeholder="Busca un barrio">
-                <datalist id="precap-barrios"><?php foreach ($options['barrio'] as $option): ?><option value="<?php echo esc_attr($option['value']); ?>"><?php endforeach; ?></datalist>
+                <select id="precap-barrio" name="barrio" data-precap-picker><option value="">Selecciona un barrio</option><?php foreach ($options['barrio'] as $option): ?><option value="<?php echo esc_attr($option['value']); ?>"><?php echo esc_html($option['label']); ?></option><?php endforeach; ?></select>
               <?php elseif ($field['type'] === 'select-field' && (($options[$name] ?? []) !== [] || in_array($name, ['competencia','id_pph'], true))): ?>
-                <?php if ($multiple): ?><input type="search" data-precap-search="precap-<?php echo esc_attr($name); ?>" aria-label="Buscar en <?php echo esc_attr($field['label']); ?>" placeholder="Buscar opción…"><?php endif; ?>
-                <select id="precap-<?php echo esc_attr($name); ?>" name="<?php echo esc_attr($name . ($multiple ? '[]' : '')); ?>"<?php echo $multiple ? ' multiple size="4"' : ''; ?><?php echo $required ? ' required' : ''; ?>>
+                <select data-precap-picker id="precap-<?php echo esc_attr($name); ?>" name="<?php echo esc_attr($name . ($multiple ? '[]' : '')); ?>"<?php echo $multiple ? ' multiple' : ''; ?><?php echo $required ? ' required' : ''; ?>>
                   <?php if (!$multiple): ?><option value="">Selecciona una opción</option><?php endif; ?>
                   <?php foreach ($options[$name] as $option): ?><option value="<?php echo esc_attr($option['value']); ?>"><?php echo esc_html($option['label']); ?></option><?php endforeach; ?>
                 </select>
-                <?php if ($multiple): ?><small>Puedes seleccionar varias opciones con Ctrl o Cmd.</small><?php endif; ?>
+                <?php if ($multiple): ?><small>Busca y marca una o varias opciones.</small><?php endif; ?>
               <?php else: ?>
                 <input id="precap-<?php echo esc_attr($name); ?>" name="<?php echo esc_attr($name); ?>" type="<?php echo in_array($name, ['telefono','celular'], true) ? 'tel' : 'text'; ?>"<?php echo $name === 'celular' ? ' inputmode="numeric" pattern="[0-9]{7,15}"' : ''; ?><?php echo $required ? ' required' : ''; ?>>
               <?php endif; ?>
@@ -50,11 +59,16 @@ final class FormView
             </div>
           <?php endforeach; ?>
         </div>
+        <?php if ($index === 3): ?><div class="precap-review" data-precap-review></div><?php endif; ?>
+        </section>
+        <?php endforeach; ?>
         <p data-precap-message role="status" aria-live="polite"></p>
-        <footer><button type="button" class="precap-secondary" data-precap-close>Cancelar</button><button type="submit">Registrar precaptación</button></footer>
+        </div>
+        <footer class="precap-wizard-footer"><span data-precap-step-count>Paso 1 de 4</span><div><button type="button" class="precap-secondary" data-precap-back hidden>Anterior</button><button type="button" data-precap-next>Continuar →</button><button type="submit" hidden>Registrar precaptación</button></div></footer>
       </form>
     </dialog>
     <?php endif; ?>
+    <dialog id="precap-notice" class="rounded-3xl border border-brand-border bg-white shadow-modal" aria-labelledby="precap-notice-title"><form method="dialog"><header><h2 id="precap-notice-title"></h2><button value="cancel" aria-label="Cerrar">×</button></header><p data-precap-notice-text></p><footer><button class="precap-secondary" value="cancel" data-precap-notice-cancel>Cancelar</button><button value="confirm" data-precap-notice-confirm>Continuar</button></footer></form></dialog>
     <?php if (Module::policy()->canAct('precaptacion_catalogos')): ?>
       <?php foreach (['barrio'=>'Barrio','inmobiliaria'=>'Inmobiliaria'] as $kind => $label): ?>
       <dialog id="precap-add-<?php echo $kind; ?>" aria-labelledby="precap-add-<?php echo $kind; ?>-title">

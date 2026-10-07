@@ -19,6 +19,7 @@ $nonce = \SCM\Precaptacion\Module::nonce();
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Precaptación · SuCasa Inmobiliaria</title>
+  <link rel="stylesheet" href="<?php echo esc_url(SCM_BASE_URL . '/assets/css/tailwind.css'); ?>">
   <link rel="stylesheet" href="<?php echo esc_url(SCM_BASE_URL . '/assets/css/precaptacion.css?v=' . filemtime(__DIR__ . '/assets/css/precaptacion.css')); ?>">
 </head>
 <body data-precap-api="<?php echo esc_url(SCM_BASE_URL . '/precaptacion-api.php'); ?>" data-precap-nonce="<?php echo esc_attr($nonce); ?>">

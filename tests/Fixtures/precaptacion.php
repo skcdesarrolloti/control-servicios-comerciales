@@ -21,7 +21,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
   catch (\Throwable $exception) { \SCM\Precaptacion\Module::rollback(); \SCM\Http\Response\JsonResponse::error($exception->getMessage(), 500); }
 }
 ?>
-<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Precaptación: prueba local</title><link rel="stylesheet" href="../../public/assets/css/precaptacion.css"></head>
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Precaptación: prueba local</title><link rel="stylesheet" href="../../public/assets/css/tailwind.css"><link rel="stylesheet" href="../../public/assets/css/precaptacion.css"></head>
 <body data-precap-api="../../public/precaptacion-api.php" data-precap-nonce="<?php echo esc_attr(\SCM\Precaptacion\Module::nonce()); ?>">
 <?php echo \SCM\Precaptacion\FormView::render(new \SCM\Precaptacion\Repository($db)); ?>
 <?php echo \SCM\Precaptacion\LegacyPanel::render_shortcode(['modo'=>\SCM\Precaptacion\Module::policy()->canManage() ? 'control' : 'mis']); ?>

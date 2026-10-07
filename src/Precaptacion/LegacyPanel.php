@@ -106,8 +106,8 @@ final class LegacyPanel
         >
             <header class="precap-heading">
                 <div class="precap-heading-copy">
-                    <nav class="precap-breadcrumb" aria-label="Ruta de navegación">Gestión Inmobiliaria <span>›</span> Captaciones &amp; Oportunidades <span>›</span> <strong><?php echo $is_control ? 'Precaptaciones Admin' : 'Mis Precaptaciones'; ?></strong></nav>
-                    <h1><?php echo $is_control ? 'Precaptaciones Admin' : 'Mis Precaptaciones'; ?></h1>
+                    <nav class="precap-breadcrumb" aria-label="Ruta de navegación">Gestión Inmobiliaria <span>›</span> Captaciones &amp; Oportunidades <span>›</span> <strong><?php echo 'Precaptaciones'; ?></strong></nav>
+                    <h1><?php echo 'Precaptaciones'; ?></h1>
                     <p>Registra oportunidades de prospección en campo, valida avisos exteriores, depura duplicados y gestiona resultados para asignación de tareas comerciales.</p>
                 </div>
                 <div class="precap-heading-actions">
@@ -122,6 +122,7 @@ final class LegacyPanel
                 </div>
             </header>
             <div class="precap-metrics" data-precap-metrics><?php self::render_metrics($table, $filters, $is_control); ?></div>
+            <nav class="precap-contact-tabs" aria-label="Filtrar por contacto"><?php foreach ([''=>'Todos','por_llamar'=>'Por llamar','no_contesto'=>'No contestó','contactado'=>'Contactados','seguimiento'=>'En seguimiento'] as $value => $label): ?><button type="button" data-precap-contact-filter="<?php echo esc_attr($value); ?>"<?php echo $value === '' ? ' class="is-active" aria-pressed="true"' : ' aria-pressed="false"'; ?>><?php echo esc_html($label); ?></button><?php endforeach; ?></nav>
             <?php self::render_filters($table, $filters, $is_control); ?>
 
             <div class="precaptaciones__estado" data-precaptaciones-status aria-live="polite"></div>
@@ -225,9 +226,10 @@ final class LegacyPanel
         $ticket_column = self::column_for($table, 'tiene_ticket');
         if ($ticket_column) $ticket_conditions[] = "LOWER(TRIM(COALESCE(`{$ticket_column}`, ''))) IN ('si', 'sí', '1', 'true')";
         $ticket = '(' . implode(' OR ', $ticket_conditions) . ')';
+        $contact_state = self::contact_state_expression($table);
         $sql = "SELECT COUNT(*) AS total, SUM(CASE WHEN {$ticket} THEN 1 ELSE 0 END) AS tickets,
             SUM(CASE WHEN {$reason} LIKE %s THEN 1 ELSE 0 END) AS duplicates,
-            SUM(CASE WHEN NOT {$ticket} AND ({$contact} IN ('', 'no', '0') OR {$reason} LIKE %s) THEN 1 ELSE 0 END) AS pending
+            SUM(CASE WHEN NOT {$ticket} AND (({$contact_state}) IN ('por_llamar','no_contesto') OR {$reason} LIKE %s) THEN 1 ELSE 0 END) AS pending
             FROM {$table} {$where}";
         $data = $wpdb->get_row($wpdb->prepare($sql, array_merge(['%duplicad%', '%sin informaci%'], $values)), ARRAY_A) ?: [];
         $total = (int) ($data['total'] ?? 0);
@@ -245,26 +247,62 @@ final class LegacyPanel
         }
     }
 
+    /** Derive historical contact states from the recorded response, without inventing a call. */
+    private static function contact_state_expression(string $table): string
+    {
+        $parts = [];
+        foreach (['resultado', 'razones', 'observaciones'] as $logical) {
+            $column = self::column_for($table, $logical);
+            if ($column) $parts[] = "LOWER(COALESCE(`{$column}`, ''))";
+        }
+        $no_answer = [];
+        foreach ($parts as $part) {
+            // INSTR avoids placeholder ambiguity in the inherited SQL adapter.
+            foreach (['no contest', 'no respon', 'buzón', 'buzon', 'sin respuesta'] as $term) $no_answer[] = "INSTR({$part}, '{$term}') > 0";
+        }
+        $contact_column = self::column_for($table, 'contactado');
+        $contact = $contact_column ? "LOWER(TRIM(COALESCE(`{$contact_column}`, '')))" : "''";
+        $has_result = [];
+        foreach (['resultado', 'razones', 'seguimiento'] as $logical) {
+            $column = self::column_for($table, $logical);
+            if ($column) $has_result[] = "TRIM(COALESCE(`{$column}`, '')) NOT IN ('', 'No', 'no', '0')";
+        }
+        return "CASE WHEN (" . implode(' OR ', $no_answer ?: ['1=0']) . ") THEN 'no_contesto'
+            WHEN {$contact} IN ('si', 'sí', '1') THEN 'contactado'
+            WHEN (" . implode(' OR ', $has_result ?: ['1=0']) . ") THEN 'seguimiento'
+            ELSE 'por_llamar' END";
+    }
+
+    private static function contact_state(string $table, array $row): array
+    {
+        $text = self::normalize_choice(implode(' ', array_map(static fn(string $key): string => self::row_value($table, $row, [self::column_for($table, $key)]), ['resultado','razones','observaciones'])));
+        if (preg_match('/no contest|no respon|buzon|sin respuesta/', $text)) return ['no_contesto', 'No contestó'];
+        if (in_array(self::normalize_choice(self::row_value($table, $row, ['contactado'])), ['si','1'], true)) return ['contactado', 'Contactado'];
+        foreach (['resultado', 'razones', 'seguimiento'] as $logical) {
+            if (!in_array(self::normalize_choice(self::row_value($table, $row, [self::column_for($table, $logical)])), ['', 'no', '0'], true)) return ['seguimiento', 'En seguimiento'];
+        }
+        return ['por_llamar', 'Sin llamada registrada'];
+    }
+
     private static function render_filters(string $table, array $filters, bool $is_control): void
     {
         $active_filters = self::active_filter_count($filters);
         ?>
         <form class="precaptaciones__filtros rounded-lg border border-slate-200 bg-white shadow-sm" method="post" data-precaptaciones-filters>
-            <div class="precaptaciones__filtros-titulo flex flex-col gap-1 border-b border-slate-200 bg-slate-50 px-5 py-4 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                    <p class="precaptaciones__filtros-eyebrow">Filtros</p>
-                    <h2 class="precaptaciones__filtros-heading">Refina el listado de precaptaciones</h2>
-                    <span class="precaptaciones__filtros-activos" data-precaptaciones-active-filters><?php echo esc_html(number_format_i18n($active_filters)); ?> activos</span>
-                </div>
-                <button type="button" class="precap-collapse" data-precap-collapse aria-expanded="true" aria-controls="precap-filter-fields">⌄ Colapsar panel</button>
-            </div>
-
-            <div id="precap-filter-fields" class="precaptaciones__filtros-grid grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-4">
-                <label class="precaptaciones__campo precaptaciones__campo--wide min-w-0">
+            <div class="precap-primary-filters">
+                <label class="precaptaciones__campo precap-search min-w-0">
                     <span class="mb-2 block text-sm font-bold text-slate-800">Buscar</span>
                     <input class="precaptaciones__control" type="search" name="precaptaciones_buscar" value="<?php echo esc_attr($filters['buscar']); ?>" placeholder="Contacto, direccion, barrio, referencia o tarea">
                 </label>
 
+                <label class="precaptaciones__campo"><span>Estado del contacto</span><select class="precaptaciones__control" name="precaptaciones_estado_contacto" aria-label="Estado del contacto">
+                    <?php foreach ([''=>'Todos los contactos','por_llamar'=>'Sin llamada registrada','no_contesto'=>'No contestó','contactado'=>'Contactados','seguimiento'=>'En seguimiento'] as $value => $label): ?><option value="<?php echo esc_attr($value); ?>" <?php selected($filters['estado_contacto'], $value); ?>><?php echo esc_html($label); ?></option><?php endforeach; ?>
+                </select></label>
+                <?php self::render_distinct_select($table, 'tipo_inmueble', 'Tipo de inmueble', 'precaptaciones_tipo_inmueble', $filters['tipo_inmueble'], 'Todos los tipos'); ?>
+                <?php self::render_distinct_select($table, 'barrio', 'Barrio', 'precaptaciones_barrio', $filters['barrio'], 'Todos los barrios'); ?>
+                <?php if ($is_control): ?><label class="precaptaciones__campo"><span>Funcionario</span><?php self::render_user_select($table, 'precaptaciones_funcionario', $filters['funcionario']); ?></label><?php endif; ?>
+            </div>
+            <div id="precap-filter-fields" class="precaptaciones__filtros-grid" hidden>
                 <fieldset class="precaptaciones__grupo min-w-0">
                     <legend class="mb-2 text-sm font-bold text-slate-800">Fecha (Desde / Hasta)</legend>
                     <div class="precaptaciones__fecha grid grid-cols-2 gap-2">
@@ -283,21 +321,12 @@ final class LegacyPanel
                     <input class="precaptaciones__control" type="search" name="precaptaciones_ticket" value="<?php echo esc_attr($filters['ticket']); ?>" placeholder="Escribe un numero">
                 </label>
 
-                <?php if ($is_control) : ?>
-                    <label class="precaptaciones__campo min-w-0">
-                        <span class="mb-2 block text-sm font-bold text-slate-800">Funcionario</span>
-                        <?php self::render_user_select($table, 'precaptaciones_funcionario', $filters['funcionario']); ?>
-                    </label>
-                <?php endif; ?>
-
                 <?php self::render_distinct_select($table, 'contactado', 'Contactado?', 'precaptaciones_contactado', $filters['contactado'], 'Elige una opcion'); ?>
                 <?php self::render_distinct_select($table, 'merece_ticket', '¿Merece tarea?', 'precaptaciones_merece_ticket', $filters['merece_ticket'], 'Elige una opcion'); ?>
                 <?php self::render_distinct_select($table, 'tiene_ticket', '¿Tiene tarea?', 'precaptaciones_tiene_ticket', $filters['tiene_ticket'], 'Selecciona una opcion'); ?>
 
                 <?php self::render_distinct_select($table, 'ruta', 'Ruta', 'precaptaciones_ruta', $filters['ruta'], 'Elige una opcion'); ?>
-                <?php self::render_distinct_select($table, 'tipo_inmueble', 'Tipo de inmueble', 'precaptaciones_tipo_inmueble', $filters['tipo_inmueble'], 'Selecciona un tipo'); ?>
                 <?php self::render_distinct_select($table, 'categoria', 'Categoria', 'precaptaciones_categoria', $filters['categoria'], 'Selecciona una categoria'); ?>
-                <?php self::render_distinct_select($table, 'barrio', 'Barrio', 'precaptaciones_barrio', $filters['barrio'], 'Seleccione'); ?>
 
                 <?php if ($is_control) : ?>
                     <?php self::render_distinct_select($table, 'promocionado_por', 'Promocionado por', 'precaptaciones_promocionado_por', $filters['promocionado_por'], 'Elige una opcion'); ?>
@@ -315,7 +344,8 @@ final class LegacyPanel
                 <button class="precaptaciones__boton-limpiar inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 bg-white px-5 py-2 text-sm font-bold text-slate-700 no-underline transition hover:bg-slate-100 focus:outline-none focus:ring-4 focus:ring-slate-300/50" type="button" data-precaptaciones-clear-filters>
                     Limpiar Filtros
                 </button>
-                <span class="precap-filter-hint">Criterios activos aplicables instantáneamente</span>
+                <button type="button" class="precap-collapse" data-precap-collapse aria-expanded="false" aria-controls="precap-filter-fields">Más filtros ⌄</button>
+                <span class="precaptaciones__filtros-activos" data-precaptaciones-active-filters><?php echo esc_html(number_format_i18n($active_filters)); ?> activos</span>
             </div>
         </form>
         <?php
@@ -333,7 +363,7 @@ final class LegacyPanel
             <th>Barrio</th>
             <th>Tipo de inmueble</th>
             <th>Categoria</th>
-            <th>Resultado</th>
+            <th>Contacto / Resultado</th>
             <th>Razón / Detalle</th>
             <th>Tarea</th>
         </tr>
@@ -399,7 +429,7 @@ final class LegacyPanel
             <td><?php echo esc_html(self::row_value($table, $row, ['barrio', 'sector'])); ?></td>
             <td><span class="precap-property-badge"><?php echo esc_html(self::row_value($table, $row, ['tipo_inmueble', 'tipo_de_inmueble'])); ?></span></td>
             <td><span class="precap-category-badge"><?php echo esc_html(self::row_value($table, $row, ['categoria', 'categoria_inmueble'])); ?></span></td>
-            <td><?php echo esc_html(self::display_text(self::row_value($table, $row, ['resultado']))); ?></td>
+            <td class="precap-contact-cell"><?php [$state, $state_label] = self::contact_state($table, $row); ?><span class="precap-contact-badge precap-contact-badge--<?php echo esc_attr($state); ?>"><?php echo esc_html($state_label); ?></span><p><?php echo esc_html(self::display_text(self::row_value($table, $row, ['resultado']))); ?></p></td>
             <td><?php echo esc_html(self::display_text($reason_value)); ?></td>
             <td><span class="precap-ticket-badge"><?php echo self::render_ticket($table, $row) ?: 'Sin tarea'; ?></span></td>
         </tr>
@@ -447,7 +477,7 @@ final class LegacyPanel
                 <div class="precaptaciones-precap-modal__header">
                     <div>
                         <p class="precaptaciones-precap-modal__eyebrow">Precaptacion #<?php echo esc_html((string) $id); ?></p>
-                        <h2 id="<?php echo esc_attr($modal_id); ?>-title">Detalles completos</h2>
+                        <h2 id="<?php echo esc_attr($modal_id); ?>-title">Detalle de la precaptación</h2>
                     </div>
                     <button class="precaptaciones-precap-modal__close" type="button" data-precaptaciones-modal-close aria-label="Cerrar detalles">
                         <svg aria-hidden="true" viewBox="0 0 24 24" fill="none">
@@ -455,17 +485,21 @@ final class LegacyPanel
                         </svg>
                     </button>
                 </div>
-                <dl class="precaptaciones-detalle">
-                    <?php foreach ($fields as $label => $value) : ?>
-                        <?php if (trim((string) $value) === '') : ?>
-                            <?php continue; ?>
-                        <?php endif; ?>
-                        <div class="precaptaciones-detalle__item <?php echo strlen((string) $value) > 80 ? 'precaptaciones-detalle__item--wide' : ''; ?>">
-                            <dt><?php echo esc_html($label); ?></dt>
-                            <dd><?php echo esc_html(self::display_text((string) $value)); ?></dd>
-                        </div>
+                <div class="precap-detail-body">
+                    <?php [$contact_state, $contact_label] = self::contact_state($table, $row); ?>
+                    <div class="precap-detail-summary"><?php echo self::render_evidence($table, $row); ?><div><strong><?php echo esc_html($fields['Contacto'] ?: 'Contacto por identificar'); ?></strong><p><?php echo esc_html($fields['Direccion'] ?: $fields['Barrio']); ?></p><span class="precap-contact-badge precap-contact-badge--<?php echo esc_attr($contact_state); ?>"><?php echo esc_html($contact_label); ?></span></div></div>
+                    <?php foreach ([
+                        'Inmueble y ubicación'=>['Tipo de inmueble','Categoria','Barrio','Direccion','Referencia','Ruta'],
+                        'Información de contacto'=>['Contacto','Celular','Correo','Origen','Promocionado por','Competencia','PPH'],
+                        'Gestión comercial'=>['Funcionario','Observaciones','Resultado','Razon','Contactado','Merece tarea','Tiene tarea','Tarea','Seguimiento'],
+                    ] as $group => $labels): ?>
+                    <section class="precap-detail-section"><h3><?php echo esc_html($group); ?></h3><dl class="precaptaciones-detalle">
+                        <?php foreach ($labels as $label): $value = $fields[$label] ?? ''; if (trim((string) $value) === '') continue; ?>
+                        <div class="precaptaciones-detalle__item <?php echo strlen((string) $value) > 80 ? 'precaptaciones-detalle__item--wide' : ''; ?>"><dt><?php echo esc_html($label); ?></dt><dd><?php echo esc_html(self::display_text((string) $value)); ?></dd></div>
+                        <?php endforeach; ?>
+                    </dl></section>
                     <?php endforeach; ?>
-                </dl>
+                </div>
                 <div class="precaptaciones-precap-modal__footer">
                     <button class="precaptaciones-precap-modal__secondary" type="button" data-precaptaciones-modal-close>Cerrar</button>
                 </div>
@@ -1611,6 +1645,7 @@ final class LegacyPanel
             'celular',
             'funcionario',
             'contactado',
+            'estado_contacto',
             'merece_ticket',
             'tiene_ticket',
             'seguimiento',
@@ -1657,6 +1692,10 @@ final class LegacyPanel
         self::add_date_filter($where, $values, $date_col, '<=', $filters['fecha_hasta'], '23:59:59');
 
         self::add_search_filter($table, $where, $values, $filters['buscar']);
+        if (in_array($filters['estado_contacto'], ['por_llamar','no_contesto','contactado','seguimiento'], true)) {
+            $where[] = '(' . self::contact_state_expression($table) . ') = %s';
+            $values[] = $filters['estado_contacto'];
+        }
         self::add_like_filter($table, $where, $values, 'ticket', $filters['ticket']);
         self::add_like_filter($table, $where, $values, 'celular', $filters['celular']);
         self::add_exact_filter($table, $where, $values, 'contactado', $filters['contactado']);
@@ -3829,8 +3868,8 @@ final class LegacyPanel
                     assign.classList.toggle("is-visible", select.value === "Si");
                 };
                 const showNotice = (type, title, text) => {
-                    if (window.Swal && typeof window.Swal.fire === "function") {
-                        return window.Swal.fire({
+                    if (window.PrecapUI && typeof window.PrecapUI.fire === "function") {
+                        return window.PrecapUI.fire({
                             confirmButtonColor: "#061d49",
                             icon: type,
                             text: text,
@@ -3847,8 +3886,8 @@ final class LegacyPanel
                     }
 
                     const text = "Esta precaptacion es Club PPH. Si marcas No, se registraran puntos PPH como inmueble no efectivo. Si debes continuar el seguimiento, usa Seguir llamando.";
-                    if (window.Swal && typeof window.Swal.fire === "function") {
-                        return window.Swal.fire({
+                    if (window.PrecapUI && typeof window.PrecapUI.fire === "function") {
+                        return window.PrecapUI.fire({
                             cancelButtonText: "Cancelar",
                             confirmButtonColor: "#061d49",
                             confirmButtonText: "Si, registrar No",
@@ -3859,7 +3898,7 @@ final class LegacyPanel
                         }).then((result) => Boolean(result.isConfirmed));
                     }
 
-                    return Promise.resolve(window.confirm(text));
+                    return window.PrecapUI.confirm(text);
                 };
                 const syncTicketModalFromEdit = (editForm, ticketModal) => {
                     if (!editForm || !ticketModal) return;
@@ -4086,7 +4125,7 @@ final class LegacyPanel
                         const message = wrapper ? wrapper.querySelector("[data-precaptaciones-bulk-message]") : null;
                         if (count <= 0) return;
 
-                        const confirmed = window.confirm(
+                        const confirmed = await window.PrecapUI.confirm(
                             "Se normalizaran " + count.toLocaleString("es-CO") + " valores de Promocionado por al formato serializado. ¿Continuar?"
                         );
                         if (!confirmed) return;
@@ -4138,7 +4177,7 @@ final class LegacyPanel
                         const message = wrapper ? wrapper.querySelector("[data-precaptaciones-bulk-message]") : null;
                         if (count <= 0) return;
 
-                        const confirmed = window.confirm(
+                        const confirmed = await window.PrecapUI.confirm(
                             "Se normalizaran " + count.toLocaleString("es-CO") + " valores de Competencia al formato serializado. ¿Continuar?"
                         );
                         if (!confirmed) return;
@@ -4190,7 +4229,7 @@ final class LegacyPanel
                         const message = wrapper ? wrapper.querySelector("[data-precaptaciones-bulk-message]") : null;
                         if (count <= 0) return;
 
-                        const confirmed = window.confirm(
+                        const confirmed = await window.PrecapUI.confirm(
                             "Se cambiaran " + count.toLocaleString("es-CO") + " razones de Creado a Tarea creada. ¿Continuar?"
                         );
                         if (!confirmed) return;
@@ -4239,8 +4278,8 @@ final class LegacyPanel
                         const isSinInformacion = Boolean(estadoButton.matches("[data-precaptaciones-sin-informacion]"));
                         const panel = getPanel(estadoButton);
                         const text = isSinInformacion
-                            ? "Se marcara como sin informacion con contactado = Si, razon Precaptacion sin informacion y un resultado fijo de falta de datos."
-                            : "Se marcara como duplicada con contactado = Si, razon Precaptacion duplicada y el resultado fijo de duplicidad.";
+                            ? "Esta precaptación quedará marcada como sin información. Confirma que faltan los datos necesarios para continuar."
+                            : "Esta precaptación quedará marcada como duplicada. Confirma que la oportunidad ya está registrada.";
                         const title = isSinInformacion ? "Marcar sin informacion" : "Marcar duplicada";
                         const confirmText = isSinInformacion ? "Si, marcar sin informacion" : "Si, marcar duplicada";
                         const action = isSinInformacion ? "precaptaciones_marcar_sin_informacion" : "precaptaciones_marcar_duplicada";
@@ -4248,8 +4287,8 @@ final class LegacyPanel
                         const fallbackSuccess = isSinInformacion ? "Precaptacion marcada como sin informacion." : "Precaptacion marcada como duplicada.";
                         const fallbackError = isSinInformacion ? "No se pudo marcar sin informacion." : "No se pudo marcar duplicada.";
                         let confirmed = true;
-                        if (window.Swal && typeof window.Swal.fire === "function") {
-                            const result = await window.Swal.fire({
+                        if (window.PrecapUI && typeof window.PrecapUI.fire === "function") {
+                            const result = await window.PrecapUI.fire({
                                 cancelButtonText: "Cancelar",
                                 confirmButtonColor: "#991b1b",
                                 confirmButtonText: confirmText,
@@ -4260,7 +4299,7 @@ final class LegacyPanel
                             });
                             confirmed = Boolean(result.isConfirmed);
                         } else {
-                            confirmed = window.confirm(text);
+                            confirmed = await window.PrecapUI.confirm(text);
                         }
                         if (!confirmed) return;
 
@@ -4302,7 +4341,7 @@ final class LegacyPanel
                         const message = wrapper ? wrapper.querySelector("[data-precaptaciones-bulk-message]") : null;
                         if (count <= 0) return;
 
-                        const confirmed = window.confirm(
+                        const confirmed = await window.PrecapUI.confirm(
                             "Se marcaran " + count.toLocaleString("es-CO") + " precaptaciones anteriores a 2026 como contactadas. Razon: No contestó. ¿Continuar?"
                         );
                         if (!confirmed) return;
