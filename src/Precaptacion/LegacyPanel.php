@@ -124,7 +124,7 @@ final class LegacyPanel
             <div class="precap-metrics" data-precap-metrics><?php self::render_metrics($table, $filters, $is_control); ?></div>
             <nav class="precap-contact-tabs" aria-label="Filtrar por contacto"><?php foreach ([''=>'Todos','por_llamar'=>'Por llamar','no_contesto'=>'No contestó','contactado'=>'Contactados','seguimiento'=>'En seguimiento'] as $value => $label): ?><button type="button" data-precap-contact-filter="<?php echo esc_attr($value); ?>"<?php echo $value === '' ? ' class="is-active" aria-pressed="true"' : ' aria-pressed="false"'; ?>><?php echo esc_html($label); ?></button><?php endforeach; ?></nav>
             <?php self::render_filters($table, $filters, $is_control); ?>
-            <details class="precap-state-help"><summary>¿Qué significa cada estado?</summary><dl><div><dt>Todos</dt><dd>Muestra todos los registros, sin filtrar por contacto.</dd></div><div><dt>Por llamar / Sin llamada registrada</dt><dd>No está marcado como contactado y no tiene resultado, razón ni seguimiento de gestión guardados.</dd></div><div><dt>No contestó</dt><dd>La última razón o resultado empieza indicando que no contestó, no respondió o dejó la llamada en buzón. Las observaciones iniciales solo se usan si aún no hay una gestión posterior.</dd></div><div><dt>Contactados</dt><dd>Se confirmó que hubo respuesta, sin una llamada fallida actual ni la decisión de seguir llamando.</dd></div><div><dt>En seguimiento</dt><dd>Se seleccionó Seguir llamando, o existe una gestión pendiente sin contacto confirmado. Permite ver detalles y editar si aún no tiene tarea y tu cargo tiene permiso.</dd></div></dl></details>
+            <details class="precap-state-help"><summary>¿Qué significa cada estado?</summary><dl><div><dt>Todos</dt><dd>Muestra todos los registros, sin filtrar por contacto.</dd></div><div><dt>Por llamar / Sin llamada registrada</dt><dd>No está marcado como contactado y no tiene resultado, razón ni seguimiento de gestión guardados.</dd></div><div><dt>No contestó</dt><dd>La última gestión confirmó que se intentó contactar y no contestaron. Los registros antiguos se identifican como históricos por verificar.</dd></div><div><dt>Contactados</dt><dd>La última gestión confirmó que la persona contestó y no se seleccionó Seguir llamando.</dd></div><div><dt>En seguimiento</dt><dd>La persona contestó, pero requiere otra llamada programada. Si no contestó, aparece en No contestó con su próxima llamada. Puedes ver detalles y editar si aún no tiene tarea y tu cargo tiene permiso.</dd></div></dl></details>
 
             <div class="precaptaciones__estado" data-precaptaciones-status aria-live="polite"></div>
             <div data-precaptaciones-results>
@@ -219,10 +219,10 @@ final class LegacyPanel
         $contact_column = self::column_for($table, 'contactado');
         $reason = $reason_column ? "LOWER(COALESCE(`{$reason_column}`, ''))" : "''";
         $contact = $contact_column ? "LOWER(TRIM(COALESCE(`{$contact_column}`, '')))" : "''";
-        $ticket_conditions = ["{$reason} = 'ticket creado'"];
+        $ticket_conditions = ["{$reason} IN ('ticket creado','tarea creada')"];
         foreach (['id_ticket_asignado', 'ticket_asignado', 'id_ticket', 'ticket', 'numero_de_ticket', 'url_ticket', 'url_ticket_precap'] as $candidate) {
             $column = self::first_existing_column($table, [$candidate]);
-            if ($column) $ticket_conditions[] = "TRIM(COALESCE(`{$column}`, '')) <> ''";
+            if ($column) $ticket_conditions[] = "TRIM(COALESCE(`{$column}`, '')) NOT IN ('', '0')";
         }
         $ticket_column = self::column_for($table, 'tiene_ticket');
         if ($ticket_column) $ticket_conditions[] = "LOWER(TRIM(COALESCE(`{$ticket_column}`, ''))) IN ('si', 'sí', '1', 'true')";
@@ -277,15 +277,17 @@ final class LegacyPanel
             $column = self::column_for($table, $logical);
             if ($column) $has_result[] = "TRIM(COALESCE(`{$column}`, '')) NOT IN ('', 'No', 'no', '0')";
         }
-        return "CASE WHEN (" . implode(' OR ', $no_answer ?: ['1=0']) . ") THEN 'no_contesto'
+        return 'COALESCE(' . Module::history()->expression($table, 'state') . ", CASE WHEN (" . implode(' OR ', $no_answer ?: ['1=0']) . ") THEN 'no_contesto'
             WHEN {$followup} THEN 'seguimiento'
             WHEN {$contact} IN ('si', 'sí', '1') THEN 'contactado'
             WHEN (" . implode(' OR ', $has_result ?: ['1=0']) . ") THEN 'seguimiento'
-            ELSE 'por_llamar' END";
+            ELSE 'por_llamar' END)";
     }
 
     private static function contact_state(string $table, array $row): array
     {
+        $management = Module::history()->latest((int) ($row['_ID'] ?? 0));
+        if ($management) return [$management['state'], ['por_llamar'=>'Sin llamada registrada','no_contesto'=>'No contestó','contactado'=>'Contactado','seguimiento'=>'En seguimiento'][$management['state']]];
         foreach (['resultado', 'razones'] as $logical) {
             $text = self::normalize_choice(self::row_value($table, $row, [self::column_for($table, $logical)]));
             if (preg_match('/^(no contest|no respon|buzon|sin respuesta)/', $text)) return ['no_contesto', 'No contestó'];
@@ -314,6 +316,9 @@ final class LegacyPanel
 
                 <label class="precaptaciones__campo"><span>Estado del contacto</span><select class="precaptaciones__control" name="precaptaciones_estado_contacto" aria-label="Estado del contacto">
                     <?php foreach ([''=>'Todos los contactos','por_llamar'=>'Sin llamada registrada','no_contesto'=>'No contestó','contactado'=>'Contactados','seguimiento'=>'En seguimiento'] as $value => $label): ?><option value="<?php echo esc_attr($value); ?>" <?php selected($filters['estado_contacto'], $value); ?>><?php echo esc_html($label); ?></option><?php endforeach; ?>
+                </select></label>
+                <label class="precaptaciones__campo"><span>Agenda de llamadas</span><select class="precaptaciones__control" name="precaptaciones_agenda">
+                    <?php foreach ([''=>'Todas','programadas'=>'Llamadas programadas','vencidas'=>'Llamadas vencidas'] as $value => $label): ?><option value="<?php echo esc_attr($value); ?>" <?php selected($filters['agenda'], $value); ?>><?php echo esc_html($label); ?></option><?php endforeach; ?>
                 </select></label>
                 <?php self::render_distinct_select($table, 'tipo_inmueble', 'Tipo de inmueble', 'precaptaciones_tipo_inmueble', $filters['tipo_inmueble'], 'Todos los tipos'); ?>
                 <?php self::render_distinct_select($table, 'barrio', 'Barrio', 'precaptaciones_barrio', $filters['barrio'], 'Todos los barrios'); ?>
@@ -448,7 +453,7 @@ final class LegacyPanel
             <td><?php echo esc_html(self::row_value($table, $row, ['barrio', 'sector'])); ?></td>
             <td><span class="precap-property-badge"><?php echo esc_html(self::row_value($table, $row, ['tipo_inmueble', 'tipo_de_inmueble'])); ?></span></td>
             <td><span class="precap-category-badge"><?php echo esc_html(self::row_value($table, $row, ['categoria', 'categoria_inmueble'])); ?></span></td>
-            <td class="precap-contact-cell"><?php [$state, $state_label] = self::contact_state($table, $row); ?><span class="precap-contact-badge precap-contact-badge--<?php echo esc_attr($state); ?>"><?php echo esc_html($state_label); ?></span><p><?php echo esc_html(self::display_text(self::row_value($table, $row, ['resultado']))); ?></p></td>
+            <td class="precap-contact-cell"><?php [$state, $state_label] = self::contact_state($table, $row); $management = Module::history()->latest((int) $id); ?><span class="precap-contact-badge precap-contact-badge--<?php echo esc_attr($state); ?>"><?php echo esc_html($state_label); ?></span><?php if (!$management && $state !== 'por_llamar'): ?><small class="precap-history-note">Estado histórico por verificar</small><?php endif; ?><?php if ($management && $management['next_contact_at'] && !$has_ticket): ?><small class="precap-history-note">Próxima llamada: <?php echo esc_html(self::format_date($management['next_contact_at'])); ?></small><?php endif; ?><p><?php echo esc_html(self::display_text(self::row_value($table, $row, ['resultado']))); ?></p></td>
             <td><?php echo esc_html(self::display_text($reason_value)); ?></td>
             <td><span class="precap-ticket-badge"><?php echo self::render_ticket($table, $row) ?: 'Sin tarea'; ?></span></td>
         </tr>
@@ -493,6 +498,7 @@ final class LegacyPanel
         $fields = [
             'Fecha de registro' => self::registration_date($table, $row),
             'Última respuesta' => self::response_date($table, $row),
+            'Última gestión confirmada' => self::format_date((string) (Module::history()->latest((int) $id)['recorded_at'] ?? '')),
             'Funcionario' => $is_control ? self::employee_name($employee_id) : '',
             'Ruta' => self::row_value($table, $row, ['ruta', 'numero_ruta']),
             'Barrio' => self::row_value($table, $row, ['barrio', 'sector']),
@@ -538,7 +544,7 @@ final class LegacyPanel
                     <?php foreach ([
                         'Inmueble y ubicación'=>['Tipo de inmueble','Categoria','Barrio','Direccion','Referencia','Ruta'],
                         'Información de contacto'=>['Contacto','Celular','Correo','Origen','Promocionado por','Competencia','PPH'],
-                        'Gestión comercial'=>['Fecha de registro','Última respuesta','Funcionario','Observaciones','Resultado','Razon','Contactado','Merece tarea','Tiene tarea','Tarea','Seguimiento'],
+                        'Gestión comercial'=>['Fecha de registro','Última respuesta','Última gestión confirmada','Funcionario','Observaciones','Resultado','Razon','Contactado','Merece tarea','Tiene tarea','Tarea','Seguimiento'],
                     ] as $group => $labels): ?>
                     <section class="precap-detail-section"><h3><?php echo esc_html($group); ?></h3><dl class="precaptaciones-detalle">
                         <?php foreach ($labels as $label): $value = $fields[$label] ?? ''; if (trim((string) $value) === '') continue; ?>
@@ -546,6 +552,10 @@ final class LegacyPanel
                         <?php endforeach; ?>
                     </dl></section>
                     <?php endforeach; ?>
+                    <section class="precap-detail-section"><h3>Historial de gestiones</h3>
+                    <?php $entries = Module::history()->entries((int) $id); if (!$entries): ?><p class="precap-history-note">No hay gestiones confirmadas en este módulo. El estado anterior es histórico y debe verificarse.</p><?php endif; ?>
+                    <?php foreach ($entries as $entry): ?><article class="precap-history-entry"><strong><?php echo esc_html(self::format_date($entry['recorded_at'])); ?> · <?php echo esc_html(self::employee_name($entry['employee_id'])); ?></strong><p><?php echo esc_html(['contactado'=>'Contestó','no_contesto'=>'No contestó','por_llamar'=>'Sin llamada realizada'][$entry['outcome']]); ?> · <?php echo esc_html($entry['merit'] === 'Seguir llamando' ? 'Seguir llamando' : 'Merece tarea: ' . $entry['merit']); ?></p><p><?php echo esc_html($entry['reason']); ?></p><p><?php echo esc_html($entry['result']); ?></p><?php if ($entry['next_contact_at']): ?><small>Próxima llamada: <?php echo esc_html(self::format_date($entry['next_contact_at'])); ?></small><?php endif; ?></article><?php endforeach; ?>
+                    </section>
                 </div>
                 <div class="precaptaciones-precap-modal__footer">
                     <button class="precaptaciones-precap-modal__secondary" type="button" data-precaptaciones-modal-close>Cerrar</button>
@@ -595,6 +605,7 @@ final class LegacyPanel
                     <input type="hidden" name="action" value="precaptaciones_actualizar">
                     <input type="hidden" name="nonce" value="<?php echo esc_attr(wp_create_nonce('precaptaciones_actualizar')); ?>">
                     <input type="hidden" name="id_precaptacion" value="<?php echo esc_attr((string) $id); ?>">
+                    <input type="hidden" name="gestion_version" value="<?php echo (int) (Module::history()->latest((int) $id)['id'] ?? 0); ?>">
                     <input type="hidden" name="id_pph" value="<?php echo esc_attr($id_pph); ?>">
                     <input type="hidden" name="id_empleado" value="<?php echo esc_attr((string) $employee_id); ?>">
                     <input type="hidden" name="fecha" value="<?php echo esc_attr((string) time()); ?>">
@@ -631,13 +642,20 @@ final class LegacyPanel
                         </label>
 
                         <label>
-                            <span>¿Se confirmó el contacto?</span>
-                            <select class="precaptaciones__control" name="contactado" required>
+                            <span>Resultado del contacto</span>
+                            <select class="precaptaciones__control" name="resultado_contacto" required>
                                 <option value="">Selecciona una opción</option>
-                                <option value="Si">Sí, contestó</option>
-                                <option value="No">No, sin respuesta</option>
+                                <option value="contactado">Contestó</option>
+                                <option value="no_contesto">No contestó</option>
+                                <option value="por_llamar">Sin llamada realizada</option>
                             </select>
                             <small>Guardar una gestión no significa que la persona haya contestado.</small>
+                        </label>
+
+                        <label data-precap-next-contact>
+                            <span>Próxima llamada</span>
+                            <input class="precaptaciones__control" type="datetime-local" name="proximo_contacto" value="<?php echo esc_attr(str_replace(' ', 'T', substr((string) (Module::history()->latest((int) $id)['next_contact_at'] ?? ''), 0, 16))); ?>">
+                            <small>Obligatoria si seleccionas Seguir llamando.</small>
                         </label>
 
                         <label>
@@ -650,7 +668,7 @@ final class LegacyPanel
 
                         <?php if ($is_pph) : ?>
                             <div class="precaptaciones-precap-modal__pph-note precaptaciones-precap-modal__wide" data-precaptaciones-pph-note>
-                                <strong>Club PPH:</strong> si ya hubo contacto pero debes continuar el seguimiento, selecciona <strong>Seguir llamando</strong>. Si seleccionas <strong>No</strong>, se registran puntos PPH como inmueble no efectivo.
+                                <strong>Club PPH:</strong> usa <strong>Seguir llamando</strong> para continuar la gestión. Los puntos por inmueble no efectivo requieren que el contacto haya contestado y que selecciones <strong>No</strong>. Se registran una sola vez.
                             </div>
                         <?php endif; ?>
 
@@ -1696,6 +1714,7 @@ final class LegacyPanel
             'funcionario',
             'contactado',
             'estado_contacto',
+            'agenda',
             'merece_ticket',
             'tiene_ticket',
             'seguimiento',
@@ -1742,6 +1761,20 @@ final class LegacyPanel
         self::add_date_filter($where, $values, $date_col, '<=', $filters['fecha_hasta'], '23:59:59');
 
         self::add_search_filter($table, $where, $values, $filters['buscar']);
+        if (in_array($filters['agenda'], ['programadas','vencidas'], true)) {
+            $next = Module::history()->expression($table, 'next_contact_at');
+            $where[] = "{$next} IS NOT NULL";
+            if ($filters['agenda'] === 'vencidas') { $where[] = "{$next} <= %s"; $values[] = current_time('mysql'); }
+            // A task supersedes the precaptación's scheduled call.
+            foreach (['id_ticket_asignado','ticket_asignado','id_ticket','ticket','numero_de_ticket','url_ticket','url_ticket_precap'] as $candidate) {
+                $column = self::first_existing_column($table, [$candidate]);
+                if ($column) $where[] = "TRIM(COALESCE(`{$column}`, '')) IN ('', '0')";
+            }
+            $ticketFlag = self::column_for($table, 'tiene_ticket');
+            if ($ticketFlag) $where[] = "LOWER(TRIM(COALESCE(`{$ticketFlag}`, ''))) NOT IN ('si','sí','1','true')";
+            $reasonColumn = self::column_for($table, 'razones');
+            if ($reasonColumn) $where[] = "LOWER(TRIM(COALESCE(`{$reasonColumn}`, ''))) NOT IN ('ticket creado','tarea creada')";
+        }
         if (in_array($filters['estado_contacto'], ['por_llamar','no_contesto','contactado','seguimiento'], true)) {
             $where[] = '(' . self::contact_state_expression($table) . ') = %s';
             $values[] = $filters['estado_contacto'];
@@ -2968,7 +3001,7 @@ final class LegacyPanel
                 $tarjeta_pph = (string) $pph->tarjeta_bienvenida;
             }
 
-            if ($pph && $params && $origen === 'Club PPH' && $bandera === 'No' && $merece_ticket === 'No') {
+            if ($pph && $params && $origen === 'Club PPH' && $bandera === 'No' && $merece_ticket === 'No' && ($request['contactado'] ?? '') === 'Si') {
                 $total_puntos = is_numeric($pph->total_puntos) ? (float) $pph->total_puntos : 0.0;
                 $membresia = self::determinar_membresia(
                     $total_puntos,
@@ -3919,6 +3952,8 @@ final class LegacyPanel
                     const assign = scope.querySelector("[data-precaptaciones-asignar-ticket]");
                     if (!select || !assign) return;
                     assign.classList.toggle("is-visible", select.value === "Si");
+                    const next = scope.querySelector('[name="proximo_contacto"]');
+                    if (next) next.required = select.value === 'Seguir llamando';
                 };
                 const showNotice = (type, title, text) => {
                     if (window.PrecapUI && typeof window.PrecapUI.fire === "function") {
@@ -3934,7 +3969,7 @@ final class LegacyPanel
                 const confirmPphPoints = (form) => {
                     const select = form.querySelector("[data-precaptaciones-merece-ticket]");
                     const isPph = Boolean(form.querySelector("[data-precaptaciones-pph-note]"));
-                    if (!isPph || !select || select.value !== "No") {
+                    if (!isPph || !select || select.value !== "No" || form.querySelector('[name="resultado_contacto"]')?.value !== 'contactado') {
                         return Promise.resolve(true);
                     }
 

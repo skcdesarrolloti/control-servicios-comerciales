@@ -176,7 +176,7 @@ final class PrecaptacionTest extends TestCase
     self::assertStringContainsString('precap-contact-badge--seguimiento', $html);
     self::assertStringContainsString('data-precaptaciones-modal-open="precaptaciones-detalle-modal-1"', $html);
     self::assertStringContainsString('data-precaptaciones-modal-open="precaptaciones-precap-modal-1"', $html);
-    self::assertStringContainsString('name="contactado" required', $html);
+    self::assertStringContainsString('name="resultado_contacto" required', $html);
     self::assertFalse(LegacyPanel::row_has_ticket('wp_jet_cct_precaptaciones', ['id_ticket_asignado'=>'0']));
     self::assertTrue(LegacyPanel::row_has_ticket('wp_jet_cct_precaptaciones', ['id_ticket_asignado'=>'0','tiene_ticket'=>'Si']));
     $this->db->update('wp_jet_cct_precaptaciones', ['id_ticket_asignado'=>'123'], ['_ID'=>1]);
@@ -195,6 +195,76 @@ final class PrecaptacionTest extends TestCase
     self::assertStringContainsString('Última respuesta', $html);
     self::assertStringContainsString('Fecha de registro', $html);
     self::assertSame($registered, $this->db->getVar('SELECT fecha FROM wp_jet_cct_precaptaciones WHERE _ID = 1'));
+  }
+
+  public function testExplicitOutcomeOverridesTextAndHistoryPreservesEveryAttempt(): void
+  {
+    $history = Module::history();
+    $next = (new \DateTimeImmutable('+1 day'))->format('Y-m-d\TH:i');
+    foreach (['no_contesto','contactado'] as $outcome) {
+      $data = $history->validate(['resultado_contacto'=>$outcome,'merece_ticket'=>'Seguir llamando','proximo_contacto'=>$next]);
+      $history->record(1, $data, ['resultado'=>'Antes no contestó','razones'=>'No contestó']);
+    }
+    self::assertCount(2, $history->entries(1));
+    self::assertSame('seguimiento', $history->latest(1)['state']);
+    self::assertSame('101', $history->latest(1)['employee_id']);
+    $row = $this->db->getRow('SELECT * FROM wp_jet_cct_precaptaciones WHERE _ID = 1');
+    $classify = new \ReflectionMethod(LegacyPanel::class, 'contact_state');
+    self::assertSame('seguimiento', $classify->invoke(null, 'wp_jet_cct_precaptaciones', $row)[0]);
+    $expression = new \ReflectionMethod(LegacyPanel::class, 'contact_state_expression');
+    self::assertSame('seguimiento', $this->db->getVar('SELECT (' . $expression->invoke(null, 'wp_jet_cct_precaptaciones') . ') FROM wp_jet_cct_precaptaciones WHERE _ID = 1'));
+    self::assertStringContainsString('Historial de gestiones', LegacyPanel::render_shortcode(['modo'=>'mis']));
+  }
+
+  public function testFollowUpRequiresAFutureScheduledCall(): void
+  {
+    foreach (['', '2020-01-01T10:00', '2026-02-30T10:00'] as $date) {
+      try {
+        Module::history()->validate(['resultado_contacto'=>'contactado','merece_ticket'=>'Seguir llamando','proximo_contacto'=>$date]);
+        self::fail('Aceptó una próxima llamada inválida.');
+      } catch (\InvalidArgumentException $exception) { self::assertNotEmpty($exception->getMessage()); }
+    }
+  }
+
+  public function testCannotCreateATaskFromAnUnansweredCall(): void
+  {
+    $this->expectException(\InvalidArgumentException::class);
+    Module::history()->validate(['resultado_contacto'=>'no_contesto','merece_ticket'=>'Si']);
+  }
+
+  public function testCallAgendaOnlyIncludesScheduledUntaskedRecordsAndDetectsOverdueCalls(): void
+  {
+    $history = Module::history();
+    $history->record(1, ['outcome'=>'no_contesto','state'=>'no_contesto','merit'=>'Seguir llamando','next_contact_at'=>'2020-01-01 10:00:00'], []);
+    $filters = new \ReflectionMethod(LegacyPanel::class, 'read_filters');
+    $query = new \ReflectionMethod(LegacyPanel::class, 'query_precaptaciones');
+    foreach (['programadas','vencidas'] as $agenda) {
+      $result = $query->invoke(null, 'wp_jet_cct_precaptaciones', $filters->invoke(null, ['precaptaciones_agenda'=>$agenda]), false, 10, 1);
+      self::assertSame(1, $result['total']);
+    }
+    $this->db->update('wp_jet_cct_precaptaciones', ['id_ticket_asignado'=>'123'], ['_ID'=>1]);
+    $result = $query->invoke(null, 'wp_jet_cct_precaptaciones', $filters->invoke(null, ['precaptaciones_agenda'=>'programadas']), false, 10, 1);
+    self::assertSame(0, $result['total']);
+  }
+
+  public function testPphNonEffectivePointsRequireAnAnsweredContactAndAreNotRepeated(): void
+  {
+    foreach ([
+      'puntos_pph'=>['cantidad_inmueble_no_efectivo','porcentaje_plata','porcentaje_oro','porcentaje_platino','limite_bronce','limite_plata','limite_oro'],
+      'historial_puntos_pph'=>['cct_author_id','fecha','tipo_punto','cantidad','efectivo','id_pph','tarjeta_pph','nombre'],
+    ] as $name => $columns) {
+      $this->db->pdo()->exec('CREATE TABLE wp_jet_cct_' . $name . ' (_ID INTEGER PRIMARY KEY, ' . implode(',', array_map(static fn(string $field): string => $field . ' TEXT', $columns)) . ')');
+    }
+    $this->db->insert('wp_jet_cct_puntos_pph', ['cantidad_inmueble_no_efectivo'=>'10','porcentaje_plata'=>'1','porcentaje_oro'=>'1','porcentaje_platino'=>'1','limite_bronce'=>'100','limite_plata'=>'200','limite_oro'=>'300']);
+    $request = ['id_precaptacion'=>1,'id_pph'=>1,'id_empleado'=>101,'origen'=>'Club PPH','bandera'=>'No','merece_ticket'=>'No'];
+    foreach (['No','Si','Si'] as $contacted) {
+      $request['contactado'] = $contacted;
+      $request['bandera'] = $this->db->getVar('SELECT bandera FROM wp_jet_cct_precaptaciones WHERE _ID = 1');
+      ob_start();
+      try { LegacyPanel::handle_resultado_precaptacion($request, null); } finally { ob_end_clean(); }
+      self::assertSame($contacted === 'No' ? 0 : 1, (int) $this->db->getVar('SELECT COUNT(*) FROM wp_jet_cct_historial_puntos_pph'));
+    }
+    self::assertSame(10.0, (float) $this->db->getVar('SELECT total_puntos FROM wp_jet_cct_club_pph WHERE _ID = 1'));
   }
 
   public function testPreparedQueriesHandleQuotedPlaceholdersAndUntrustedNames(): void

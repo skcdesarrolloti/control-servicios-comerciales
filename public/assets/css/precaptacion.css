@@ -129,7 +129,7 @@ body{background:#faf8ff}
 .precap-state-help dt{font-weight:600;color:#061d49;margin-bottom:3px}
 .precap-state-help dd{margin:0;line-height:1.6}
 .precaptaciones .precaptaciones__filtros{padding:20px;border-radius:20px;box-shadow:none}
-.precap-primary-filters{display:grid;grid-template-columns:2fr repeat(4,minmax(0,1fr));gap:12px;align-items:end}
+.precap-primary-filters{display:grid;grid-template-columns:2fr repeat(5,minmax(0,1fr));gap:12px;align-items:end}
 .precaptaciones .precap-primary-filters .precap-search{min-width:0}
 .precaptaciones .precaptaciones__filtros input,.precaptaciones .precaptaciones__filtros select{background:#f3f2ff;border-color:#dedee5;border-radius:11px;font-size:12px;height:38px}
 .precaptaciones .precaptaciones__acciones-filtro{border:0;padding:14px 0 0}
@@ -200,3 +200,6 @@ body{background:#faf8ff}
 .precap-detail-section .precaptaciones-detalle__item dt{font-size:11px;font-weight:400;color:#56709b;text-transform:none;margin-bottom:4px}.precap-detail-section .precaptaciones-detalle__item dd{font-size:13px;font-weight:500;color:#061d49}
 @media(max-width:1000px){.precap-primary-filters{grid-template-columns:repeat(2,minmax(0,1fr))}.precap-primary-filters .precap-search{grid-column:1/-1}}
 @media(max-width:600px){.precap-primary-filters{grid-template-columns:1fr}.precap-wizard-header,.precap-wizard-body{padding:18px}.precap-steps{padding:14px 18px;gap:4px}.precap-steps button{flex-direction:column;font-size:10px;padding:0;gap:5px}.precap-wizard-header h2{font-size:20px}.precap-wizard-footer{padding:12px 18px;gap:10px;flex-wrap:wrap}.precap-review{grid-template-columns:repeat(2,minmax(0,1fr))}.precap-detail-body{padding:16px}.precap-detail-summary{padding:12px}.precap-contact-tabs button{min-height:40px}.precaptaciones .precaptaciones__filtros{padding:16px}}
+.precap-history-note{display:block;font-size:11px;color:#56709b;margin-top:7px;line-height:1.5}
+.precap-history-entry{padding:14px 16px;margin:10px 0;border:1px solid #e3e5f4;border-radius:12px;background:#faf9ff;font-size:12px}
+.precap-history-entry strong{color:#061d49;font-weight:600}.precap-history-entry p{margin:6px 0;white-space:pre-wrap;overflow-wrap:anywhere}.precap-history-entry small{color:#56709b}

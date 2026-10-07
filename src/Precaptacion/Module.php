@@ -19,6 +19,7 @@ final class Module
   private static CommercialAccessPolicy $access;
   private static Csrf $csrf;
   private static array $emails = [];
+  private static ManagementHistory $history;
 
   public static function init(Database $db, Settings $settings, Csrf $csrf, array $config): void
   {
@@ -28,9 +29,11 @@ final class Module
     require_once __DIR__ . '/Compatibility.php';
     require_once __DIR__ . '/LegacyPanel.php';
     $GLOBALS['wpdb'] = new DatabaseAdapter($db);
+    self::$history = new ManagementHistory($db);
   }
 
   public static function db(): Database { return self::$database; }
+  public static function history(): ManagementHistory { return self::$history; }
   public static function policy(): CommercialAccessPolicy { return self::$access; }
   public static function nonce(): string { return $_SESSION['scm_csrf']['precaptacion_nonce'] ?? self::$csrf->token('precaptacion_nonce'); }
   public static function verify(string $nonce): void
@@ -83,6 +86,9 @@ final class Module
   {
     if (!self::policy()->canView('precaptacion')) JsonResponse::error('No tienes permiso para acceder a Precaptación.', 403);
     self::verify((string) ($input['nonce'] ?? ''));
+    if ($action === 'precaptaciones_marcar_antiguas_no_contactadas') {
+      JsonResponse::error('Los registros antiguos deben verificarse individualmente. No se pueden confirmar llamadas ni mensajes de forma automática.', 409);
+    }
     if ($action === 'precaptaciones_exportar') LegacyPanel::export_csv($input);
     $repository = new Repository(self::db());
     if ($action === 'precaptacion_catalog_create') {
@@ -110,26 +116,19 @@ final class Module
       'precaptaciones_crear_ticket'=>'ajax_crear_ticket',
       'precaptaciones_marcar_duplicada'=>'ajax_marcar_duplicada',
       'precaptaciones_marcar_sin_informacion'=>'ajax_marcar_sin_informacion',
-      'precaptaciones_marcar_antiguas_no_contactadas'=>'ajax_marcar_antiguas_no_contactadas',
       'precaptaciones_normalizar_promocionado_por'=>'ajax_normalizar_promocionado_por',
       'precaptaciones_normalizar_competencia'=>'ajax_normalizar_competencia',
       'precaptaciones_normalizar_razon_creado'=>'ajax_normalizar_razon_creado',
     ][$action] ?? null;
     if ($method === null) JsonResponse::error('Acción desconocida.', 400);
+    $management = [];
     if ($action !== 'precaptaciones_filtrar') {
       $permission = $action === 'precaptaciones_crear_ticket' ? 'precaptacion_ticket' : 'precaptacion_editar';
       if (!self::policy()->canAct($permission)) JsonResponse::error('No tienes permiso para realizar esta acción.', 403);
       if ($action === 'precaptaciones_actualizar') {
         if (!in_array($input['merece_ticket'] ?? '', ['Si','No','Seguir llamando'], true)) throw new \InvalidArgumentException('Indica si merece tarea o si debes seguir llamando.');
-        if (!in_array($input['contactado'] ?? '', ['Si','No'], true)) throw new \InvalidArgumentException('Confirma si hubo respuesta del contacto.');
-        if ($input['contactado'] === 'Si') {
-          foreach (['resultado','razones'] as $field) {
-            if (preg_match('/^(no contest|no respon|buzon|sin respuesta)/', Repository::normalizeName((string) ($input[$field] ?? '')))) {
-              throw new \InvalidArgumentException('El contacto confirmado contradice la razón o el resultado sin respuesta. Actualiza la última gestión.');
-            }
-          }
-        }
-        if ($input['merece_ticket'] === 'Si' && $input['contactado'] !== 'Si') throw new \InvalidArgumentException('Confirma el contacto antes de crear una tarea.');
+        $management = self::history()->validate($input);
+        $input['contactado'] = $management['outcome'] === 'contactado' ? 'Si' : 'No';
         if (in_array(Repository::normalizeName((string) ($input['razones'] ?? '')), ['ticket creado','tarea creada'], true)) throw new \InvalidArgumentException('La razón Tarea creada se asigna al crear la tarea.');
         if ($input['merece_ticket'] === 'Si' && !self::policy()->canAct('precaptacion_ticket')) JsonResponse::error('No tienes permiso para crear tareas desde precaptación.', 403);
         $input['fecha'] = time();
@@ -153,6 +152,14 @@ final class Module
           wp_send_json_error(['message'=>'Esta precaptación ya tiene una tarea y no se puede editar.'], 409);
         }
         // Identity and PPH reward state always come from the saved record.
+        if ($action === 'precaptaciones_actualizar') {
+          if (isset($input['gestion_version']) && (int) $input['gestion_version'] !== (int) (self::history()->latest((int) $input['id_precaptacion'])['id'] ?? 0)) {
+            wp_send_json_error(['message'=>'Otra gestión se guardó mientras editabas. Recarga el listado antes de continuar.'], 409);
+          }
+          // Preserve omitted contact fields, rather than erasing them on partial requests.
+          foreach (['contacto','correo','celular','razones','resultado'] as $field) $input[$field] = $input[$field] ?? $row[$field] ?? '';
+          self::history()->record((int) $input['id_precaptacion'], $management, $input);
+        }
         foreach (['origen','id_pph','bandera'] as $field) $input[$field] = $row[$field] ?? '';
         if ($action === 'precaptaciones_actualizar' && !self::policy()->canManage()) $input['id_empleado'] = Auth::employeeId();
         if ($action === 'precaptaciones_crear_ticket') {
