@@ -13,6 +13,7 @@ final class CommercialAccessPolicy
   public const VIEWS = [
     'inicio' => 'Inicio',
     'calendario' => 'Calendario comercial',
+    'precaptacion' => 'Precaptación',
     'inmuebles' => 'Inmuebles',
     'abiertos' => 'Tareas abiertas',
     'postergados' => 'Tareas postergadas',
@@ -21,7 +22,6 @@ final class CommercialAccessPolicy
     'actualizaciones' => 'Actualizaciones de inmuebles',
     'avisos' => 'Avisos en fachada',
     'notificaciones' => 'Notificaciones comerciales',
-    'precaptacion' => 'Precaptación',
   ];
 
   public const ACTIONS = [

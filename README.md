@@ -142,9 +142,9 @@ Para verificar todos los archivos PHP:
 Get-ChildItem -Recurse -Filter *.php | ForEach-Object { php -l $_.FullName }
 ```
 
-## Actividades administrativas: Precaptación
+## Actividades comerciales: Precaptación
 
-El menú **Actividades administrativas → Precaptación** integra el panel suministrado en
+El menú **Actividades comerciales → Precaptación** integra el panel suministrado en
 `precaptacion/precaptaciones/precaptaciones.php`. Su adaptación está en
 `src/Precaptacion/LegacyPanel.php`; usa la sesión, base de datos, permisos y cola de
 notificaciones de este proyecto y no requiere cargar WordPress.

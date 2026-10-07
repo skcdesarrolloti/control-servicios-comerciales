@@ -665,6 +665,21 @@ final class CommercialDashboardView
         </div>
       <?php endif; ?>
 
+      <?php if (in_array('precaptacion', $views, true)): ?>
+        <div class="relative group/nav" data-commercial-dropdown="comerciales">
+          <button type="button" class="flex items-center gap-space-xs px-2 lg:px-3 py-space-xs font-label-md text-label-md <?php echo $bucket === 'precaptacion' ? ($activeClasses . ' active') : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-dropdown-trigger="comerciales" aria-expanded="false">
+            <span class="material-symbols-outlined text-[16px]" aria-hidden="true">business_center</span>
+            <span>Actividades comerciales</span>
+            <span class="material-symbols-outlined text-[16px]">expand_more</span>
+          </button>
+          <div class="absolute left-0 top-full hidden group-hover/nav:block bg-surface-container-lowest shadow-[0_8px_24px_rgba(0,0,0,0.12)] rounded-xl py-space-xs min-w-[230px] z-50 border border-outline-variant/30 text-on-surface" data-commercial-dropdown-menu="comerciales">
+            <a class="flex items-center gap-2 px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="precaptacion" href="<?php echo esc_url(self::url($baseUrl, ['tab'=>'precaptacion'])); ?>">
+              <span class="material-symbols-outlined text-[18px] text-secondary" aria-hidden="true">add_home_work</span><span>Precaptación</span>
+            </a>
+          </div>
+        </div>
+      <?php endif; ?>
+
       <!-- Dropdown Inmuebles (Públicos, Pendientes por publicar, No públicos, Destacados, Solicitudes, Cupos, Mis inmuebles) -->
       <?php if (in_array('inmuebles', $views, true)): ?>
         <div class="relative group/nav" data-commercial-dropdown="inmuebles">
@@ -901,20 +916,6 @@ final class CommercialDashboardView
             <a class="flex items-center justify-between px-space-md py-space-sm font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="avisos" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'avisos'])); ?>">
               <span>Rutas Operativas</span>
               <span class="material-symbols-outlined text-secondary text-[16px]">near_me</span>
-            </a>
-          </div>
-        </div>
-      <?php endif; ?>
-      <?php if (in_array('precaptacion', $views, true)): ?>
-        <div class="relative group/nav" data-commercial-dropdown="administrativas">
-          <button type="button" class="flex items-center gap-space-xs px-2 lg:px-3 py-space-xs font-label-md text-label-md <?php echo $bucket === 'precaptacion' ? ($activeClasses . ' active') : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-dropdown-trigger="administrativas" aria-expanded="false">
-            <span class="material-symbols-outlined text-[16px]" aria-hidden="true">business_center</span>
-            <span>Actividades administrativas</span>
-            <span class="material-symbols-outlined text-[16px]">expand_more</span>
-          </button>
-          <div class="absolute left-0 top-full hidden group-hover/nav:block bg-surface-container-lowest shadow-[0_8px_24px_rgba(0,0,0,0.12)] rounded-xl py-space-xs min-w-[230px] z-50 border border-outline-variant/30 text-on-surface" data-commercial-dropdown-menu="administrativas">
-            <a class="flex items-center gap-2 px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="precaptacion" href="<?php echo esc_url(self::url($baseUrl, ['tab'=>'precaptacion'])); ?>">
-              <span class="material-symbols-outlined text-[18px] text-secondary" aria-hidden="true">add_home_work</span><span>Precaptación</span>
             </a>
           </div>
         </div>
