@@ -912,9 +912,9 @@ final class CommercialDashboardView
             <span>Actividades administrativas</span>
             <span class="material-symbols-outlined text-[16px]">expand_more</span>
           </button>
-          <div class="absolute left-0 top-full hidden bg-surface-container-lowest shadow-modal rounded-xl py-space-xs min-w-[230px] z-50 border border-outline-variant/30" data-commercial-dropdown-menu="administrativas">
-            <a class="flex items-center gap-2 px-3 py-3 rounded-xl font-label-md text-on-surface hover:bg-surface-container-low" data-commercial-tab="precaptacion" href="<?php echo esc_url(self::url($baseUrl, ['tab'=>'precaptacion'])); ?>">
-              <span class="material-symbols-outlined text-[18px]" aria-hidden="true">add_home_work</span>Precaptación
+          <div class="absolute left-0 top-full hidden group-hover/nav:block bg-surface-container-lowest shadow-[0_8px_24px_rgba(0,0,0,0.12)] rounded-xl py-space-xs min-w-[230px] z-50 border border-outline-variant/30 text-on-surface" data-commercial-dropdown-menu="administrativas">
+            <a class="flex items-center gap-2 px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="precaptacion" href="<?php echo esc_url(self::url($baseUrl, ['tab'=>'precaptacion'])); ?>">
+              <span class="material-symbols-outlined text-[18px] text-secondary" aria-hidden="true">add_home_work</span><span>Precaptación</span>
             </a>
           </div>
         </div>
