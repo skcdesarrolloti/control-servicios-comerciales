@@ -506,6 +506,8 @@ final class CommercialDashboardView
             echo self::renderCalendarPage($runtime['config'] ?? [], $calendarEmployees, $subtab, $policy, $baseUrl);
           } elseif ($bucket === 'inmuebles') {
             echo self::renderPropertiesPage($propertyResult, $propertyFilters, $propertySummaryCounts, $propertyOptions, $policy, $baseUrl);
+          } elseif ($bucket === 'precaptacion') {
+            echo self::renderPrecaptacion($baseUrl);
           } elseif ($bucket === 'notificaciones') {
             echo CommercialNotificationsView::render($data['notifications_service'], $policy);
           } else {
@@ -899,6 +901,20 @@ final class CommercialDashboardView
             <a class="flex items-center justify-between px-space-md py-space-sm font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="avisos" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'avisos'])); ?>">
               <span>Rutas Operativas</span>
               <span class="material-symbols-outlined text-secondary text-[16px]">near_me</span>
+            </a>
+          </div>
+        </div>
+      <?php endif; ?>
+      <?php if (in_array('precaptacion', $views, true)): ?>
+        <div class="relative group/nav" data-commercial-dropdown="administrativas">
+          <button type="button" class="flex items-center gap-space-xs px-2 lg:px-3 py-space-xs font-label-md text-label-md <?php echo $bucket === 'precaptacion' ? ($activeClasses . ' active') : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-dropdown-trigger="administrativas" aria-expanded="false">
+            <span class="material-symbols-outlined text-[16px]" aria-hidden="true">business_center</span>
+            <span>Actividades administrativas</span>
+            <span class="material-symbols-outlined text-[16px]">expand_more</span>
+          </button>
+          <div class="absolute left-0 top-full hidden bg-surface-container-lowest shadow-modal rounded-xl py-space-xs min-w-[230px] z-50 border border-outline-variant/30" data-commercial-dropdown-menu="administrativas">
+            <a class="flex items-center gap-2 px-3 py-3 rounded-xl font-label-md text-on-surface hover:bg-surface-container-low" data-commercial-tab="precaptacion" href="<?php echo esc_url(self::url($baseUrl, ['tab'=>'precaptacion'])); ?>">
+              <span class="material-symbols-outlined text-[18px]" aria-hidden="true">add_home_work</span>Precaptación
             </a>
           </div>
         </div>
@@ -4870,6 +4886,11 @@ final class CommercialDashboardView
     </div>
 <?php
     return (string) ob_get_clean();
+  }
+
+  public static function renderPrecaptacion(string $baseUrl): string
+  {
+    return '<section class="w-full"><iframe src="' . esc_url(rtrim($baseUrl, '/') . '/precaptaciones.php') . '" title="Precaptación" class="w-full border-0" style="height:calc(100vh - 145px);min-height:600px" loading="lazy"></iframe></section>';
   }
 
   private static function currentDateFormatted(): string

@@ -21,6 +21,7 @@ final class CommercialAccessPolicy
     'actualizaciones' => 'Actualizaciones de inmuebles',
     'avisos' => 'Avisos en fachada',
     'notificaciones' => 'Notificaciones comerciales',
+    'precaptacion' => 'Precaptación',
   ];
 
   public const ACTIONS = [
@@ -34,6 +35,10 @@ final class CommercialAccessPolicy
     'cambiar_estado' => 'Cambiar estado comercial',
     'reasignar' => 'Reasignar responsable',
     'enviar_notificacion' => 'Enviar notificaciones comerciales',
+    'precaptacion_crear' => 'Registrar precaptaciones',
+    'precaptacion_editar' => 'Editar resultados de precaptación',
+    'precaptacion_ticket' => 'Crear ticket desde precaptación',
+    'precaptacion_catalogos' => 'Crear barrios e inmobiliarias',
   ];
 
   public const SUBVIEWS = [

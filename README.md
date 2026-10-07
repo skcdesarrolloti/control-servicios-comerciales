@@ -141,3 +141,41 @@ Para verificar todos los archivos PHP:
 ```powershell
 Get-ChildItem -Recurse -Filter *.php | ForEach-Object { php -l $_.FullName }
 ```
+
+## Actividades administrativas: Precaptación
+
+El menú **Actividades administrativas → Precaptación** integra el panel suministrado en
+`precaptacion/precaptaciones/precaptaciones.php`. Su adaptación está en
+`src/Precaptacion/LegacyPanel.php`; usa la sesión, base de datos, permisos y cola de
+notificaciones de este proyecto y no requiere cargar WordPress.
+
+En **Configuración de Accesos**, habilitar la vista **Precaptación** y las acciones
+necesarias: registrar, editar resultados, crear tickets y crear barrios/inmobiliarias.
+Los cargos administrativos pueden ver el control completo; los demás solo ven y
+modifican sus propias precaptaciones, identificadas por `id_empleado`.
+
+El formulario conserva los campos de `anadir-precaptacion.json`, incluida la evidencia
+fotográfica y los campos condicionales de Club PPH y competencia. **Añadir barrio** y
+**Añadir inmobiliaria** crean y seleccionan el registro sin abandonar el formulario.
+La comparación ignora mayúsculas, tildes y espacios repetidos; para barrios también
+compara país y ciudad. Los registros existentes se reutilizan. La creación de catálogos
+usa bloqueo por tabla en MySQL para coordinar solicitudes concurrentes de este módulo.
+
+Se reutilizan las tablas CCT existentes de precaptaciones, barrios, inmobiliarias,
+funcionarios, países y Club PPH, los glosarios JetEngine y las tablas de tickets e
+historial del panel original. Los campos obligatorios de precaptaciones se comprueban
+antes de insertar. Los correos se encolan en `shared-notifications`; no se envían desde
+la petición HTTP.
+
+Pruebas con SQLite aislado:
+
+```powershell
+php .vendor-test-junction/bin/phpunit --filter 'PrecaptacionTest|CommercialAccessPolicyTest'
+php -S 127.0.0.1:8770 -t .
+# En otra terminal, con Playwright disponible:
+node tools/check-precaptacion-ui.cjs RUTA_A_NODE_MODULES
+```
+
+La prueba de navegador comprueba registro con fotografías, catálogos, campos
+condicionales, permisos, edición y creación de tickets con reintentos. La base de datos
+y los archivos de esa prueba se guardan en el directorio temporal, separados del entorno real.

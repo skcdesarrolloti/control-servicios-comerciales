@@ -1,0 +1,20 @@
+:root{color-scheme:light;font-family:Arial,sans-serif;color:#061d49;background:#faf8ff}
+body{margin:0;padding:20px;box-sizing:border-box}
+body:has(dialog[open]){overflow:hidden}
+button,input,select,textarea{font:inherit}
+button{cursor:pointer;border:0;border-radius:10px;padding:11px 16px;background:#735c00;color:#fff;font-weight:600;min-height:44px}
+button:disabled{opacity:.6;cursor:wait}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid #1e3c76;outline-offset:2px}
+.precap-toolbar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:20px;background:#fff;padding:20px;border:1px solid #e2e8f0;border-radius:16px}
+.precap-toolbar h1{margin:0;font-size:24px}.precap-toolbar p{margin:8px 0 0;color:#4b5d8c}
+dialog{border:1px solid #e2e8f0;border-radius:18px;padding:24px;width:min(850px,calc(100vw - 64px));max-height:85vh;overflow:auto;color:#061d49}
+dialog::backdrop{background:rgba(6,29,73,.55)}
+dialog header,dialog footer{display:flex;gap:12px;align-items:center;justify-content:space-between}
+dialog header h2{margin:0;font-size:22px}dialog header button{background:transparent;color:#4b5d8c;font-size:26px}
+dialog footer{justify-content:flex-end;margin-top:16px}
+.precap-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:20px 0}
+.precap-field,label{display:flex;flex-direction:column;gap:8px}.precap-field[hidden]{display:none}.precap-wide{grid-column:1/-1}
+input,select,textarea{box-sizing:border-box;max-width:100%;width:100%;border:1px solid #cdd9ff;border-radius:8px;padding:10px;background:#faf8ff;color:#061d49;min-height:44px}
+small{color:#4b5d8c}.precap-secondary{background:#e9edff;color:#061d49}
+[data-precap-message]{min-height:20px;color:#4b5d8c}[data-precap-message].error{color:#ba1a1a}
+@media(max-width:600px){body{padding:10px}.precap-toolbar{align-items:flex-start;flex-direction:column}.precap-fields{grid-template-columns:1fr}dialog{padding:16px;width:calc(100vw - 48px)}dialog footer{flex-wrap:wrap}}

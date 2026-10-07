@@ -1,0 +1,281 @@
+{
+  "fields": [
+    {
+      "field_value": "manual_input",
+      "hidden_value": "banner",
+      "name": "funcion",
+      "type": "hidden-field"
+    },
+    {
+      "field_value": "manual_input",
+      "name": "banner",
+      "jfb_update_fields_value_enabled": true,
+      "jfb_update_fields_field_to_listen": "funcion",
+      "jfb_update_fields_callback": "1250|imagen",
+      "type": "hidden-field"
+    },
+    {
+      "return_raw": true,
+      "field_value": "user_id",
+      "name": "id_empleado",
+      "type": "hidden-field"
+    },
+    {
+      "return_raw": true,
+      "field_value": "user_name",
+      "name": "creador",
+      "type": "hidden-field"
+    },
+    {
+      "return_raw": true,
+      "field_value": "user_email",
+      "name": "creador_email",
+      "type": "hidden-field"
+    },
+    {
+      "return_raw": true,
+      "field_value": "user_meta",
+      "hidden_value_field": "celular-del-empleado",
+      "name": "creador_celular",
+      "type": "hidden-field"
+    },
+    {
+      "return_raw": true,
+      "field_value": "user_meta",
+      "hidden_value_field": "sucursal-user",
+      "name": "sucursal",
+      "type": "hidden-field"
+    },
+    {
+      "field_value": "current_date",
+      "date_format": "U",
+      "name": "fecha",
+      "type": "hidden-field"
+    },
+    {
+      "glossary_id": "185",
+      "field_options_from": "glossary",
+      "label": "Origen",
+      "name": "origen",
+      "placeholder": "Elige una opcion",
+      "required": true,
+      "type": "select-field"
+    },
+    {
+      "glossary_id": "162",
+      "field_options_from": "generate",
+      "generator_function": "get_from_query",
+      "generator_field": "1054|_ID|tarjeta_bienvenida",
+      "label": "Aliado PPH",
+      "name": "id_pph",
+      "desc": "Selecciona al aliado que le sugerio o informó de está precaptación.",
+      "placeholder": "Elige una opcion",
+      "required": true,
+      "autocomplete_enable": true,
+      "autocomplete_via_ajax": false,
+      "autocomplete_minimumInputLength": 0,
+      "type": "select-field"
+    },
+    {
+      "value": {
+        "groups": []
+      },
+      "field_value": "",
+      "name": "ruta",
+      "jfb_update_fields_value_enabled": true,
+      "jfb_update_fields_field_to_listen": "barrio",
+      "jfb_update_fields_callback": "1447|ruta_asignada",
+      "type": "hidden-field"
+    },
+    {
+      "glossary_id": "783",
+      "field_options_from": "glossary",
+      "label": "Tipo de inmueble",
+      "name": "tipo_inmueble",
+      "desc": "Seleccione el tipo de inmueble correspondiente.",
+      "placeholder": "Elige una opcion",
+      "required": true,
+      "autocomplete_enable": true,
+      "autocomplete_minimumInputLength": 0,
+      "type": "select-field"
+    },
+    {
+      "glossary_id": "784",
+      "field_options_from": "glossary",
+      "field_options": [
+        {
+          "__visible": true,
+          "label": "Arriendo",
+          "value": "Arriendo"
+        },
+        {
+          "__visible": true,
+          "label": "Venta",
+          "value": "Venta"
+        },
+        {
+          "__visible": true,
+          "label": "Arriendo o venta",
+          "value": "Arriendo o venta"
+        }
+      ],
+      "label": "Categoría",
+      "name": "categoria",
+      "desc": "Seleccione la categoría correspondiente.",
+      "placeholder": "Elige una opcion",
+      "required": true,
+      "type": "select-field"
+    },
+    {
+      "validation": {
+        "messages": {
+          "max_size": "Tamaño máximo permitido: %max_size%"
+        }
+      },
+      "allowed_user_cap": "any_user",
+      "max_files": 2,
+      "max_size": "10",
+      "allowed_mimes": [
+        "image/jpeg",
+        "image/gif",
+        "image/png",
+        "image/heic",
+        "image/tiff",
+        "image/webp",
+        "image/bmp",
+        "image/avif",
+        "image/x-icon",
+        "image/heif",
+        "image/heic-sequence",
+        "image/heif-sequence",
+        "image/svg+xml"
+      ],
+      "name": "fotos",
+      "desc": "Solo se permite la subida de una sola imagen por políticas de rendimiento.",
+      "required": true,
+      "type": "media-field"
+    },
+    {
+      "glossary_id": "160",
+      "field_options_from": "glossary",
+      "label": "¿De quién tiene contacto?",
+      "name": "tipo_contacto",
+      "placeholder": "Elige una opcion",
+      "type": "select-field"
+    },
+    {
+      "label": "Nombre",
+      "name": "contacto",
+      "type": "text-field"
+    },
+    {
+      "glossary_id": "189",
+      "field_options_from": "generate",
+      "generator_function": "get_from_query",
+      "generator_field": "923|barrio|barrio",
+      "label": "Barrio",
+      "name": "barrio",
+      "desc": "Selecciona el barrio correspondiente. En tal caso de no encontrarlo presiona el boton <strong>\"AÑADIR BARRIO\" </strong>para añadir el barrio al sistema.",
+      "placeholder": "Elige una opcion",
+      "autocomplete_enable": true,
+      "autocomplete_via_ajax": true,
+      "autocomplete_minimumInputLength": 0,
+      "type": "select-field"
+    },
+    {
+      "label": "Dirección",
+      "name": "direccion",
+      "desc": "Coloca la dirección y/o nomenclatura correspondiente.",
+      "type": "text-field"
+    },
+    {
+      "label": "Punto de referencia",
+      "name": "punto_referencia",
+      "desc": "Describa en este campo si tiene un lugar de referencia.",
+      "type": "text-field"
+    },
+    {
+      "value": {
+        "groups": []
+      },
+      "label": "Teléfono",
+      "name": "telefono",
+      "desc": "Si no lo tiene dejelo vacio.",
+      "type": "number-field"
+    },
+    {
+      "field_options_from": "generate",
+      "generator_function": "get_from_query",
+      "generator_field": "920|codigo|pais",
+      "label": "Pais",
+      "name": "indicativo",
+      "desc": "Indica el pais en el cual se encuentra ubicado el cliente. Si no tiene no escoja nada.",
+      "placeholder": "Elige un pais",
+      "metadata": {
+        "categories": [],
+        "patternName": "core/block/68425",
+        "name": "Pais con indicativo"
+      },
+      "autocomplete_enable": true,
+      "type": "select-field"
+    },
+    {
+      "value": {
+        "groups": []
+      },
+      "label": "Celular",
+      "name": "celular",
+      "desc": "Si no lo tiene dejelo vacio. No colocar indicativo del pais solamente el numero.",
+      "required": true,
+      "type": "number-field"
+    },
+    {
+      "multiple": true,
+      "multiple_size": 2,
+      "glossary_id": "161",
+      "field_options_from": "glossary",
+      "label": "¿Promocionado por?",
+      "name": "promocionado_por",
+      "desc": "Seleccione por quién está promocionado.",
+      "autocomplete_enable": true,
+      "type": "select-field"
+    },
+    {
+      "multiple": true,
+      "glossary_id": "162",
+      "field_options_from": "generate",
+      "generator_function": "get_from_query",
+      "generator_field": "925|inmobiliaria|inmobiliaria",
+      "label": "Competencia",
+      "name": "competencia",
+      "desc": "Seleccione que inmobiliaria está presente en este inmueble Si no esta puede agregarla en el botón que aparece en la aprte superior \"Añadir inmobiliaria\".",
+      "required": true,
+      "autocomplete_enable": true,
+      "autocomplete_via_ajax": true,
+      "autocomplete_minimumInputLength": 0,
+      "type": "select-field"
+    },
+    {
+      "label": "Observaciones",
+      "name": "observaciones",
+      "desc": "Describa las observaciones o anotaciones que tenga que ver con esta precaptacion.",
+      "type": "textarea-field"
+    }
+  ],
+  "notification": {
+    "mail_to": "custom",
+    "custom_email": "sucasacomercial@gmail.com,gcorrearivera@gmail.com,sc.dircomercial@gmail.com",
+    "subject": "Nueva precaptación #%inserted_cct_precaptaciones%",
+    "from_name": "SUCASA INMOBILIARIA",
+    "from_address": "sucasainfo@sucasainmobiliaria.com.co",
+    "content_type": "text/html",
+    "content": "<!DOCTYPE html>\n<html lang=\"es\">\n\n<head>\n  <meta charset=\"UTF-8\">\n  <title>Precaptación</title>\n</head>\n\n<body style=\"margin:0; padding:0; background-color:#f5f5f5; font-family:Arial, sans-serif;\">\n\n  <table align=\"center\" width=\"800\" cellpadding=\"0\" cellspacing=\"0\"\n    style=\"border:3px solid #ebecec; background:#ffffff;\">\n    <tr>\n      <td>\n        <img src=\"%banner%\" alt=\"Banner-skc\" style=\"width:100%; height:auto; display:block;\">\n      </td>\n    </tr>\n\n    <tr>\n      <td style=\"padding:20px; text-align:center; color:#061d49;\">\n        <h3 style=\"font-size:16px; margin-bottom:20px;\">Apreciado/a administrador 🤗</h3>\n        <p style=\"font-weight:500; margin:10px 0;\">\n          Nuestro funcionario <b>%creador%</b> ha agregado una nueva precaptación.\n        </p>\n      </td>\n    </tr>\n\n    <tr>\n      <td style=\"padding:20px; text-align:center; color:#061d49;\">\n        <p style=\"font-weight:500; margin:10px 0;\">\n          A través del siguiente enlace podrás consultar todos los detalles de la precaptación:\n        </p>\n        <a href=\"https://sucasainmobiliaria.com.co/mi-cuenta/precaptacion/?id_precaptacion=%inserted_cct_precaptaciones%\"\n          style=\"background-color:#404041; padding:15px 20px; border-radius:5px; text-decoration:none; color:white; font-weight:700; display:inline-block; margin:15px 0;\">\n          Ver precaptación\n        </a>\n\n        <p style=\"font-weight:500; margin:10px 0;\">\n          ¡Descubre nuestra revista digital! Mantente al día con las mejores oportunidades inmobiliarias, tips\n          exclusivos y tendencias del mercado.\n        </p>\n        <a href=\"https://sucasainmobiliaria.com.co/revista/\"\n          style=\"background-color:#404041; padding:15px 20px; border-radius:5px; text-decoration:none; color:white; font-weight:700; display:inline-block; margin:15px 0;\">\n          Ver revista\n        </a>\n      </td>\n    </tr>\n\n    <tr>\n      <td style=\"background:#f59120; text-align:center; font-weight:600; font-size:18px; padding:18px; color:white;\">\n        Una empresa para lograr sus sueños.\n      </td>\n    </tr>\n  </table>\n\n</body>\n\n</html>",
+    "disable_format": true,
+    "reply_to": "form",
+    "reply_to_email": "sucasacomercial@gmail.com",
+    "reply_from_field": "creador_email",
+    "use_cc_bcc": true,
+    "cc_from": "custom",
+    "cc_email": "sucasacorreos@gmail.com"
+  }
+}
