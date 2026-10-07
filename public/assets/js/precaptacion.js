@@ -111,6 +111,17 @@
     message.classList.remove("error");
     message.textContent = "Guardando…";
     try {
+      if (action === "precaptacion_create") {
+        message.textContent = "Comprimiendo fotografías…";
+        data.delete("fotos[]");
+        var photos = Array.from(form.elements["fotos[]"].files);
+        for (var photo of photos) {
+          var optimized = await compressPhoto(photo);
+          if (optimized.size > 10 * 1024 * 1024) throw new Error("La foto " + photo.name + " sigue superando 10 MB. Guárdala como JPG o selecciona una imagen más pequeña.");
+          data.append("fotos[]", optimized, optimized.name);
+        }
+        message.textContent = "Subiendo fotografías y guardando…";
+      }
       var response = await fetch(body.dataset.precapApi, {method:"POST", body:data, credentials:"same-origin"});
       var result = await response.json();
       if (!response.ok || !result.success) throw new Error(result.data && result.data.message || "No se pudo guardar.");
@@ -121,6 +132,28 @@
       message.textContent = error.message;
       return null;
     } finally { button.disabled = false; }
+  }
+  async function compressPhoto(file) {
+    // Keep animation and formats that the browser cannot decode as supplied.
+    if (!/^image\/(jpeg|jpg|png|webp|bmp|x-ms-bmp)$/i.test(file.type)) return file;
+    var url = URL.createObjectURL(file);
+    try {
+      var image = new Image(); image.src = url; await image.decode();
+      var ratio = Math.min(1, 1920 / Math.max(image.naturalWidth, image.naturalHeight));
+      var canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(image.naturalWidth * ratio));
+      canvas.height = Math.max(1, Math.round(image.naturalHeight * ratio));
+      var context = canvas.getContext("2d", {alpha:false});
+      if (!context) return file;
+      context.fillStyle = "#fff"; context.fillRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      var blob = await new Promise(function (resolve) { canvas.toBlob(resolve, "image/jpeg", 0.82); });
+      canvas.width = canvas.height = 0;
+      // Never enlarge a file that was already optimized.
+      if (!blob || blob.size >= file.size) return file;
+      return new File([blob], file.name.replace(/\.[^.]+$/, "") + ".jpg", {type:"image/jpeg",lastModified:file.lastModified});
+    } catch (error) { return file; }
+    finally { URL.revokeObjectURL(url); }
   }
   document.addEventListener("click", function (event) {
     if (!event.target.closest(".precap-picker")) document.querySelectorAll(".precap-picker-popup").forEach(function (item) { item.hidden = true; item.previousElementSibling.setAttribute("aria-expanded", "false"); });
@@ -189,10 +222,10 @@
       if (currentStep < 3) { if (validateStep(currentStep)) showStep(currentStep + 1); return; }
       for (var index = 0; index < 4; index++) { if (!validateStep(index)) { showStep(index); validateStep(index); return; } }
       var photos = createForm.elements["fotos[]"].files;
-      if (photos.length > 2 || Array.from(photos).some(function (photo) { return photo.size > 10 * 1024 * 1024; })) {
+      if (photos.length > 2 || Array.from(photos).some(function (photo) { return photo.size > 30 * 1024 * 1024; })) {
         var message = createForm.querySelector("[data-precap-message]");
         message.classList.add("error");
-        message.textContent = "Adjunta una o dos fotografías de hasta 10 MB cada una.";
+        message.textContent = "Adjunta una o dos fotografías de hasta 30 MB cada una. Las comprimiremos antes de subirlas.";
         return;
       }
       var result = await send(createForm, "precaptacion_create");

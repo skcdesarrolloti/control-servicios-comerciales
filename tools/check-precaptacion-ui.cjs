@@ -73,12 +73,33 @@ const { chromium } = require(process.argv[2] ? path.join(process.argv[2], 'playw
     assert.ok((await page.locator('#precap-create [data-precap-message]').textContent()).includes('Ya existe'));
     await page.locator('[data-precap-next]').click();
     assert.ok(await page.locator('[data-precap-step="3"]').isVisible());
-    await page.locator('#precap-fotos').setInputFiles({name:'evidencia.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jWZkAAAAASUVORK5CYII=', 'base64')});
+    const originalPhoto = Buffer.from(await page.evaluate(() => {
+      const canvas = document.createElement('canvas'); canvas.width = 2560; canvas.height = 1600;
+      const ctx = canvas.getContext('2d'); const image = ctx.createImageData(canvas.width, canvas.height);
+      let seed = 17;
+      for (let i = 0; i < image.data.length; i += 4) {
+        for (let channel = 0; channel < 3; channel++) { seed ^= seed << 13; seed ^= seed >>> 17; seed ^= seed << 5; image.data[i + channel] = seed & 255; }
+        image.data[i + 3] = 255;
+      }
+      ctx.putImageData(image, 0, 0); return canvas.toDataURL('image/png').split(',')[1];
+    }), 'base64');
+    await page.locator('#precap-fotos').setInputFiles([
+      {name:'fachada.png',mimeType:'image/png',buffer:originalPhoto},
+      {name:'evidencia.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jWZkAAAAASUVORK5CYII=', 'base64')},
+    ]);
     fs.mkdirSync('output', {recursive:true});
     await page.screenshot({path:'output/precaptacion-form-desktop.png',fullPage:true});
     const createResponse = page.waitForResponse(response => response.request().method() === 'POST' && response.request().postData().includes('precaptacion_create'));
     await page.locator('#precap-create button[type="submit"]').click();
     const created = await createResponse;
+    const uploaded = created.request().postDataBuffer();
+    assert.ok(uploaded.includes(Buffer.from('filename="fachada.jpg"')));
+    assert.ok(uploaded.includes(Buffer.from('filename="evidencia.png"')), 'No debe aumentar una imagen pequeña');
+    assert.ok(uploaded.length < originalPhoto.length / 2, 'Las fotos deben comprimirse antes de enviar la solicitud');
+    const jpegStart = uploaded.indexOf(Buffer.from([0xff, 0xd8]));
+    const jpegEnd = uploaded.indexOf(Buffer.from([0xff, 0xd9]), jpegStart) + 2;
+    const dimensions = await page.evaluate(async data => { const image = new Image(); image.src = 'data:image/jpeg;base64,' + data; await image.decode(); return [image.naturalWidth,image.naturalHeight]; }, uploaded.subarray(jpegStart, jpegEnd).toString('base64'));
+    assert.deepEqual(dimensions, [1920,1200], 'Debe conservar la proporción y limitar el lado mayor');
     assert.equal(created.status(), 200, await created.text());
     await page.locator('#precap-create').waitFor({state:'hidden'});
     await page.getByText('Nueva oportunidad de prueba', {exact:true}).first().waitFor({state:'attached'});

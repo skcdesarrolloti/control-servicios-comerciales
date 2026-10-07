@@ -39,7 +39,7 @@ final class FormView
               <?php if ($field['type'] === 'media-field'): ?>
                 <label class="precap-upload" for="precap-fotos"><span aria-hidden="true">＋</span><strong>Agregar fotografías del inmueble</strong><small>Selecciona una o dos imágenes de tu dispositivo</small><input id="precap-fotos" name="fotos[]" type="file" accept="image/jpeg,image/png,image/gif,image/webp,image/bmp,image/heic,image/heif,image/tiff" multiple required></label>
                 <div class="precap-photo-preview" data-precap-photo-preview></div>
-                <small>Una o dos fotografías, hasta 10 MB por archivo.</small>
+                <small>Una o dos fotografías, hasta 30 MB por archivo. Se comprimen automáticamente antes de subir.</small>
               <?php elseif ($field['type'] === 'textarea-field'): ?>
                 <textarea id="precap-<?php echo esc_attr($name); ?>" name="<?php echo esc_attr($name); ?>" rows="3"></textarea>
               <?php elseif ($name === 'barrio'): ?>
