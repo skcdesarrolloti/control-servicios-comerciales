@@ -110,6 +110,8 @@ const { chromium } = require(process.argv[2] ? path.join(process.argv[2], 'playw
     await page.locator('[data-precap-contact-filter="no_contesto"]').click();
     await refresh;
     await page.waitForFunction(() => document.querySelector('.precap-contact-badge--no_contesto') !== null);
+    assert.ok(/\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}/.test(await page.locator('.precap-dates').innerText()));
+    assert.ok(!(await page.locator('.precap-dates').innerText()).includes('No registrada'), 'Debe guardar la fecha de respuesta');
     assert.equal(await page.locator('[data-precaptaciones-row-id]').count(), 1);
     assert.equal(await page.locator('[data-precaptaciones-row-id]').getAttribute('data-precaptaciones-row-id'), '1');
     refresh = page.waitForResponse(response => response.request().postData()?.includes('precaptaciones_filtrar'));
@@ -142,11 +144,30 @@ const { chromium } = require(process.argv[2] ? path.join(process.argv[2], 'playw
     await page.screenshot({path:'output/precaptacion-list-mobile.png',fullPage:true});
     const admin = await browser.newPage({viewport:{width:1440,height:1000}});
     await admin.route('**/public/precaptacion-api.php', route => route.continue({url:endpoint}));
-    await admin.goto(endpoint + '?admin=1');
+    await admin.goto(endpoint + '?admin=1&normalize=1');
     await admin.evaluate(() => document.fonts.ready);
     await admin.screenshot({path:'output/precaptacion-admin-desktop.png',fullPage:true});
     assert.equal(await admin.locator('h1').innerText(), 'Precaptaciones');
     assert.ok(!(await admin.locator('body').innerText()).match(/\btickets?\b/i));
+    for (const kind of ['promocionado','competencia']) {
+      const button = admin.locator('[data-precaptaciones-normalizar-' + kind + ']');
+      assert.equal(await button.getAttribute('data-count'), '1');
+      const action = kind === 'promocionado' ? 'precaptaciones_normalizar_promocionado_por' : 'precaptaciones_normalizar_competencia';
+      const result = admin.waitForResponse(response => response.request().postData()?.includes(action));
+      await button.click();
+      await admin.locator('[data-precap-notice-confirm]').click();
+      const normalized = await (await result).json();
+      assert.equal(normalized.success, true, JSON.stringify(normalized));
+      assert.equal(normalized.data.updated, 1);
+      assert.equal(normalized.data.remaining, 0);
+      await admin.waitForFunction(kind => document.querySelector('[data-precaptaciones-normalizar-' + kind + ']').dataset.count === '0', kind);
+      assert.ok(await button.isDisabled());
+      assert.ok((await button.innerText()).includes('Normalizar'));
+    }
+    await admin.goto(endpoint + '?admin=1');
+    assert.equal(await admin.locator('[data-precaptaciones-normalizar-competencia]').getAttribute('data-count'), '0');
+    assert.equal(await admin.locator('[data-precaptaciones-normalizar-promocionado]').getAttribute('data-count'), '0');
+    assert.ok((await admin.locator('.precap-dates').first().innerText()).includes('No registrada'), 'Normalizar no debe inventar una respuesta');
     let nativeDialogs = 0;
     admin.on('dialog', async dialog => { nativeDialogs++; await dialog.dismiss(); });
     await admin.locator('[data-precaptaciones-duplicada]').first().click();

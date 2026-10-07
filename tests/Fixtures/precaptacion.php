@@ -14,6 +14,9 @@ define('SCM_UPLOAD_MAX_BYTES', 10485760);
 $_SESSION += ['scm_logged_in'=>true,'scm_user_id'=>1,'scm_employee_id'=>'101','scm_user_cargo'=>'9','scm_user'=>'Funcionario de prueba'];
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'GET' && isset($_GET['admin'])) $_SESSION['scm_user_cargo'] = $_GET['admin'] === '1' ? '13' : '9';
 $db = \Tests\Fixtures\PrecaptacionDatabase::create('sqlite:' . sys_get_temp_dir() . '/scm-precap-' . session_id() . '.sqlite');
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'GET' && ($_GET['normalize'] ?? '') === '1' && ($_SESSION['scm_user_cargo'] ?? '') === '13') {
+  $db->update('wp_jet_cct_precaptaciones', ['promocionado_por'=>'Directo','competencia'=>serialize([''])], ['_ID'=>1]);
+}
 \SCM\Precaptacion\Module::init($db, new \SCM\Core\Settings($db), new \SCM\Core\Csrf('fixture-secret'), []);
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
   try { \SCM\Precaptacion\Module::dispatch((string) ($_POST['action'] ?? ''), $_POST); }

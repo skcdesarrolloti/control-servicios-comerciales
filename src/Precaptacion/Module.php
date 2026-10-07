@@ -28,6 +28,7 @@ final class Module
     require_once __DIR__ . '/Compatibility.php';
     require_once __DIR__ . '/LegacyPanel.php';
     $GLOBALS['wpdb'] = new DatabaseAdapter($db);
+    (new ResponseDates($db))->ensureSchema();
   }
 
   public static function db(): Database { return self::$database; }
@@ -151,6 +152,9 @@ final class Module
           if (($row['merece_ticket'] ?? '') !== 'Si') wp_send_json_error(['message'=>'Guarda primero un resultado que merezca tarea.'], 409);
           $assigned = self::employee((string) ($input['asignado'] ?? $input['id_empleado'] ?? Auth::employeeId()));
           if (($assigned['activo'] ?? '') !== 'Si') wp_send_json_error(['message'=>'Selecciona un funcionario activo.'], 422);
+        }
+        if (in_array($action, ['precaptaciones_actualizar','precaptaciones_marcar_duplicada','precaptaciones_marcar_sin_informacion'], true)) {
+          (new ResponseDates(self::db()))->record((int) $input['id_precaptacion']);
         }
       } elseif (in_array($action, ['precaptaciones_actualizar','precaptaciones_crear_ticket','precaptaciones_marcar_duplicada','precaptaciones_marcar_sin_informacion'], true)) {
         wp_send_json_error(['message'=>'Selecciona una precaptación válida.'], 422);

@@ -202,6 +202,9 @@ final class LegacyPanel
         $rows_sql = "SELECT * FROM {$table} {$where_sql} {$order_sql} LIMIT %d OFFSET %d";
         $rows_values = array_merge($where_values, [$per_page, $offset]);
         $rows = $wpdb->get_results($wpdb->prepare($rows_sql, $rows_values), ARRAY_A);
+        $dates = (new ResponseDates(Module::db()))->forIds(array_map(static fn(array $row): int => (int) $row['_ID'], $rows ?: []));
+        foreach ($rows as &$row) $row['_scm_responded_at'] = $dates[(int) $row['_ID']] ?? '';
+        unset($row);
 
         return [
             'rows' => $rows ?: [],
@@ -357,6 +360,7 @@ final class LegacyPanel
         <tr>
             <th>Acciones</th>
             <th>Evidencia</th>
+            <th>Fechas</th>
             <?php if ($is_control) : ?>
                 <th>Funcionario</th>
             <?php endif; ?>
@@ -423,6 +427,7 @@ final class LegacyPanel
                 <?php endif; ?>
             </td>
             <td><?php echo self::render_evidence($table, $row); ?></td>
+            <td class="precap-dates"><small>Registro</small><time><?php echo esc_html(self::registration_date($table, $row)); ?></time><small>Última respuesta</small><time><?php echo esc_html(self::response_date($table, $row)); ?></time></td>
             <?php if ($is_control) : ?>
                 <td><div class="precap-employee"><span class="precap-avatar" aria-hidden="true"><?php echo esc_html(mb_strtoupper(mb_substr(self::employee_name($employee_id), 0, 1))); ?></span><strong><?php echo esc_html(self::employee_name($employee_id)); ?></strong></div></td>
             <?php endif; ?>
@@ -436,6 +441,38 @@ final class LegacyPanel
         <?php
     }
 
+    private static function format_date(string $raw): string
+    {
+        if ($raw === '' || $raw === '0' || str_starts_with($raw, '0000-')) return '';
+        try {
+            $zone = new \DateTimeZone('America/Bogota');
+            $date = is_numeric($raw)
+                ? (new \DateTimeImmutable('@' . (string) (int) ((float) $raw > 9999999999 ? (float) $raw / 1000 : (float) $raw)))->setTimezone($zone)
+                : new \DateTimeImmutable($raw, $zone);
+            return $date->setTimezone($zone)->format('d/m/Y H:i');
+        } catch (\Exception $exception) { return ''; }
+    }
+
+    private static function registration_date(string $table, array $row): string
+    {
+        foreach (['fecha', 'cct_created', '_created'] as $column) {
+            $formatted = self::format_date(self::row_value($table, $row, [$column]));
+            if ($formatted !== '') return $formatted;
+        }
+        return 'No registrada';
+    }
+
+    private static function response_date(string $table, array $row): string
+    {
+        $formatted = self::format_date((string) ($row['_scm_responded_at'] ?? ''));
+        if ($formatted !== '') return $formatted;
+        foreach (['fecha_respuesta', 'fecha_respuesta_precat', 'fecha_respuesta_precap'] as $column) {
+            $formatted = self::format_date(self::row_value($table, $row, [$column]));
+            if ($formatted !== '') return $formatted;
+        }
+        return 'No registrada';
+    }
+
     private static function render_detail_modal(string $table, array $row, bool $is_control): void
     {
         $id = self::row_value($table, $row, ['_ID', 'id_precaptacion']);
@@ -446,6 +483,8 @@ final class LegacyPanel
 
         $modal_id = 'precaptaciones-detalle-modal-' . $id;
         $fields = [
+            'Fecha de registro' => self::registration_date($table, $row),
+            'Última respuesta' => self::response_date($table, $row),
             'Funcionario' => $is_control ? self::employee_name($employee_id) : '',
             'Ruta' => self::row_value($table, $row, ['ruta', 'numero_ruta']),
             'Barrio' => self::row_value($table, $row, ['barrio', 'sector']),
@@ -491,7 +530,7 @@ final class LegacyPanel
                     <?php foreach ([
                         'Inmueble y ubicación'=>['Tipo de inmueble','Categoria','Barrio','Direccion','Referencia','Ruta'],
                         'Información de contacto'=>['Contacto','Celular','Correo','Origen','Promocionado por','Competencia','PPH'],
-                        'Gestión comercial'=>['Funcionario','Observaciones','Resultado','Razon','Contactado','Merece tarea','Tiene tarea','Tarea','Seguimiento'],
+                        'Gestión comercial'=>['Fecha de registro','Última respuesta','Funcionario','Observaciones','Resultado','Razon','Contactado','Merece tarea','Tiene tarea','Tarea','Seguimiento'],
                     ] as $group => $labels): ?>
                     <section class="precap-detail-section"><h3><?php echo esc_html($group); ?></h3><dl class="precaptaciones-detalle">
                         <?php foreach ($labels as $label): $value = $fields[$label] ?? ''; if (trim((string) $value) === '') continue; ?>
@@ -1474,12 +1513,8 @@ final class LegacyPanel
             return 0;
         }
 
-        return (int) $wpdb->get_var(
-            "SELECT COUNT(*) FROM {$table}
-            WHERE {$column} IS NOT NULL
-                AND TRIM({$column}) <> ''
-                AND (TRIM({$column}) NOT LIKE 'a:%' OR {$column} LIKE '%s:0:\"\";%')"
-        );
+        $values = $wpdb->get_col("SELECT {$column} FROM {$table} WHERE {$column} IS NOT NULL AND TRIM({$column}) <> ''");
+        return count(array_filter($values, static fn($raw): bool => self::canonical_serialized_choice(trim((string) $raw)) !== (string) $raw));
     }
 
     private static function normalize_promocionado_por_values(string $table): array
@@ -1510,8 +1545,8 @@ final class LegacyPanel
 
         foreach ($rows ?: [] as $row) {
             $scanned++;
-            $raw = trim((string) ($row['raw_value'] ?? ''));
-            if ($raw === '') {
+            $raw = (string) ($row['raw_value'] ?? '');
+            if (trim($raw) === '') {
                 continue;
             }
 
@@ -1966,7 +2001,7 @@ final class LegacyPanel
     {
         $values = self::serialized_choice_values($raw);
 
-        return maybe_serialize($values ?: ['']);
+        return maybe_serialize($values);
     }
 
     private static function serialized_choice_values(string $raw): array
@@ -2065,7 +2100,7 @@ final class LegacyPanel
 
     private static function table_colspan(bool $is_control): int
     {
-        return $is_control ? 9 : 8;
+        return $is_control ? 10 : 9;
     }
 
     private static function preserve_query_args(array $exclude = []): void
@@ -2162,6 +2197,10 @@ final class LegacyPanel
             'active_filters' => self::active_filter_count($filters),
             'html' => $html,
             'metrics' => $metrics,
+            'normalization' => $is_control ? [
+                'promocionado'=>self::count_promocionado_por_por_normalizar($table),
+                'competencia'=>self::count_competencia_por_normalizar($table),
+            ] : [],
         ]);
     }
 
@@ -4047,6 +4086,14 @@ final class LegacyPanel
                         results.innerHTML = payload.data.html || "";
                         const metrics = panel.querySelector("[data-precap-metrics]");
                         if (metrics && payload.data.metrics) metrics.innerHTML = payload.data.metrics;
+                        Object.entries(payload.data.normalization || {}).forEach(([kind, count]) => {
+                            const button = panel.querySelector('[data-precaptaciones-normalizar-' + kind + ']');
+                            if (!button) return;
+                            button.dataset.count = String(count);
+                            button.disabled = Number(count) <= 0;
+                            const badge = button.closest('.precaptaciones__bulk').querySelector('[data-precaptaciones-bulk-count]');
+                            if (badge) badge.textContent = Number(count).toLocaleString('es-CO');
+                        });
                         enforceLockedActions(results);
                         updateActiveFilters(panel, Number(payload.data.active_filters || localActiveFilterCount(form)));
                         if (status) {
@@ -4152,6 +4199,10 @@ final class LegacyPanel
                                 if (!payload.success) {
                                     throw new Error(payload.data && payload.data.message ? payload.data.message : "No se pudo normalizar.");
                                 }
+                                normalizarPromocionadoButton.textContent = originalText;
+                                normalizarPromocionadoButton.dataset.count = String(payload.data.remaining || 0);
+                                normalizarPromocionadoButton.disabled = Number(payload.data.remaining || 0) <= 0;
+                                wrapper.querySelector('[data-precaptaciones-bulk-count]').textContent = String(payload.data.remaining || 0);
                                 if (message) {
                                     message.className = "precaptaciones__bulk-message is-success";
                                     message.textContent = payload.data.message || "Normalizacion completada.";
@@ -4204,6 +4255,10 @@ final class LegacyPanel
                                 if (!payload.success) {
                                     throw new Error(payload.data && payload.data.message ? payload.data.message : "No se pudo normalizar.");
                                 }
+                                normalizarCompetenciaButton.textContent = originalText;
+                                normalizarCompetenciaButton.dataset.count = String(payload.data.remaining || 0);
+                                normalizarCompetenciaButton.disabled = Number(payload.data.remaining || 0) <= 0;
+                                wrapper.querySelector('[data-precaptaciones-bulk-count]').textContent = String(payload.data.remaining || 0);
                                 if (message) {
                                     message.className = "precaptaciones__bulk-message is-success";
                                     message.textContent = payload.data.message || "Normalizacion completada.";

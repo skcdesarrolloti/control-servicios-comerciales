@@ -132,6 +132,35 @@ final class PrecaptacionTest extends TestCase
     self::assertMatchesRegularExpression('/precap-metric--pending.*?<strong>0<\/strong>/s', $html);
   }
 
+  public function testNormalizationLeavesEmptyChoicesCanonicalAndNoPendingCounts(): void
+  {
+    $this->db->update('wp_jet_cct_precaptaciones', ['competencia'=>serialize(['']),'promocionado_por'=>'Directo'], ['_ID'=>1]);
+    $table = 'wp_jet_cct_precaptaciones';
+    $normalize = new \ReflectionMethod(LegacyPanel::class, 'normalize_serialized_choice_values');
+    foreach (['promocionado_por','competencia'] as $column) {
+      $result = $normalize->invoke(null, $table, $column, $column);
+      self::assertSame('', $result['error']);
+      self::assertSame(1, $result['updated']);
+      self::assertSame(0, $result['remaining']);
+      self::assertSame(0, $normalize->invoke(null, $table, $column, $column)['updated']);
+    }
+    self::assertSame('a:0:{}', $this->db->getVar('SELECT competencia FROM wp_jet_cct_precaptaciones WHERE _ID = 1'));
+  }
+
+  public function testResponseDatesAreTransactionalAndDoNotReplaceRegistrationDate(): void
+  {
+    $dates = new \SCM\Precaptacion\ResponseDates($this->db);
+    $registered = $this->db->getVar('SELECT fecha FROM wp_jet_cct_precaptaciones WHERE _ID = 1');
+    $this->db->pdo()->beginTransaction(); $dates->record(1); $this->db->pdo()->rollBack();
+    self::assertSame([], $dates->forIds([1]));
+    $dates->record(1); $dates->record(1);
+    self::assertCount(1, $dates->forIds([1]));
+    $html = LegacyPanel::render_shortcode(['modo'=>'mis']);
+    self::assertStringContainsString('Última respuesta', $html);
+    self::assertStringContainsString('Fecha de registro', $html);
+    self::assertSame($registered, $this->db->getVar('SELECT fecha FROM wp_jet_cct_precaptaciones WHERE _ID = 1'));
+  }
+
   public function testPreparedQueriesHandleQuotedPlaceholdersAndUntrustedNames(): void
   {
     $adapter = new DatabaseAdapter($this->db);
