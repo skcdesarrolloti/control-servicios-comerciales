@@ -129,6 +129,21 @@ const { chromium } = require(process.argv[2] ? path.join(process.argv[2], 'playw
     await page.locator('#precaptaciones-detalle-modal-1').waitFor({state:'visible'});
     assert.equal(await page.locator('#precaptaciones-detalle-modal-1 .precap-history-entry').count(), 2);
     assert.ok((await page.locator('#precaptaciones-detalle-modal-1').innerText()).includes('No contestó'));
+    for (const viewport of [{width:1440,height:1000},{width:390,height:844}]) {
+      await page.setViewportSize(viewport);
+      const layout = await page.locator('#precaptaciones-detalle-modal-1').evaluate(modal => {
+        const panel = modal.querySelector('.precaptaciones-precap-modal__panel');
+        const body = modal.querySelector('.precap-detail-body');
+        const footer = modal.querySelector('.precaptaciones-precap-modal__footer');
+        const before = footer.getBoundingClientRect().top;
+        body.scrollTop = body.scrollHeight;
+        return {overflow:panel.scrollWidth > panel.clientWidth, footerMoved:footer.getBoundingClientRect().top !== before,
+          headerVisible:modal.querySelector('.precaptaciones-precap-modal__header').getBoundingClientRect().top >= 0,
+          footerVisible:footer.getBoundingClientRect().bottom <= window.innerHeight};
+      });
+      assert.deepEqual(layout, {overflow:false,footerMoved:false,headerVisible:true,footerVisible:true}, 'El detalle debe desplazar solo el contenido y mantener Cerrar visible');
+    }
+    await page.setViewportSize({width:1440,height:1000});
     await page.screenshot({path:'output/precaptacion-followup-detail.png'});
     await page.locator('#precaptaciones-detalle-modal-1 [data-precaptaciones-modal-close]').last().click();
     await page.locator('[data-precaptaciones-row-id="1"] .precaptaciones__editar').click();

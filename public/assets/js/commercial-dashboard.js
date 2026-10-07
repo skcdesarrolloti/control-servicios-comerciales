@@ -1812,16 +1812,6 @@
       exportVisibleTableToCsv("reporte_tareas_" + new Date().toISOString().slice(0, 10) + ".csv");
       notify("success", "Reporte descargado correctamente en formato CSV.");
     }
-    if (event.target.closest("#scm-footer-guide")) {
-      event.preventDefault();
-      var guideBtn = document.getElementById("scm-open-guide");
-      if (guideBtn) guideBtn.click();
-    }
-    if (event.target.closest("#scm-footer-permissions")) {
-      event.preventDefault();
-      var permBtn = document.getElementById("commercial-open-permissions");
-      if (permBtn) permBtn.click();
-    }
   });
 
   window.addEventListener("popstate", function () {

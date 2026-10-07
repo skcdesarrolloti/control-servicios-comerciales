@@ -543,25 +543,6 @@ final class CommercialDashboardView
     <?php endif; ?>
   </main>
 
-  <!-- Footer -->
-  <footer class="w-full bg-surface-container-low py-space-lg shadow-[0_1px_8px_rgba(0,0,0,0.04)]">
-    <div class="w-full px-margin flex flex-col md:flex-row items-center justify-between gap-space-md">
-      <div class="flex items-center gap-space-sm">
-        <div class="w-6 h-6 rounded-lg bg-primary-container flex items-center justify-center">
-          <span class="material-symbols-outlined text-on-surface text-[14px]">domain</span>
-        </div>
-        <span class="font-label-md text-label-md text-on-surface font-semibold">SuCasa Inmobiliaria</span>
-        <span class="text-on-surface-variant font-body-sm text-body-sm">— Plataforma de Gestión y Servicios Comerciales</span>
-      </div>
-      <div class="flex items-center gap-space-lg font-label-sm text-label-sm text-on-surface-variant">
-        <button type="button" class="hover:text-on-surface transition-colors cursor-pointer" id="scm-footer-guide">Soporte Operativo</button>
-        <?php if ($policy instanceof CommercialAccessPolicy && $policy->canManage()): ?>
-          <button type="button" class="hover:text-on-surface transition-colors cursor-pointer" id="scm-footer-permissions">Auditoría &amp; Accesos</button>
-        <?php endif; ?>
-        <span>© <?php echo esc_html(date('Y')); ?> SuCasa Inmobiliaria. Todos los derechos reservados.</span>
-      </div>
-    </div>
-  </footer>
   </div>
 
   <script src="<?php echo esc_url($baseUrl . '/assets/js/scm-admin.js?v=' . SCM_VERSION); ?>"></script>
