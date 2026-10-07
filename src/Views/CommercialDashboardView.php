@@ -4739,6 +4739,12 @@ final class CommercialDashboardView
             </div>
           </div>
 
+          <div class="flex flex-wrap items-center gap-space-sm">
+            <span class="font-label-sm text-secondary font-semibold">Vistas y acciones de todos los cargos:</span>
+            <button type="button" class="px-3 py-1.5 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface font-label-sm font-semibold transition-colors cursor-pointer" data-commercial-permissions-toggle="all" data-checked="true">Marcar todo</button>
+            <button type="button" class="px-3 py-1.5 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface font-label-sm font-semibold transition-colors cursor-pointer" data-commercial-permissions-toggle="all" data-checked="false">Desmarcar todo</button>
+          </div>
+
           <div class="grid grid-cols-1 md:grid-cols-2 gap-space-md">
             <?php foreach ($cargos as $cargo): ?>
               <?php $current = $permissions[$cargo['id']] ?? ['views' => array_keys(CommercialAccessPolicy::VIEWS), 'actions' => array_keys(CommercialAccessPolicy::ACTIONS)]; ?>
@@ -4746,6 +4752,10 @@ final class CommercialDashboardView
                 <div class="flex items-center justify-between pb-1 border-b border-surface-container">
                   <span class="font-label-md font-semibold text-on-surface"><?php echo esc_html($cargo['name']); ?></span>
                   <span class="font-label-sm text-secondary">ID <?php echo esc_html($cargo['id']); ?> (<?php echo esc_html((string) $cargo['total']); ?> activos)</span>
+                </div>
+                <div class="flex flex-wrap items-center gap-2 py-1">
+                  <button type="button" class="px-3 py-1.5 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface font-label-sm font-semibold transition-colors cursor-pointer" data-commercial-permissions-toggle="cargo" data-checked="true" aria-label="Marcar todas las vistas y acciones de <?php echo esc_attr($cargo['name']); ?>">Marcar todo</button>
+                  <button type="button" class="px-3 py-1.5 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface font-label-sm font-semibold transition-colors cursor-pointer" data-commercial-permissions-toggle="cargo" data-checked="false" aria-label="Desmarcar todas las vistas y acciones de <?php echo esc_attr($cargo['name']); ?>">Desmarcar todo</button>
                 </div>
                 <label class="flex items-center gap-2 py-1 cursor-pointer">
                   <input type="checkbox" name="admin_cargos[]" value="<?php echo esc_attr($cargo['id']); ?>"<?php checked(isset($adminCargoIds[$cargo['id']])); ?> class="rounded text-primary focus:ring-primary">

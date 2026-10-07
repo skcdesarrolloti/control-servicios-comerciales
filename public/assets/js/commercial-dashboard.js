@@ -1631,6 +1631,18 @@
     });
   }
   if (permissionForm) {
+    permissionForm.addEventListener("click", function (event) {
+      var toggle = event.target.closest("[data-commercial-permissions-toggle]");
+      if (!toggle) return;
+      var scope = toggle.getAttribute("data-commercial-permissions-toggle") === "cargo"
+        ? toggle.closest("[data-cargo]")
+        : permissionForm;
+      if (!scope) return;
+      var checked = toggle.getAttribute("data-checked") === "true";
+      scope.querySelectorAll('input[type="checkbox"][name^="permissions["]').forEach(function (checkbox) {
+        checkbox.checked = checked;
+      });
+    });
     permissionForm.addEventListener("change", function (event) {
       var master = event.target.closest(".commercial-permission-master");
       if (master && event.target.matches('input[name="admin_cargos[]"]')) {
