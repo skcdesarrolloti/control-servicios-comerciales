@@ -232,6 +232,133 @@ final class PrecaptacionTest extends TestCase
     Module::history()->validate(['resultado_contacto'=>'no_contesto','merece_ticket'=>'Si']);
   }
 
+  private function callInput(string $outcome = 'no_contesto'): array
+  {
+    return ['tipo_gestion'=>'llamada','resultado_contacto'=>$outcome,'merece_ticket'=>'Seguir llamando','resultado'=>'Gestión de prueba',
+      'proximo_contacto'=>(new \DateTimeImmutable('+1 day'))->format('Y-m-d\TH:i')];
+  }
+
+  public function testThreeRealUnansweredCallsCloseTheRecordAndReopeningKeepsHistory(): void
+  {
+    $row = $this->db->getRow('SELECT * FROM wp_jet_cct_precaptaciones WHERE _ID = 1');
+    $workflow = Module::workflow();
+    foreach ([1,2,3] as $attempt) {
+      $data = $workflow->apply($row, $this->callInput());
+      self::assertSame($attempt, (int) $workflow->get(1)['unanswered']);
+      self::assertSame($attempt === 3 ? 'cerrada' : 'no_contesto', $data['state']);
+    }
+    self::assertNull(Module::history()->latest(1)['next_contact_at']);
+    self::assertSame('Sin contacto: 3 intentos agotados', $workflow->get(1)['closure_reason']);
+    self::assertSame(0, $workflow->summary('101')['pendientes']);
+    try { $workflow->apply($row, $this->callInput()); self::fail('Permitió un cuarto intento sin reapertura.'); }
+    catch (\InvalidArgumentException $exception) { self::assertNotEmpty($exception->getMessage()); }
+    $workflow->administrative($row, 'reabrir', 'Nuevo teléfono confirmado');
+    self::assertSame(2, (int) $workflow->get(1)['cycle']);
+    self::assertSame(0, (int) $workflow->get(1)['unanswered']);
+    self::assertCount(4, Module::history()->entries(1));
+  }
+
+  public function testAdministrativeEditsDoNotConsumeAttemptsAndAnsweredCallsResetTheCounter(): void
+  {
+    $row = $this->db->getRow('SELECT * FROM wp_jet_cct_precaptaciones WHERE _ID = 1');
+    $workflow = Module::workflow();
+    $workflow->apply($row, $this->callInput());
+    $workflow->apply($row, ['tipo_gestion'=>'administrativa','resultado_contacto'=>'por_llamar','merece_ticket'=>'No','resultado'=>'Actualizó dirección']);
+    self::assertSame(1, (int) $workflow->get(1)['attempts']);
+    self::assertSame(1, (int) $workflow->get(1)['unanswered']);
+    self::assertSame('no_contesto', $workflow->get(1)['status']);
+    $workflow->apply($row, $this->callInput('contactado'));
+    self::assertSame(0, (int) $workflow->get(1)['unanswered']);
+    self::assertSame('seguimiento', $workflow->get(1)['status']);
+  }
+
+  public function testAssignmentChangesTheCallersScopeAndHomeTotalsStayPersonal(): void
+  {
+    $row = $this->db->getRow('SELECT * FROM wp_jet_cct_precaptaciones WHERE _ID = 1');
+    Module::workflow()->administrative($row, 'asignar', 'Asignación al consultor', '202');
+    self::assertSame(0, Module::workflow()->summary('101')['total']);
+    self::assertSame(2, Module::workflow()->summary('202')['total']);
+    self::assertSame(2, Module::workflow()->summary()['total']);
+    try { Module::authorizeRecord($row); self::fail('El captador accedió a una gestión asignada a otro consultor.'); }
+    catch (\RuntimeException $exception) { self::assertNotEmpty($exception->getMessage()); }
+    $_SESSION['scm_employee_id'] = '202';
+    Module::authorizeRecord($row);
+    $html = LegacyPanel::render_shortcode(['modo'=>'mis']);
+    self::assertStringContainsString('data-precaptaciones-row-id="1"', $html);
+  }
+
+  public function testApprovedOpportunitiesAppearAsPendingTasksAndConvertedRecordsLeaveTheAgenda(): void
+  {
+    $row = $this->db->getRow('SELECT * FROM wp_jet_cct_precaptaciones WHERE _ID = 1');
+    $input = $this->callInput('contactado'); $input['merece_ticket'] = 'Si'; $input['proximo_contacto'] = '';
+    Module::workflow()->apply($row, $input);
+    self::assertSame(1, Module::workflow()->summary('101')['pendiente_tarea']);
+    $this->db->insert('wp_jet_cct_tickets', ['_ID'=>25,'estado_comercial'=>'Captado']);
+    Module::workflow()->converted($row, 25);
+    self::assertSame(0, Module::workflow()->summary('101')['pendientes']);
+    self::assertSame(1, Module::workflow()->summary('101')['convertidas']);
+    self::assertSame('Captado', Module::workflow()->task($row)['estado_comercial']);
+  }
+
+  public function testDuplicateDetectionRequiresBothPhoneAndAddress(): void
+  {
+    $this->db->update('wp_jet_cct_precaptaciones', ['direccion'=>'Calle Águila 10','indicativo'=>'57'], ['_ID'=>1]);
+    self::assertSame(1, $this->repository->duplicate(['celular'=>'3001234567','direccion'=>' calle aguila   10 ','indicativo'=>'57']));
+    self::assertSame(0, $this->repository->duplicate(['celular'=>'3001234567','direccion'=>'Otro inmueble','indicativo'=>'57']));
+  }
+
+  public function testHomeRepositoryRespectsAssignmentAdminScopeAndDeniedAccess(): void
+  {
+    $repository = new \SCM\Commercial\CommercialTicketsRepository($this->db);
+    $method = new \ReflectionMethod($repository, 'precaptationsSummary');
+    Module::workflow()->administrative($this->db->getRow('SELECT * FROM wp_jet_cct_precaptaciones WHERE _ID = 1'), 'asignar', 'Reparto', '202');
+    $summary = $method->invoke($repository, ['id_empleado'=>'202'], Module::policy());
+    self::assertSame('personal', $summary['scope']);
+    self::assertSame(0, $summary['total'], 'El filtro global no amplía el alcance del consultor.');
+    $_SESSION['scm_user_cargo'] = '13';
+    $summary = $method->invoke($repository, ['id_empleado'=>'101'], Module::policy());
+    self::assertSame('global', $summary['scope']);
+    self::assertSame(2, $summary['total']);
+    $_SESSION['scm_user_cargo'] = '9';
+    $this->db->update('wp_jet_cct_confi_sistema', ['valor'=>json_encode(['commercial_admin_cargos'=>['13'],'commercial_permissions'=>['9'=>['views'=>['inicio'],'actions'=>[]]]], JSON_THROW_ON_ERROR)], ['funcion'=>'control_servicios_config']);
+    $settings = new Settings($this->db);
+    $policy = new \SCM\Commercial\CommercialAccessPolicy($settings, $this->db, ['13']);
+    self::assertFalse($method->invoke($repository, [], $policy)['available']);
+  }
+
+  public function testHistoricalResponsesStayPendingWithoutInventedAttempts(): void
+  {
+    $this->db->update('wp_jet_cct_precaptaciones', ['merece_ticket'=>'Seguir llamando','contactado'=>'Si','resultado'=>'Solicita llamada'], ['_ID'=>1]);
+    $summary = Module::workflow()->summary('101');
+    self::assertSame(1, $summary['pendientes']);
+    self::assertSame(0, $summary['vencidas'], 'Sin una cita guardada no se inventa un vencimiento.');
+    $process = Module::workflow()->ensure($this->db->getRow('SELECT * FROM wp_jet_cct_precaptaciones WHERE _ID = 1'));
+    self::assertSame('seguimiento', $process['status']);
+    self::assertSame(0, $process['attempts']);
+    self::assertSame(0, $process['unanswered']);
+    $filters = new \ReflectionMethod(LegacyPanel::class, 'read_filters');
+    $query = new \ReflectionMethod(LegacyPanel::class, 'query_precaptaciones');
+    $result = $query->invoke(null, 'wp_jet_cct_precaptaciones', $filters->invoke(null, ['precaptaciones_pendientes'=>'1']), false, 10, 1);
+    self::assertSame($summary['pendientes'], $result['total']);
+  }
+
+  public function testUpcomingCallsAndTasklessHistoricalApprovalsMatchHomeFilters(): void
+  {
+    $row = $this->db->getRow('SELECT * FROM wp_jet_cct_precaptaciones WHERE _ID = 1');
+    Module::workflow()->apply($row, $this->callInput('contactado'));
+    $this->db->update(Module::history()->table(), ['next_contact_at'=>date('Y-m-d H:i:s', time()+3600)], ['precaptacion_id'=>1]);
+    self::assertSame(1, Module::workflow()->summary('101')['por_vencer']);
+    $filters = new \ReflectionMethod(LegacyPanel::class, 'read_filters');
+    $query = new \ReflectionMethod(LegacyPanel::class, 'query_precaptaciones');
+    $result = $query->invoke(null, 'wp_jet_cct_precaptaciones', $filters->invoke(null, ['precaptaciones_agenda'=>'proximas']), false, 10, 1);
+    self::assertSame(1, $result['total']);
+    $this->db->update('wp_jet_cct_precaptaciones', ['merece_ticket'=>'Si','contactado'=>'Si'], ['_ID'=>2]);
+    self::assertSame(1, Module::workflow()->summary('202')['pendiente_tarea']);
+    $_SESSION['scm_employee_id'] = '202';
+    $result = $query->invoke(null, 'wp_jet_cct_precaptaciones', $filters->invoke(null, ['precaptaciones_estado_contacto'=>'pendiente_tarea']), false, 10, 1);
+    self::assertSame(1, $result['total']);
+  }
+
   public function testCallAgendaOnlyIncludesScheduledUntaskedRecordsAndDetectsOverdueCalls(): void
   {
     $history = Module::history();

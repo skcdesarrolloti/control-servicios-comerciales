@@ -33,6 +33,7 @@ final class PrecaptacionDatabase
     $db = new Database($pdo);
     if ((int) $db->getVar('SELECT COUNT(*) FROM wp_jet_cct_funcionarios') > 0) return $db;
     $db->insert('wp_jet_cct_funcionarios', ['_ID'=>1,'id_empleado'=>'101','nombre'=>'Funcionario de prueba','activo'=>'Si','correo'=>'test@example.test','id_cargo'=>'9','pais'=>'Colombia','ciudad'=>'Medellín','sucursal'=>'Principal']);
+    $db->insert('wp_jet_cct_funcionarios', ['_ID'=>2,'id_empleado'=>'202','nombre'=>'Segundo consultor','activo'=>'Si','correo'=>'other@example.test','id_cargo'=>'9','pais'=>'Colombia','ciudad'=>'Medellín','sucursal'=>'Principal']);
     $db->insert('wp_jet_cct_cargos', ['_ID'=>9,'nombre_cargo'=>'Consultor de Arriendo']);
     $db->insert('wp_jet_cct_confi_sistema', ['funcion'=>'control_servicios_config','valor'=>json_encode(['commercial_admin_cargos'=>['13'],'commercial_permissions'=>['9'=>['views'=>['precaptacion'],'actions'=>['precaptacion_crear','precaptacion_editar','precaptacion_ticket','precaptacion_catalogos']]]], JSON_THROW_ON_ERROR)]);
     $db->insert('wp_jet_cct_barrios', ['barrio'=>'El Poblado','pais'=>'Colombia','ciudad'=>'Medellín','latitud'=>'6.21','longitud'=>'-75.56','codigo_postal'=>'050021','ruta_asignada'=>'Ruta 1']);

@@ -94,11 +94,11 @@ final class CommercialApiController
     $tabCounts['mis_tickets'] = (int) ($myTabCounts['mis_tickets'] ?? 0);
     $html = '';
     if ($bucket === 'precaptacion') {
-      $html = CommercialDashboardView::renderPrecaptacion($this->baseUrl);
+      $html = CommercialDashboardView::renderPrecaptacion($this->baseUrl, $input);
     } elseif ($bucket === 'inicio') {
       $result = $this->tickets->search('abiertos', $filters);
       $html = CommercialDashboardView::renderHome(
-        $this->tickets->homeDashboard($globalCountFilters),
+        $this->tickets->homeDashboard($globalCountFilters, $this->policy),
         $filters,
         $this->policy,
         $this->baseUrl,

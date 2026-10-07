@@ -452,7 +452,7 @@ final class CommercialTicketsRepository
    * @param array<string,mixed> $filters
    * @return array<string,mixed>
    */
-  public function homeDashboard(array $filters = []): array
+  public function homeDashboard(array $filters = [], ?CommercialAccessPolicy $policy = null): array
   {
     $scopedFilters = $this->globalHomeFilters($filters);
     $openSlaRows = $this->openSlaRows($scopedFilters, true);
@@ -462,7 +462,7 @@ final class CommercialTicketsRepository
     $ticketPulse = $this->commercialTicketPulse($scopedFilters);
     $updateHealth = $this->commercialTicketUpdateHealth($scopedFilters);
     $quotes = $this->commercialQuotesSummary($scopedFilters);
-    $precaptations = $this->precaptationsSummary($scopedFilters);
+    $precaptations = $this->precaptationsSummary($scopedFilters, $policy);
     $properties = $this->propertiesSummary($scopedFilters);
     $signs = $this->signsSummary($scopedFilters);
 
@@ -844,37 +844,14 @@ final class CommercialTicketsRepository
   }
 
   /** @param array<string,mixed> $filters @return array<string,mixed> */
-  private function precaptationsSummary(array $filters): array
+  private function precaptationsSummary(array $filters, ?CommercialAccessPolicy $policy = null): array
   {
-    $table = $this->db->table('jet_cct_precaptaciones');
-    if (!$this->schema->tableExists($table)) {
-      return ['available' => false, 'total' => 0, 'hoy' => 0, 'mes' => 0, 'contactadas' => 0, 'sin_tarea' => 0];
-    }
-
-    [$where, $args] = $this->employeeWhereForAlias($filters, 'p', ['id_empleado']);
-    $where = $where ?: ['1=1'];
-    $todayStart = strtotime(date('Y-m-d 00:00:00')) ?: time();
-    $monthStart = strtotime(date('Y-m-01 00:00:00')) ?: $todayStart;
-    $row = $this->db->getRow(
-      "SELECT
-          COUNT(1) AS total,
-          SUM(CASE WHEN COALESCE(NULLIF(p.`fecha`, 0), UNIX_TIMESTAMP(p.`cct_created`), 0) >= ? THEN 1 ELSE 0 END) AS hoy,
-          SUM(CASE WHEN COALESCE(NULLIF(p.`fecha`, 0), UNIX_TIMESTAMP(p.`cct_created`), 0) >= ? THEN 1 ELSE 0 END) AS mes,
-          SUM(CASE WHEN LOWER(TRIM(COALESCE(p.`contactado`, ''))) IN ('si', 'sí', '1') THEN 1 ELSE 0 END) AS contactadas,
-          SUM(CASE WHEN TRIM(COALESCE(p.`id_ticket`, '')) = '' AND TRIM(COALESCE(p.`id_ticket_asignado`, '')) = '' THEN 1 ELSE 0 END) AS sin_tarea
-         FROM `{$table}` p
-        WHERE " . implode(' AND ', $where),
-      array_merge([$todayStart, $monthStart], $args)
-    ) ?: [];
-
-    return [
-      'available' => true,
-      'total' => (int) ($row['total'] ?? 0),
-      'hoy' => (int) ($row['hoy'] ?? 0),
-      'mes' => (int) ($row['mes'] ?? 0),
-      'contactadas' => (int) ($row['contactadas'] ?? 0),
-      'sin_tarea' => (int) ($row['sin_tarea'] ?? 0),
-    ];
+    $policy ??= new CommercialAccessPolicy(new \SCM\Core\Settings($this->db), $this->db, ['11','12','13','14']);
+    if (!$policy->canView('precaptacion')) return ['available'=>false];
+    if (!$policy->canManage() && Auth::employeeId() === '') return ['available'=>false];
+    $history = new \SCM\Precaptacion\ManagementHistory($this->db);
+    $workflow = new \SCM\Precaptacion\Workflow($this->db, $history);
+    return $workflow->summary($policy->canManage() ? '' : Auth::employeeId());
   }
 
   /** @param array<string,mixed> $filters @return array<string,mixed> */
@@ -1129,7 +1106,7 @@ final class CommercialTicketsRepository
     $push('danger', 'Retoques de aviso vencidos', 'Hay inmuebles con aviso instalado que ya necesitan retoque.', $this->homeUrl(['tab' => 'avisos', 'estado_aviso' => 'Vencido'], $filters), 'Abrir retoques', (int) ($signs['retoque_vencido'] ?? 0));
     $push('warning', 'Retoques de aviso por vencer', 'Algunos avisos están entrando en ventana de retoque.', $this->homeUrl(['tab' => 'avisos', 'estado_aviso' => 'Alerta'], $filters), 'Abrir avisos', (int) ($signs['retoque_alerta'] ?? 0));
     $push('danger', 'Avisos nuevos atrasados', 'Hay inmuebles que pidieron aviso y siguen pendientes por instalación.', $this->homeUrl(['tab' => 'avisos', 'estado_aviso' => 'Atrasado'], $filters), 'Abrir nuevos', (int) ($signs['instalacion_atrasada'] ?? 0));
-    $push('warning', 'Precaptaciones sin tarea', 'Hay precaptaciones que todavía no tienen tarea asociada.', $this->homeUrl(['tab' => 'abiertos', 'estado' => 'Prospectado'], $filters), 'Convertir', (int) ($precaptations['sin_tarea'] ?? 0));
+    $push('warning', 'Precaptaciones por gestionar', 'Hay llamadas o tareas de precaptación pendientes de gestionar.', $this->homeUrl(['tab' => 'precaptacion'], $filters), 'Gestionar', (int) ($precaptations['pendientes'] ?? 0));
     $push('warning', 'Cotizaciones sin tarea', 'Existen cotizaciones comerciales sin tarea asociada para seguimiento.', $this->homeUrl(['tab' => 'abiertos', 'estado' => 'En cierre'], $filters), 'Revisar', (int) ($quotes['sin_tarea'] ?? 0));
 
     return array_slice($alerts, 0, 8);

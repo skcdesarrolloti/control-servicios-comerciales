@@ -608,6 +608,7 @@
       "fecha_hasta",
       "sla_filter",
       "property_subtab",
+      "precaptaciones_estado_contacto", "precaptaciones_agenda", "precaptaciones_pendientes", "precaptaciones_id", "abrir",
       "tipo_inmueble",
       "tipo_negocio",
       "ciudad",

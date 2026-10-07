@@ -266,4 +266,22 @@
       form.closest("dialog").close();
     });
   });
+  document.addEventListener('submit', async function (event) {
+    var form = event.target.closest('[data-precap-process-form]');
+    if (!form) return;
+    event.preventDefault();
+    var button = form.querySelector('[type="submit"]');
+    var message = form.querySelector('[data-process-message]');
+    button.disabled = true;
+    try {
+      var response = await fetch(body.dataset.precapApi, {method:'POST',credentials:'same-origin',body:new FormData(form)});
+      var payload = await response.json();
+      if (!response.ok || !payload.success) throw new Error(payload.data?.message || 'No se pudo actualizar el proceso.');
+      await window.PrecapUI.fire({icon:'success',title:'Proceso actualizado',text:payload.data.message});
+      var modal = form.closest('.precaptaciones-precap-modal');
+      modal.hidden = true; document.body.classList.remove('precaptaciones-precap-modal-open');
+      document.querySelector('[data-precaptaciones-filters]').dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));
+    } catch (error) { message.textContent = error.message; }
+    finally { button.disabled = false; }
+  });
 })();

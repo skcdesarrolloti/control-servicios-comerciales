@@ -78,7 +78,7 @@ final class CommercialDashboardController
     $myTabCounts = $repository->bucketCounts(['id_empleado' => $currentEmployeeFilter]);
     $tabCounts['mis_tickets'] = (int) ($myTabCounts['mis_tickets'] ?? 0);
     $result = in_array($bucket, ['actualizaciones', 'avisos', 'calendario', 'inmuebles', 'notificaciones', 'precaptacion'], true) ? ['rows' => [], 'counts' => $repository->statusCounts($filters), 'pagination' => []] : $repository->search($bucket === 'inicio' ? 'abiertos' : $bucket, $filters);
-    $homeDashboard = $repository->homeDashboard($globalCountFilters);
+    $homeDashboard = $repository->homeDashboard($globalCountFilters, $policy);
     $canSeeAll = $policy->canSeeAllCommercialTickets();
     $propertiesRepository = new CommercialPropertiesRepository($this->db);
     $propertyFilters = $this->propertyFilters($input, !$canSeeAll);

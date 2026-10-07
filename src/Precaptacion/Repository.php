@@ -163,6 +163,8 @@ final class Repository
 
   public function create(array $data, array $photos): int
   {
+    $duplicate = $this->duplicate($data);
+    if ($duplicate > 0) throw new \InvalidArgumentException('Ya existe la precaptación #' . $duplicate . ' con el mismo teléfono y dirección. Gestiona ese registro o solicita su reapertura.');
     if ($photos === [] || count($photos) > 2) throw new \InvalidArgumentException('Adjunta una o dos fotografías válidas.');
     if (Auth::employeeId() === '') throw new \RuntimeException('Tu usuario no tiene un identificador de empleado configurado.');
     $employee = $this->employee();
@@ -171,6 +173,15 @@ final class Repository
       if (!in_array($field, $this->columns('jet_cct_precaptaciones'), true)) throw new \RuntimeException('La tabla de precaptaciones no contiene el campo requerido: ' . $field);
     }
     return $this->insert('jet_cct_precaptaciones', $data);
+  }
+
+  public function duplicate(array $data): int
+  {
+    $address = self::normalizeName((string) ($data['direccion'] ?? ''));
+    if ($address === '') return 0;
+    $rows = $this->db->getResults('SELECT _ID, direccion, indicativo FROM `' . $this->db->table('jet_cct_precaptaciones') . '` WHERE celular = ?', [(string) ($data['celular'] ?? '')]);
+    foreach ($rows as $row) if (self::normalizeName((string) ($row['direccion'] ?? '')) === $address && (string) ($row['indicativo'] ?? '') === (string) ($data['indicativo'] ?? '')) return (int) $row['_ID'];
+    return 0;
   }
 
   private function insert(string $name, array $data): int

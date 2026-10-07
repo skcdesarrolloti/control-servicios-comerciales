@@ -20,6 +20,7 @@ final class Module
   private static Csrf $csrf;
   private static array $emails = [];
   private static ManagementHistory $history;
+  private static Workflow $workflow;
 
   public static function init(Database $db, Settings $settings, Csrf $csrf, array $config): void
   {
@@ -30,10 +31,12 @@ final class Module
     require_once __DIR__ . '/LegacyPanel.php';
     $GLOBALS['wpdb'] = new DatabaseAdapter($db);
     self::$history = new ManagementHistory($db);
+    self::$workflow = new Workflow($db, self::$history);
   }
 
   public static function db(): Database { return self::$database; }
   public static function history(): ManagementHistory { return self::$history; }
+  public static function workflow(): Workflow { return self::$workflow; }
   public static function policy(): CommercialAccessPolicy { return self::$access; }
   public static function nonce(): string { return $_SESSION['scm_csrf']['precaptacion_nonce'] ?? self::$csrf->token('precaptacion_nonce'); }
   public static function verify(string $nonce): void
@@ -77,7 +80,7 @@ final class Module
   public static function authorizeRecord(array $row): void
   {
     if ($row === []) throw new \InvalidArgumentException('Precaptación no encontrada.');
-    if (!self::policy()->canManage() && (Auth::employeeId() === '' || (string) ($row['id_empleado'] ?? $row['cct_author_id'] ?? '') !== Auth::employeeId())) {
+    if (!self::policy()->canManage() && (Auth::employeeId() === '' || self::workflow()->responsible($row) !== Auth::employeeId())) {
       throw new \RuntimeException('No tienes permiso para modificar esta precaptación.');
     }
   }
@@ -91,6 +94,22 @@ final class Module
     }
     if ($action === 'precaptaciones_exportar') LegacyPanel::export_csv($input);
     $repository = new Repository(self::db());
+    if (in_array($action, ['precaptaciones_reabrir','precaptaciones_asignar','precaptaciones_cerrar'], true)) {
+      if (!self::policy()->canManage()) JsonResponse::error('Esta acción requiere acceso administrativo.', 403);
+      self::db()->pdo()->beginTransaction();
+      $lock = self::db()->pdo()->getAttribute(\PDO::ATTR_DRIVER_NAME) === 'mysql' ? ' FOR UPDATE' : '';
+      $row = self::db()->getRow('SELECT * FROM `' . self::db()->table('jet_cct_precaptaciones') . '` WHERE _ID = ?' . $lock, [(int) ($input['id_precaptacion'] ?? 0)]) ?? [];
+      self::authorizeRecord($row);
+      if (LegacyPanel::row_has_ticket(self::db()->table('jet_cct_precaptaciones'), $row)) throw new \InvalidArgumentException('Gestiona el registro desde su tarea vinculada.');
+      $responsible = (string) ($input['responsable'] ?? '');
+      if ($action === 'precaptaciones_asignar' && (self::employee($responsible)['activo'] ?? '') !== 'Si') throw new \InvalidArgumentException('Selecciona un funcionario activo.');
+      $cargo = (string) (self::employee($responsible)['id_cargo'] ?? '');
+      $permissions = self::policy()->permissions();
+      if ($action === 'precaptaciones_asignar' && isset($permissions[$cargo]) && !in_array($cargo, self::policy()->adminCargoIds(), true) && (!in_array('precaptacion', $permissions[$cargo]['views'], true) || !in_array('precaptacion_editar', $permissions[$cargo]['actions'], true))) throw new \InvalidArgumentException('Ese cargo no tiene permisos para gestionar precaptaciones.');
+      self::workflow()->administrative($row, substr($action, strlen('precaptaciones_')), (string) ($input['motivo'] ?? ''), $responsible);
+      if ($action === 'precaptaciones_reabrir') self::db()->update(self::db()->table('jet_cct_precaptaciones'), ['merece_ticket'=>'','contactado'=>'No'], ['_ID'=>$row['_ID']]);
+      self::commit(); JsonResponse::success(['message'=>'Proceso actualizado correctamente.']);
+    }
     if ($action === 'precaptacion_catalog_create') {
       if (!self::policy()->canAct('precaptacion_catalogos')) JsonResponse::error('No tienes permiso para crear barrios o inmobiliarias.', 403);
       $result = $repository->createCatalog((string) ($input['kind'] ?? ''), $input);
@@ -99,13 +118,16 @@ final class Module
     if ($action === 'precaptacion_create') {
       if (!self::policy()->canAct('precaptacion_crear')) JsonResponse::error('No tienes permiso para registrar precaptaciones.', 403);
       $data = $repository->validate($input);
+      if ($repository->duplicate($data) > 0) throw new \InvalidArgumentException('Ya existe una precaptación con ese teléfono y dirección. Gestiona el registro existente o solicita su reapertura.');
       $sizes = (array) ($_FILES['fotos']['size'] ?? []);
       if (count($sizes) > 2 || array_filter($sizes, static fn($size): bool => (int) $size > 10485760)) {
         throw new \InvalidArgumentException('Adjunta una o dos fotografías de hasta 10 MB cada una.');
       }
       $photos = StoredFileService::fromRuntime()->storeImages('fotos', 2);
       if (count($photos) !== count($sizes)) throw new \InvalidArgumentException('No se pudieron recibir todas las fotografías. Verifica su formato y tamaño.');
+      self::db()->pdo()->beginTransaction();
       $id = $repository->create($data, $photos);
+      self::workflow()->ensure(self::db()->getRow('SELECT * FROM `' . self::db()->table('jet_cct_precaptaciones') . '` WHERE _ID = ?', [$id]) ?? []);
       self::notifyCreated($id, $data);
       self::commit();
       JsonResponse::success(['id'=>$id,'message'=>'Precaptación registrada correctamente.']);
@@ -127,10 +149,8 @@ final class Module
       if (!self::policy()->canAct($permission)) JsonResponse::error('No tienes permiso para realizar esta acción.', 403);
       if ($action === 'precaptaciones_actualizar') {
         if (!in_array($input['merece_ticket'] ?? '', ['Si','No','Seguir llamando'], true)) throw new \InvalidArgumentException('Indica si merece tarea o si debes seguir llamando.');
-        $management = self::history()->validate($input);
-        $input['contactado'] = $management['outcome'] === 'contactado' ? 'Si' : 'No';
         if (in_array(Repository::normalizeName((string) ($input['razones'] ?? '')), ['ticket creado','tarea creada'], true)) throw new \InvalidArgumentException('La razón Tarea creada se asigna al crear la tarea.');
-        if ($input['merece_ticket'] === 'Si' && !self::policy()->canAct('precaptacion_ticket')) JsonResponse::error('No tienes permiso para crear tareas desde precaptación.', 403);
+        if (($input['tipo_gestion'] ?? '') !== 'administrativa' && $input['merece_ticket'] === 'Si' && !self::policy()->canAct('precaptacion_ticket')) JsonResponse::error('No tienes permiso para crear tareas desde precaptación.', 403);
         $input['fecha'] = time();
       }
       if (str_contains($action, 'normalizar') || str_contains($action, 'marcar_')) {
@@ -158,15 +178,24 @@ final class Module
           }
           // Preserve omitted contact fields, rather than erasing them on partial requests.
           foreach (['contacto','correo','celular','razones','resultado'] as $field) $input[$field] = $input[$field] ?? $row[$field] ?? '';
-          self::history()->record((int) $input['id_precaptacion'], $management, $input);
+          $management = self::workflow()->apply($row, $input);
+          $input['contactado'] = $management['outcome'] === 'contactado' ? 'Si' : 'No';
+          $input['merece_ticket'] = $management['merit'];
         }
         foreach (['origen','id_pph','bandera'] as $field) $input[$field] = $row[$field] ?? '';
         if ($action === 'precaptaciones_actualizar' && !self::policy()->canManage()) $input['id_empleado'] = Auth::employeeId();
         if ($action === 'precaptaciones_crear_ticket') {
           if (($row['merece_ticket'] ?? '') !== 'Si') wp_send_json_error(['message'=>'Guarda primero un resultado que merezca tarea.'], 409);
+          $latest = self::history()->latest((int) $row['_ID']);
+          if (!$latest || $latest['outcome'] !== 'contactado' || (self::workflow()->get((int) $row['_ID'])['status'] ?? '') !== 'pendiente_tarea') throw new \InvalidArgumentException('Registra un contacto confirmado y aprueba la creación de tarea primero.');
           $assigned = self::employee((string) ($input['asignado'] ?? $input['id_empleado'] ?? Auth::employeeId()));
           if (($assigned['activo'] ?? '') !== 'Si') wp_send_json_error(['message'=>'Selecciona un funcionario activo.'], 422);
+          // Preserve the existing medium/origin while deriving identity from the saved record.
+          foreach (['solicitante'=>'contacto','correo_solicitante'=>'correo','celular_solicitante'=>'celular','medio'=>'origen','tipo_inmueble'=>'tipo_inmueble','destinacion'=>'categoria'] as $target => $source) $input[$target] = $row[$source] ?? '';
+          $input['tema_ayuda'] = 'Captacion';
+          if (trim((string) $input['solicitante']) === '' || trim((string) $input['celular_solicitante']) === '' || trim((string) ($input['asunto'] ?? '')) === '' || trim((string) ($input['descripcion'] ?? '')) === '') throw new \InvalidArgumentException('Completa contacto, celular, asunto y descripción de la tarea.');
         }
+        if (in_array($action, ['precaptaciones_marcar_duplicada','precaptaciones_marcar_sin_informacion'], true)) self::workflow()->administrative($row, 'cerrar', $action === 'precaptaciones_marcar_duplicada' ? 'Duplicada' : 'Sin información');
         if (in_array($action, ['precaptaciones_actualizar','precaptaciones_marcar_duplicada','precaptaciones_marcar_sin_informacion'], true)) {
           if (array_key_exists('cct_modified', $row)) {
             self::db()->update(self::db()->table('jet_cct_precaptaciones'), ['cct_modified'=>current_time('mysql')], ['_ID'=>(int) $input['id_precaptacion']]);

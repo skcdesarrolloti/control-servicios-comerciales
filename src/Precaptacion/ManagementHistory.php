@@ -24,6 +24,16 @@ final class ManagementHistory
             next_contact_at VARCHAR(19) NULL {$index}
         )" . ($sqlite ? '' : ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4'));
         if ($sqlite) $db->pdo()->exec("CREATE INDEX IF NOT EXISTS precap_latest ON `{$table}` (precaptacion_id, id)");
+        $columns = (new DatabaseAdapter($db))->get_col('DESCRIBE ' . $table);
+        foreach (['event_type'=>"VARCHAR(30) NOT NULL DEFAULT 'historica'",'cycle'=>'INTEGER NOT NULL DEFAULT 0','attempt_number'=>'INTEGER NOT NULL DEFAULT 0'] as $column => $type) {
+            if (!in_array($column, $columns, true)) {
+                try { $db->pdo()->exec("ALTER TABLE `{$table}` ADD COLUMN `{$column}` {$type}"); }
+                catch (\PDOException $exception) {
+                    // Another request may have completed the same additive migration.
+                    if (!in_array($column, (new DatabaseAdapter($db))->get_col('DESCRIBE ' . $table), true)) throw $exception;
+                }
+            }
+        }
     }
 
     public function table(): string { return $this->db->table('scm_precaptacion_gestiones'); }

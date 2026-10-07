@@ -122,9 +122,9 @@ final class LegacyPanel
                 </div>
             </header>
             <div class="precap-metrics" data-precap-metrics><?php self::render_metrics($table, $filters, $is_control); ?></div>
-            <nav class="precap-contact-tabs" aria-label="Filtrar por contacto"><?php foreach ([''=>'Todos','por_llamar'=>'Por llamar','no_contesto'=>'No contestó','contactado'=>'Contactados','seguimiento'=>'En seguimiento'] as $value => $label): ?><button type="button" data-precap-contact-filter="<?php echo esc_attr($value); ?>"<?php echo $value === '' ? ' class="is-active" aria-pressed="true"' : ' aria-pressed="false"'; ?>><?php echo esc_html($label); ?></button><?php endforeach; ?></nav>
+            <nav class="precap-contact-tabs" aria-label="Filtrar por contacto"><?php foreach (([''=>'Todos'] + Workflow::LABELS) as $value => $label): ?><button type="button" data-precap-contact-filter="<?php echo esc_attr($value); ?>"<?php echo $value === '' ? ' class="is-active" aria-pressed="true"' : ' aria-pressed="false"'; ?>><?php echo esc_html($label); ?></button><?php endforeach; ?></nav>
             <?php self::render_filters($table, $filters, $is_control); ?>
-            <details class="precap-state-help"><summary>¿Qué significa cada estado?</summary><dl><div><dt>Todos</dt><dd>Muestra todos los registros, sin filtrar por contacto.</dd></div><div><dt>Por llamar / Sin llamada registrada</dt><dd>No está marcado como contactado y no tiene resultado, razón ni seguimiento de gestión guardados.</dd></div><div><dt>No contestó</dt><dd>La última gestión confirmó que se intentó contactar y no contestaron. Los registros antiguos se identifican como históricos por verificar.</dd></div><div><dt>Contactados</dt><dd>La última gestión confirmó que la persona contestó y no se seleccionó Seguir llamando.</dd></div><div><dt>En seguimiento</dt><dd>La persona contestó, pero requiere otra llamada programada. Si no contestó, aparece en No contestó con su próxima llamada. Puedes ver detalles y editar si aún no tiene tarea y tu cargo tiene permiso.</dd></div></dl></details>
+            <details class="precap-state-help"><summary>¿Qué significa cada estado?</summary><dl><div><dt>Todos</dt><dd>Muestra todos los registros, sin filtrar por contacto.</dd></div><div><dt>Por llamar / Sin llamada registrada</dt><dd>Todavía no tiene una llamada registrada. Las ediciones administrativas no cuentan como llamadas.</dd></div><div><dt>No contestó</dt><dd>La última gestión confirmó que se intentó contactar y no contestaron. Requiere otra llamada con fecha programada. Se cierra automáticamente después de tres llamadas consecutivas sin respuesta; las gestiones históricas no consumen intentos.</dd></div><div><dt>Contactados</dt><dd>La última gestión confirmó que la persona contestó y no se seleccionó Seguir llamando.</dd></div><div><dt>En seguimiento</dt><dd>La persona contestó, pero requiere otra llamada programada. Si no contestó, aparece en No contestó con su próxima llamada. Puedes ver detalles y editar si aún no tiene tarea y tu cargo tiene permiso.</dd></div><div><dt>Pendiente de crear tarea</dt><dd>La persona contestó y la oportunidad fue aprobada. Falta completar la creación de la tarea.</dd></div><div><dt>Cerrada</dt><dd>Se archivó con un motivo o se agotaron los tres intentos. Conserva los detalles y el historial; un administrador puede reabrirla con un motivo.</dd></div><div><dt>Convertida a tarea</dt><dd>Ya tiene una tarea vinculada. Su gestión continúa desde esa tarea y su estado aparece en los detalles.</dd></div></dl></details>
 
             <div class="precaptaciones__estado" data-precaptaciones-status aria-live="polite"></div>
             <div data-precaptaciones-results>
@@ -174,6 +174,7 @@ final class LegacyPanel
             <div class="precaptaciones__modales">
                 <?php foreach ($rows as $row) : ?>
                     <?php self::render_detail_modal($table, $row, $is_control); ?>
+                    <?php if (Module::policy()->canAct('precaptacion_ticket') && self::contact_state($table, $row)[0] === 'pendiente_tarea') self::render_ticket_modal($table, $row); ?>
                     <?php if (Module::policy()->canAct('precaptacion_editar') && !self::row_actions_locked($table, $row)) : ?>
                         <?php self::render_edit_modal($table, $row); ?>
                     <?php endif; ?>
@@ -230,7 +231,7 @@ final class LegacyPanel
         $contact_state = self::contact_state_expression($table);
         $sql = "SELECT COUNT(*) AS total, SUM(CASE WHEN {$ticket} THEN 1 ELSE 0 END) AS tickets,
             SUM(CASE WHEN {$reason} LIKE %s THEN 1 ELSE 0 END) AS duplicates,
-            SUM(CASE WHEN NOT {$ticket} AND (({$contact_state}) IN ('por_llamar','no_contesto') OR {$reason} LIKE %s) THEN 1 ELSE 0 END) AS pending
+            SUM(CASE WHEN NOT {$ticket} AND ({$contact_state}) NOT IN ('cerrada','convertida') AND (({$contact_state}) IN ('por_llamar','no_contesto','seguimiento','pendiente_tarea') OR {$reason} LIKE %s) THEN 1 ELSE 0 END) AS pending
             FROM {$table} {$where}";
         $data = $wpdb->get_row($wpdb->prepare($sql, array_merge(['%duplicad%', '%sin informaci%'], $values)), ARRAY_A) ?: [];
         $total = (int) ($data['total'] ?? 0);
@@ -277,30 +278,32 @@ final class LegacyPanel
             $column = self::column_for($table, $logical);
             if ($column) $has_result[] = "TRIM(COALESCE(`{$column}`, '')) NOT IN ('', 'No', 'no', '0')";
         }
-        return 'COALESCE(' . Module::history()->expression($table, 'state') . ", CASE WHEN (" . implode(' OR ', $no_answer ?: ['1=0']) . ") THEN 'no_contesto'
+        $merit_pending = $merit_column ? "LOWER(TRIM(COALESCE(`{$merit_column}`, ''))) = 'si'" : '1=0';
+        $tasks = [];
+        $reason_column = self::column_for($table, 'razones');
+        if ($reason_column) $tasks[] = "LOWER(TRIM(COALESCE(`{$reason_column}`, ''))) IN ('ticket creado','tarea creada')";
+        foreach (['id_ticket_asignado','ticket_asignado','id_ticket','ticket','numero_de_ticket','url_ticket','url_ticket_precap'] as $candidate) {
+            $col = self::first_existing_column($table, [$candidate]);
+            if ($col) $tasks[] = "TRIM(COALESCE(`{$col}`, '')) NOT IN ('', '0')";
+        }
+        $flag = self::column_for($table, 'tiene_ticket');
+        if ($flag) $tasks[] = "LOWER(TRIM(COALESCE(`{$flag}`, ''))) IN ('si','sí','1','true')";
+        $confirmed = Module::history()->expression($table, 'state');
+        $confirmed = "CASE WHEN {$confirmed} = 'contactado' AND {$merit_pending} THEN 'pendiente_tarea' ELSE {$confirmed} END";
+        return "CASE WHEN (" . implode(' OR ', $tasks ?: ['1=0']) . " ) THEN 'convertida' ELSE COALESCE(" . Module::workflow()->expression($table, 'status') . ', ' . $confirmed . ", CASE WHEN (" . implode(' OR ', $no_answer ?: ['1=0']) . ") THEN 'no_contesto'
+            WHEN $merit_pending THEN 'pendiente_tarea'
             WHEN {$followup} THEN 'seguimiento'
             WHEN {$contact} IN ('si', 'sí', '1') THEN 'contactado'
             WHEN (" . implode(' OR ', $has_result ?: ['1=0']) . ") THEN 'seguimiento'
-            ELSE 'por_llamar' END)";
+            ELSE 'por_llamar' END) END";
     }
 
     private static function contact_state(string $table, array $row): array
     {
-        $management = Module::history()->latest((int) ($row['_ID'] ?? 0));
-        if ($management) return [$management['state'], ['por_llamar'=>'Sin llamada registrada','no_contesto'=>'No contestó','contactado'=>'Contactado','seguimiento'=>'En seguimiento'][$management['state']]];
-        foreach (['resultado', 'razones'] as $logical) {
-            $text = self::normalize_choice(self::row_value($table, $row, [self::column_for($table, $logical)]));
-            if (preg_match('/^(no contest|no respon|buzon|sin respuesta)/', $text)) return ['no_contesto', 'No contestó'];
-        }
-        if (trim(self::row_value($table, $row, ['resultado'])) === '' && trim(self::row_value($table, $row, ['razones'])) === ''
-            && !in_array(self::normalize_choice(self::row_value($table, $row, ['contactado'])), ['si','1'], true)
-            && preg_match('/^(no contest|no respon|buzon|sin respuesta)/', self::normalize_choice(self::row_value($table, $row, ['observaciones'])))) return ['no_contesto', 'No contestó'];
-        if (self::normalize_choice(self::row_value($table, $row, ['merece_ticket'])) === 'seguir llamando') return ['seguimiento', 'En seguimiento'];
-        if (in_array(self::normalize_choice(self::row_value($table, $row, ['contactado'])), ['si','1'], true)) return ['contactado', 'Contactado'];
-        foreach (['resultado', 'razones', 'seguimiento'] as $logical) {
-            if (!in_array(self::normalize_choice(self::row_value($table, $row, [self::column_for($table, $logical)])), ['', 'no', '0'], true)) return ['seguimiento', 'En seguimiento'];
-        }
-        return ['por_llamar', 'Sin llamada registrada'];
+        $process = Module::workflow()->get((int) ($row['_ID'] ?? 0));
+        if ($process) $row['process_status'] = $process['status'];
+        $state = Module::workflow()->status($row);
+        return [$state, Workflow::LABELS[$state] ?? $state];
     }
 
     private static function render_filters(string $table, array $filters, bool $is_control): void
@@ -308,17 +311,17 @@ final class LegacyPanel
         $active_filters = self::active_filter_count($filters);
         ?>
         <form class="precaptaciones__filtros rounded-lg border border-slate-200 bg-white shadow-sm" method="post" data-precaptaciones-filters>
-            <div class="precap-primary-filters">
+            <input type="hidden" name="precaptaciones_id" value="<?php echo esc_attr($filters['id']); ?>"><input type="hidden" name="precaptaciones_pendientes" value="<?php echo esc_attr($filters['pendientes']); ?>"><div class="precap-primary-filters">
                 <label class="precaptaciones__campo precap-search min-w-0">
                     <span class="mb-2 block text-sm font-bold text-slate-800">Buscar</span>
                     <input class="precaptaciones__control" type="search" name="precaptaciones_buscar" value="<?php echo esc_attr($filters['buscar']); ?>" placeholder="Contacto, direccion, barrio, referencia o tarea">
                 </label>
 
                 <label class="precaptaciones__campo"><span>Estado del contacto</span><select class="precaptaciones__control" name="precaptaciones_estado_contacto" aria-label="Estado del contacto">
-                    <?php foreach ([''=>'Todos los contactos','por_llamar'=>'Sin llamada registrada','no_contesto'=>'No contestó','contactado'=>'Contactados','seguimiento'=>'En seguimiento'] as $value => $label): ?><option value="<?php echo esc_attr($value); ?>" <?php selected($filters['estado_contacto'], $value); ?>><?php echo esc_html($label); ?></option><?php endforeach; ?>
+                    <?php foreach (([''=>'Todos los estados'] + Workflow::LABELS) as $value => $label): ?><option value="<?php echo esc_attr($value); ?>" <?php selected($filters['estado_contacto'], $value); ?>><?php echo esc_html($label); ?></option><?php endforeach; ?>
                 </select></label>
                 <label class="precaptaciones__campo"><span>Agenda de llamadas</span><select class="precaptaciones__control" name="precaptaciones_agenda">
-                    <?php foreach ([''=>'Todas','programadas'=>'Llamadas programadas','vencidas'=>'Llamadas vencidas'] as $value => $label): ?><option value="<?php echo esc_attr($value); ?>" <?php selected($filters['agenda'], $value); ?>><?php echo esc_html($label); ?></option><?php endforeach; ?>
+                    <?php foreach ([''=>'Todas','programadas'=>'Llamadas programadas','vencidas'=>'Llamadas vencidas','hoy'=>'Llamadas de hoy','proximas'=>'Por vencer en 24 horas'] as $value => $label): ?><option value="<?php echo esc_attr($value); ?>" <?php selected($filters['agenda'], $value); ?>><?php echo esc_html($label); ?></option><?php endforeach; ?>
                 </select></label>
                 <?php self::render_distinct_select($table, 'tipo_inmueble', 'Tipo de inmueble', 'precaptaciones_tipo_inmueble', $filters['tipo_inmueble'], 'Todos los tipos'); ?>
                 <?php self::render_distinct_select($table, 'barrio', 'Barrio', 'precaptaciones_barrio', $filters['barrio'], 'Todos los barrios'); ?>
@@ -400,6 +403,7 @@ final class LegacyPanel
         if (!$employee_id) {
             $employee_id = get_current_user_id();
         }
+        $process = Module::workflow()->get((int) $id);
         $actions_locked = !Module::policy()->canAct('precaptacion_editar') || self::row_actions_locked($table, $row);
         $has_ticket = self::row_has_ticket($table, $row);
         $reason_value = self::row_value($table, $row, ['razones', 'razones_precap', 'razon']);
@@ -410,6 +414,7 @@ final class LegacyPanel
                 <button class="precaptaciones__detalle" type="button" data-precaptaciones-modal-open="precaptaciones-detalle-modal-<?php echo esc_attr((string) $id); ?>" title="Ver detalles de precaptacion" aria-label="Ver detalles de precaptacion">
                     Detalles
                 </button>
+                <?php if (Module::policy()->canAct('precaptacion_ticket') && self::contact_state($table, $row)[0] === 'pendiente_tarea') : ?><button class="precaptaciones__editar" type="button" data-precaptaciones-modal-open="precaptaciones-ticket-modal-<?php echo (int) $id; ?>">Crear tarea</button><?php endif; ?>
                 <?php if (!$actions_locked) : ?>
                     <button class="precaptaciones__editar inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#ffc23d] px-3 py-2 text-sm font-black text-[#061d49] no-underline shadow-sm transition hover:bg-[#ffd36d] focus:outline-none focus:ring-4 focus:ring-[#ffc23d]/40" type="button" data-precaptaciones-modal-open="precaptaciones-precap-modal-<?php echo esc_attr((string) $id); ?>" title="Editar resultado de precaptacion" aria-label="Editar resultado de precaptacion">
                         <svg class="h-4 w-4" aria-hidden="true" viewBox="0 0 24 24" fill="none">
@@ -453,7 +458,7 @@ final class LegacyPanel
             <td><?php echo esc_html(self::row_value($table, $row, ['barrio', 'sector'])); ?></td>
             <td><span class="precap-property-badge"><?php echo esc_html(self::row_value($table, $row, ['tipo_inmueble', 'tipo_de_inmueble'])); ?></span></td>
             <td><span class="precap-category-badge"><?php echo esc_html(self::row_value($table, $row, ['categoria', 'categoria_inmueble'])); ?></span></td>
-            <td class="precap-contact-cell"><?php [$state, $state_label] = self::contact_state($table, $row); $management = Module::history()->latest((int) $id); ?><span class="precap-contact-badge precap-contact-badge--<?php echo esc_attr($state); ?>"><?php echo esc_html($state_label); ?></span><?php if (!$management && $state !== 'por_llamar'): ?><small class="precap-history-note">Estado histórico por verificar</small><?php endif; ?><?php if ($management && $management['next_contact_at'] && !$has_ticket): ?><small class="precap-history-note">Próxima llamada: <?php echo esc_html(self::format_date($management['next_contact_at'])); ?></small><?php endif; ?><p><?php echo esc_html(self::display_text(self::row_value($table, $row, ['resultado']))); ?></p></td>
+            <td class="precap-contact-cell"><?php [$state, $state_label] = self::contact_state($table, $row); $management = Module::history()->latest((int) $id); ?><span class="precap-contact-badge precap-contact-badge--<?php echo esc_attr($state); ?>"><?php echo esc_html($state_label); ?></span><?php if ($process): ?><small class="precap-history-note">Llamadas: <?php echo (int) $process['attempts']; ?> · Sin respuesta: <?php echo (int) $process['unanswered']; ?>/3</small><?php endif; ?><?php if (!$management && $state !== 'por_llamar'): ?><small class="precap-history-note">Estado histórico por verificar</small><?php endif; ?><?php if ($management && $management['next_contact_at'] && !$has_ticket && $state !== 'cerrada'): ?><small class="precap-history-note">Próxima llamada: <?php echo esc_html(self::format_date($management['next_contact_at'])); ?></small><?php endif; ?><p><?php echo esc_html(self::display_text(self::row_value($table, $row, ['resultado']))); ?></p></td>
             <td><?php echo esc_html(self::display_text($reason_value)); ?></td>
             <td><span class="precap-ticket-badge"><?php echo self::render_ticket($table, $row) ?: 'Sin tarea'; ?></span></td>
         </tr>
@@ -499,7 +504,12 @@ final class LegacyPanel
             'Fecha de registro' => self::registration_date($table, $row),
             'Última respuesta' => self::response_date($table, $row),
             'Última gestión confirmada' => self::format_date((string) (Module::history()->latest((int) $id)['recorded_at'] ?? '')),
-            'Funcionario' => $is_control ? self::employee_name($employee_id) : '',
+            'Captador del registro' => self::employee_name($employee_id),
+            'Responsable de llamadas' => self::employee_name(Module::workflow()->responsible($row)),
+            'Llamadas registradas' => (string) (Module::workflow()->get((int) $id)['attempts'] ?? 0),
+            'Intentos sin respuesta' => (string) (Module::workflow()->get((int) $id)['unanswered'] ?? 0) . '/3',
+            'Motivo de cierre' => (string) (Module::workflow()->get((int) $id)['closure_reason'] ?? ''),
+            'Estado de la tarea' => (string) (Module::workflow()->task($row)['estado_comercial'] ?? ''),
             'Ruta' => self::row_value($table, $row, ['ruta', 'numero_ruta']),
             'Barrio' => self::row_value($table, $row, ['barrio', 'sector']),
             'Direccion' => self::row_value($table, $row, ['direccion', 'direccion_inmueble']),
@@ -515,7 +525,7 @@ final class LegacyPanel
             'Contactado' => self::row_value($table, $row, ['contactado']),
             'Merece tarea' => self::row_value($table, $row, ['merece_ticket']),
             'Tiene tarea' => self::row_value($table, $row, ['tiene_ticket']),
-            'Tarea' => self::row_value($table, $row, ['ticket', 'numero_de_ticket']),
+            'Tarea' => (string) (Module::workflow()->task($row)['_ID'] ?? ''),
             'Origen' => self::row_value($table, $row, ['origen']),
             'Promocionado por' => self::serialized_choice_label(self::row_value($table, $row, ['promocionado_por', 'promocionado'])),
             'Competencia' => self::serialized_choice_label(self::row_value($table, $row, ['competencia', 'competencias', 'competencia_precat'])),
@@ -544,7 +554,7 @@ final class LegacyPanel
                     <?php foreach ([
                         'Inmueble y ubicación'=>['Tipo de inmueble','Categoria','Barrio','Direccion','Referencia','Ruta'],
                         'Información de contacto'=>['Contacto','Celular','Correo','Origen','Promocionado por','Competencia','PPH'],
-                        'Gestión comercial'=>['Fecha de registro','Última respuesta','Última gestión confirmada','Funcionario','Observaciones','Resultado','Razon','Contactado','Merece tarea','Tiene tarea','Tarea','Seguimiento'],
+                        'Gestión comercial'=>['Fecha de registro','Última respuesta','Última gestión confirmada','Captador del registro','Responsable de llamadas','Llamadas registradas','Intentos sin respuesta','Motivo de cierre','Estado de la tarea','Observaciones','Resultado','Razon','Contactado','Merece tarea','Tiene tarea','Tarea','Seguimiento'],
                     ] as $group => $labels): ?>
                     <section class="precap-detail-section"><h3><?php echo esc_html($group); ?></h3><dl class="precaptaciones-detalle">
                         <?php foreach ($labels as $label): $value = $fields[$label] ?? ''; if (trim((string) $value) === '') continue; ?>
@@ -552,9 +562,15 @@ final class LegacyPanel
                         <?php endforeach; ?>
                     </dl></section>
                     <?php endforeach; ?>
+                    <?php if (Module::policy()->canManage() && !self::row_has_ticket($table, $row)): ?>
+                    <section class="precap-detail-section"><h3>Administrar proceso</h3>
+                    <form data-precap-process-form class="precap-process-form"><input type="hidden" name="action" value="precaptaciones_asignar"><input type="hidden" name="nonce" value="<?php echo esc_attr(Module::nonce()); ?>"><input type="hidden" name="id_precaptacion" value="<?php echo (int) $id; ?>"><label>Responsable de llamadas<?php self::render_ticket_employee_select('responsable', Module::workflow()->responsible($row)); ?></label><label>Motivo de asignación<input class="precaptaciones__control" name="motivo" required></label><button type="submit">Asignar responsable</button><p data-process-message role="status"></p></form>
+                    <form data-precap-process-form class="precap-process-form"><input type="hidden" name="action" value="<?php echo $contact_state === 'cerrada' ? 'precaptaciones_reabrir' : 'precaptaciones_cerrar'; ?>"><input type="hidden" name="nonce" value="<?php echo esc_attr(Module::nonce()); ?>"><input type="hidden" name="id_precaptacion" value="<?php echo (int) $id; ?>"><label>Motivo obligatorio<input class="precaptaciones__control" name="motivo" required></label><button type="submit"><?php echo $contact_state === 'cerrada' ? 'Reabrir e iniciar nuevo ciclo' : 'Cerrar registro'; ?></button><p data-process-message role="status"></p></form>
+                    </section>
+                    <?php endif; ?>
                     <section class="precap-detail-section"><h3>Historial de gestiones</h3>
                     <?php $entries = Module::history()->entries((int) $id); if (!$entries): ?><p class="precap-history-note">No hay gestiones confirmadas en este módulo. El estado anterior es histórico y debe verificarse.</p><?php endif; ?>
-                    <?php foreach ($entries as $entry): ?><article class="precap-history-entry"><strong><?php echo esc_html(self::format_date($entry['recorded_at'])); ?> · <?php echo esc_html(self::employee_name($entry['employee_id'])); ?></strong><p><?php echo esc_html(['contactado'=>'Contestó','no_contesto'=>'No contestó','por_llamar'=>'Sin llamada realizada'][$entry['outcome']]); ?> · <?php echo esc_html($entry['merit'] === 'Seguir llamando' ? 'Seguir llamando' : 'Merece tarea: ' . $entry['merit']); ?></p><p><?php echo esc_html($entry['reason']); ?></p><p><?php echo esc_html($entry['result']); ?></p><?php if ($entry['next_contact_at']): ?><small>Próxima llamada: <?php echo esc_html(self::format_date($entry['next_contact_at'])); ?></small><?php endif; ?></article><?php endforeach; ?>
+                    <?php foreach ($entries as $entry): ?><article class="precap-history-entry"><strong><?php echo esc_html(self::format_date($entry['recorded_at'])); ?> · <?php echo esc_html($entry['event_type'] ?? 'histórica'); ?> · Ciclo <?php echo (int) ($entry['cycle'] ?? 0); ?> · <?php echo esc_html(self::employee_name($entry['employee_id'])); ?></strong><p><?php echo esc_html(['contactado'=>'Contestó','no_contesto'=>'No contestó','por_llamar'=>'Sin llamada realizada'][$entry['outcome']]); ?> · <?php echo esc_html($entry['merit'] === 'Seguir llamando' ? 'Seguir llamando' : 'Merece tarea: ' . $entry['merit']); ?></p><p><?php echo esc_html($entry['reason']); ?></p><p><?php echo esc_html($entry['result']); ?></p><?php if ($entry['next_contact_at']): ?><small>Próxima llamada: <?php echo esc_html(self::format_date($entry['next_contact_at'])); ?></small><?php endif; ?></article><?php endforeach; ?>
                     </section>
                 </div>
                 <div class="precaptaciones-precap-modal__footer">
@@ -601,7 +617,7 @@ final class LegacyPanel
                     </button>
                 </div>
 
-                <form class="precaptaciones-precap-modal__form" data-precaptaciones-precap-form>
+                <form class="precaptaciones-precap-modal__form" data-precaptaciones-precap-form data-precap-unanswered="<?php echo (int) (Module::workflow()->get((int) $id)['unanswered'] ?? 0); ?>">
                     <input type="hidden" name="action" value="precaptaciones_actualizar">
                     <input type="hidden" name="nonce" value="<?php echo esc_attr(wp_create_nonce('precaptaciones_actualizar')); ?>">
                     <input type="hidden" name="id_precaptacion" value="<?php echo esc_attr((string) $id); ?>">
@@ -613,6 +629,7 @@ final class LegacyPanel
                     <input type="hidden" name="bandera" value="<?php echo esc_attr($bandera); ?>">
 
                     <div class="precaptaciones-precap-modal__grid">
+                        <label class="precaptaciones-precap-modal__wide"><span>Tipo de gestión</span><select class="precaptaciones__control" name="tipo_gestion" required><option value="llamada">Llamada realizada</option><option value="administrativa">Actualizar datos (no consume intento)</option></select><small>Solo las llamadas sin respuesta consumen los 3 intentos. Al tercer intento se cierra automáticamente.</small></label>
                         <label>
                             <span>Contacto</span>
                             <input class="precaptaciones__control" type="text" name="contacto" value="<?php echo esc_attr($contacto); ?>" autocomplete="name">
@@ -652,6 +669,7 @@ final class LegacyPanel
                             <small>Guardar una gestión no significa que la persona haya contestado.</small>
                         </label>
 
+                        <label data-precap-closure-reason><span>Motivo de cierre</span><select class="precaptaciones__control" name="motivo_cierre"><option value="">Selecciona el motivo</option><?php foreach (array_slice(Workflow::REASONS, 1) as $reason): ?><option><?php echo esc_html($reason); ?></option><?php endforeach; ?></select><small>Obligatorio al descartar una oportunidad contactada.</small></label>
                         <label data-precap-next-contact>
                             <span>Próxima llamada</span>
                             <input class="precaptaciones__control" type="datetime-local" name="proximo_contacto" value="<?php echo esc_attr(str_replace(' ', 'T', substr((string) (Module::history()->latest((int) $id)['next_contact_at'] ?? ''), 0, 16))); ?>">
@@ -713,13 +731,13 @@ final class LegacyPanel
         $modal_id = 'precaptaciones-ticket-modal-' . $id;
         ?>
         <div class="precaptaciones-precap-modal" id="<?php echo esc_attr($modal_id); ?>" role="dialog" aria-modal="true" aria-labelledby="<?php echo esc_attr($modal_id); ?>-title" data-precaptaciones-ticket-modal hidden>
-            <div class="precaptaciones-precap-modal__backdrop"></div>
+            <div class="precaptaciones-precap-modal__backdrop" data-precaptaciones-modal-close></div>
             <div class="precaptaciones-precap-modal__panel" role="document">
                 <div class="precaptaciones-precap-modal__header">
                     <div>
                         <p class="precaptaciones-precap-modal__eyebrow">Precaptacion #<?php echo esc_html((string) $id); ?></p>
                         <h2 id="<?php echo esc_attr($modal_id); ?>-title">Crear tarea comercial</h2>
-                    </div>
+                    </div><button class="precaptaciones-precap-modal__close" type="button" data-precaptaciones-modal-close aria-label="Cerrar creación de tarea">×</button>
                 </div>
 
                 <form class="precaptaciones-precap-modal__form" data-precaptaciones-ticket-form>
@@ -732,7 +750,7 @@ final class LegacyPanel
                     <div class="precaptaciones-precap-modal__grid">
                         <label class="precaptaciones-precap-modal__wide">
                             <span>Asignar a</span>
-                            <?php self::render_ticket_employee_select('asignado', (string) $employee_id); ?>
+                            <?php self::render_ticket_employee_select('asignado', Module::workflow()->responsible($row)); ?>
                         </label>
 
                         <label>
@@ -794,7 +812,7 @@ final class LegacyPanel
                     <div class="precaptaciones-precap-modal__message" data-precaptaciones-ticket-message aria-live="polite"></div>
 
                     <div class="precaptaciones-precap-modal__footer">
-                        <button class="precaptaciones-precap-modal__primary" type="submit">Crear tarea comercial</button>
+                        <button class="precaptaciones-precap-modal__secondary" type="button" data-precaptaciones-modal-close>Continuar después</button><button class="precaptaciones-precap-modal__primary" type="submit">Crear tarea comercial</button>
                     </div>
                 </form>
             </div>
@@ -1112,6 +1130,7 @@ final class LegacyPanel
 
     private static function row_actions_locked(string $table, array $row): bool
     {
+        if ((Module::workflow()->get((int) ($row['_ID'] ?? 0))['status'] ?? '') === 'cerrada') return true;
         return self::row_has_ticket($table, $row);
     }
 
@@ -1715,6 +1734,8 @@ final class LegacyPanel
             'contactado',
             'estado_contacto',
             'agenda',
+            'pendientes',
+            'id',
             'merece_ticket',
             'tiene_ticket',
             'seguimiento',
@@ -1745,13 +1766,13 @@ final class LegacyPanel
         if (!$is_control) {
             $employee_col = self::first_existing_column($table, ['id_empleado', 'cct_author_id', 'captador_precat']);
             if ($employee_col) {
-                $where[] = "{$employee_col} = %d";
-                $values[] = get_current_user_id();
+                $where[] = 'COALESCE(' . Module::workflow()->expression($table, 'responsible_id') . ", {$employee_col}) = %s";
+                $values[] = (string) get_current_user_id();
             }
         } elseif ($filters['funcionario'] !== '') {
             $employee_col = self::first_existing_column($table, ['id_empleado', 'cct_author_id', 'captador_precat']);
             if ($employee_col) {
-                $where[] = "{$employee_col} = %s";
+                $where[] = 'COALESCE(' . Module::workflow()->expression($table, 'responsible_id') . ", {$employee_col}) = %s";
                 $values[] = $filters['funcionario'];
             }
         }
@@ -1760,10 +1781,20 @@ final class LegacyPanel
         self::add_date_filter($where, $values, $date_col, '>=', $filters['fecha_desde'], '00:00:00');
         self::add_date_filter($where, $values, $date_col, '<=', $filters['fecha_hasta'], '23:59:59');
 
+        if ($filters['id'] !== '') { $where[] = '_ID = %d'; $values[] = absint($filters['id']); }
+        if ($filters['pendientes'] === '1') {
+            $state = self::contact_state_expression($table); $next = Module::history()->expression($table, 'next_contact_at');
+            $where[] = "({$state}) NOT IN ('cerrada','convertida') AND (({$state}) IN ('por_llamar','no_contesto','seguimiento','pendiente_tarea') OR {$next} IS NOT NULL)";
+        }
         self::add_search_filter($table, $where, $values, $filters['buscar']);
-        if (in_array($filters['agenda'], ['programadas','vencidas'], true)) {
+        if (in_array($filters['agenda'], ['programadas','vencidas','hoy','proximas'], true)) {
             $next = Module::history()->expression($table, 'next_contact_at');
             $where[] = "{$next} IS NOT NULL";
+            $where[] = '(' . self::contact_state_expression($table) . ") NOT IN ('cerrada','convertida')";
+            if (in_array($filters['agenda'], ['hoy','proximas'], true)) {
+                $where[] = "{$next} > %s AND {$next} <= %s";
+                $values[] = current_time('mysql'); $values[] = $filters['agenda'] === 'hoy' ? date('Y-m-d 23:59:59') : date('Y-m-d H:i:s', time() + 86400);
+            }
             if ($filters['agenda'] === 'vencidas') { $where[] = "{$next} <= %s"; $values[] = current_time('mysql'); }
             // A task supersedes the precaptación's scheduled call.
             foreach (['id_ticket_asignado','ticket_asignado','id_ticket','ticket','numero_de_ticket','url_ticket','url_ticket_precap'] as $candidate) {
@@ -1775,7 +1806,7 @@ final class LegacyPanel
             $reasonColumn = self::column_for($table, 'razones');
             if ($reasonColumn) $where[] = "LOWER(TRIM(COALESCE(`{$reasonColumn}`, ''))) NOT IN ('ticket creado','tarea creada')";
         }
-        if (in_array($filters['estado_contacto'], ['por_llamar','no_contesto','contactado','seguimiento'], true)) {
+        if (array_key_exists($filters['estado_contacto'], Workflow::LABELS)) {
             $where[] = '(' . self::contact_state_expression($table) . ') = %s';
             $values[] = $filters['estado_contacto'];
         }
@@ -2276,7 +2307,7 @@ final class LegacyPanel
 
         $ticket_modal_id = '';
         $ticket_modal_html = '';
-        if (sanitize_text_field($request['merece_ticket'] ?? '') === 'Si') {
+        if (sanitize_text_field($request['merece_ticket'] ?? '') === 'Si' && Module::policy()->canAct('precaptacion_ticket')) {
             $id_precaptacion = absint($request['id_precaptacion'] ?? 0);
             $ticket_modal_id = 'precaptaciones-ticket-modal-' . $id_precaptacion;
             $table = self::table_name('jet_cct_precaptaciones');
@@ -2388,6 +2419,7 @@ final class LegacyPanel
 
         self::registrar_historial_ticket($ticket_id, $ticket_data);
         self::actualizar_precaptacion_con_ticket($precaptaciones_table, $id_precaptacion, $ticket_id);
+        Module::workflow()->converted($wpdb->get_row($wpdb->prepare("SELECT * FROM {$precaptaciones_table} WHERE _ID = %d", $id_precaptacion), ARRAY_A), $ticket_id);
         self::enviar_correos_ticket($ticket_id, $ticket_data, $creator);
 
         $ticket_url = add_query_arg(['id_ticket' => (string) $ticket_id], 'https://sucasainmobiliaria.com.co/ticket/');
@@ -3001,7 +3033,7 @@ final class LegacyPanel
                 $tarjeta_pph = (string) $pph->tarjeta_bienvenida;
             }
 
-            if ($pph && $params && $origen === 'Club PPH' && $bandera === 'No' && $merece_ticket === 'No' && ($request['contactado'] ?? '') === 'Si') {
+            if ($pph && $params && $origen === 'Club PPH' && $bandera === 'No' && $merece_ticket === 'No' && ($request['contactado'] ?? '') === 'Si' && ($request['tipo_gestion'] ?? '') !== 'administrativa') {
                 $total_puntos = is_numeric($pph->total_puntos) ? (float) $pph->total_puntos : 0.0;
                 $membresia = self::determinar_membresia(
                     $total_puntos,
@@ -3930,7 +3962,6 @@ final class LegacyPanel
             (function () {
                 const closeModal = (modal) => {
                     if (!modal) return;
-                    if (modal.matches("[data-precaptaciones-ticket-modal]")) return;
                     modal.hidden = true;
                     document.body.classList.remove("precaptaciones-precap-modal-open");
                 };
@@ -3948,12 +3979,24 @@ final class LegacyPanel
                     syncTicketField(modal);
                 };
                 const syncTicketField = (scope) => {
-                    const select = scope.querySelector("[data-precaptaciones-merece-ticket]");
-                    const assign = scope.querySelector("[data-precaptaciones-asignar-ticket]");
+                    const select = scope.querySelector('[data-precaptaciones-merece-ticket]');
+                    const assign = scope.querySelector('[data-precaptaciones-asignar-ticket]');
                     if (!select || !assign) return;
-                    assign.classList.toggle("is-visible", select.value === "Si");
+                    const form = scope.querySelector('[data-precaptaciones-precap-form]') || scope;
+                    const type = form.querySelector('[name="tipo_gestion"]');
+                    const outcome = form.querySelector('[name="resultado_contacto"]');
+                    const administrative = type?.value === 'administrativa';
+                    if (outcome) { outcome.disabled = administrative; if (administrative) outcome.value = 'por_llamar'; }
+                    const noAnswer = outcome?.value === 'no_contesto';
+                    const third = noAnswer && Number(form.dataset.precapUnanswered || 0) >= 2;
+                    if (noAnswer) select.value = third ? 'No' : 'Seguir llamando';
+                    if (administrative && !select.value) select.value = 'No';
+                    select.disabled = administrative || noAnswer;
+                    assign.classList.toggle('is-visible', !administrative && select.value === 'Si');
                     const next = scope.querySelector('[name="proximo_contacto"]');
-                    if (next) next.required = select.value === 'Seguir llamando';
+                    if (next) { next.required = !administrative && !third && select.value === 'Seguir llamando'; next.disabled = administrative || third; }
+                    const closeReason = scope.querySelector('[name="motivo_cierre"]');
+                    if (closeReason) { closeReason.required = !administrative && !noAnswer && select.value === 'No'; closeReason.closest('label').hidden = !closeReason.required; }
                 };
                 const showNotice = (type, title, text) => {
                     if (window.PrecapUI && typeof window.PrecapUI.fire === "function") {
@@ -4170,6 +4213,10 @@ final class LegacyPanel
                     filterTimers.set(panel, window.setTimeout(() => fetchResults(panel, 1), 350));
                 };
                 enforceLockedActions(document);
+                document.addEventListener('DOMContentLoaded', () => {
+                    const query = new URLSearchParams(window.location.search);
+                    if (query.get('abrir') === 'detalles' && /^\d+$/.test(query.get('precaptaciones_id') || '')) openModal(document.getElementById('precaptaciones-detalle-modal-' + query.get('precaptaciones_id')));
+                });
 
                 document.addEventListener("click", async (event) => {
                     const evidenceButton = event.target.closest("[data-precaptaciones-evidence]");
@@ -4206,6 +4253,8 @@ final class LegacyPanel
                         const form = panel ? panel.querySelector("[data-precaptaciones-filters]") : null;
                         if (form) {
                             form.reset();
+                            form.querySelectorAll('[name^="precaptaciones_"]').forEach(control => { control.value = ''; });
+                            panel.querySelectorAll('[data-precap-contact-filter]').forEach(tab => { const active = tab.dataset.precapContactFilter === ''; tab.classList.toggle('is-active', active); tab.setAttribute('aria-pressed', String(active)); });
                             updateActiveFilters(panel, 0);
                             fetchResults(panel, 1);
                         }
@@ -4522,7 +4571,7 @@ final class LegacyPanel
                 });
 
                 document.addEventListener("change", (event) => {
-                    if (event.target.matches("[data-precaptaciones-merece-ticket]")) {
+                    if (event.target.matches("[data-precaptaciones-merece-ticket], [name=tipo_gestion], [name=resultado_contacto]")) {
                         syncTicketField(event.target.closest(".precaptaciones-precap-modal"));
                     }
                     const filterForm = event.target.closest("[data-precaptaciones-filters]");
@@ -4642,7 +4691,7 @@ final class LegacyPanel
                         const response = await fetch(window.Precaptaciones.ajaxUrl, {
                             method: "POST",
                             credentials: "same-origin",
-                            body: new FormData(form)
+                            body: (() => { const data = new FormData(form); data.set('merece_ticket', form.querySelector('[name="merece_ticket"]').value); data.set('resultado_contacto', form.querySelector('[name="resultado_contacto"]').value); return data; })()
                         });
                         const payload = await response.json();
                         if (!payload.success) {

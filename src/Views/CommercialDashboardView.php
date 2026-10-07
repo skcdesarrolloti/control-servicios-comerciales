@@ -507,7 +507,7 @@ final class CommercialDashboardView
           } elseif ($bucket === 'inmuebles') {
             echo self::renderPropertiesPage($propertyResult, $propertyFilters, $propertySummaryCounts, $propertyOptions, $policy, $baseUrl);
           } elseif ($bucket === 'precaptacion') {
-            echo self::renderPrecaptacion($baseUrl);
+            echo self::renderPrecaptacion($baseUrl, $_GET);
           } elseif ($bucket === 'notificaciones') {
             echo CommercialNotificationsView::render($data['notifications_service'], $policy);
           } else {
@@ -1000,6 +1000,8 @@ final class CommercialDashboardView
 
       <!-- Tarjetas de Alertas & KPIs Circulares -->
       <?php echo self::renderHomeCards($slaSummary, $properties, $signs, $baseUrl, $filters); ?>
+
+      <?php if ($policy instanceof CommercialAccessPolicy && $policy->canView('precaptacion')) echo \SCM\Precaptacion\HomeView::render($dashboard['precaptations'] ?? [], $baseUrl); ?>
 
       <!-- Avisos Operativos de lo Pendiente (Alertas Claras del Día) -->
       <?php echo self::renderHomePendingSection($taskOverdue, $taskTotal, $taskCompliancePct, $propertyPending, $propertyExpired, $propertyAlert, $signPending, $retouchExpired, $newSignLate, $baseUrl); ?>
@@ -4870,9 +4872,11 @@ final class CommercialDashboardView
     return (string) ob_get_clean();
   }
 
-  public static function renderPrecaptacion(string $baseUrl): string
+  public static function renderPrecaptacion(string $baseUrl, array $input = []): string
   {
-    return '<section class="w-full"><iframe src="' . esc_url(rtrim($baseUrl, '/') . '/precaptaciones.php') . '" title="Precaptación" class="w-full border-0" style="height:calc(100vh - 145px);min-height:600px" loading="lazy"></iframe></section>';
+    $query = array_intersect_key($input, array_flip(['precaptaciones_estado_contacto','precaptaciones_agenda','precaptaciones_pendientes','precaptaciones_id','abrir']));
+    $query = array_filter($query, 'is_scalar');
+    return '<section class="w-full"><iframe src="' . esc_url(rtrim($baseUrl, '/') . '/precaptaciones.php' . ($query ? '?' . http_build_query($query) : '')) . '" title="Precaptación" class="w-full border-0" style="height:calc(100vh - 145px);min-height:600px" loading="lazy"></iframe></section>';
   }
 
   private static function currentDateFormatted(): string
