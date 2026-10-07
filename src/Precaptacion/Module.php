@@ -121,7 +121,16 @@ final class Module
       if (!self::policy()->canAct($permission)) JsonResponse::error('No tienes permiso para realizar esta acción.', 403);
       if ($action === 'precaptaciones_actualizar') {
         if (!in_array($input['merece_ticket'] ?? '', ['Si','No','Seguir llamando'], true)) throw new \InvalidArgumentException('Indica si merece tarea o si debes seguir llamando.');
-        if (Repository::normalizeName((string) ($input['razones'] ?? '')) === 'ticket creado') throw new \InvalidArgumentException('La razón Tarea creada se asigna al crear la tarea.');
+        if (!in_array($input['contactado'] ?? '', ['Si','No'], true)) throw new \InvalidArgumentException('Confirma si hubo respuesta del contacto.');
+        if ($input['contactado'] === 'Si') {
+          foreach (['resultado','razones'] as $field) {
+            if (preg_match('/^(no contest|no respon|buzon|sin respuesta)/', Repository::normalizeName((string) ($input[$field] ?? '')))) {
+              throw new \InvalidArgumentException('El contacto confirmado contradice la razón o el resultado sin respuesta. Actualiza la última gestión.');
+            }
+          }
+        }
+        if ($input['merece_ticket'] === 'Si' && $input['contactado'] !== 'Si') throw new \InvalidArgumentException('Confirma el contacto antes de crear una tarea.');
+        if (in_array(Repository::normalizeName((string) ($input['razones'] ?? '')), ['ticket creado','tarea creada'], true)) throw new \InvalidArgumentException('La razón Tarea creada se asigna al crear la tarea.');
         if ($input['merece_ticket'] === 'Si' && !self::policy()->canAct('precaptacion_ticket')) JsonResponse::error('No tienes permiso para crear tareas desde precaptación.', 403);
         $input['fecha'] = time();
       }
@@ -139,11 +148,10 @@ final class Module
           $candidate = trim((string) ($row[$field] ?? ''));
           if ($candidate !== '' && $candidate !== '0') { $ticket = $candidate; break; }
         }
-        if ($ticket !== '' && $ticket !== '0') {
-          if ($action === 'precaptaciones_crear_ticket') wp_send_json_success(['ticket_id'=>$ticket,'ticket_url'=>home_url('/ticket/?id_ticket=' . rawurlencode($ticket)),'message'=>'La precaptación ya tiene una tarea.']);
+        if (LegacyPanel::row_has_ticket(self::db()->table('jet_cct_precaptaciones'), $row)) {
+          if ($action === 'precaptaciones_crear_ticket' && $ticket !== '') wp_send_json_success(['ticket_id'=>$ticket,'ticket_url'=>home_url('/ticket/?id_ticket=' . rawurlencode($ticket)),'message'=>'La precaptación ya tiene una tarea.']);
           wp_send_json_error(['message'=>'Esta precaptación ya tiene una tarea y no se puede editar.'], 409);
         }
-        if (($row['merece_ticket'] ?? '') === 'No' && $action === 'precaptaciones_actualizar') wp_send_json_error(['message'=>'Esta precaptación ya tiene un resultado definitivo.'], 409);
         // Identity and PPH reward state always come from the saved record.
         foreach (['origen','id_pph','bandera'] as $field) $input[$field] = $row[$field] ?? '';
         if ($action === 'precaptaciones_actualizar' && !self::policy()->canManage()) $input['id_empleado'] = Auth::employeeId();

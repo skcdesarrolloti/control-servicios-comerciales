@@ -147,6 +147,44 @@ final class PrecaptacionTest extends TestCase
     self::assertSame('a:0:{}', $this->db->getVar('SELECT competencia FROM wp_jet_cct_precaptaciones WHERE _ID = 1'));
   }
 
+  public function testContactClassificationMatchesSqlAndLatestManagementOverridesOldNotes(): void
+  {
+    $classify = new \ReflectionMethod(LegacyPanel::class, 'contact_state');
+    $expression = new \ReflectionMethod(LegacyPanel::class, 'contact_state_expression');
+    $table = 'wp_jet_cct_precaptaciones';
+    foreach ([
+      ['No', '', '', '', '', 'por_llamar'],
+      ['No', '', '', 'No contestó', '', 'no_contesto'],
+      ['Si', 'Hablamos con el propietario', 'En proceso', 'No contestó', '', 'contactado'],
+      ['Si', 'Antes no contestó; hoy confirmó', 'En proceso', 'No contestó', '', 'contactado'],
+      ['Si', 'Solicita otra llamada', 'En proceso', '', 'Seguir llamando', 'seguimiento'],
+      ['No', 'No contestó', 'En proceso', '', 'Seguir llamando', 'no_contesto'],
+      ['No', 'Pendiente de validar', 'En proceso', '', 'No', 'seguimiento'],
+    ] as [$contacted, $result, $reason, $notes, $merit, $expected]) {
+      $data = ['contactado'=>$contacted,'resultado'=>$result,'razones'=>$reason,'observaciones'=>$notes,'merece_ticket'=>$merit];
+      $this->db->update($table, $data, ['_ID'=>1]);
+      $row = $this->db->getRow("SELECT * FROM {$table} WHERE _ID = 1");
+      self::assertSame($expected, $classify->invoke(null, $table, $row)[0]);
+      self::assertSame($expected, $this->db->getVar('SELECT (' . $expression->invoke(null, $table) . ") FROM {$table} WHERE _ID = 1"));
+    }
+  }
+
+  public function testFollowingUpWithoutARealTaskKeepsDetailsAndEditingAvailable(): void
+  {
+    $this->db->update('wp_jet_cct_precaptaciones', ['id_ticket_asignado'=>'0','merece_ticket'=>'No','resultado'=>'Pendiente de validar','contactado'=>'No'], ['_ID'=>1]);
+    $html = LegacyPanel::render_shortcode(['modo'=>'mis']);
+    self::assertStringContainsString('precap-contact-badge--seguimiento', $html);
+    self::assertStringContainsString('data-precaptaciones-modal-open="precaptaciones-detalle-modal-1"', $html);
+    self::assertStringContainsString('data-precaptaciones-modal-open="precaptaciones-precap-modal-1"', $html);
+    self::assertStringContainsString('name="contactado" required', $html);
+    self::assertFalse(LegacyPanel::row_has_ticket('wp_jet_cct_precaptaciones', ['id_ticket_asignado'=>'0']));
+    self::assertTrue(LegacyPanel::row_has_ticket('wp_jet_cct_precaptaciones', ['id_ticket_asignado'=>'0','tiene_ticket'=>'Si']));
+    $this->db->update('wp_jet_cct_precaptaciones', ['id_ticket_asignado'=>'123'], ['_ID'=>1]);
+    $html = LegacyPanel::render_shortcode(['modo'=>'mis']);
+    self::assertStringNotContainsString('data-precaptaciones-modal-open="precaptaciones-precap-modal-1"', $html);
+    self::assertStringContainsString('data-precaptaciones-modal-open="precaptaciones-detalle-modal-1"', $html);
+  }
+
   public function testResponseDateUsesCctModifiedAndPreservesRegistrationDate(): void
   {
     $registered = $this->db->getVar('SELECT fecha FROM wp_jet_cct_precaptaciones WHERE _ID = 1');

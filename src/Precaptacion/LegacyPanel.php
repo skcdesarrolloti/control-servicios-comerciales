@@ -124,7 +124,7 @@ final class LegacyPanel
             <div class="precap-metrics" data-precap-metrics><?php self::render_metrics($table, $filters, $is_control); ?></div>
             <nav class="precap-contact-tabs" aria-label="Filtrar por contacto"><?php foreach ([''=>'Todos','por_llamar'=>'Por llamar','no_contesto'=>'No contestó','contactado'=>'Contactados','seguimiento'=>'En seguimiento'] as $value => $label): ?><button type="button" data-precap-contact-filter="<?php echo esc_attr($value); ?>"<?php echo $value === '' ? ' class="is-active" aria-pressed="true"' : ' aria-pressed="false"'; ?>><?php echo esc_html($label); ?></button><?php endforeach; ?></nav>
             <?php self::render_filters($table, $filters, $is_control); ?>
-            <details class="precap-state-help"><summary>¿Qué significa cada estado?</summary><dl><div><dt>Todos</dt><dd>Muestra todos los registros, sin filtrar por contacto.</dd></div><div><dt>Por llamar / Sin llamada registrada</dt><dd>No está marcado como contactado y no tiene resultado, razón ni seguimiento de gestión guardados.</dd></div><div><dt>No contestó</dt><dd>El resultado, la razón o las observaciones indican que no contestó, no respondió o dejó la llamada en buzón. Este estado tiene prioridad.</dd></div><div><dt>Contactados</dt><dd>El registro está marcado como contactado y no contiene una indicación de falta de respuesta.</dd></div><div><dt>En seguimiento</dt><dd>Tiene resultado, razón o seguimiento guardados, pero no está marcado como contactado ni como una llamada sin respuesta.</dd></div></dl></details>
+            <details class="precap-state-help"><summary>¿Qué significa cada estado?</summary><dl><div><dt>Todos</dt><dd>Muestra todos los registros, sin filtrar por contacto.</dd></div><div><dt>Por llamar / Sin llamada registrada</dt><dd>No está marcado como contactado y no tiene resultado, razón ni seguimiento de gestión guardados.</dd></div><div><dt>No contestó</dt><dd>La última razón o resultado empieza indicando que no contestó, no respondió o dejó la llamada en buzón. Las observaciones iniciales solo se usan si aún no hay una gestión posterior.</dd></div><div><dt>Contactados</dt><dd>Se confirmó que hubo respuesta, sin una llamada fallida actual ni la decisión de seguir llamando.</dd></div><div><dt>En seguimiento</dt><dd>Se seleccionó Seguir llamando, o existe una gestión pendiente sin contacto confirmado. Permite ver detalles y editar si aún no tiene tarea y tu cargo tiene permiso.</dd></div></dl></details>
 
             <div class="precaptaciones__estado" data-precaptaciones-status aria-live="polite"></div>
             <div data-precaptaciones-results>
@@ -168,6 +168,8 @@ final class LegacyPanel
             </table>
         </div>
 
+        <?php self::render_pagination($total, $per_page, $page); ?>
+        </div>
         <?php if ($rows) : ?>
             <div class="precaptaciones__modales">
                 <?php foreach ($rows as $row) : ?>
@@ -179,8 +181,6 @@ final class LegacyPanel
             </div>
         <?php endif; ?>
 
-        <?php self::render_pagination($total, $per_page, $page); ?>
-        </div>
         <?php
     }
 
@@ -252,23 +252,33 @@ final class LegacyPanel
     private static function contact_state_expression(string $table): string
     {
         $parts = [];
-        foreach (['resultado', 'razones', 'observaciones'] as $logical) {
+        foreach (['resultado', 'razones'] as $logical) {
             $column = self::column_for($table, $logical);
             if ($column) $parts[] = "LOWER(COALESCE(`{$column}`, ''))";
         }
         $no_answer = [];
         foreach ($parts as $part) {
             // INSTR avoids placeholder ambiguity in the inherited SQL adapter.
-            foreach (['no contest', 'no respon', 'buzón', 'buzon', 'sin respuesta'] as $term) $no_answer[] = "INSTR({$part}, '{$term}') > 0";
+            foreach (['no contest', 'no respon', 'buzón', 'buzon', 'sin respuesta'] as $term) $no_answer[] = "INSTR(TRIM({$part}), '{$term}') = 1";
         }
         $contact_column = self::column_for($table, 'contactado');
         $contact = $contact_column ? "LOWER(TRIM(COALESCE(`{$contact_column}`, '')))" : "''";
+        $observations = self::column_for($table, 'observaciones');
+        if ($observations) {
+            $empty_management = array_map(static fn(string $part): string => "TRIM({$part}) = ''", $parts);
+            foreach (['no contest', 'no respon', 'buzón', 'buzon', 'sin respuesta'] as $term) {
+                $no_answer[] = '(' . implode(' AND ', $empty_management ?: ['1=1']) . " AND {$contact} NOT IN ('si','sí','1') AND INSTR(LOWER(TRIM(COALESCE(`{$observations}`, ''))), '{$term}') = 1)";
+            }
+        }
+        $merit_column = self::column_for($table, 'merece_ticket');
+        $followup = $merit_column ? "LOWER(TRIM(COALESCE(`{$merit_column}`, ''))) = 'seguir llamando'" : '1=0';
         $has_result = [];
         foreach (['resultado', 'razones', 'seguimiento'] as $logical) {
             $column = self::column_for($table, $logical);
             if ($column) $has_result[] = "TRIM(COALESCE(`{$column}`, '')) NOT IN ('', 'No', 'no', '0')";
         }
         return "CASE WHEN (" . implode(' OR ', $no_answer ?: ['1=0']) . ") THEN 'no_contesto'
+            WHEN {$followup} THEN 'seguimiento'
             WHEN {$contact} IN ('si', 'sí', '1') THEN 'contactado'
             WHEN (" . implode(' OR ', $has_result ?: ['1=0']) . ") THEN 'seguimiento'
             ELSE 'por_llamar' END";
@@ -276,8 +286,14 @@ final class LegacyPanel
 
     private static function contact_state(string $table, array $row): array
     {
-        $text = self::normalize_choice(implode(' ', array_map(static fn(string $key): string => self::row_value($table, $row, [self::column_for($table, $key)]), ['resultado','razones','observaciones'])));
-        if (preg_match('/no contest|no respon|buzon|sin respuesta/', $text)) return ['no_contesto', 'No contestó'];
+        foreach (['resultado', 'razones'] as $logical) {
+            $text = self::normalize_choice(self::row_value($table, $row, [self::column_for($table, $logical)]));
+            if (preg_match('/^(no contest|no respon|buzon|sin respuesta)/', $text)) return ['no_contesto', 'No contestó'];
+        }
+        if (trim(self::row_value($table, $row, ['resultado'])) === '' && trim(self::row_value($table, $row, ['razones'])) === ''
+            && !in_array(self::normalize_choice(self::row_value($table, $row, ['contactado'])), ['si','1'], true)
+            && preg_match('/^(no contest|no respon|buzon|sin respuesta)/', self::normalize_choice(self::row_value($table, $row, ['observaciones'])))) return ['no_contesto', 'No contestó'];
+        if (self::normalize_choice(self::row_value($table, $row, ['merece_ticket'])) === 'seguir llamando') return ['seguimiento', 'En seguimiento'];
         if (in_array(self::normalize_choice(self::row_value($table, $row, ['contactado'])), ['si','1'], true)) return ['contactado', 'Contactado'];
         foreach (['resultado', 'razones', 'seguimiento'] as $logical) {
             if (!in_array(self::normalize_choice(self::row_value($table, $row, [self::column_for($table, $logical)])), ['', 'no', '0'], true)) return ['seguimiento', 'En seguimiento'];
@@ -612,6 +628,16 @@ final class LegacyPanel
                         <label class="precaptaciones-precap-modal__wide">
                             <span>Resultado</span>
                             <textarea class="precaptaciones__control" name="resultado" rows="5" placeholder="Describe todas las observaciones encontradas."><?php echo esc_textarea($resultado); ?></textarea>
+                        </label>
+
+                        <label>
+                            <span>¿Se confirmó el contacto?</span>
+                            <select class="precaptaciones__control" name="contactado" required>
+                                <option value="">Selecciona una opción</option>
+                                <option value="Si">Sí, contestó</option>
+                                <option value="No">No, sin respuesta</option>
+                            </select>
+                            <small>Guardar una gestión no significa que la persona haya contestado.</small>
                         </label>
 
                         <label>
@@ -1068,18 +1094,13 @@ final class LegacyPanel
 
     private static function row_actions_locked(string $table, array $row): bool
     {
-        $merece_ticket = self::normalize_choice(self::row_value($table, $row, ['merece_ticket', 'merece_ticket_precat', 'merece_ticket_precap', 'efectivo']));
-        if ($merece_ticket === 'no') {
-            return true;
-        }
-
         return self::row_has_ticket($table, $row);
     }
 
-    private static function row_has_ticket(string $table, array $row): bool
+    public static function row_has_ticket(string $table, array $row): bool
     {
         $reason = self::normalize_choice(self::row_value($table, $row, ['razones', 'razones_precap', 'razon']));
-        if ($reason === 'ticket creado') {
+        if (in_array($reason, ['ticket creado', 'tarea creada'], true)) {
             return true;
         }
 
@@ -1088,7 +1109,7 @@ final class LegacyPanel
             return true;
         }
 
-        $ticket = trim(self::row_value($table, $row, [
+        foreach ([
             'id_ticket_asignado',
             'id_ticket-asignado',
             'id_ticket asignado',
@@ -1106,9 +1127,11 @@ final class LegacyPanel
             'id_del_ticket',
             'url_ticket',
             'url_ticket_precap',
-        ]));
-
-        return $ticket !== '';
+        ] as $field) {
+            $ticket = trim(self::row_value($table, $row, [$field]));
+            if ($ticket !== '' && $ticket !== '0') return true;
+        }
+        return false;
     }
 
     private static function normalize_choice(string $value): string
@@ -2682,12 +2705,11 @@ final class LegacyPanel
         $updated = $wpdb->update(
             $table,
             [
-                $contactado_col => 'Si',
                 $razones_col => $razon,
                 $resultado_col => $resultado,
             ],
             [$id_col => $id],
-            ['%s', '%s', '%s'],
+            ['%s', '%s'],
             ['%d']
         );
 
@@ -3006,7 +3028,7 @@ final class LegacyPanel
                 'merece_ticket' => $merece_ticket,
                 'tarjeta_pph' => $tarjeta_pph,
                 'bandera' => $bandera_final,
-                'contactado' => 'Si',
+                'contactado' => $request['contactado'] === 'Si' ? 'Si' : 'No',
                 'tiene_ticket' => 'No',
             ],
             ['_ID' => $id_precaptacion]
@@ -3018,7 +3040,7 @@ final class LegacyPanel
         }
 
         if ($seguir_llamando) {
-            echo 'Precaptacion guardada para seguir llamando. Se marco como contactada y no se registraron puntos PPH.';
+            echo 'Precaptacion guardada para seguir llamando. No se registraron puntos PPH.';
             return;
         }
 
@@ -4029,12 +4051,10 @@ final class LegacyPanel
                     const root = scope || document;
                     root.querySelectorAll("[data-precaptaciones-row-id]").forEach((row) => {
                         const reason = String(row.dataset.precaptacionesReason || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
-                        const mereceTicket = String(row.dataset.precaptacionesMereceTicket || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
                         const shouldLock = row.dataset.precaptacionesActionsLocked === "1"
                             || row.dataset.precaptacionesHasTicket === "1"
                             || Boolean(row.querySelector(".precaptaciones__ticket-boton"))
-                            || reason === "ticket creado"
-                            || mereceTicket === "no";
+                            || reason === "ticket creado";
                         if (!shouldLock) return;
 
                         row.querySelectorAll(".precaptaciones__editar, .precaptaciones__duplicada, .precaptaciones__sin-informacion").forEach((button) => button.remove());
@@ -4045,12 +4065,16 @@ final class LegacyPanel
                         }
                     });
                 };
+                const filterRequests = new WeakMap();
                 const fetchResults = async (panel, page) => {
                     if (!panel) return;
                     const form = panel.querySelector("[data-precaptaciones-filters]");
                     const results = panel.querySelector("[data-precaptaciones-results]");
                     const status = panel.querySelector("[data-precaptaciones-status]");
                     if (!form || !results) return;
+                    filterRequests.get(panel)?.abort();
+                    const controller = new AbortController();
+                    filterRequests.set(panel, controller);
 
                     const data = new FormData(form);
                     data.append("action", "precaptaciones_filtrar");
@@ -4069,9 +4093,11 @@ final class LegacyPanel
                         const response = await fetch(window.Precaptaciones.ajaxUrl, {
                             method: "POST",
                             credentials: "same-origin",
+                            signal: controller.signal,
                             body: data
                         });
                         const payload = await response.json();
+                        if (filterRequests.get(panel) !== controller) return;
                         if (!payload.success) {
                             throw new Error(payload.data && payload.data.message ? payload.data.message : "No se pudo filtrar.");
                         }
@@ -4093,12 +4119,13 @@ final class LegacyPanel
                             status.textContent = "";
                         }
                     } catch (error) {
+                        if (error.name === "AbortError") return;
                         if (status) {
                             status.className = "precaptaciones__estado is-error";
                             status.textContent = error.message || "No se pudo filtrar.";
                         }
                     } finally {
-                        panel.classList.remove("is-loading");
+                        if (filterRequests.get(panel) === controller) panel.classList.remove("is-loading");
                     }
                 };
                 const filterTimers = new WeakMap();
@@ -4434,6 +4461,8 @@ final class LegacyPanel
 
                     const openTarget = event.target.closest("[data-precaptaciones-modal-open]");
                     if (openTarget) {
+                        const panel = openTarget.closest('[data-precaptaciones-panel]');
+                        window.clearTimeout(filterTimers.get(panel));
                         openModal(document.getElementById(openTarget.dataset.precaptacionesModalOpen));
                         return;
                     }
