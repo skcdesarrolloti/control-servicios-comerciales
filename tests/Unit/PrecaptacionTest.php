@@ -106,6 +106,20 @@ final class PrecaptacionTest extends TestCase
     self::assertStringContainsString('name="competencia[]"', $html);
   }
 
+  public function testMetricsCountScopedPendingAndConvertedRecords(): void
+  {
+    $html = LegacyPanel::render_shortcode(['modo'=>'mis']);
+    self::assertMatchesRegularExpression('/precap-metric--total.*?<strong>1<\/strong>/s', $html);
+    $_SESSION['scm_user_cargo'] = '13';
+    $html = LegacyPanel::render_shortcode(['modo'=>'control']);
+    self::assertMatchesRegularExpression('/precap-metric--pending.*?<strong>2<\/strong>/s', $html);
+    $this->db->update('wp_jet_cct_precaptaciones', ['id_ticket_asignado'=>'10','razones'=>'Ticket creado'], ['_ID'=>1]);
+    $html = LegacyPanel::render_shortcode(['modo'=>'control']);
+    self::assertMatchesRegularExpression('/precap-metric--pending.*?<strong>1<\/strong>/s', $html);
+    self::assertMatchesRegularExpression('/precap-metric--conversion.*?<strong>50\.0%<\/strong>/s', $html);
+    self::assertMatchesRegularExpression('/Tarea creada\s*<\/option>/', $html);
+  }
+
   public function testPreparedQueriesHandleQuotedPlaceholdersAndUntrustedNames(): void
   {
     $adapter = new DatabaseAdapter($this->db);

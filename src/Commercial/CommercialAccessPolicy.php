@@ -37,7 +37,7 @@ final class CommercialAccessPolicy
     'enviar_notificacion' => 'Enviar notificaciones comerciales',
     'precaptacion_crear' => 'Registrar precaptaciones',
     'precaptacion_editar' => 'Editar resultados de precaptación',
-    'precaptacion_ticket' => 'Crear ticket desde precaptación',
+    'precaptacion_ticket' => 'Crear tarea desde precaptación',
     'precaptacion_catalogos' => 'Crear barrios e inmobiliarias',
   ];
 

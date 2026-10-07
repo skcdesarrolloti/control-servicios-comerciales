@@ -41,6 +41,17 @@
     } finally { button.disabled = false; }
   }
   document.addEventListener("click", function (event) {
+    var collapse = event.target.closest("[data-precap-collapse]");
+    if (collapse) {
+      var filterForm = collapse.closest("form");
+      var expanded = collapse.getAttribute("aria-expanded") === "true";
+      collapse.setAttribute("aria-expanded", String(!expanded));
+      collapse.textContent = expanded ? "⌄ Expandir panel" : "⌄ Colapsar panel";
+      filterForm.querySelector(".precaptaciones__filtros-grid").hidden = expanded;
+      filterForm.querySelector(".precaptaciones__acciones-filtro").hidden = expanded;
+    }
+    var exportButton = event.target.closest("[data-precap-export]");
+    if (exportButton) exportCsv(exportButton);
     var open = event.target.closest("[data-precap-open]");
     if (open) {
       var dialog = document.getElementById(open.dataset.precapOpen);
@@ -49,6 +60,32 @@
     var close = event.target.closest("[data-precap-close]");
     if (close) close.closest("dialog").close();
   });
+  document.addEventListener("change", function (event) {
+    if (!event.target.matches("[data-precap-page-size]")) return;
+    var panel = event.target.closest("[data-precaptaciones-panel]");
+    panel.dataset.perPage = event.target.value;
+    panel.querySelector("[data-precaptaciones-filters]").dispatchEvent(new Event("submit", {bubbles:true,cancelable:true}));
+  });
+  async function exportCsv(button) {
+    var panel = button.closest("[data-precaptaciones-panel]");
+    var data = new FormData(panel.querySelector("[data-precaptaciones-filters]"));
+    data.set("action", "precaptaciones_exportar");
+    data.set("nonce", body.dataset.precapNonce);
+    data.set("mode", panel.dataset.mode);
+    var status = panel.querySelector("[data-precaptaciones-status]");
+    button.disabled = true;
+    try {
+      var response = await fetch(body.dataset.precapApi, {method:"POST",body:data,credentials:"same-origin"});
+      if (!response.ok || !response.headers.get("content-type").includes("text/csv")) throw new Error("No se pudo exportar el listado. Recarga la página e inténtalo de nuevo.");
+      var url = URL.createObjectURL(await response.blob());
+      var link = document.createElement("a");
+      link.href = url; link.download = "precaptaciones.csv";
+      document.body.appendChild(link); link.click(); link.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+      status.textContent = "";
+    } catch (error) { status.textContent = error.message; status.classList.add("is-error"); }
+    finally { button.disabled = false; }
+  }
   document.addEventListener("input", function (event) {
     var search = event.target.closest("[data-precap-search]");
     if (!search) return;

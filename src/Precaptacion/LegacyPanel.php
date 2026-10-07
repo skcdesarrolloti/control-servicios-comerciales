@@ -28,7 +28,7 @@ final class LegacyPanel
         $atts = shortcode_atts(
             [
                 'modo' => 'mis',
-                'por_pagina' => 50,
+                'por_pagina' => 10,
                 'url_formulario' => '',
                 'clase' => '',
             ],
@@ -96,6 +96,7 @@ final class LegacyPanel
         ob_start();
         self::print_assets();
         ?>
+        <link rel="stylesheet" href="<?php echo esc_url(SCM_BASE_URL . '/assets/css/precaptacion.css?v=' . filemtime(dirname(__DIR__, 2) . '/public/assets/css/precaptacion.css')); ?>">
         <section
             class="precaptaciones w-full text-slate-950 <?php echo esc_attr((string) $atts['clase']); ?>"
             data-precaptaciones-panel
@@ -103,6 +104,24 @@ final class LegacyPanel
             data-per-page="<?php echo esc_attr((string) $per_page); ?>"
             data-nonce="<?php echo esc_attr(wp_create_nonce('precaptaciones_filtrar')); ?>"
         >
+            <header class="precap-heading">
+                <div class="precap-heading-copy">
+                    <nav class="precap-breadcrumb" aria-label="Ruta de navegación">Gestión Inmobiliaria <span>›</span> Captaciones &amp; Oportunidades <span>›</span> <strong><?php echo $is_control ? 'Precaptaciones Admin' : 'Mis Precaptaciones'; ?></strong></nav>
+                    <h1><?php echo $is_control ? 'Precaptaciones Admin' : 'Mis Precaptaciones'; ?></h1>
+                    <p>Registra oportunidades de prospección en campo, valida avisos exteriores, depura duplicados y gestiona resultados para asignación de tareas comerciales.</p>
+                </div>
+                <div class="precap-heading-actions">
+                    <button type="button" class="precap-export" data-precap-export>↓ Exportar CSV</button>
+                    <?php if ($is_control) : ?>
+                        <?php self::render_bulk_promocionado_por_button(self::count_promocionado_por_por_normalizar($table)); ?>
+                        <?php self::render_bulk_competencia_button(self::count_competencia_por_normalizar($table)); ?>
+                    <?php endif; ?>
+                    <?php if (Module::policy()->canAct('precaptacion_crear')) : ?>
+                        <button type="button" class="precap-register" data-precap-open="precap-create"><span aria-hidden="true">＋</span> Registrar precaptación</button>
+                    <?php endif; ?>
+                </div>
+            </header>
+            <div class="precap-metrics" data-precap-metrics><?php self::render_metrics($table, $filters, $is_control); ?></div>
             <?php self::render_filters($table, $filters, $is_control); ?>
 
             <div class="precaptaciones__estado" data-precaptaciones-status aria-live="polite"></div>
@@ -119,23 +138,14 @@ final class LegacyPanel
         $data = self::query_precaptaciones($table, $filters, $is_control, $per_page, $page);
         $rows = $data['rows'];
         $total = $data['total'];
-        $promocionado_count = $data['promocionado_count'];
-        $competencia_count = $data['competencia_count'];
+        $page = $data['page'];
         ?>
-        <div class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div class="precaptaciones__contador inline-flex w-fit items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-900 shadow-sm">
-                <span class="h-2 w-2 rounded-full bg-[#ffc23d]" aria-hidden="true"></span>
-                <?php echo esc_html(number_format_i18n($total)); ?> registros
-            </div>
-            <?php if ($is_control) : ?>
-                <div class="precaptaciones__bulk-group">
-                    <?php self::render_bulk_promocionado_por_button($promocionado_count); ?>
-                    <?php self::render_bulk_competencia_button($competencia_count); ?>
-                </div>
-            <?php endif; ?>
+        <div class="precap-results-card">
+        <div class="precap-results-toolbar">
+            <div class="precaptaciones__contador"><strong><?php echo esc_html(number_format_i18n($total)); ?> registros</strong><span> | Vista operativa de prospección</span></div>
+            <label class="precap-page-size">Filas por página: <select data-precap-page-size aria-label="Filas por página"><?php foreach (array_unique([10, 25, 50, 100, $per_page]) as $size) : ?><option value="<?php echo (int) $size; ?>" <?php echo $size === $per_page ? 'selected' : ''; ?>><?php echo (int) $size; ?></option><?php endforeach; ?></select></label>
         </div>
-
-        <div class="precaptaciones__tabla-wrap rounded-lg border border-slate-200 bg-white shadow-sm">
+        <div class="precaptaciones__tabla-wrap">
             <table class="precaptaciones__tabla">
                 <thead>
                     <?php self::render_table_head($is_control); ?>
@@ -168,6 +178,7 @@ final class LegacyPanel
         <?php endif; ?>
 
         <?php self::render_pagination($total, $per_page, $page); ?>
+        </div>
         <?php
     }
 
@@ -181,6 +192,8 @@ final class LegacyPanel
 
         $total_sql = "SELECT COUNT(*) FROM {$table} {$where_sql}";
         $total = (int) $wpdb->get_var($where_values ? $wpdb->prepare($total_sql, $where_values) : $total_sql);
+        $page = min($page, max(1, (int) ceil($total / $per_page)));
+        $offset = ($page - 1) * $per_page;
 
         $order_col = self::first_existing_column($table, ['fecha', 'cct_created', '_created', '_ID']);
         $order_sql = $order_col ? "ORDER BY {$order_col} DESC" : '';
@@ -190,38 +203,70 @@ final class LegacyPanel
         $rows = $wpdb->get_results($wpdb->prepare($rows_sql, $rows_values), ARRAY_A);
 
         return [
-            'promocionado_count' => $is_control ? self::count_promocionado_por_por_normalizar($table) : 0,
-            'competencia_count' => $is_control ? self::count_competencia_por_normalizar($table) : 0,
             'rows' => $rows ?: [],
             'total' => $total,
+            'page' => $page,
         ];
+    }
+
+    private static function render_metrics(string $table, array $filters, bool $is_control): void
+    {
+        global $wpdb;
+        [$where, $values] = self::build_where($table, $filters, $is_control);
+        $reason_column = self::column_for($table, 'razones');
+        $contact_column = self::column_for($table, 'contactado');
+        $reason = $reason_column ? "LOWER(COALESCE(`{$reason_column}`, ''))" : "''";
+        $contact = $contact_column ? "LOWER(TRIM(COALESCE(`{$contact_column}`, '')))" : "''";
+        $ticket_conditions = ["{$reason} = 'ticket creado'"];
+        foreach (['id_ticket_asignado', 'ticket_asignado', 'id_ticket', 'ticket', 'numero_de_ticket', 'url_ticket', 'url_ticket_precap'] as $candidate) {
+            $column = self::first_existing_column($table, [$candidate]);
+            if ($column) $ticket_conditions[] = "TRIM(COALESCE(`{$column}`, '')) <> ''";
+        }
+        $ticket_column = self::column_for($table, 'tiene_ticket');
+        if ($ticket_column) $ticket_conditions[] = "LOWER(TRIM(COALESCE(`{$ticket_column}`, ''))) IN ('si', 'sí', '1', 'true')";
+        $ticket = '(' . implode(' OR ', $ticket_conditions) . ')';
+        $sql = "SELECT COUNT(*) AS total, SUM(CASE WHEN {$ticket} THEN 1 ELSE 0 END) AS tickets,
+            SUM(CASE WHEN {$reason} LIKE %s THEN 1 ELSE 0 END) AS duplicates,
+            SUM(CASE WHEN NOT {$ticket} AND ({$contact} IN ('', 'no', '0') OR {$reason} LIKE %s) THEN 1 ELSE 0 END) AS pending
+            FROM {$table} {$where}";
+        $data = $wpdb->get_row($wpdb->prepare($sql, array_merge(['%duplicad%', '%sin informaci%'], $values)), ARRAY_A) ?: [];
+        $total = (int) ($data['total'] ?? 0);
+        $pending = (int) ($data['pending'] ?? 0);
+        $duplicates = (int) ($data['duplicates'] ?? 0);
+        $tickets = (int) ($data['tickets'] ?? 0);
+        $cards = [
+            ['Total precaptaciones', number_format_i18n($total), 'registros', 'Listado actual', 'total'],
+            ['Sin información / Pendientes', number_format_i18n($pending), 'por depurar', ($total ? round($pending * 100 / $total, 1) : 0) . '% del listado', 'pending'],
+            ['Duplicadas identificadas', number_format_i18n($duplicates), 'registros marcados', $duplicates ? 'Revisar duplicadas' : 'Sin duplicadas', 'duplicates'],
+            ['Conversión a tarea', number_format($total ? $tickets * 100 / $total : 0, 1) . '%', 'efectividad', number_format_i18n($tickets) . ' con tarea', 'conversion'],
+        ];
+        foreach ($cards as [$label, $value, $detail, $badge, $kind]) {
+            echo '<article class="precap-metric precap-metric--' . esc_attr($kind) . '"><p>' . esc_html($label) . '</p><div><strong>' . esc_html($value) . '</strong><span>' . esc_html($detail) . '</span></div><small>' . esc_html($badge) . '</small></article>';
+        }
     }
 
     private static function render_filters(string $table, array $filters, bool $is_control): void
     {
         $active_filters = self::active_filter_count($filters);
-        $title = $is_control ? 'Precaptaciones Admin' : 'Mis Precaptaciones';
         ?>
         <form class="precaptaciones__filtros rounded-lg border border-slate-200 bg-white shadow-sm" method="post" data-precaptaciones-filters>
             <div class="precaptaciones__filtros-titulo flex flex-col gap-1 border-b border-slate-200 bg-slate-50 px-5 py-4 sm:flex-row sm:items-end sm:justify-between">
                 <div>
                     <p class="precaptaciones__filtros-eyebrow">Filtros</p>
-                    <h2 class="precaptaciones__filtros-heading"><?php echo esc_html($title); ?></h2>
-                    <p class="precaptaciones__filtros-subtitle">Refina el listado de precaptaciones</p>
+                    <h2 class="precaptaciones__filtros-heading">Refina el listado de precaptaciones</h2>
+                    <span class="precaptaciones__filtros-activos" data-precaptaciones-active-filters><?php echo esc_html(number_format_i18n($active_filters)); ?> activos</span>
                 </div>
-                <span class="precaptaciones__filtros-activos" data-precaptaciones-active-filters <?php echo $active_filters > 0 ? '' : 'hidden'; ?>>
-                    <?php echo esc_html(number_format_i18n($active_filters)); ?> activos
-                </span>
+                <button type="button" class="precap-collapse" data-precap-collapse aria-expanded="true" aria-controls="precap-filter-fields">⌄ Colapsar panel</button>
             </div>
 
-            <div class="precaptaciones__filtros-grid grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-4">
+            <div id="precap-filter-fields" class="precaptaciones__filtros-grid grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-4">
                 <label class="precaptaciones__campo precaptaciones__campo--wide min-w-0">
                     <span class="mb-2 block text-sm font-bold text-slate-800">Buscar</span>
-                    <input class="precaptaciones__control" type="search" name="precaptaciones_buscar" value="<?php echo esc_attr($filters['buscar']); ?>" placeholder="Contacto, direccion, barrio, referencia o ticket">
+                    <input class="precaptaciones__control" type="search" name="precaptaciones_buscar" value="<?php echo esc_attr($filters['buscar']); ?>" placeholder="Contacto, direccion, barrio, referencia o tarea">
                 </label>
 
                 <fieldset class="precaptaciones__grupo min-w-0">
-                    <legend class="mb-2 text-sm font-bold text-slate-800">Fecha</legend>
+                    <legend class="mb-2 text-sm font-bold text-slate-800">Fecha (Desde / Hasta)</legend>
                     <div class="precaptaciones__fecha grid grid-cols-2 gap-2">
                         <input class="precaptaciones__control" type="date" name="precaptaciones_fecha_desde" value="<?php echo esc_attr($filters['fecha_desde']); ?>" aria-label="Fecha desde">
                         <input class="precaptaciones__control" type="date" name="precaptaciones_fecha_hasta" value="<?php echo esc_attr($filters['fecha_hasta']); ?>" aria-label="Fecha hasta">
@@ -234,7 +279,7 @@ final class LegacyPanel
                 </label>
 
                 <label class="precaptaciones__campo min-w-0">
-                    <span class="mb-2 block text-sm font-bold text-slate-800">Ticket</span>
+                    <span class="mb-2 block text-sm font-bold text-slate-800">Tarea</span>
                     <input class="precaptaciones__control" type="search" name="precaptaciones_ticket" value="<?php echo esc_attr($filters['ticket']); ?>" placeholder="Escribe un numero">
                 </label>
 
@@ -246,12 +291,8 @@ final class LegacyPanel
                 <?php endif; ?>
 
                 <?php self::render_distinct_select($table, 'contactado', 'Contactado?', 'precaptaciones_contactado', $filters['contactado'], 'Elige una opcion'); ?>
-                <?php self::render_distinct_select($table, 'merece_ticket', 'Merece ticket?', 'precaptaciones_merece_ticket', $filters['merece_ticket'], 'Elige una opcion'); ?>
-                <?php self::render_distinct_select($table, 'tiene_ticket', 'Tiene ticket?', 'precaptaciones_tiene_ticket', $filters['tiene_ticket'], 'Selecciona una opcion'); ?>
-
-                <?php if ($is_control) : ?>
-                    <?php self::render_distinct_select($table, 'seguimiento', 'Tuvo seguimiento?', 'precaptaciones_seguimiento', $filters['seguimiento'], 'Elige una opcion'); ?>
-                <?php endif; ?>
+                <?php self::render_distinct_select($table, 'merece_ticket', '¿Merece tarea?', 'precaptaciones_merece_ticket', $filters['merece_ticket'], 'Elige una opcion'); ?>
+                <?php self::render_distinct_select($table, 'tiene_ticket', '¿Tiene tarea?', 'precaptaciones_tiene_ticket', $filters['tiene_ticket'], 'Selecciona una opcion'); ?>
 
                 <?php self::render_distinct_select($table, 'ruta', 'Ruta', 'precaptaciones_ruta', $filters['ruta'], 'Elige una opcion'); ?>
                 <?php self::render_distinct_select($table, 'tipo_inmueble', 'Tipo de inmueble', 'precaptaciones_tipo_inmueble', $filters['tipo_inmueble'], 'Selecciona un tipo'); ?>
@@ -263,16 +304,18 @@ final class LegacyPanel
                     <?php self::render_distinct_select($table, 'competencia', 'Competencia', 'precaptaciones_competencia', $filters['competencia'], 'Elige una opcion'); ?>
                     <?php self::render_distinct_select($table, 'origen', 'Origen', 'precaptaciones_origen', $filters['origen'], 'Selecciona uno'); ?>
                     <?php self::render_distinct_select($table, 'razones', 'Razon', 'precaptaciones_razones', $filters['razones'], 'Elige una opcion'); ?>
+                    <?php self::render_distinct_select($table, 'seguimiento', 'Tuvo seguimiento?', 'precaptaciones_seguimiento', $filters['seguimiento'], 'Elige una opcion'); ?>
                 <?php endif; ?>
             </div>
 
             <div class="precaptaciones__acciones-filtro flex flex-wrap items-center gap-3 border-t border-slate-200 bg-slate-50 px-5 py-4">
                 <button class="precaptaciones__boton-filtrar inline-flex min-h-11 items-center justify-center rounded-lg bg-[#061d49] px-5 py-2 text-sm font-black text-white shadow-sm transition hover:bg-[#0a2b6f] focus:outline-none focus:ring-4 focus:ring-[#061d49]/20" type="submit">
-                    Filtrar
+                    Filtrar Resultados
                 </button>
                 <button class="precaptaciones__boton-limpiar inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 bg-white px-5 py-2 text-sm font-bold text-slate-700 no-underline transition hover:bg-slate-100 focus:outline-none focus:ring-4 focus:ring-slate-300/50" type="button" data-precaptaciones-clear-filters>
-                    Limpiar
+                    Limpiar Filtros
                 </button>
+                <span class="precap-filter-hint">Criterios activos aplicables instantáneamente</span>
             </div>
         </form>
         <?php
@@ -291,8 +334,8 @@ final class LegacyPanel
             <th>Tipo de inmueble</th>
             <th>Categoria</th>
             <th>Resultado</th>
-            <th>Razon</th>
-            <th>Ticket</th>
+            <th>Razón / Detalle</th>
+            <th>Tarea</th>
         </tr>
         <?php
     }
@@ -351,14 +394,14 @@ final class LegacyPanel
             </td>
             <td><?php echo self::render_evidence($table, $row); ?></td>
             <?php if ($is_control) : ?>
-                <td><?php echo esc_html(self::employee_name($employee_id)); ?></td>
+                <td><div class="precap-employee"><span class="precap-avatar" aria-hidden="true"><?php echo esc_html(mb_strtoupper(mb_substr(self::employee_name($employee_id), 0, 1))); ?></span><strong><?php echo esc_html(self::employee_name($employee_id)); ?></strong></div></td>
             <?php endif; ?>
             <td><?php echo esc_html(self::row_value($table, $row, ['barrio', 'sector'])); ?></td>
-            <td><?php echo esc_html(self::row_value($table, $row, ['tipo_inmueble', 'tipo_de_inmueble'])); ?></td>
-            <td><?php echo esc_html(self::row_value($table, $row, ['categoria', 'categoria_inmueble'])); ?></td>
-            <td><?php echo esc_html(self::row_value($table, $row, ['resultado'])); ?></td>
-            <td><?php echo esc_html($reason_value); ?></td>
-            <td><?php echo self::render_ticket($table, $row); ?></td>
+            <td><span class="precap-property-badge"><?php echo esc_html(self::row_value($table, $row, ['tipo_inmueble', 'tipo_de_inmueble'])); ?></span></td>
+            <td><span class="precap-category-badge"><?php echo esc_html(self::row_value($table, $row, ['categoria', 'categoria_inmueble'])); ?></span></td>
+            <td><?php echo esc_html(self::display_text(self::row_value($table, $row, ['resultado']))); ?></td>
+            <td><?php echo esc_html(self::display_text($reason_value)); ?></td>
+            <td><span class="precap-ticket-badge"><?php echo self::render_ticket($table, $row) ?: 'Sin tarea'; ?></span></td>
         </tr>
         <?php
     }
@@ -387,9 +430,9 @@ final class LegacyPanel
             'Resultado' => self::row_value($table, $row, ['resultado']),
             'Razon' => self::row_value($table, $row, ['razones', 'razones_precap', 'razon']),
             'Contactado' => self::row_value($table, $row, ['contactado']),
-            'Merece ticket' => self::row_value($table, $row, ['merece_ticket']),
-            'Tiene ticket' => self::row_value($table, $row, ['tiene_ticket']),
-            'Ticket' => self::row_value($table, $row, ['ticket', 'numero_de_ticket']),
+            'Merece tarea' => self::row_value($table, $row, ['merece_ticket']),
+            'Tiene tarea' => self::row_value($table, $row, ['tiene_ticket']),
+            'Tarea' => self::row_value($table, $row, ['ticket', 'numero_de_ticket']),
             'Origen' => self::row_value($table, $row, ['origen']),
             'Promocionado por' => self::serialized_choice_label(self::row_value($table, $row, ['promocionado_por', 'promocionado'])),
             'Competencia' => self::serialized_choice_label(self::row_value($table, $row, ['competencia', 'competencias', 'competencia_precat'])),
@@ -419,7 +462,7 @@ final class LegacyPanel
                         <?php endif; ?>
                         <div class="precaptaciones-detalle__item <?php echo strlen((string) $value) > 80 ? 'precaptaciones-detalle__item--wide' : ''; ?>">
                             <dt><?php echo esc_html($label); ?></dt>
-                            <dd><?php echo esc_html((string) $value); ?></dd>
+                            <dd><?php echo esc_html(self::display_text((string) $value)); ?></dd>
                         </div>
                     <?php endforeach; ?>
                 </dl>
@@ -507,7 +550,7 @@ final class LegacyPanel
                         </label>
 
                         <label>
-                            <span>Merece ticket o seguir llamando?</span>
+                            <span>¿Merece tarea o seguir llamando?</span>
                             <select class="precaptaciones__control" name="merece_ticket" data-precaptaciones-merece-ticket>
                                 <option value="">Elige una opcion</option>
                                 <?php self::render_select_options(Module::policy()->canAct('precaptacion_ticket') ? ['Si', 'No', 'Seguir llamando'] : ['No', 'Seguir llamando'], $merece_ticket); ?>
@@ -566,7 +609,7 @@ final class LegacyPanel
                 <div class="precaptaciones-precap-modal__header">
                     <div>
                         <p class="precaptaciones-precap-modal__eyebrow">Precaptacion #<?php echo esc_html((string) $id); ?></p>
-                        <h2 id="<?php echo esc_attr($modal_id); ?>-title">Crear ticket comercial</h2>
+                        <h2 id="<?php echo esc_attr($modal_id); ?>-title">Crear tarea comercial</h2>
                     </div>
                 </div>
 
@@ -642,7 +685,7 @@ final class LegacyPanel
                     <div class="precaptaciones-precap-modal__message" data-precaptaciones-ticket-message aria-live="polite"></div>
 
                     <div class="precaptaciones-precap-modal__footer">
-                        <button class="precaptaciones-precap-modal__primary" type="submit">Crear ticket comercial</button>
+                        <button class="precaptaciones-precap-modal__primary" type="submit">Crear tarea comercial</button>
                     </div>
                 </form>
             </div>
@@ -678,9 +721,10 @@ final class LegacyPanel
         $options = array_values(array_unique(array_filter($options, 'strlen')));
         foreach ($options as $option) {
             printf(
-                '<option value="%1$s" %2$s>%1$s</option>',
+                '<option value="%1$s" %2$s>%3$s</option>',
                 esc_attr((string) $option),
-                selected($selected, (string) $option, false)
+                selected($selected, (string) $option, false),
+                esc_html(self::display_text((string) $option))
             );
         }
     }
@@ -702,7 +746,7 @@ final class LegacyPanel
             <option value=""><?php echo esc_html($placeholder); ?></option>
             <?php foreach ($options as $option) : ?>
                 <option value="<?php echo esc_attr((string) $option['value']); ?>" <?php selected((string) $selected, (string) $option['value']); ?>>
-                    <?php echo esc_html($option['label']); ?>
+                    <?php echo esc_html(self::display_text($option['label'])); ?>
                 </option>
             <?php endforeach; ?>
         </select>
@@ -941,7 +985,7 @@ final class LegacyPanel
             );
 
             return sprintf(
-                '<a class="precaptaciones__ticket-boton" href="%s" target="_blank" rel="noopener">Ver ticket</a>',
+                '<a class="precaptaciones__ticket-boton" href="%s" target="_blank" rel="noopener">Ver tarea</a>',
                 esc_url($ticket_url)
             );
         }
@@ -1201,22 +1245,21 @@ final class LegacyPanel
 
     private static function render_pagination(int $total, int $per_page, int $current_page): void
     {
-        $pages = (int) ceil($total / $per_page);
-        if ($pages <= 1) {
-            return;
+        $pages = max(1, (int) ceil($total / $per_page));
+        $start = $total ? min($total, ($current_page - 1) * $per_page + 1) : 0;
+        $end = min($total, $current_page * $per_page);
+        echo '<footer class="precap-results-footer"><p>Mostrando <strong>' . number_format_i18n($start) . ' a ' . number_format_i18n($end) . '</strong> de <strong>' . number_format_i18n($total) . '</strong> precaptaciones</p>';
+        echo '<nav class="precaptaciones__paginacion" aria-label="Paginación de precaptaciones">';
+        echo '<button type="button" data-precaptaciones-page="' . max(1, $current_page - 1) . '"' . ($current_page <= 1 ? ' disabled' : '') . '>Anterior</button>';
+        $visible = array_unique(array_merge([1, $pages], range(max(1, $current_page - 1), min($pages, $current_page + 1))));
+        sort($visible);
+        $previous = 0;
+        foreach ($visible as $i) {
+            if ($previous && $i > $previous + 1) echo '<span aria-hidden="true">…</span>';
+            echo '<button type="button" data-precaptaciones-page="' . $i . '" aria-label="Página ' . $i . '"' . ($i === $current_page ? ' class="is-active" aria-current="page"' : '') . '>' . $i . '</button>';
+            $previous = $i;
         }
-
-        echo '<nav class="precaptaciones__paginacion" aria-label="Paginacion de precaptaciones">';
-        for ($i = 1; $i <= $pages; $i++) {
-            $class = $i === $current_page ? ' class="is-active"' : '';
-            printf(
-                '<button%3$s type="button" data-precaptaciones-page="%1$d" aria-label="Pagina %1$d">%2$d</button>',
-                $i,
-                $i,
-                $class
-            );
-        }
-        echo '</nav>';
+        echo '<button type="button" data-precaptaciones-page="' . min($pages, $current_page + 1) . '"' . ($current_page >= $pages ? ' disabled' : '') . '>Siguiente</button></nav></footer>';
     }
 
     private static function render_bulk_old_not_contacted_button(int $count): void
@@ -1262,7 +1305,7 @@ final class LegacyPanel
                 Normalizar promocionado por
             </button>
             <span class="precaptaciones__bulk-count" data-precaptaciones-bulk-count>
-                <?php echo esc_html(number_format_i18n($count)); ?> valores por limpiar
+                <?php echo esc_html(number_format_i18n($count)); ?>
             </span>
             <span class="precaptaciones__bulk-message" data-precaptaciones-bulk-message aria-live="polite"></span>
         </div>
@@ -1287,7 +1330,7 @@ final class LegacyPanel
                 Normalizar competencia
             </button>
             <span class="precaptaciones__bulk-count" data-precaptaciones-bulk-count>
-                <?php echo esc_html(number_format_i18n($count)); ?> valores por limpiar
+                <?php echo esc_html(number_format_i18n($count)); ?>
             </span>
             <span class="precaptaciones__bulk-message" data-precaptaciones-bulk-message aria-live="polite"></span>
         </div>
@@ -1508,7 +1551,7 @@ final class LegacyPanel
                 <option value=""><?php echo esc_html($placeholder); ?></option>
                 <?php foreach ($options as $option) : ?>
                     <option value="<?php echo esc_attr($option['value']); ?>" <?php selected($selected, $option['value']); ?>>
-                        <?php echo esc_html($option['label']); ?>
+                        <?php echo esc_html(self::display_text($option['label'])); ?>
                     </option>
                 <?php endforeach; ?>
             </select>
@@ -2005,6 +2048,46 @@ final class LegacyPanel
         }
     }
 
+    public static function export_csv(array $request): never
+    {
+        global $wpdb;
+        $is_control = ($request['mode'] ?? '') === 'control';
+        if ($is_control && !self::current_user_can_bulk_update()) wp_send_json_error(['message' => 'No tienes permiso para exportar el panel administrativo.'], 403);
+        $table = self::table_name('jet_cct_precaptaciones');
+        [$where, $values] = self::build_where($table, self::read_filters($request), $is_control);
+        $sql = "SELECT * FROM {$table} {$where} ORDER BY _ID DESC";
+        $statement = Module::db()->pdo()->query($values ? $wpdb->prepare($sql, $values) : $sql);
+        $stream = fopen('php://temp', 'w+');
+        fwrite($stream, "\xEF\xBB\xBF");
+        fputcsv($stream, ['Precaptación', 'Funcionario', 'Barrio', 'Tipo de inmueble', 'Categoría', 'Resultado', 'Razón', 'Tarea'], ';', '"', '');
+        while ($row = $statement->fetch(\PDO::FETCH_ASSOC)) {
+            $cells = [
+                self::row_value($table, $row, ['_ID', 'id_precaptacion']),
+                self::employee_name(self::row_value($table, $row, ['id_empleado', 'cct_author_id', 'captador_precat'])),
+                self::row_value($table, $row, ['barrio', 'sector']),
+                self::row_value($table, $row, ['tipo_inmueble', 'tipo_de_inmueble']),
+                self::row_value($table, $row, ['categoria', 'categoria_inmueble']),
+                self::display_text(self::row_value($table, $row, ['resultado'])),
+                self::display_text(self::row_value($table, $row, ['razones', 'razones_precap', 'razon'])),
+                self::row_value($table, $row, ['id_ticket_asignado', 'ticket_asignado', 'id_ticket', 'ticket', 'numero_de_ticket']),
+            ];
+            $cells = array_map(static fn(string $cell): string => preg_match('/^[=+@\-\t\r]/', $cell) ? "'" . $cell : $cell, $cells);
+            fputcsv($stream, $cells, ';', '"', '');
+        }
+        rewind($stream);
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="precaptaciones.csv"');
+        header('Cache-Control: no-store');
+        fpassthru($stream);
+        fclose($stream);
+        exit;
+    }
+
+    private static function display_text(string $text): string
+    {
+        return str_replace(['Ticket creado', 'ticket creado', 'Tickets', 'tickets', 'Ticket', 'ticket'], ['Tarea creada', 'tarea creada', 'Tareas', 'tareas', 'Tarea', 'tarea'], $text);
+    }
+
     public static function ajax_filtrar_precaptaciones(): void
     {
         if (!is_user_logged_in()) {
@@ -2032,10 +2115,14 @@ final class LegacyPanel
         ob_start();
         self::render_results($table, $filters, $is_control, $per_page, $page);
         $html = (string) ob_get_clean();
+        ob_start();
+        self::render_metrics($table, $filters, $is_control);
+        $metrics = (string) ob_get_clean();
 
         wp_send_json_success([
             'active_filters' => self::active_filter_count($filters),
             'html' => $html,
+            'metrics' => $metrics,
         ]);
     }
 
@@ -2092,7 +2179,7 @@ final class LegacyPanel
     public static function ajax_crear_ticket(): void
     {
         if (!is_user_logged_in()) {
-            wp_send_json_error(['message' => 'Debes iniciar sesion para crear el ticket.'], 403);
+            wp_send_json_error(['message' => 'Debes iniciar sesion para crear la tarea.'], 403);
         }
 
         check_ajax_referer('precaptaciones_crear_ticket', 'nonce');
@@ -2103,12 +2190,12 @@ final class LegacyPanel
         $precaptaciones_table = self::table_name('jet_cct_precaptaciones');
         $tickets_table = self::table_name('jet_cct_tickets');
         if (!self::table_exists($precaptaciones_table) || !self::table_exists($tickets_table)) {
-            wp_send_json_error(['message' => 'No se encontraron las tablas requeridas para crear el ticket.'], 404);
+            wp_send_json_error(['message' => 'No se encontraron las tablas requeridas para crear la tarea.'], 404);
         }
 
         $id_precaptacion = absint($request['id_precaptacion'] ?? 0);
         if (!$id_precaptacion) {
-            wp_send_json_error(['message' => 'No se recibio la precaptacion para crear el ticket.'], 400);
+            wp_send_json_error(['message' => 'No se recibio la precaptacion para crear la tarea.'], 400);
         }
 
         $asignado = sanitize_text_field($request['asignado'] ?? $request['id_empleado'] ?? get_current_user_id());
@@ -2120,7 +2207,7 @@ final class LegacyPanel
         $correo_solicitante = sanitize_email($request['correo_solicitante'] ?? '');
         $celular_solicitante = sanitize_text_field($request['celular_solicitante'] ?? '');
         $tema_ayuda = sanitize_text_field($request['tema_ayuda'] ?? 'Captacion');
-        $asunto = sanitize_text_field($request['asunto'] ?? 'Ticket comercial');
+        $asunto = sanitize_text_field($request['asunto'] ?? 'Tarea comercial');
         $descripcion = sanitize_textarea_field($request['descripcion'] ?? '');
         $id_inmueble = absint($request['id_inmueble'] ?? 0);
         $id_pph = absint($request['id_pph'] ?? 0);
@@ -2170,7 +2257,7 @@ final class LegacyPanel
 
         $ticket_id = self::insert_cct_row($tickets_table, $ticket_data);
         if (!$ticket_id) {
-            wp_send_json_error(['message' => 'No se pudo crear el ticket: ' . $wpdb->last_error], 500);
+            wp_send_json_error(['message' => 'No se pudo crear la tarea: ' . $wpdb->last_error], 500);
         }
 
         self::registrar_historial_ticket($ticket_id, $ticket_data);
@@ -2179,7 +2266,7 @@ final class LegacyPanel
 
         $ticket_url = add_query_arg(['id_ticket' => (string) $ticket_id], 'https://sucasainmobiliaria.com.co/ticket/');
         wp_send_json_success([
-            'message' => sprintf('Ticket #%s creado con exito.', number_format_i18n($ticket_id)),
+            'message' => sprintf('Tarea #%s creada con exito.', number_format_i18n($ticket_id)),
             'ticket_id' => $ticket_id,
             'ticket_url' => $ticket_url,
         ]);
@@ -2240,11 +2327,11 @@ final class LegacyPanel
             'reporte_realizado_por_his' => $ticket_data['id_asignado'] ?? '',
             'fecha_his' => $ticket_data['fecha'] ?? current_time('timestamp'),
             'id_del_inmueble_his' => $ticket_data['id_inmueble'] ?? '',
-            'observacion_his' => $ticket_data['asunto'] ?: 'Se ha creado un ticket comercial.',
+            'observacion_his' => $ticket_data['asunto'] ?: 'Se ha creado una tarea comercial.',
             'id_inmueble' => $ticket_data['id_inmueble'] ?? '',
             'funcionario' => $ticket_data['nombre_empleado'] ?? '',
             'fecha' => $ticket_data['fecha'] ?? current_time('timestamp'),
-            'observacion' => 'Se ha creado un ticket comercial.',
+            'observacion' => 'Se ha creado una tarea comercial.',
             'id_empleado' => $ticket_data['id_empleado'] ?? '',
             'id_ticket' => $ticket_id,
             'tipo_de_reporte_his' => 'Ticket',
@@ -2281,7 +2368,7 @@ final class LegacyPanel
         if (!empty($ticket_data['correo_empleado']) && is_email($ticket_data['correo_empleado'])) {
             wp_mail(
                 $ticket_data['correo_empleado'],
-                self::ticket_email_replace('Nuevo ticket #%inserted_cct_tickets% asignado', $context),
+                self::ticket_email_replace('Nueva tarea #%inserted_cct_tickets% asignado', $context),
                 self::ticket_email_template_funcionario($context),
                 $headers
             );
@@ -2300,7 +2387,7 @@ final class LegacyPanel
         foreach (['sucasacorreos@gmail.com', 'gcorrearivera@gmail.com', 'sucasacomercial@gmail.com'] as $email) {
             wp_mail(
                 $email,
-                self::ticket_email_replace('Ticket comercial #%inserted_cct_tickets% creado', $context),
+                self::ticket_email_replace('Tarea comercial #%inserted_cct_tickets% creada', $context),
                 self::ticket_email_template_admin($context),
                 $headers
             );
@@ -2338,7 +2425,7 @@ final class LegacyPanel
             'celular_empleado' => (string) ($ticket_data['celular_empleado'] ?? ''),
             'solicitante' => (string) ($ticket_data['solicitante'] ?? ''),
             'tema_ayuda' => (string) ($ticket_data['tema_ayuda'] ?? 'Captacion'),
-            'asunto' => (string) ($ticket_data['asunto'] ?? 'Ticket comercial'),
+            'asunto' => (string) ($ticket_data['asunto'] ?? 'Tarea comercial'),
             'medio' => (string) ($ticket_data['medio'] ?? ''),
             'nombre_comercial' => (string) apply_filters('precaptaciones_ticket_email_nombre_comercial', 'Equipo comercial'),
             'celular_comercial' => (string) apply_filters('precaptaciones_ticket_email_celular_comercial', ''),
@@ -2414,8 +2501,8 @@ final class LegacyPanel
 
         return '<tr>
       <td style="padding:20px; text-align:center; color:#061d49;">
-        <p style="font-weight:500; margin:10px 0;">Si deseas ver toda la informacion del ticket, ingresa por este enlace:</p>
-        ' . self::ticket_email_button($context['ticket_url'], 'Ver ticket') . '
+        <p style="font-weight:500; margin:10px 0;">Si deseas ver toda la informacion de la tarea, ingresa por este enlace:</p>
+        ' . self::ticket_email_button($context['ticket_url'], 'Ver tarea') . '
         <p style="font-weight:500; margin:20px 0 10px;">Descubre quienes somos y todo lo que podemos hacer por ti.</p>
         ' . self::ticket_email_button($brochure_url, 'Ver brochure') . '
         <p style="font-weight:500; margin:20px 0 10px;">Descubre nuestra revista digital. Mantente al dia con las mejores oportunidades inmobiliarias, tips exclusivos y tendencias del mercado.</p>
@@ -2430,12 +2517,12 @@ final class LegacyPanel
       <td style="padding:20px; text-align:center; color:#061d49;">
         <h3 style="font-size:16px; margin:0 0 20px;">Estimado/a ' . esc_html($context['nombre_empleado']) . '</h3>
         <p style="font-weight:500; margin:10px 0;">
-          Se te ha asignado un nuevo ticket comercial de <b>' . esc_html($context['tema_ayuda']) . '</b> que trata de <b>' . esc_html($context['asunto']) . '</b>
+          Se te ha asignado una nueva tarea comercial de <b>' . esc_html($context['tema_ayuda']) . '</b> que trata de <b>' . esc_html($context['asunto']) . '</b>
         </p>
       </td>
     </tr>' . self::ticket_email_links($context);
 
-        return self::ticket_email_shell('Nuevo ticket comercial', $content, $context);
+        return self::ticket_email_shell('Nueva tarea comercial', $content, $context);
     }
 
     private static function ticket_email_template_solicitante(array $context): string
@@ -2453,7 +2540,7 @@ final class LegacyPanel
       </td>
     </tr>' . self::ticket_email_links($context, true);
 
-        return self::ticket_email_shell('Nuevo ticket agendado', $content, $context);
+        return self::ticket_email_shell('Nueva tarea agendada', $content, $context);
     }
 
     private static function ticket_email_template_admin(array $context): string
@@ -2462,13 +2549,13 @@ final class LegacyPanel
       <td style="padding:20px; text-align:center; color:#061d49;">
         <h3 style="font-size:16px; margin:0 0 20px;">Estimado administrador</h3>
         <p style="font-weight:500; margin:10px 0;">
-          Se ha agregado un nuevo ticket comercial de <b>' . esc_html($context['tema_ayuda']) . '</b> desde el medio <b>' . esc_html($context['medio']) . '</b>.
-          El cual fue asignado a <b>' . esc_html($context['nombre_empleado']) . '</b>.
+          Se ha agregado una nueva tarea comercial de <b>' . esc_html($context['tema_ayuda']) . '</b> desde el medio <b>' . esc_html($context['medio']) . '</b>.
+          La cual fue asignada a <b>' . esc_html($context['nombre_empleado']) . '</b>.
         </p>
       </td>
     </tr>' . self::ticket_email_links($context);
 
-        return self::ticket_email_shell('Nuevo ticket comercial', $content, $context);
+        return self::ticket_email_shell('Nueva tarea comercial', $content, $context);
     }
 
     public static function ajax_marcar_duplicada(): void
@@ -2734,7 +2821,7 @@ final class LegacyPanel
             'updated' => (int) $result['updated'],
             'remaining' => (int) $result['remaining'],
             'message' => sprintf(
-                'Se cambiaron %s razones de Creado a Ticket creado. Quedan %s pendientes.',
+                'Se cambiaron %s razones de Creado a Tarea creada. Quedan %s pendientes.',
                 number_format_i18n((int) $result['updated']),
                 number_format_i18n((int) $result['remaining'])
             ),
@@ -3859,7 +3946,7 @@ final class LegacyPanel
                 const updateActiveFilters = (panel, count) => {
                     const badge = panel ? panel.querySelector("[data-precaptaciones-active-filters]") : null;
                     if (!badge) return;
-                    badge.hidden = count <= 0;
+                    badge.hidden = false;
                     badge.textContent = count.toLocaleString("es-CO") + " activos";
                 };
                 const localActiveFilterCount = (form) => {
@@ -3919,6 +4006,8 @@ final class LegacyPanel
                             throw new Error(payload.data && payload.data.message ? payload.data.message : "No se pudo filtrar.");
                         }
                         results.innerHTML = payload.data.html || "";
+                        const metrics = panel.querySelector("[data-precap-metrics]");
+                        if (metrics && payload.data.metrics) metrics.innerHTML = payload.data.metrics;
                         enforceLockedActions(results);
                         updateActiveFilters(panel, Number(payload.data.active_filters || localActiveFilterCount(form)));
                         if (status) {
@@ -4102,7 +4191,7 @@ final class LegacyPanel
                         if (count <= 0) return;
 
                         const confirmed = window.confirm(
-                            "Se cambiaran " + count.toLocaleString("es-CO") + " razones de Creado a Ticket creado. ¿Continuar?"
+                            "Se cambiaran " + count.toLocaleString("es-CO") + " razones de Creado a Tarea creada. ¿Continuar?"
                         );
                         if (!confirmed) return;
 
@@ -4316,7 +4405,7 @@ final class LegacyPanel
                         let ticketWindow = null;
                         if (button) {
                             button.disabled = true;
-                            button.textContent = "Creando ticket...";
+                            button.textContent = "Creando tarea...";
                         }
                         if (message) {
                             message.className = "precaptaciones-precap-modal__message";
@@ -4325,7 +4414,7 @@ final class LegacyPanel
                         try {
                             ticketWindow = window.open("about:blank", "_blank", "noopener");
                             if (ticketWindow && ticketWindow.document) {
-                                ticketWindow.document.write("<p style=\"font-family:Arial,sans-serif;padding:24px;\">Creando ticket...</p>");
+                                ticketWindow.document.write("<p style=\"font-family:Arial,sans-serif;padding:24px;\">Creando tarea...</p>");
                                 ticketWindow.document.close();
                             }
                         } catch (popupError) {
@@ -4340,11 +4429,11 @@ final class LegacyPanel
                             });
                             const payload = await response.json();
                             if (!payload.success) {
-                                throw new Error(payload.data && payload.data.message ? payload.data.message : "No se pudo crear el ticket.");
+                                throw new Error(payload.data && payload.data.message ? payload.data.message : "No se pudo crear la tarea.");
                             }
                             if (message) {
                                 message.className = "precaptaciones-precap-modal__message is-success";
-                                message.textContent = payload.data.message || "Ticket creado con exito.";
+                                message.textContent = payload.data.message || "Tarea creada con exito.";
                             }
                             if (payload.data && payload.data.ticket_url) {
                                 if (ticketWindow && !ticketWindow.closed) {
@@ -4352,7 +4441,7 @@ final class LegacyPanel
                                 } else {
                                     window.open(payload.data.ticket_url, "_blank", "noopener");
                                 }
-                                await showNotice("success", "Ticket creado", payload.data.message || "Ticket creado con exito.");
+                                await showNotice("success", "Tarea creada", payload.data.message || "Tarea creada con exito.");
                                 const panel = getPanel(ticketForm);
                                 forceCloseModal(ticketForm.closest(".precaptaciones-precap-modal"));
                                 fetchResults(panel, currentPage(panel));
@@ -4367,9 +4456,9 @@ final class LegacyPanel
                             }
                             if (message) {
                                 message.className = "precaptaciones-precap-modal__message is-error";
-                                message.textContent = error.message || "No se pudo crear el ticket.";
+                                message.textContent = error.message || "No se pudo crear la tarea.";
                             }
-                            await showNotice("error", "No se pudo crear", error.message || "No se pudo crear el ticket.");
+                            await showNotice("error", "No se pudo crear", error.message || "No se pudo crear la tarea.");
                             if (button) {
                                 button.disabled = false;
                                 button.textContent = originalText;
@@ -4429,7 +4518,7 @@ final class LegacyPanel
                                 if (ticketModal) holder.appendChild(ticketModal);
                             }
                             if (!ticketModal) {
-                                throw new Error("No se pudo abrir el formulario para crear el ticket.");
+                                throw new Error("No se pudo abrir el formulario para crear la tarea.");
                             }
                             syncTicketModalFromEdit(form, ticketModal);
                             closeModal(form.closest(".precaptaciones-precap-modal"));

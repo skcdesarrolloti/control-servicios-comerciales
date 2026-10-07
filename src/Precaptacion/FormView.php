@@ -12,12 +12,6 @@ final class FormView
     $options = $repository->options();
     ob_start();
     ?>
-    <div class="precap-toolbar">
-      <div><h1>Precaptación</h1><p>Registra oportunidades y gestiona sus resultados.</p></div>
-      <?php if (Module::policy()->canAct('precaptacion_crear')): ?>
-        <button type="button" data-precap-open="precap-create">Registrar precaptación</button>
-      <?php endif; ?>
-    </div>
     <?php if (Module::policy()->canAct('precaptacion_crear')): ?>
     <dialog id="precap-create" aria-labelledby="precap-create-title">
       <form id="precap-create-form" enctype="multipart/form-data">
