@@ -3895,7 +3895,7 @@ final class CommercialDashboardView
       $title = $tipoInmueble . ($barrio !== '' ? " en {$barrio}" : '');
       $initials = self::initials($funcionarioNombre);
 ?>
-      <article class="group bg-surface-container-lowest rounded-2xl border border-surface-container overflow-hidden shadow-xs hover:shadow-lg hover:border-outline-variant/60 transition-all duration-300 flex flex-col justify-between" data-commercial-property-card="<?php echo esc_attr($codigo); ?>">
+      <article class="group bg-surface-container-lowest rounded-2xl border border-surface-container overflow-hidden shadow-xs hover:shadow-lg hover:border-outline-variant/60 transition-all duration-300 flex flex-col" data-commercial-property-card="<?php echo esc_attr($codigo); ?>">
         <!-- Contenedor de Imagen y Badges Superpuestos -->
         <div>
           <div class="relative w-full aspect-[16/10] bg-surface-container-high overflow-hidden">
@@ -4008,7 +4008,7 @@ final class CommercialDashboardView
 
             <!-- Fila de Características Clave (con estrato independiente garantizado) -->
             <?php if (!empty($featureSlots)): ?>
-              <div class="grid grid-cols-<?php echo min(5, count($featureSlots)); ?> gap-1.5 pt-2 border-t border-surface-container text-center font-label-sm text-[11px] text-secondary">
+              <div class="grid gap-1.5 pt-2 border-t border-surface-container text-center font-label-sm text-[11px] text-secondary" style="grid-template-columns: repeat(<?php echo count($featureSlots); ?>, minmax(0, 1fr));">
                 <?php foreach ($featureSlots as $slot): ?>
                   <div class="flex flex-col items-center justify-center p-1 rounded-lg bg-surface-container-low" title="<?php echo esc_attr($slot['title']); ?>">
                     <span class="material-symbols-outlined text-[16px] text-primary"><?php echo esc_html($slot['icon']); ?></span>
@@ -4021,6 +4021,7 @@ final class CommercialDashboardView
           </div>
         </div>
 
+        <div style="margin-top: auto;">
         <?php if (!empty($activePortals)): ?>
           <!-- Barra rápida para liberar cupos de portales -->
           <div class="px-4 py-2 bg-amber-50 border-t border-amber-200/60 flex flex-wrap items-center justify-between gap-1.5 text-[11px]">
@@ -4058,6 +4059,7 @@ final class CommercialDashboardView
               <span>Ficha</span>
             </button>
           </div>
+        </div>
         </div>
       </article>
 <?php
