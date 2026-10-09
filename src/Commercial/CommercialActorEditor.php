@@ -54,8 +54,20 @@ final class CommercialActorEditor
     ['config' => $config, 'row' => $row] = $this->actor($type, $id);
     $values = [];
     foreach ($this->fields($config, $row) as $field => $column) { $values[$field] = (string) ($row[$column] ?? ''); }
+    $groups = ['inmuebles' => 'Inmuebles', 'mandatos' => 'Contratos de mandato', 'arrendamientos' => 'Contratos de arrendamiento', 'cierres' => 'Cierres'];
+    $related = [];
+    $relatedError = '';
+    try {
+      foreach ($this->related($type, $id, $row, [], array_keys($groups), true) as $item) {
+        $record = $this->present($item);
+        $record['values'] = array_map(static fn(array $field): array => ['label' => $field['label'], 'value' => $field['before']], $record['changes']);
+        unset($record['changes']);
+        $related[] = $record;
+      }
+    } catch (\PDOException $exception) { throw $exception; }
+    catch (\RuntimeException $exception) { $relatedError = $exception->getMessage(); }
     return ['id' => $id, 'type' => $type, 'label' => $config['role'], 'values' => $values,
-      'groups' => ['inmuebles' => 'Inmuebles', 'mandatos' => 'Contratos de mandato', 'arrendamientos' => 'Contratos de arrendamiento', 'cierres' => 'Cierres'],
+      'groups' => $groups, 'related' => $related, 'related_error' => $relatedError,
       'version' => $this->version($row)];
   }
 
@@ -118,7 +130,10 @@ final class CommercialActorEditor
     }
     $plan = [$this->item($config['table'], $row, $changes, $config['role'] . ' · registro principal', 'actor', 'Datos principales')];
     $groups = array_intersect(['inmuebles', 'mandatos', 'arrendamientos', 'cierres'], (array) ($input['groups'] ?? []));
-    foreach ($this->related($type, $id, $row, $logical, $groups) as $item) { $plan[] = $item; }
+    $selected = isset($input['select_records']) ? array_map('strval', (array) ($input['records'] ?? [])) : null;
+    foreach ($this->related($type, $id, $row, $logical, $groups) as $item) {
+      if ($selected === null || in_array($item['key'], $selected, true)) { $plan[] = $item; }
+    }
     if (count($plan) > 500) { throw new \RuntimeException('La edición afecta más de 500 registros. Selecciona menos grupos para revisar.'); }
     $this->assertTransactional(array_unique(array_column($plan, 'table')));
     $token = bin2hex(random_bytes(24));
@@ -152,7 +167,7 @@ final class CommercialActorEditor
   }
 
   /** Solo relaciones por ID estable, nunca por nombre o correo. Los mandatos respetan cada titular. */
-  private function related(string $type, int $id, array $actor, array $logical, array $groups): array
+  private function related(string $type, int $id, array $actor, array $logical, array $groups, bool $listing = false): array
   {
     if ($groups === []) { return []; }
     $party = str_starts_with($type, 'propietarios') ? 'propietario' : (str_starts_with($type, 'arrendatarios') ? 'arrendatario' : ($type === 'copropiedades' ? 'copropiedad' : 'pph'));
@@ -205,13 +220,13 @@ final class CommercialActorEditor
             foreach (['nombre' => $juridical ? 'empresa_1' : 'nombre_1', 'documento' => $juridical ? 'nit_1' : 'documento_1', 'correo' => 'correo_1', 'celular' => 'celular_1', 'indicativo' => 'indicativo_1'] as $field => $column) { $map[$field][] = $column; }
           }
         }
-        foreach ($logical as $field => $value) {
+        foreach ($listing ? array_fill_keys(array_keys(self::FIELDS), '') : $logical as $field => $value) {
           foreach ($map[$field] ?? [] as $column) {
-            if ($this->schema->columnExists($table, $column) && (string) ($row[$column] ?? '') !== $value) { $data[$column] = $value; }
+            if ($this->schema->columnExists($table, $column) && ($listing || (string) ($row[$column] ?? '') !== $value)) { $data[$column] = $listing ? (string) ($row[$column] ?? '') : $value; }
           }
         }
         if ($data === []) { continue; }
-        $context = implode(' · ', array_filter([(string) ($row['estado'] ?? ''), (string) ($row['contrato'] ?? $row['codigo'] ?? ''), (string) ($row['direccion'] ?? '')]));
+        $context = implode(' · ', array_filter([(string) ($row['estado'] ?? ''), (string) ($row['contrato'] ?? ''), (string) ($row['codigo'] ?? ''), (string) ($row['direccion'] ?? '')]));
         $out[] = $this->item($table, $row, $data, $label . ' #' . $row['_ID'], $group, $context);
       }
     }

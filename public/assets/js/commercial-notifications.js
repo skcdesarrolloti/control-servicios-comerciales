@@ -334,6 +334,33 @@
       actorBusy = value; actorModal.setAttribute('aria-busy', String(value));
       actorModal.querySelectorAll('button, input').forEach(function (node) { node.disabled = value || node.hasAttribute('data-actor-required'); });
     }
+    function updateActorRelatedSelection() {
+      var records = Array.from(actorModal.querySelectorAll('[data-notif-actor-record]'));
+      actorModal.querySelectorAll('[data-notif-actor-group]').forEach(function (group) {
+        var items = records.filter(function (node) { return node.dataset.group === group.value; });
+        var count = items.filter(function (node) { return node.checked; }).length;
+        group.checked = count > 0;
+        group.indeterminate = count > 0 && count < items.length;
+      });
+      el('[data-notif-actor-related-summary]').textContent = records.filter(function (node) { return node.checked; }).length + ' de ' + records.length + ' registros relacionados seleccionados';
+    }
+    function renderActorRelated(data) {
+      var records = data.related || [];
+      el('[data-notif-actor-groups]').innerHTML = Object.entries(data.groups).map(function (entry) {
+        var count = records.filter(function (item) { return item.group === entry[0]; }).length;
+        return '<label class="flex items-center gap-2 text-sm"><input type="checkbox" name="groups[]" data-notif-actor-group value="' + esc(entry[0]) + '" ' + (count ? 'checked' : 'data-actor-required disabled') + ' class="w-4 h-4 accent-[#735c00]">' + esc(entry[1]) + ' (' + count + ')</label>';
+      }).join('');
+      el('[data-notif-actor-related]').innerHTML = records.length ? Object.entries(data.groups).map(function (entry) {
+        var items = records.filter(function (item) { return item.group === entry[0]; });
+        if (!items.length) return '';
+        return '<section class="rounded-xl border border-slate-200 bg-white overflow-hidden"><h4 class="px-4 py-3 text-sm font-semibold">' + esc(entry[1]) + ' · ' + items.length + '</h4>' + items.map(function (item) {
+          var values = item.values.filter(function (field) { return field.value !== ''; });
+          var current = values.length ? values.map(function (field) { return '<span class="block"><span class="font-medium">' + esc(field.label) + ':</span> <span class="break-all">' + esc(field.value) + '</span></span>'; }).join('') : 'Sin datos de contacto guardados en este registro.';
+          return '<label class="flex items-start gap-3 border-t border-slate-100 p-4"><input type="checkbox" name="records[]" data-notif-actor-record data-group="' + esc(item.group) + '" value="' + esc(item.key) + '" checked class="mt-1 w-4 h-4 shrink-0 accent-[#735c00]"><span class="min-w-0 text-sm"><strong class="block">' + esc(item.label) + '</strong><span class="block text-xs text-secondary mt-1 break-words">' + esc(item.context || 'ID ' + item.id) + '</span><span class="block text-xs text-secondary mt-2">' + current + '</span></span></label>';
+        }).join('') + '</section>';
+      }).join('') : '<p class="text-sm text-secondary">' + esc(data.related_error || 'No se encontraron registros relacionados con este actor. Se actualizará únicamente su registro principal.') + '</p>';
+      updateActorRelatedSelection();
+    }
     async function openActor(id) {
       if (!actorModal || actorBusy || !config.can_edit_actor) return;
       var ticket = ++actorSequence, actorType = type;
@@ -351,13 +378,14 @@
           form.elements[field].disabled = !Object.hasOwn(data.values, field);
         });
         el('[data-notif-actor-identity]').textContent = data.label + ' · ' + data.values.nombre + ' · ID ' + data.id;
-        el('[data-notif-actor-groups]').innerHTML = Object.entries(data.groups).map(function (entry) { return '<label class="flex items-center gap-2 text-sm"><input type="checkbox" name="groups[]" value="' + esc(entry[0]) + '" checked class="w-4 h-4 accent-[#735c00]">' + esc(entry[1]) + '</label>'; }).join('');
+        renderActorRelated(data);
         actorFeedback('Edita los datos y revisa dónde se aplicarán.'); form.hidden = false; form.elements.nombre.focus();
       } catch (error) { if (ticket === actorSequence && panel.isConnected) actorFeedback(error.message, true); }
     }
     async function reviewActor(event) {
       event.preventDefault(); if (actorBusy || !actorData) return;
       var data = new FormData(el('[data-notif-actor-form]')); data.set('type', actorData.type); data.set('id', actorData.id); data.set('version', actorData.version);
+      data.set('select_records', '1');
       actorToken = ''; setActorBusy(true); actorFeedback('Preparando la comparación de los registros…');
       try {
         var result = await api('commercial_actor_preview', data);
@@ -440,6 +468,15 @@
     });
     panel.addEventListener("change", function (event) {
       var target = event.target;
+      if (target.hasAttribute('data-notif-actor-group')) {
+        actorModal.querySelectorAll('[data-notif-actor-record]').forEach(function (node) { if (node.dataset.group === target.value) node.checked = target.checked; });
+        updateActorRelatedSelection();
+      }
+      if (target.hasAttribute('data-notif-actor-record')) updateActorRelatedSelection();
+      if (target.hasAttribute('data-notif-actor-target')) {
+        actorModal.querySelectorAll('[data-notif-actor-record]').forEach(function (node) { if (node.value === target.value) node.checked = target.checked; });
+        updateActorRelatedSelection();
+      }
       if (target.hasAttribute("data-notif-recipient")) {
         if (allFiltered) { if (target.checked) excluded.delete(target.value); else excluded.add(target.value); }
         else if (target.checked) selected.set(target.value, target.dataset.name); else selected.delete(target.value);

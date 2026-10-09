@@ -42,6 +42,33 @@ final class CommercialActorEditorTest extends TestCase
     self::assertSame('Cerrado', array_values(array_filter($preview['items'], static fn(array $item): bool => $item['group'] === 'cierres'))[0]['context']);
   }
 
+  public function testDetailListsConcreteRelationsBeforeEditingEvenWhenValuesAlreadyMatch(): void
+  {
+    [$db, , $editor] = CommercialNotificationsFixture::makeForActorEditing();
+    $db->update('wp_jet_cct_inmuebles', ['propietario' => 'Propietario 10'], ['_ID' => 2]);
+    $detail = $editor->detail('propietarios_activos', 10);
+    self::assertCount(5, $detail['related']);
+    self::assertSame('', $detail['related_error']);
+    self::assertSame(['inmuebles:2', 'mandatos:1', 'arrendamientos:2', 'arrendamientos:7', 'cierres:1'], array_column($detail['related'], 'key'));
+    self::assertStringContainsString('SIMI-100', $detail['related'][0]['context']);
+    self::assertSame('Propietario 10', $detail['related'][0]['values'][0]['value']);
+    self::assertStringContainsString('C-2', $detail['related'][2]['context']);
+    self::assertSame('Cerrado', $detail['related'][4]['context']);
+    self::assertNotContains('Nombre · titular 2', array_column($detail['related'][1]['values'], 'label'));
+    self::assertArrayNotHasKey('table', $detail['related'][0]);
+    self::assertSame([], $editor->detail('copropiedades', 33)['related']);
+  }
+
+  public function testInitialRecordSelectionControlsPreviewAndSaving(): void
+  {
+    [$db, , $editor] = CommercialNotificationsFixture::makeForActorEditing();
+    $preview = $this->preview($editor, ['select_records' => '1', 'records' => ['inmuebles:2', 'arrendamientos:7', 'inmuebles:999']]);
+    self::assertSame(['actor:10', 'inmuebles:2', 'arrendamientos:7'], array_column($preview['items'], 'key'));
+    self::assertSame(3, $editor->save($preview['token'], array_column($preview['items'], 'key'))['updated']);
+    self::assertSame('Propietario original', $db->getVar('SELECT propietario FROM wp_jet_cct_contratos_arrendamiento WHERE _ID = 2'));
+    self::assertCount(1, $this->preview($editor, ['nombre' => 'Solo principal', 'select_records' => '1', 'records' => []])['items']);
+  }
+
   public function testSaveUpdatesSelectedRelationsAndRecordsWhoChangedWhat(): void
   {
     [$db, , $editor] = CommercialNotificationsFixture::makeForActorEditing();
@@ -156,6 +183,9 @@ final class CommercialActorEditorTest extends TestCase
   {
     [$db, , $editor] = CommercialNotificationsFixture::makeForActorEditing();
     $db->update('wp_jet_cct_propietarios', ['id_propietario' => '10'], ['_ID' => 13]);
+    $detail = $editor->detail('propietarios_activos', 10);
+    self::assertSame([], $detail['related']);
+    self::assertStringContainsString('referencia', $detail['related_error']);
     try { $this->preview($editor); self::fail('Se propagaron referencias ambiguas.'); }
     catch (\RuntimeException $exception) { self::assertStringContainsString('referencia', $exception->getMessage()); }
     self::assertCount(1, $this->preview($editor, ['groups' => []])['items']);
