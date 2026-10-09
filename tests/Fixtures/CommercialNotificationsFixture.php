@@ -99,6 +99,7 @@ final class CommercialNotificationsFixture
       'wp_jet_cct_confi_sistema' => '_ID INTEGER PRIMARY KEY, funcion TEXT, valor TEXT',
       'wp_jet_cct_funcionarios' => '_ID INTEGER PRIMARY KEY, id_empleado TEXT, nombre TEXT, rol TEXT, id_cargo TEXT, celular TEXT, correo TEXT, activo TEXT',
       'wp_jet_cct_cargos' => '_ID INTEGER PRIMARY KEY, nombre_cargo TEXT',
+      'wp_jet_cct_paises' => '_ID INTEGER PRIMARY KEY, codigo TEXT, pais TEXT',
       'wp_jet_cct_propietarios' => '_ID INTEGER PRIMARY KEY, id_propietario TEXT, nombre TEXT, correo TEXT, celular TEXT, indicativo TEXT, cct_author_id TEXT, bloqueo_whatsapp INTEGER, permite_marketing_whatsapp INTEGER',
       'wp_jet_cct_arrendatarios' => '_ID INTEGER PRIMARY KEY, id_arrendatario TEXT, nombre TEXT, correo TEXT, celular TEXT, indicativo TEXT, cct_author_id TEXT',
       'wp_jet_cct_copropiedades' => '_ID INTEGER PRIMARY KEY, copropiedad TEXT, correo TEXT, contacto TEXT, indicativo TEXT, cct_author_id TEXT',
@@ -116,6 +117,7 @@ final class CommercialNotificationsFixture
     }
     $pdo->exec("INSERT INTO wp_jet_cct_funcionarios VALUES (1,'900','Ana Pérez','Consultora','9','3001234567','ana@example.test','Si'),(2,'901','Otro usuario','Consultor','9','3007654321','otro@example.test','Si'),(3,'999','Administrador','Administrador','11','3005555555','admin@example.test','Si')");
     $pdo->exec("INSERT INTO wp_jet_cct_cargos VALUES (9,'Consultora de Arriendo'),(11,'Administrador')");
+    $pdo->exec("INSERT INTO wp_jet_cct_paises VALUES (1,'57','Colombia'),(2,'+34','España'),(3,'+1','Estados Unidos'),(4,'1','Canadá')");
     $pdo->exec("INSERT INTO wp_jet_cct_inmuebles VALUES (1,'900','2011','2020','30')");
     $pdo->exec("INSERT INTO wp_jet_cct_contratos_arrendamiento VALUES
       (1,'900','2012','2021','31','Recibido'),

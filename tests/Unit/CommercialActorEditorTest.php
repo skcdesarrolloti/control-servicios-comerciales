@@ -92,6 +92,26 @@ final class CommercialActorEditorTest extends TestCase
     $editor->save($preview['token'], array_column($preview['items'], 'key'));
   }
 
+  public function testCountryCatalogNormalizesCodesAndIncludesCountriesSharingACode(): void
+  {
+    [$db, , $editor] = CommercialNotificationsFixture::makeForActorEditing();
+    $countries = array_column($editor->detail('propietarios_activos', 10)['dialing_codes'], 'country', 'code');
+    self::assertSame('Colombia', $countries['+57']);
+    self::assertSame('España', $countries['+34']);
+    self::assertStringContainsString('Canadá', $countries['+1']);
+    self::assertStringContainsString('Estados Unidos', $countries['+1']);
+    self::assertCount(3, $countries);
+    self::assertSame('57', $db->getVar('SELECT indicativo FROM wp_jet_cct_propietarios WHERE _ID = 10'));
+  }
+
+  public function testCountryCatalogFallsBackWhenTheTableIsMissing(): void
+  {
+    [$db, , $editor] = CommercialNotificationsFixture::makeForActorEditing();
+    $db->pdo()->exec("DELETE FROM information_schema.TABLES WHERE TABLE_NAME = 'wp_jet_cct_paises'");
+    $db->pdo()->exec('DROP TABLE wp_jet_cct_paises');
+    self::assertSame([['code' => '+57', 'country' => 'Colombia']], $editor->detail('propietarios_activos', 10)['dialing_codes']);
+  }
+
   public function testComparisonIncludesUnchangedFieldsAndOnlyWritesChangedRecords(): void
   {
     [$db, , $editor] = CommercialNotificationsFixture::makeForActorEditing();

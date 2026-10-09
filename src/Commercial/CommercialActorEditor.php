@@ -68,7 +68,33 @@ final class CommercialActorEditor
     catch (\RuntimeException $exception) { $relatedError = $exception->getMessage(); }
     return ['id' => $id, 'type' => $type, 'label' => $config['role'], 'values' => $values,
       'groups' => $groups, 'related' => $related, 'related_error' => $relatedError,
+      'dialing_codes' => $this->dialingCodes(),
       'version' => $this->version($row)];
+  }
+
+  private function dialingCodes(): array
+  {
+    $fallback = [['code' => '+57', 'country' => 'Colombia']];
+    $table = $this->db->table('jet_cct_paises');
+    if (!$this->schema->tableExists($table)) { return $fallback; }
+    $codeColumn = $countryColumn = null;
+    foreach (['codigo', 'indicativo', 'phone_code'] as $column) {
+      if ($this->schema->columnExists($table, $column)) { $codeColumn = $column; break; }
+    }
+    foreach (['pais', 'nombre', 'country'] as $column) {
+      if ($this->schema->columnExists($table, $column)) { $countryColumn = $column; break; }
+    }
+    if ($codeColumn === null || $countryColumn === null) { return $fallback; }
+    $countries = [];
+    foreach ($this->db->getResults("SELECT `{$codeColumn}` AS code, `{$countryColumn}` AS country FROM `{$table}` ORDER BY `{$countryColumn}` LIMIT 500") as $row) {
+      $code = trim((string) ($row['code'] ?? ''));
+      $country = trim((string) ($row['country'] ?? ''));
+      if ($country === '' || !preg_match('/^\+?[1-9][0-9]{0,3}$/', $code)) { continue; }
+      $countries['+' . ltrim($code, '+')][] = $country;
+    }
+    $out = [];
+    foreach ($countries as $code => $names) { $out[] = ['code' => $code, 'country' => implode(' / ', array_unique($names))]; }
+    return $out ?: $fallback;
   }
 
   private function validate(string $field, string $value): string

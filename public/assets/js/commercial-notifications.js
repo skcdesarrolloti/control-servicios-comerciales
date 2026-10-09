@@ -333,9 +333,30 @@
       var node = el('[data-notif-actor-feedback]'); node.textContent = message; node.classList.toggle('text-error', !!error);
       if (error) node.scrollIntoView({block: 'nearest'});
     }
+    function actorDialingCode(value) { return /^\+?[1-9][0-9]{0,3}$/.test(String(value).trim()) ? '+' + String(value).trim().replace(/^\+/, '') : ''; }
+    function renderActorCountries(data) {
+      var current = String(data.values.indicativo || ''), code = actorDialingCode(current), found = false;
+      var options = '<option value="">Sin indicativo</option>';
+      (data.dialing_codes || []).forEach(function (entry) {
+        var matches = entry.code === code; found = found || matches;
+        options += '<option value="' + esc(matches ? current : entry.code) + '">' + esc(entry.country + ' (' + entry.code + ')') + '</option>';
+      });
+      if (current && !found) options += '<option value="' + esc(current) + '">' + esc('País no registrado (' + current + ')') + '</option>';
+      el('[data-notif-actor-country]').innerHTML = options;
+    }
+    function actorFieldValue(label, value) {
+      if (!value) return '(vacío)';
+      if (!/^Indicativo/.test(label)) return value;
+      var country = ((actorData || {}).dialing_codes || []).find(function (entry) { return entry.code === actorDialingCode(value); });
+      return country ? country.country + ' (' + country.code + ')' : value + ' · País no registrado';
+    }
     function updateActorSaveState() {
       var count = actorModal.querySelectorAll('[data-notif-actor-target][data-has-changes="1"]:checked').length;
       var confirmed = el('[data-notif-actor-confirm]').checked;
+      actorModal.querySelectorAll('[data-notif-actor-comparison-group]').forEach(function (group) {
+        var targets = Array.from(group.querySelectorAll('[data-notif-actor-target]'));
+        group.querySelector('[data-notif-actor-comparison-count]').textContent = targets.filter(function (node) { return node.checked; }).length + ' de ' + targets.length + ' seleccionados · ' + targets.filter(function (node) { return node.checked && node.dataset.hasChanges === '1'; }).length + ' con cambios';
+      });
       el('[data-notif-actor-save]').disabled = actorBusy || !actorToken || !count || !confirmed;
       el('[data-notif-actor-save-hint]').textContent = !actorReviewed ? 'Primero abre la comparación para habilitar el guardado.' : (!count ? 'No hay cambios seleccionados para guardar. Vuelve a editar para modificar los datos.' : count + ' registros se actualizarán. ' + (confirmed ? 'Pulsa Guardar cambios para confirmar.' : 'Revisa la comparación y marca la confirmación para habilitar Guardar cambios.'));
     }
@@ -353,7 +374,7 @@
     }
     function setActorBusy(value) {
       actorBusy = value; actorModal.setAttribute('aria-busy', String(value));
-      actorModal.querySelectorAll('button, input').forEach(function (node) { node.disabled = value || node.hasAttribute('data-actor-required') || node.hasAttribute('data-actor-unavailable'); });
+      actorModal.querySelectorAll('button, input, select').forEach(function (node) { node.disabled = value || node.hasAttribute('data-actor-required') || node.hasAttribute('data-actor-unavailable'); });
       updateActorSaveState();
     }
     function updateActorRelatedSelection() {
@@ -363,6 +384,12 @@
         var count = items.filter(function (node) { return node.checked; }).length;
         group.checked = count > 0;
         group.indeterminate = count > 0 && count < items.length;
+        var accordion = Array.from(actorModal.querySelectorAll('[data-notif-actor-related-group]')).find(function (node) { return node.dataset.group === group.value; });
+        if (accordion) {
+          accordion.hidden = count === 0;
+          if (!count) accordion.open = false;
+          accordion.querySelector('[data-notif-actor-group-count]').textContent = count + ' de ' + items.length + ' seleccionados';
+        }
       });
       el('[data-notif-actor-related-summary]').textContent = records.filter(function (node) { return node.checked; }).length + ' de ' + records.length + ' registros relacionados seleccionados';
     }
@@ -375,11 +402,11 @@
       el('[data-notif-actor-related]').innerHTML = records.length ? Object.entries(data.groups).map(function (entry) {
         var items = records.filter(function (item) { return item.group === entry[0]; });
         if (!items.length) return '';
-        return '<section class="rounded-xl border border-slate-200 bg-white overflow-hidden"><h4 class="px-4 py-3 text-sm font-semibold">' + esc(entry[1]) + ' · ' + items.length + '</h4>' + items.map(function (item) {
+        return '<details data-notif-actor-related-group data-group="' + esc(entry[0]) + '" class="rounded-xl border border-slate-200 bg-white overflow-hidden"><summary class="px-4 py-3 min-h-[44px] cursor-pointer text-sm font-semibold focus-visible:ring-2 focus-visible:ring-primary-container">' + esc(entry[1]) + ' (' + items.length + ')<span data-notif-actor-group-count class="block text-xs text-secondary font-normal mt-1"></span></summary>' + items.map(function (item) {
           var values = item.values.filter(function (field) { return field.value !== ''; });
-          var current = values.length ? values.map(function (field) { return '<span class="block"><span class="font-medium">' + esc(field.label) + ':</span> <span class="break-all">' + esc(field.value) + '</span></span>'; }).join('') : 'Sin datos de contacto guardados en este registro.';
+          var current = values.length ? values.map(function (field) { return '<span class="block"><span class="font-medium">' + esc(field.label) + ':</span> <span class="break-all">' + esc(actorFieldValue(field.label, field.value)) + '</span></span>'; }).join('') : 'Sin datos de contacto guardados en este registro.';
           return '<label class="flex items-start gap-3 border-t border-slate-100 p-4"><input type="checkbox" name="records[]" data-notif-actor-record data-group="' + esc(item.group) + '" value="' + esc(item.key) + '" checked class="mt-1 w-4 h-4 shrink-0 accent-[#735c00]"><span class="min-w-0 text-sm"><strong class="block">' + esc(item.label) + '</strong><span class="block text-xs text-secondary mt-1 break-words">' + esc(item.context || 'ID ' + item.id) + '</span><span class="block text-xs text-secondary mt-2">' + current + '</span></span></label>';
-        }).join('') + '</section>';
+        }).join('') + '</details>';
       }).join('') : '<p class="text-sm text-secondary">' + esc(data.related_error || 'No se encontraron registros relacionados con este actor. Se actualizará únicamente su registro principal.') + '</p>';
       updateActorRelatedSelection();
     }
@@ -395,6 +422,7 @@
         if (ticket !== actorSequence || !panel.isConnected || !actorModal.open) return;
         actorData = data;
         var form = el('[data-notif-actor-form]'); form.reset();
+        renderActorCountries(data);
         ['documento', 'nombre', 'correo', 'celular', 'indicativo'].forEach(function (field) {
           form.elements[field].value = data.values[field] || '';
           form.elements[field].closest('label').hidden = !Object.hasOwn(data.values, field);
@@ -416,8 +444,13 @@
         var result = await api('commercial_actor_preview', data);
         if (!panel.isConnected) return;
         actorToken = result.token;
-        el('[data-notif-actor-changes]').innerHTML = result.items.map(function (item) {
-          return '<section class="rounded-xl border border-slate-200 overflow-hidden"><div class="p-4 bg-surface-container-low"><label class="flex items-start gap-2 text-sm font-semibold"><input type="checkbox" data-notif-actor-target data-has-changes="' + (item.has_changes ? '1' : '0') + '" value="' + esc(item.key) + '" checked ' + (item.group === 'actor' ? 'data-actor-required disabled' : '') + ' class="mt-1 w-4 h-4 accent-[#735c00]"><span>' + esc(item.label) + '<span class="block text-xs text-secondary font-normal mt-1 break-words">' + esc(item.context || 'Registro relacionado') + '</span><span class="block text-xs mt-1">' + (item.has_changes ? 'Se actualizará si está seleccionado' : 'Sin cambios') + '</span></span></label></div><div class="overflow-x-auto"><table class="w-full table-fixed text-sm"><thead class="text-left text-xs text-secondary"><tr><th class="p-3">Campo</th><th class="p-3">Valor actual</th><th class="p-3">Así quedará</th></tr></thead><tbody>' + item.changes.map(function (change) { return '<tr data-notif-actor-field data-changed="' + (change.changed ? '1' : '0') + '" class="border-t border-slate-100' + (change.changed ? ' bg-surface-container-low' : '') + '"><td class="p-3 text-xs break-words">' + esc(change.label || change.field) + '</td><td class="p-3 text-xs break-all">' + esc(change.before || '(vacío)') + '</td><td class="p-3 text-xs break-all' + (change.changed ? ' font-semibold' : '') + '">' + esc(change.after || '(vacío)') + (change.changed ? '<span class="block mt-1 text-secondary">Cambiará</span>' : '') + '</td></tr>'; }).join('') + '</tbody></table></div></section>';
+        var comparisons = result.items.map(function (item) {
+          return '<section class="rounded-xl border border-slate-200 overflow-hidden"><div class="p-4 bg-surface-container-low"><label class="flex items-start gap-2 text-sm font-semibold"><input type="checkbox" data-notif-actor-target data-has-changes="' + (item.has_changes ? '1' : '0') + '" value="' + esc(item.key) + '" checked ' + (item.group === 'actor' ? 'data-actor-required disabled' : '') + ' class="mt-1 w-4 h-4 accent-[#735c00]"><span>' + esc(item.label) + '<span class="block text-xs text-secondary font-normal mt-1 break-words">' + esc(item.context || 'Registro relacionado') + '</span><span class="block text-xs mt-1">' + (item.has_changes ? 'Se actualizará si está seleccionado' : 'Sin cambios') + '</span></span></label></div><div class="overflow-x-auto"><table class="w-full table-fixed text-sm"><thead class="text-left text-xs text-secondary"><tr><th class="p-3">Campo</th><th class="p-3">Valor actual</th><th class="p-3">Así quedará</th></tr></thead><tbody>' + item.changes.map(function (change) { return '<tr data-notif-actor-field data-changed="' + (change.changed ? '1' : '0') + '" class="border-t border-slate-100' + (change.changed ? ' bg-surface-container-low' : '') + '"><td class="p-3 text-xs break-words">' + esc(change.label || change.field) + '</td><td class="p-3 text-xs break-all">' + esc(actorFieldValue(change.label, change.before)) + '</td><td class="p-3 text-xs break-all' + (change.changed ? ' font-semibold' : '') + '">' + esc(actorFieldValue(change.label, change.after)) + (change.changed ? '<span class="block mt-1 text-secondary">Cambiará</span>' : '') + '</td></tr>'; }).join('') + '</tbody></table></div></section>';
+        });
+        el('[data-notif-actor-changes]').innerHTML = comparisons[0] + Object.entries(actorData.groups).map(function (entry) {
+          var items = result.items.map(function (item, index) { return {item: item, html: comparisons[index]}; }).filter(function (record) { return record.item.group === entry[0]; });
+          if (!items.length) return '';
+          return '<details data-notif-actor-comparison-group data-group="' + esc(entry[0]) + '" class="rounded-xl border border-slate-200 bg-white overflow-hidden"><summary class="px-4 py-3 min-h-[44px] cursor-pointer text-sm font-semibold focus-visible:ring-2 focus-visible:ring-primary-container">' + esc(entry[1]) + ' (' + items.length + ')<span data-notif-actor-comparison-count class="block text-xs text-secondary font-normal mt-1"></span></summary><div class="p-3 space-y-3">' + items.map(function (record) { return record.html; }).join('') + '</div></details>';
         }).join('');
         showActorStep(true);
         actorFeedback(result.total ? result.records_total + ' registros revisados · ' + result.total + ' con cambios. Revisa los valores antes de confirmar.' : 'No modificaste los datos. Aquí puedes comparar los registros seleccionados; vuelve a editar para hacer cambios.');
@@ -497,6 +530,7 @@
       if (target.hasAttribute('data-notif-actor-group')) {
         actorModal.querySelectorAll('[data-notif-actor-record]').forEach(function (node) { if (node.dataset.group === target.value) node.checked = target.checked; });
         updateActorRelatedSelection();
+        actorModal.querySelectorAll('[data-notif-actor-related-group]').forEach(function (node) { if (node.dataset.group === target.value) node.open = target.checked; });
       }
       if (target.hasAttribute('data-notif-actor-record')) updateActorRelatedSelection();
       if (target.hasAttribute('data-notif-actor-target')) {
