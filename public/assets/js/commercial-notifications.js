@@ -365,6 +365,7 @@
       el('[data-notif-actor-form]').hidden = review;
       el('[data-notif-actor-review-panel]').hidden = !review;
       el('[data-notif-actor-review]').hidden = review;
+      el('[data-notif-actor-save]').hidden = !review;
       el('[data-notif-actor-back]').hidden = !review;
       el('[data-notif-actor-confirm-wrap]').hidden = !review;
       el('[data-notif-actor-confirm]').checked = false;

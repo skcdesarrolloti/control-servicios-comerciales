@@ -181,7 +181,7 @@ final class CommercialNotificationsView
     <div data-notif-actor-actions class="sticky bottom-0 bg-white border-t border-slate-200 mt-4 pt-4 pb-2 space-y-3">
       <p data-notif-actor-save-hint role="status" class="text-xs text-secondary">Primero abre la comparación para habilitar el guardado.</p>
       <label data-notif-actor-confirm-wrap class="flex items-start gap-2 text-sm" hidden><input type="checkbox" data-notif-actor-confirm class="mt-1 w-4 h-4 shrink-0 accent-[#735c00]"><span>He revisado los valores actuales y finales y confirmo actualizar los registros seleccionados.</span></label>
-      <div class="flex flex-col sm:flex-row sm:justify-end gap-2"><button type="button" data-notif-actor-back class="<?php echo $secondary; ?>" hidden>Volver a editar</button><button type="button" data-notif-actor-review class="<?php echo $secondary; ?> bg-primary-container">Ver cómo quedarán los datos</button><button type="button" data-notif-actor-save disabled class="<?php echo $secondary; ?> bg-primary-container">Guardar cambios</button></div>
+      <div class="flex flex-col sm:flex-row sm:justify-end gap-2"><button type="button" data-notif-actor-back class="<?php echo $secondary; ?>" hidden>Volver a editar</button><button type="button" data-notif-actor-review class="<?php echo $secondary; ?> bg-primary-container">Ver cómo quedarán los datos</button><button type="button" data-notif-actor-save hidden disabled class="<?php echo $secondary; ?> bg-primary-container">Guardar cambios</button></div>
     </div>
   </dialog>
   <?php endif; ?>
