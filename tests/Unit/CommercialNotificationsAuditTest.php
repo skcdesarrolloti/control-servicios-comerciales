@@ -151,7 +151,10 @@ final class CommercialNotificationsAuditTest extends TestCase
     self::assertSame(2, $report['totals']['total']);
     self::assertSame(1, $report['totals']['sent']);
     self::assertSame(1, $report['totals']['failed']);
-    self::assertCount(2, $report['rows']);
+    self::assertCount(1, $report['rows']);
+    self::assertSame(1, $report['rows'][0]['sms']);
+    self::assertSame(1, $report['rows'][0]['whatsapp']);
+    self::assertSame(0, $report['rows'][0]['email']);
     $db->update('skc_notification_queue', ['created_at' => '2026-10-09 05:00:00'], ['id' => 3]);
     self::assertSame(1, $service->notificationReport(['date_from' => '2026-10-08', 'date_to' => '2026-10-08'])['totals']['total']);
     self::assertSame(0, $service->notificationReport(['employee_id' => '901'])['totals']['total']);
@@ -164,6 +167,24 @@ final class CommercialNotificationsAuditTest extends TestCase
       try { $service->notificationReport($filters); self::fail('Se aceptaron fechas inválidas.'); }
       catch (\InvalidArgumentException $exception) { self::assertNotEmpty($exception->getMessage()); }
     }
+  }
+
+  public function testReportKeepsOneEmployeeRowAcrossChannelsAndHistoricalNameChanges(): void
+  {
+    [$db, , $service] = $this->fixture();
+    $row = $db->getRow('SELECT * FROM skc_notification_queue WHERE id = 1');
+    unset($row['id']);
+    $row['meta_json'] = '{"commercial_notifications":{"employee_id":"900","nombre_funcionario":"Nombre anterior","cargo":"Cargo anterior"}}';
+    $row['created_at'] = '2020-01-01 00:00:00';
+    $row['dedupe_key'] = 'historic-name';
+    $db->insert('skc_notification_queue', $row);
+    $report = $service->notificationReport();
+    self::assertCount(1, $report['rows']);
+    self::assertSame('Ana Pérez', $report['rows'][0]['creator_name']);
+    self::assertSame(4, $report['rows'][0]['total']);
+    self::assertSame(2, $report['rows'][0]['email']);
+    self::assertSame(1, $report['rows'][0]['sms']);
+    self::assertSame(1, $report['rows'][0]['whatsapp']);
   }
 
   public function testHistoricalMediaAndMissingAuthorAreHandled(): void

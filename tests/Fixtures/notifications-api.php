@@ -9,9 +9,13 @@ define('SCM_UPLOAD_MAX_BYTES', 10485760);
 define('SCM_UPLOAD_PATH', dirname(__DIR__, 2) . '/output/media');
 define('SCM_APP_SECRET', str_repeat('x', 40));
 define('SCM_VERSION', 'test');
+session_name('scm_notifications_fixture');
+session_start();
+$actorPreviews = $_SESSION['scm_actor_previews'] ?? [];
 [$db, $policy, $service] = isset($_GET['audit'])
   ? Tests\Fixtures\CommercialNotificationsFixture::makeWithAudit($_GET['audit'] === 'admin')
   : Tests\Fixtures\CommercialNotificationsFixture::make();
+$_SESSION['scm_actor_previews'] = $actorPreviews;
 $csrf = new SCM\Core\Csrf(str_repeat('x', 40));
 $_SESSION['scm_csrf']['commercial_nonce'] = 'fixture';
 if (($_POST['restricted'] ?? '') === '1') {

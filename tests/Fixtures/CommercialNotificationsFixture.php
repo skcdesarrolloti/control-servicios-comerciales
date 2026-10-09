@@ -15,6 +15,7 @@ final class CommercialNotificationsFixture
   public static function makeWithAudit(bool $admin = false): array
   {
     [$db, $policy, $service] = self::make();
+    self::addActorRelations($db);
     $service->prepareDelivery(md5('audit-ui'), []);
     $service->enqueue('propietarios_activos', [10], ['email', 'sms', 'whatsapp'], 'Información del inmueble', 'Mensaje de prueba para el informe', 'scm_marketing_generica_texto_v1');
     foreach ([1 => 'sent', 2 => 'pending', 3 => 'failed'] as $id => $status) {
@@ -36,6 +37,51 @@ final class CommercialNotificationsFixture
       $_SESSION['scm_user'] = 'Administrador';
     }
     return [$db, $policy, new CommercialNotificationsService($db, $policy)];
+  }
+
+  public static function makeForActorEditing(bool $admin = true): array
+  {
+    [$db, $policy] = self::make($admin);
+    self::addActorRelations($db);
+    return [$db, $policy, new \SCM\Commercial\CommercialActorEditor($db, $policy)];
+  }
+
+  private static function addActorRelations(Database $db): void
+  {
+    $tables = [
+      'wp_jet_cct_propietarios' => ['documento', 'nombre_juridico', 'documento_juridico', 'tipo_persona', 'cct_modified'],
+      'wp_jet_cct_arrendatarios' => ['documento', 'nombre_juridico', 'documento_juridico', 'tipo_persona', 'cct_modified'],
+      'wp_jet_cct_copropiedades' => ['nit', 'cct_modified'],
+      'wp_jet_cct_club_pph' => ['documento', 'indicativo', 'cct_modified'],
+      'wp_jet_cct_inmuebles' => ['propietario', 'arrendatario', 'copropiedad', 'codigo', 'cct_modified'],
+      'wp_jet_cct_contratos_arrendamiento' => ['cct_modified', 'contrato', 'propietario', 'documento_propietario', 'correo_propietario', 'celular_propietario', 'indicativo_propietario', 'arrendatario', 'documento_arrendatario', 'correo_arrendatario', 'celular_arrendatario', 'indicativo_arrendatario', 'copropiedad', 'nit_copropiedad', 'correo_copropiedad', 'celular_copropiedad', 'id_pph', 'nombre_pph'],
+      'wp_jet_cct_contrato_mandato' => ['cct_modified', 'id_propietario', 'id_copropiedad', 'propietarios', 'estado', 'copropiedad', 'nit_co', 'correo_co', 'contacto_co'],
+      'wp_jet_cct_cierres' => ['cct_modified', 'id_propietario', 'id_arrendatario', 'id_copropiedad', 'id_pph', 'propietario', 'documento_propietario', 'correo_propietario', 'celular_propietario', 'arrendatario', 'documento_arrendatario', 'correo_arrendatario', 'celular_arrendatario', 'copropiedad', 'nit_copropiedad', 'correo_copropiedad', 'celular_copropiedad', 'nombre_pph', 'estado'],
+    ];
+    for ($slot = 1; $slot <= 6; $slot++) {
+      foreach (['id_propietario_nuevo_', 'nombre_', 'documento_', 'correo_', 'celular_', 'indicativo_', 'tipo_', 'empresa_', 'nit_'] as $prefix) { $tables['wp_jet_cct_contrato_mandato'][] = $prefix . $slot; }
+    }
+    foreach ($tables as $table => $columns) {
+      $exists = $db->getVar('SELECT 1 FROM information_schema.TABLES WHERE TABLE_NAME = ?', [$table]);
+      if (!$exists) {
+        $db->pdo()->exec("CREATE TABLE `{$table}` (_ID INTEGER PRIMARY KEY)");
+        $db->pdo()->prepare('INSERT INTO information_schema.TABLES VALUES (?,?)')->execute(['fixture', $table]);
+        $db->pdo()->prepare('INSERT INTO information_schema.COLUMNS VALUES (?,?,?)')->execute(['fixture', $table, '_ID']);
+      }
+      $existing = array_column($db->getResults("PRAGMA table_info(`{$table}`)"), 'name');
+      foreach ($columns as $column) {
+        if (in_array($column, $existing, true)) { continue; }
+        $db->pdo()->exec("ALTER TABLE `{$table}` ADD COLUMN `{$column}` TEXT");
+        $db->pdo()->prepare('INSERT INTO information_schema.COLUMNS VALUES (?,?,?)')->execute(['fixture', $table, $column]);
+      }
+    }
+    $db->update('wp_jet_cct_propietarios', ['documento' => '123456', 'cct_modified' => '2026-10-08 10:00:00'], ['_ID' => 10]);
+    $db->update('wp_jet_cct_propietarios', ['documento' => '654321'], ['_ID' => 13]);
+    $db->insert('wp_jet_cct_inmuebles', ['_ID' => 2, 'id_propietario' => '10', 'id_arrendatario' => '22', 'id_copropiedad' => '32', 'propietario' => 'Propietario original', 'codigo' => 'SIMI-100']);
+    foreach ([2, 7] as $id) { $db->update('wp_jet_cct_contratos_arrendamiento', ['propietario' => 'Propietario original', 'documento_propietario' => '123456', 'correo_propietario' => 'original@example.test', 'contrato' => 'C-' . $id], ['_ID' => $id]); }
+    $db->update('wp_jet_cct_contratos_arrendamiento', ['id_pph' => '40', 'nombre_pph' => 'Club PPH original'], ['_ID' => 7]);
+    $db->insert('wp_jet_cct_contrato_mandato', ['_ID' => 1, 'id_propietario' => '10', 'propietarios' => '2', 'id_propietario_nuevo_1' => '10', 'nombre_1' => 'Propietario original', 'documento_1' => '123456', 'id_propietario_nuevo_2' => '13', 'nombre_2' => 'Otro titular', 'documento_2' => '654321', 'id_copropiedad' => '32', 'estado' => 'Vigente']);
+    $db->insert('wp_jet_cct_cierres', ['_ID' => 1, 'id_propietario' => '2010', 'propietario' => 'Propietario original', 'documento_propietario' => '123456', 'id_arrendatario' => '22', 'id_copropiedad' => '32', 'id_pph' => '40', 'nombre_pph' => 'Club PPH original', 'estado' => 'Cerrado']);
   }
 
   /** Base en memoria: estas pruebas nunca usan la cola ni los contactos reales. */

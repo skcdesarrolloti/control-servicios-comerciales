@@ -18,6 +18,7 @@ final class CommercialNotificationsView
     $config = ['templates' => $templates, 'sender' => $sender, 'request_id' => bin2hex(random_bytes(16)), 'max_bytes' => (int) SCM_UPLOAD_MAX_BYTES,
       'can_send' => $policy->canAct('enviar_notificacion') && $sender['phone'] !== '',
       'can_delete' => $policy->canAct('eliminar_notificacion'),
+      'can_edit_actor' => $policy->canAct('editar_actor'),
       'email_document' => $service->emailDocument('__SCM_NAME__', '__SCM_SUBJECT__', '__SCM_MESSAGE__'),
       'sms' => ['prefix' => CommercialSmsMessage::PREFIX, 'max' => CommercialSmsMessage::MAX_CHARACTERS, 'basic' => CommercialSmsMessage::GSM_BASIC, 'extended' => CommercialSmsMessage::GSM_EXTENDED]];
     $field = 'w-full rounded-xl border border-slate-200 bg-surface-container-lowest px-3 py-2.5 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary-container';
@@ -149,7 +150,7 @@ final class CommercialNotificationsView
   <div id="notif-report-panel" role="tabpanel" aria-labelledby="notif-report-tab" data-notif-panel="report" hidden class="space-y-4">
     <div class="bg-white border border-slate-200 rounded-2xl shadow-card overflow-hidden">
       <div class="p-5 space-y-4">
-        <div><h3 class="font-semibold text-title-md">Informe de notificaciones por funcionario</h3><p class="text-xs text-secondary mt-1"><?php echo $policy->canManage() ? 'Todos los autores del módulo comercial.' : 'Informe de tus notificaciones.'; ?> Cada mensaje por canal cuenta como un envío. Incluye eliminados para conservar la trazabilidad.</p></div>
+        <div><h3 class="font-semibold text-title-md">Informe de notificaciones por funcionario</h3><p class="text-xs text-secondary mt-1"><?php echo $policy->canManage() ? 'Todos los autores del módulo comercial.' : 'Informe de tus notificaciones.'; ?> Una fila por funcionario, con cantidades de WhatsApp, correo y SMS. Incluye eliminados para conservar la trazabilidad.</p></div>
         <form data-notif-report-form class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
           <label class="text-xs text-secondary">Desde<input type="date" name="date_from" class="<?php echo $field; ?> mt-1"></label>
           <label class="text-xs text-secondary">Hasta<input type="date" name="date_to" class="<?php echo $field; ?> mt-1"></label>
@@ -160,9 +161,26 @@ final class CommercialNotificationsView
         <p data-notif-report-summary role="status" class="text-sm text-secondary"></p>
         <p class="text-xs text-secondary">Fechas de creación en hora de Colombia. «Eliminados» es parte del total y puede coincidir con cualquier estado. El autor es quien creó y solicitó el envío; la entrega la realiza el servicio automático.</p>
       </div>
-      <div class="overflow-x-auto"><table class="w-full text-sm"><thead class="bg-surface-container-low text-left text-xs text-secondary"><tr><?php foreach (['Funcionario', 'Cargo', 'Canal', 'Total', 'Pendientes', 'Procesando', 'Enviados', 'Fallidos', 'Cancelados', 'Eliminados', 'Última creación'] as $heading): ?><th class="px-4 py-3 whitespace-nowrap"><?php echo $heading; ?></th><?php endforeach; ?></tr></thead><tbody data-notif-report-rows class="divide-y divide-slate-100"></tbody></table></div>
+      <div class="overflow-x-auto"><table class="w-full text-sm"><thead class="bg-surface-container-low text-left text-xs text-secondary"><tr><?php foreach (['Funcionario', 'Cargo', 'WhatsApp', 'Correo', 'SMS', 'Total', 'Pendientes', 'Procesando', 'Enviados', 'Fallidos', 'Cancelados', 'Eliminados', 'Última creación'] as $heading): ?><th class="px-4 py-3 whitespace-nowrap"><?php echo $heading; ?></th><?php endforeach; ?></tr></thead><tbody data-notif-report-rows class="divide-y divide-slate-100"></tbody></table></div>
     </div>
   </div>
+  <?php if ($policy->canAct('editar_actor')): ?>
+  <dialog data-notif-actor-modal aria-labelledby="notif-actor-title" class="m-auto w-[calc(100%-2rem)] max-w-5xl max-h-[90dvh] overflow-y-auto p-5 sm:p-7 rounded-2xl border-0 bg-white text-on-surface shadow-modal backdrop:bg-slate-900/50">
+    <div class="flex items-center justify-between gap-3"><h3 id="notif-actor-title" class="text-headline-md font-semibold">Editar datos del actor</h3><button type="button" data-notif-actor-close class="<?php echo $secondary; ?>" aria-label="Cerrar editor"><span class="material-symbols-outlined" aria-hidden="true">close</span></button></div>
+    <p data-notif-actor-feedback role="status" class="mt-3 text-sm text-secondary"></p>
+    <form data-notif-actor-form class="mt-4 space-y-4" hidden>
+      <p data-notif-actor-identity class="text-sm font-semibold"></p>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3"><?php foreach (\SCM\Commercial\CommercialActorEditor::FIELDS as $key => $label): ?><label class="text-xs text-secondary"><?php echo $label; ?><input name="<?php echo $key; ?>" type="<?php echo $key === 'correo' ? 'email' : 'text'; ?>" maxlength="<?php echo in_array($key, ['nombre', 'correo'], true) ? '254' : '40'; ?>" <?php echo $key === 'nombre' ? 'required' : ''; ?> class="<?php echo $field; ?> mt-1"></label><?php endforeach; ?></div>
+      <fieldset class="rounded-xl bg-surface-container-low p-4 space-y-3"><legend class="text-sm font-semibold">Revisar también los registros relacionados</legend><p class="text-xs text-secondary">Selecciona dónde deseas aplicar los datos. En el siguiente paso podrás revisar cada registro y excluir los que deben conservar sus valores.</p><div data-notif-actor-groups class="flex flex-wrap gap-4"></div><p class="text-xs text-secondary">Se revisan todos los estados de los grupos elegidos, incluidos históricos y cerrados. Los documentos PDF ya emitidos conservan su contenido.</p></fieldset>
+      <button type="submit" data-notif-actor-review class="<?php echo $secondary; ?> bg-primary-container">Ver cómo quedarán los datos</button>
+    </form>
+    <div data-notif-actor-review-panel class="mt-4 space-y-4" hidden>
+      <p class="text-sm font-semibold">Revisa los cambios antes de guardar</p><p class="text-xs text-secondary">El registro principal se actualizará siempre. Marca los registros relacionados que deseas actualizar; cada tabla muestra su valor actual y cómo quedará.</p>
+      <div data-notif-actor-changes class="space-y-3"></div>
+      <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2"><button type="button" data-notif-actor-back class="<?php echo $secondary; ?>">Volver a editar</button><button type="button" data-notif-actor-save class="<?php echo $secondary; ?> bg-primary-container">Confirmar y guardar cambios</button></div>
+    </div>
+  </dialog>
+  <?php endif; ?>
 </section>
 <?php
     return (string) ob_get_clean();

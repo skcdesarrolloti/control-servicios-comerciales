@@ -86,6 +86,19 @@ final class CommercialNotificationsService extends AdministrativeNotificationsSe
     return $types;
   }
 
+  /** Acceso al actor con el mismo alcance de los destinatarios; los IDs internos no se editan. */
+  public function actorForEditing(string $type, int $id): array
+  {
+    $config = $this->types()[$type] ?? null;
+    if ($config === null || !$this->policy->canView('notificaciones')) {
+      throw new \RuntimeException('El actor no está disponible.');
+    }
+    $table = (string) $config['table'];
+    $row = $this->db->getRow("SELECT * FROM `{$table}` WHERE (" . $this->baseWhere($config) . ') AND `_ID` = ?', [$id]);
+    if ($row === null) { throw new \RuntimeException('El actor no está disponible dentro de tu alcance.'); }
+    return ['config' => $config, 'row' => $row];
+  }
+
   /** @return array<string,array{name:string,label:string,language:string,description:string,body:string,variables:array<int,string>,header_type:string}> */
   public function whatsappTemplates(): array
   {
@@ -441,6 +454,19 @@ final class CommercialNotificationsService extends AdministrativeNotificationsSe
       }
     }
     unset($row);
-    return ['rows' => $rows, 'totals' => $totals];
+    $grouped = [];
+    foreach ($rows as $row) {
+      $key = $row['employee_id'] !== null && $row['employee_id'] !== '' ? 'employee:' . $row['employee_id'] : 'name:' . $row['creator_name'];
+      if (!isset($grouped[$key])) {
+        $grouped[$key] = array_merge($row, array_fill_keys(array_keys($totals), 0), ['whatsapp' => 0, 'email' => 0, 'sms' => 0]);
+        unset($grouped[$key]['channel']);
+      }
+      foreach ($totals as $metric => $_value) { $grouped[$key][$metric] += $row[$metric]; }
+      if (in_array($row['channel'], ['whatsapp', 'email', 'sms'], true)) { $grouped[$key][$row['channel']] += $row['total']; }
+      if ($row['last_created_at'] >= $grouped[$key]['last_created_at']) {
+        foreach (['creator_name', 'creator_cargo', 'last_created_at'] as $field) { $grouped[$key][$field] = $row[$field]; }
+      }
+    }
+    return ['rows' => array_values($grouped), 'totals' => $totals];
   }
 }

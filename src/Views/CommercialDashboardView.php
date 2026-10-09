@@ -4790,7 +4790,7 @@ final class CommercialDashboardView
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-space-md">
             <?php foreach ($cargos as $cargo): ?>
-              <?php $current = $permissions[$cargo['id']] ?? ['views' => array_keys(CommercialAccessPolicy::VIEWS), 'actions' => array_keys(CommercialAccessPolicy::ACTIONS)]; ?>
+              <?php $current = $permissions[$cargo['id']] ?? ['views' => array_keys(CommercialAccessPolicy::VIEWS), 'actions' => array_values(array_diff(array_keys(CommercialAccessPolicy::ACTIONS), ['editar_actor']))]; ?>
               <div class="bg-surface-container-low rounded-xl p-space-md border border-surface-container space-y-space-xs" data-cargo="<?php echo esc_attr($cargo['id']); ?>">
                 <div class="flex items-center justify-between pb-1 border-b border-surface-container">
                   <span class="font-label-md font-semibold text-on-surface"><?php echo esc_html($cargo['name']); ?></span>
@@ -4837,7 +4837,7 @@ final class CommercialDashboardView
                   <div class="grid grid-cols-2 gap-1 pt-1">
                     <?php foreach (CommercialAccessPolicy::ACTIONS as $k => $label): ?>
                       <label class="flex items-center gap-1.5 text-[11px] text-on-surface cursor-pointer">
-                        <input type="checkbox" name="permissions[<?php echo esc_attr($cargo['id']); ?>][actions][]" value="<?php echo esc_attr($k); ?>"<?php checked($k === 'eliminar_notificacion' ? isset($adminCargoIds[$cargo['id']]) : in_array($k, $current['actions'], true)); ?> <?php echo $k === 'eliminar_notificacion' ? 'disabled' : ''; ?> class="rounded text-primary">
+                        <input type="checkbox" name="permissions[<?php echo esc_attr($cargo['id']); ?>][actions][]" value="<?php echo esc_attr($k); ?>"<?php checked($k === 'eliminar_notificacion' ? isset($adminCargoIds[$cargo['id']]) : (($k === 'editar_actor' && isset($adminCargoIds[$cargo['id']])) || in_array($k, $current['actions'], true))); ?> <?php echo $k === 'eliminar_notificacion' ? 'disabled' : ''; ?> class="rounded text-primary">
                         <span><?php echo esc_html($label); ?></span>
                       </label>
                     <?php endforeach; ?>

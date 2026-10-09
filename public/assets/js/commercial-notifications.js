@@ -23,6 +23,7 @@
     var queueSequence = 0, historySequence = 0, reportSequence = 0, queueRows = new Map(), reportRows = [];
     var historyModal = panel.querySelector('[data-notif-history-modal]'), deleteModal = panel.querySelector('[data-notif-delete-modal]');
     var deleteId = null, deleting = false;
+    var actorModal = panel.querySelector('[data-notif-actor-modal]'), actorData = null, actorToken = '', actorBusy = false, actorSequence = 0;
     var statusLabels = {pending: "Pendiente", processing: "Procesando", sent: "Enviado", failed: "Fallido", cancelled: "Cancelado"};
     function newRequestId() { return Array.from(crypto.getRandomValues(new Uint8Array(16)), function (byte) { return byte.toString(16).padStart(2, "0"); }).join(""); }
 
@@ -129,6 +130,7 @@
           var reason = !config.can_send ? "No tienes permiso para enviar" : (unavailable ? (entry[0] === "email" ? "Sin correo válido" : (entry[0] === "all" ? "Sin datos de contacto válidos" : "Sin celular válido")) : "Enviar a este contacto");
           return '<button type="button" data-notif-single-channel="' + entry[0] + '" data-id="' + esc(row._ID) + '" data-name="' + esc(row.nombre) + '" title="' + esc(reason) + '" ' + (!config.can_send || unavailable ? 'disabled ' : '') + 'class="min-h-[44px] rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium hover:bg-surface-container-low disabled:opacity-50 disabled:cursor-not-allowed">' + entry[1] + '</button>';
         }).join("");
+        if (config.can_edit_actor) actions += '<button type="button" data-notif-edit-actor="' + esc(row._ID) + '" class="min-h-[44px] rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium hover:bg-surface-container-low focus-visible:ring-2 focus-visible:ring-primary-container"><span class="material-symbols-outlined text-[16px] align-middle" aria-hidden="true">edit</span> Editar datos</button>';
         return '<div class="p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4 hover:bg-surface-container-low"><label class="flex min-w-0 flex-1 items-start gap-3 cursor-pointer"><input type="checkbox" class="mt-1 w-4 h-4 accent-[#735c00]" data-notif-recipient value="' + esc(row._ID) + '" data-name="' + esc(row.nombre) + '"><span class="flex items-center justify-center w-9 h-9 shrink-0 rounded-full bg-surface-container-low text-secondary font-semibold" aria-hidden="true">' + esc(String(row.nombre || "?").slice(0, 1).toUpperCase()) + '</span><span class="min-w-0 flex-1"><strong class="block text-sm break-words">' + esc(row.nombre) + '</strong><span class="block text-xs text-secondary mt-1 break-all">' + esc(row.correo || "Sin correo") + ' · ' + esc(row.celular_normalizado || row.celular || "Sin celular") + '</span>' + (row.contrato_arrendamiento_estado ? '<span class="block text-xs text-secondary mt-1">' + esc(row.contrato_arrendamiento_estado) + '</span>' : '') + '</span></label><div class="flex shrink-0 flex-wrap gap-2 md:justify-end" aria-label="Enviar a ' + esc(row.nombre) + '">' + actions + '</div></div>';
       }).join("") : '<div class="p-10 text-center"><span class="material-symbols-outlined text-secondary text-[32px]" aria-hidden="true">person_search</span><p class="text-sm font-medium mt-2">No hay destinatarios con estos filtros.</p><p class="text-xs text-secondary mt-1">Prueba otra búsqueda o cambia de categoría.</p></div>';
       updateSelection();
@@ -310,8 +312,8 @@
         reportRows = result.rows;
         el('[data-notif-report-summary]').textContent = result.totals.total + ' mensajes creados · ' + result.totals.sent + ' enviados · ' + result.totals.failed + ' fallidos · ' + result.totals.deleted + ' eliminados';
         el('[data-notif-report-rows]').innerHTML = reportRows.length ? reportRows.map(function (row) {
-          return '<tr><td class="px-4 py-3 text-xs"><strong class="block">' + esc(row.creator_name) + '</strong><span class="text-secondary">' + (row.employee_id ? 'ID ' + esc(row.employee_id) : 'Sin ID registrado') + '</span></td>' + [row.creator_cargo || 'Sin cargo registrado', row.channel, row.total, row.pending, row.processing, row.sent, row.failed, row.cancelled, row.deleted, dateLabel(row.last_created_at)].map(function (value) { return '<td class="px-4 py-3 text-xs whitespace-nowrap">' + esc(value) + '</td>'; }).join('') + '</tr>';
-        }).join('') : '<tr><td colspan="11" class="p-8 text-center text-secondary">No hay mensajes para estos filtros.</td></tr>';
+          return '<tr><td class="px-4 py-3 text-xs"><strong class="block">' + esc(row.creator_name) + '</strong><span class="text-secondary">' + (row.employee_id ? 'ID ' + esc(row.employee_id) : 'Sin ID registrado') + '</span></td>' + [row.creator_cargo || 'Sin cargo registrado', row.whatsapp, row.email, row.sms, row.total, row.pending, row.processing, row.sent, row.failed, row.cancelled, row.deleted, dateLabel(row.last_created_at)].map(function (value) { return '<td class="px-4 py-3 text-xs whitespace-nowrap">' + esc(value) + '</td>'; }).join('') + '</tr>';
+        }).join('') : '<tr><td colspan="13" class="p-8 text-center text-secondary">No hay mensajes para estos filtros.</td></tr>';
         el('[data-notif-report-export]').disabled = !reportRows.length;
       } catch (error) { if (ticket === reportSequence && panel.isConnected) el('[data-notif-report-summary]').textContent = error.message; }
     }
@@ -322,10 +324,71 @@
         if (/^\s*[=+\-@]/.test(text) || /^[\t\r\n]/.test(text)) text = "'" + text;
         return '"' + text.replace(/"/g, '""') + '"';
       }
-      var lines = [['ID funcionario', 'Funcionario', 'Cargo', 'Canal', 'Total', 'Pendientes', 'Procesando', 'Enviados', 'Fallidos', 'Cancelados', 'Eliminados', 'Última creación (Colombia)']];
-      reportRows.forEach(function (row) { lines.push([row.employee_id, row.creator_name, row.creator_cargo, row.channel, row.total, row.pending, row.processing, row.sent, row.failed, row.cancelled, row.deleted, dateLabel(row.last_created_at)]); });
+      var lines = [['ID funcionario', 'Funcionario', 'Cargo', 'WhatsApp', 'Correo', 'SMS', 'Total', 'Pendientes', 'Procesando', 'Enviados', 'Fallidos', 'Cancelados', 'Eliminados', 'Última creación (Colombia)']];
+      reportRows.forEach(function (row) { lines.push([row.employee_id, row.creator_name, row.creator_cargo, row.whatsapp, row.email, row.sms, row.total, row.pending, row.processing, row.sent, row.failed, row.cancelled, row.deleted, dateLabel(row.last_created_at)]); });
       var url = URL.createObjectURL(new Blob(['\uFEFF' + lines.map(function (line) { return line.map(cell).join(';'); }).join('\r\n')], {type: 'text/csv;charset=utf-8;'}));
       var link = document.createElement('a'); link.href = url; link.download = 'informe-notificaciones.csv'; document.body.append(link); link.click(); link.remove(); setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    }
+    function actorFeedback(message, error) { el('[data-notif-actor-feedback]').textContent = message; el('[data-notif-actor-feedback]').classList.toggle('text-error', !!error); }
+    function setActorBusy(value) {
+      actorBusy = value; actorModal.setAttribute('aria-busy', String(value));
+      actorModal.querySelectorAll('button, input').forEach(function (node) { node.disabled = value || node.hasAttribute('data-actor-required'); });
+    }
+    async function openActor(id) {
+      if (!actorModal || actorBusy || !config.can_edit_actor) return;
+      var ticket = ++actorSequence, actorType = type;
+      actorData = null; actorToken = '';
+      el('[data-notif-actor-form]').hidden = true; el('[data-notif-actor-review-panel]').hidden = true;
+      actorFeedback('Cargando datos del actor…'); actorModal.showModal();
+      try {
+        var data = await api('commercial_actor_detail', {type: actorType, id: id});
+        if (ticket !== actorSequence || !panel.isConnected || !actorModal.open) return;
+        actorData = data;
+        var form = el('[data-notif-actor-form]'); form.reset();
+        ['documento', 'nombre', 'correo', 'celular', 'indicativo'].forEach(function (field) {
+          form.elements[field].value = data.values[field] || '';
+          form.elements[field].closest('label').hidden = !Object.hasOwn(data.values, field);
+          form.elements[field].disabled = !Object.hasOwn(data.values, field);
+        });
+        el('[data-notif-actor-identity]').textContent = data.label + ' · ' + data.values.nombre + ' · ID ' + data.id;
+        el('[data-notif-actor-groups]').innerHTML = Object.entries(data.groups).map(function (entry) { return '<label class="flex items-center gap-2 text-sm"><input type="checkbox" name="groups[]" value="' + esc(entry[0]) + '" checked class="w-4 h-4 accent-[#735c00]">' + esc(entry[1]) + '</label>'; }).join('');
+        actorFeedback('Edita los datos y revisa dónde se aplicarán.'); form.hidden = false; form.elements.nombre.focus();
+      } catch (error) { if (ticket === actorSequence && panel.isConnected) actorFeedback(error.message, true); }
+    }
+    async function reviewActor(event) {
+      event.preventDefault(); if (actorBusy || !actorData) return;
+      var data = new FormData(el('[data-notif-actor-form]')); data.set('type', actorData.type); data.set('id', actorData.id); data.set('version', actorData.version);
+      actorToken = ''; setActorBusy(true); actorFeedback('Preparando la comparación de los registros…');
+      try {
+        var result = await api('commercial_actor_preview', data);
+        if (!panel.isConnected) return;
+        actorToken = result.token;
+        el('[data-notif-actor-changes]').innerHTML = result.items.map(function (item) {
+          return '<section class="rounded-xl border border-slate-200 overflow-hidden"><div class="p-4 bg-surface-container-low"><label class="flex items-start gap-2 text-sm font-semibold"><input type="checkbox" data-notif-actor-target value="' + esc(item.key) + '" checked ' + (item.group === 'actor' ? 'data-actor-required disabled' : '') + ' class="mt-1 w-4 h-4 accent-[#735c00]"><span>' + esc(item.label) + '<span class="block text-xs text-secondary font-normal mt-1 break-words">' + esc(item.context || 'Registro relacionado') + '</span></span></label></div><div class="overflow-x-auto"><table class="w-full table-fixed text-sm"><thead class="text-left text-xs text-secondary"><tr><th class="p-3">Campo</th><th class="p-3">Valor actual</th><th class="p-3">Así quedará</th></tr></thead><tbody>' + item.changes.map(function (change) { return '<tr class="border-t border-slate-100"><td class="p-3 text-xs break-all">' + esc(change.label || change.field) + '</td><td class="p-3 text-xs break-all">' + esc(change.before || '(vacío)') + '</td><td class="p-3 text-xs font-semibold break-all">' + esc(change.after || '(vacío)') + '</td></tr>'; }).join('') + '</tbody></table></div></section>';
+        }).join('');
+        el('[data-notif-actor-form]').hidden = true; el('[data-notif-actor-review-panel]').hidden = false;
+        actorFeedback(result.total + ' registros con cambios. Revisa la selección y confirma para guardar.');
+        el('[data-notif-actor-save]').focus();
+      } catch (error) { actorFeedback(error.message, true); }
+      finally { setActorBusy(false); }
+    }
+    async function saveActor() {
+      if (actorBusy || !actorToken) return;
+      var data = new FormData(); data.set('token', actorToken);
+      actorModal.querySelectorAll('[data-notif-actor-target]:checked').forEach(function (node) { data.append('targets[]', node.value); });
+      setActorBusy(true); actorFeedback('Guardando los registros seleccionados…');
+      try {
+        var result = await api('commercial_actor_save', data);
+        if (!panel.isConnected) return;
+        actorToken = ''; actorModal.close(); recipientCache.clear(); recipientDetails.clear(); resetSelection();
+        await loadRecipients(true); feedback(result.message);
+      } catch (error) { actorToken = ''; actorFeedback(error.message + ' Vuelve a editar y genera una nueva revisión.', true); el('[data-notif-actor-save]').setAttribute('data-actor-required', ''); }
+      finally { setActorBusy(false); }
+    }
+    if (actorModal) {
+      el('[data-notif-actor-form]').addEventListener('submit', reviewActor);
+      actorModal.addEventListener('cancel', function (event) { if (actorBusy) event.preventDefault(); });
+      actorModal.addEventListener('close', function () { actorSequence++; actorToken = ''; el('[data-notif-actor-save]').removeAttribute('data-actor-required'); });
     }
     function resetSelection() { selected.clear(); excluded.clear(); allFiltered = false; updateSelection(); }
     panel.addEventListener("click", function (event) {
@@ -341,6 +404,10 @@
       if (button.hasAttribute('data-notif-delete-cancel') && !deleting) deleteModal.close();
       if (button.hasAttribute('data-notif-delete-confirm')) confirmDelete();
       if (button.hasAttribute('data-notif-report-export')) exportReport();
+      if (button.hasAttribute('data-notif-edit-actor')) openActor(button.dataset.notifEditActor);
+      if (button.hasAttribute('data-notif-actor-close') && !actorBusy) actorModal.close();
+      if (button.hasAttribute('data-notif-actor-save')) saveActor();
+      if (button.hasAttribute('data-notif-actor-back') && !actorBusy) { actorToken = ''; el('[data-notif-actor-form]').hidden = false; el('[data-notif-actor-review-panel]').hidden = true; el('[data-notif-actor-save]').removeAttribute('data-actor-required'); actorFeedback('Edita los datos y genera una nueva revisión.'); }
       if (button.hasAttribute("data-notif-result-queue")) { resultModal.close(); if (modal.open) modal.close(); queuePage = 1; el("[data-notif-queue-status]").value = ""; el('[data-notif-view="queue"]').click(); }
       if (button.hasAttribute("data-notif-preview-channel")) { previewChannel = button.dataset.notifPreviewChannel; preview(); }
       if (button.dataset.notifType) {

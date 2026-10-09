@@ -36,6 +36,7 @@ final class CommercialAccessPolicy
     'reasignar' => 'Reasignar responsable',
     'enviar_notificacion' => 'Enviar notificaciones comerciales',
     'eliminar_notificacion' => 'Eliminar notificaciones comerciales (solo administradores)',
+    'editar_actor' => 'Editar datos de actores y registros relacionados',
     'precaptacion_crear' => 'Registrar precaptaciones',
     'precaptacion_editar' => 'Editar resultados de precaptación',
     'precaptacion_ticket' => 'Crear tarea desde precaptación',
@@ -154,7 +155,7 @@ final class CommercialAccessPolicy
     if ($this->canManage()) {
       return true;
     }
-    return in_array($action, $this->allowed('actions', array_keys(self::ACTIONS)), true);
+    return in_array($action, $this->allowed('actions', array_values(array_diff(array_keys(self::ACTIONS), ['editar_actor']))), true);
   }
 
   /** @return array<string,array{views:array<int,string>,actions:array<int,string>,subviews:array<string,array<int,string>>}> */

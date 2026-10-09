@@ -63,7 +63,7 @@ let browser;
   await page.locator('[data-notif-history-close]').click();
   await page.locator('[data-notif-view="report"]').click();
   await page.locator('[data-notif-report-summary]').filter({ hasText: '6 mensajes creados' }).waitFor();
-  assert.equal(await page.locator('[data-notif-report-rows] tr').count(), 5);
+  assert.equal(await page.locator('[data-notif-report-rows] tr').count(), 3);
   const downloadPromise = page.waitForEvent('download');
   await page.locator('[data-notif-report-export]').click();
   const download = await downloadPromise;

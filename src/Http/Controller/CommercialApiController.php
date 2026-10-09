@@ -621,6 +621,43 @@ final class CommercialApiController
     }
   }
 
+  private function actorEditor(array $input): \SCM\Commercial\CommercialActorEditor
+  {
+    $this->notificationService($input);
+    $this->authorize('editar_actor', 'No tienes permiso para editar datos de actores.');
+    return new \SCM\Commercial\CommercialActorEditor($this->db, $this->policy);
+  }
+
+  public function actorDetail(array $input): never
+  {
+    $editor = $this->actorEditor($input);
+    try { JsonResponse::success($editor->detail((string) ($input['type'] ?? ''), (int) ($input['id'] ?? 0))); }
+    catch (\RuntimeException $exception) {
+      if ($exception instanceof \PDOException) { throw $exception; }
+      JsonResponse::error($exception->getMessage(), 404);
+    }
+  }
+
+  public function actorPreview(array $input): never
+  {
+    $editor = $this->actorEditor($input);
+    try { JsonResponse::success($editor->preview((string) ($input['type'] ?? ''), (int) ($input['id'] ?? 0), $input)); }
+    catch (\InvalidArgumentException | \RuntimeException $exception) {
+      if ($exception instanceof \PDOException) { throw $exception; }
+      JsonResponse::error($exception->getMessage(), 422);
+    }
+  }
+
+  public function actorSave(array $input): never
+  {
+    $editor = $this->actorEditor($input);
+    try { JsonResponse::success($editor->save((string) ($input['token'] ?? ''), (array) ($input['targets'] ?? []))); }
+    catch (\InvalidArgumentException | \RuntimeException $exception) {
+      if ($exception instanceof \PDOException) { throw $exception; }
+      JsonResponse::error($exception->getMessage(), 409);
+    }
+  }
+
   public function sendNotifications(array $input): never
   {
     $service = $this->notificationService($input, true);

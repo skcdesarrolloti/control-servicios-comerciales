@@ -1,0 +1,74 @@
+// Requiere generar la vista --audit --admin y servir el repositorio en 127.0.0.1:8769.
+const path = require('path');
+const assert = require('node:assert/strict');
+const { chromium } = require(process.argv[2] ? path.join(process.argv[2], 'playwright') : 'playwright');
+let browser;
+(async () => {
+  browser = await chromium.launch({ headless: true, channel: 'msedge' });
+  const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  const base = 'http://127.0.0.1:8769';
+  const api = (action, extra = {}, admin = false) => page.request.post(base + '/tests/Fixtures/notifications-api.php?audit=' + (admin ? 'admin' : 'user'), { form: { action, nonce: 'fixture', ...extra } });
+  for (const action of ['commercial_actor_detail', 'commercial_actor_preview', 'commercial_actor_save']) {
+    assert.equal((await api(action, { id: '10', type: 'propietarios_activos' })).status(), 403);
+    assert.equal((await api(action, { nonce: 'bad' }, true)).status(), 403);
+  }
+  assert.equal((await api('commercial_actor_detail', { type: 'invalid', id: '10' }, true)).status(), 404);
+  assert.equal((await api('commercial_actor_save', { token: 'inventado' }, true)).status(), 409);
+  await page.goto(base + '/output/notifications-audit-user.html');
+  await page.locator('[data-notif-type="propietarios_activos"]').click();
+  await page.locator('[data-notif-recipient][value="10"]').waitFor();
+  assert.equal(await page.locator('[data-notif-edit-actor]').count(), 0);
+  await page.goto(base + '/output/notifications-audit-admin.html');
+  await page.locator('[data-notif-type="propietarios_activos"]').click();
+  await page.locator('[data-notif-edit-actor="10"]').click();
+  const modal = page.locator('[data-notif-actor-modal]');
+  const form = page.locator('[data-notif-actor-form]');
+  await form.waitFor({ state: 'visible' });
+  assert.equal(await form.locator('[name="nombre"]').inputValue(), 'Propietario 10');
+  assert.equal(await form.locator('[name="documento"]').inputValue(), '123456');
+  assert.equal(await form.locator('[name="groups[]"]').count(), 4);
+  await form.locator('[name="nombre"]').fill('Nombre corregido');
+  await form.locator('[name="documento"]').fill('123456-7');
+  await form.locator('[name="correo"]').fill('corregido@example.test');
+  await form.locator('[name="celular"]').fill('3001112233');
+  await form.locator('[name="indicativo"]').fill('+57');
+  await page.screenshot({ path: 'output/actor-editor-form.png', fullPage: true });
+  await page.locator('[data-notif-actor-review]').click();
+  await page.locator('[data-notif-actor-review-panel]').waitFor({ state: 'visible' });
+  assert.equal(await page.locator('[data-notif-actor-target]').count(), 6);
+  assert.equal(await page.locator('[data-notif-actor-target][value="actor:10"]').isDisabled(), true);
+  assert.match(await page.locator('[data-notif-actor-changes]').innerText(), /Nombre corregido/);
+  assert.match(await page.locator('[data-notif-actor-changes]').innerText(), /Mandato #1/);
+  assert.match(await page.locator('[data-notif-actor-changes]').innerText(), /Cerrado/);
+  assert.equal((await page.locator('[data-notif-actor-changes]').innerText()).includes('titular 2'), false);
+  await page.screenshot({ path: 'output/actor-editor-preview.png', fullPage: true });
+  await page.locator('[data-notif-actor-back]').click();
+  await form.waitFor({ state: 'visible' });
+  await form.locator('[name="nombre"]').fill('Nombre final');
+  await page.locator('[data-notif-actor-review]').click();
+  await page.locator('[data-notif-actor-review-panel]').waitFor({ state: 'visible' });
+  await page.locator('[data-notif-actor-target][value="arrendamientos:2"]').uncheck();
+  await page.setViewportSize({ width: 390, height: 844 });
+  assert.equal(await modal.evaluate(node => node.scrollWidth > node.clientWidth), false, 'El editor desborda el móvil');
+  await modal.evaluate(node => { node.scrollTop = 0; });
+  await page.screenshot({ path: 'output/actor-editor-preview-mobile.png', fullPage: true });
+  const saved = page.waitForResponse(response => response.url().includes('notifications-api.php') && response.request().postData()?.includes('commercial_actor_save'));
+  await page.locator('[data-notif-actor-save]').click();
+  const result = await (await saved).json();
+  assert.equal(result.success, true);
+  assert.equal(result.data.updated, 5);
+  await page.locator('[data-notif-feedback]').filter({ hasText: 'Datos guardados en el actor y 4 registros relacionados.' }).waitFor();
+  assert.equal(await modal.isVisible(), false);
+  for (const [type, id] of [['arrendatarios_activos', '22'], ['copropiedades', '32'], ['club_pph', '40']]) {
+    await page.locator('[data-notif-type="' + type + '"]').click();
+    await page.locator('[data-notif-edit-actor="' + id + '"]').click();
+    await form.waitFor({ state: 'visible' });
+    assert.equal(await form.locator('[name="nombre"]').inputValue() !== '', true);
+    await page.locator('[data-notif-actor-close]').click();
+  }
+  assert.deepEqual(errors, []);
+  console.log('Editor de actores: permisos, cinco campos, comparación, titulares, selección individual, guardado, cuatro tipos y móvil: OK');
+  await browser.close();
+})().catch(async error => { console.error(error); if (browser) await browser.close(); process.exit(1); });
