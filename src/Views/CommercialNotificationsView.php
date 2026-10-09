@@ -17,6 +17,7 @@ final class CommercialNotificationsView
     $sender = $service->senderProfile();
     $config = ['templates' => $templates, 'sender' => $sender, 'request_id' => bin2hex(random_bytes(16)), 'max_bytes' => (int) SCM_UPLOAD_MAX_BYTES,
       'can_send' => $policy->canAct('enviar_notificacion') && $sender['phone'] !== '',
+      'can_delete' => $policy->canAct('eliminar_notificacion'),
       'email_document' => $service->emailDocument('__SCM_NAME__', '__SCM_SUBJECT__', '__SCM_MESSAGE__'),
       'sms' => ['prefix' => CommercialSmsMessage::PREFIX, 'max' => CommercialSmsMessage::MAX_CHARACTERS, 'basic' => CommercialSmsMessage::GSM_BASIC, 'extended' => CommercialSmsMessage::GSM_EXTENDED]];
     $field = 'w-full rounded-xl border border-slate-200 bg-surface-container-lowest px-3 py-2.5 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary-container';
@@ -34,6 +35,7 @@ final class CommercialNotificationsView
   <div class="inline-flex flex-wrap gap-2 rounded-2xl bg-surface-container-low p-1.5" role="tablist" aria-label="Vistas de notificaciones">
     <button type="button" role="tab" aria-selected="true" aria-controls="notif-recipients-panel" id="notif-recipients-tab" data-notif-view="recipients" class="<?php echo $secondary; ?> bg-white"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">groups</span>Destinatarios</button>
     <button type="button" role="tab" aria-selected="false" aria-controls="notif-queue-panel" id="notif-queue-tab" data-notif-view="queue" class="<?php echo $secondary; ?>"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">schedule_send</span>Cola de notificaciones</button>
+    <button type="button" role="tab" aria-selected="false" aria-controls="notif-report-panel" id="notif-report-tab" data-notif-view="report" class="<?php echo $secondary; ?>"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">assessment</span>Informe por funcionario</button>
   </div>
   <p data-notif-feedback role="status" aria-live="polite" class="text-sm font-medium text-secondary" hidden></p>
   <div id="notif-recipients-panel" role="tabpanel" aria-labelledby="notif-recipients-tab" data-notif-panel="recipients" class="space-y-5">
@@ -122,8 +124,43 @@ final class CommercialNotificationsView
     <div class="grid grid-cols-2 sm:grid-cols-5 gap-3" data-notif-queue-stats></div>
     <div class="bg-white border border-slate-200 rounded-2xl shadow-card overflow-hidden">
       <div class="p-5 flex flex-wrap justify-between gap-3"><div><h3 class="font-semibold text-title-md">Estado de los envíos</h3><p class="text-xs text-secondary mt-1"><?php echo $policy->canManage() ? 'Todos los envíos del módulo comercial.' : 'Historial de tus notificaciones.'; ?></p></div><div class="flex gap-2"><select aria-label="Filtrar por estado" data-notif-queue-status class="<?php echo $field; ?>"><option value="">Todos los estados</option><option value="pending">Pendientes</option><option value="processing">Procesando</option><option value="sent">Enviados</option><option value="failed">Fallidos</option><option value="cancelled">Cancelados</option></select><button type="button" data-notif-queue-refresh class="<?php echo $secondary; ?>" aria-label="Actualizar cola"><span class="material-symbols-outlined text-[20px]" aria-hidden="true">refresh</span></button></div></div>
-      <div class="overflow-x-auto"><table class="w-full text-sm"><thead class="bg-surface-container-low text-left text-xs text-secondary"><tr><th class="px-5 py-3">Destinatario</th><th class="px-5 py-3">Canal</th><th class="px-5 py-3">Estado</th><th class="px-5 py-3">Fecha</th><th class="px-5 py-3">Detalle</th></tr></thead><tbody data-notif-queue-rows class="divide-y divide-slate-100"></tbody></table></div>
+      <div class="overflow-x-auto"><table class="w-full text-sm"><thead class="bg-surface-container-low text-left text-xs text-secondary"><tr><th class="px-5 py-3">Destinatario</th><th class="px-5 py-3">Creada por</th><th class="px-5 py-3">Canal</th><th class="px-5 py-3">Estado</th><th class="px-5 py-3">Fecha de creación</th><th class="px-5 py-3">Detalle</th><th class="px-5 py-3">Acciones</th></tr></thead><tbody data-notif-queue-rows class="divide-y divide-slate-100"></tbody></table></div>
       <div class="p-4 flex items-center justify-between gap-2"><button type="button" data-notif-queue-prev class="<?php echo $secondary; ?>" disabled>Anterior</button><span data-notif-queue-page class="text-xs text-secondary"></span><button type="button" data-notif-queue-next class="<?php echo $secondary; ?>" disabled>Siguiente</button></div>
+    </div>
+  </div>
+  <dialog data-notif-history-modal aria-labelledby="notif-history-title" class="m-auto w-[calc(100%-2rem)] max-w-3xl max-h-[90dvh] overflow-y-auto p-5 sm:p-7 rounded-2xl border-0 bg-white text-on-surface shadow-modal backdrop:bg-slate-900/50">
+    <div class="flex items-center justify-between gap-3"><h3 id="notif-history-title" class="text-headline-md font-semibold">Vista previa del mensaje</h3><button type="button" data-notif-history-close class="<?php echo $secondary; ?>" aria-label="Cerrar vista previa"><span class="material-symbols-outlined" aria-hidden="true">close</span></button></div>
+    <p data-notif-history-loading role="status" class="mt-4 text-sm text-secondary">Cargando mensaje…</p>
+    <div data-notif-history-content class="mt-4 space-y-4" hidden>
+      <dl data-notif-history-info class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm rounded-xl bg-surface-container-low p-4"></dl>
+      <p data-notif-history-text class="whitespace-pre-wrap break-words rounded-xl border border-slate-200 p-4 text-sm leading-relaxed"></p>
+      <iframe data-notif-history-email title="Correo guardado en la cola" sandbox="" referrerpolicy="no-referrer" class="w-full h-[560px] rounded-xl border border-slate-200 bg-white" hidden></iframe>
+      <div data-notif-history-media class="space-y-2" hidden></div>
+      <p class="text-xs text-secondary">Contenido guardado al crear el mensaje. Enviado indica el resultado registrado por el proveedor; no confirma lectura.</p>
+    </div>
+  </dialog>
+  <dialog data-notif-delete-modal aria-labelledby="notif-delete-title" aria-describedby="notif-delete-description" class="m-auto w-[calc(100%-2rem)] max-w-lg max-h-[90dvh] overflow-y-auto p-6 rounded-2xl border-0 bg-white text-on-surface shadow-modal backdrop:bg-slate-900/50">
+    <h3 id="notif-delete-title" class="text-headline-md font-semibold">Eliminar notificación</h3>
+    <p data-notif-delete-target class="mt-3 text-sm font-semibold break-words"></p>
+    <p id="notif-delete-description" class="mt-2 text-sm text-secondary">Se retirará de la cola. Si está pendiente, se cancelará su envío. Los mensajes enviados no se pueden retirar del destinatario. Se conservarán el contenido, el autor y el registro de eliminación para auditoría.</p>
+    <p data-notif-delete-feedback role="status" class="mt-3 text-sm text-error" hidden></p>
+    <div class="mt-5 flex flex-col-reverse sm:flex-row sm:justify-end gap-2"><button type="button" data-notif-delete-cancel autofocus class="<?php echo $secondary; ?>">Cancelar</button><button type="button" data-notif-delete-confirm class="<?php echo $secondary; ?> text-error">Eliminar notificación</button></div>
+  </dialog>
+  <div id="notif-report-panel" role="tabpanel" aria-labelledby="notif-report-tab" data-notif-panel="report" hidden class="space-y-4">
+    <div class="bg-white border border-slate-200 rounded-2xl shadow-card overflow-hidden">
+      <div class="p-5 space-y-4">
+        <div><h3 class="font-semibold text-title-md">Informe de notificaciones por funcionario</h3><p class="text-xs text-secondary mt-1"><?php echo $policy->canManage() ? 'Todos los autores del módulo comercial.' : 'Informe de tus notificaciones.'; ?> Cada mensaje por canal cuenta como un envío. Incluye eliminados para conservar la trazabilidad.</p></div>
+        <form data-notif-report-form class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
+          <label class="text-xs text-secondary">Desde<input type="date" name="date_from" class="<?php echo $field; ?> mt-1"></label>
+          <label class="text-xs text-secondary">Hasta<input type="date" name="date_to" class="<?php echo $field; ?> mt-1"></label>
+          <label class="text-xs text-secondary">ID del funcionario<input type="text" name="employee_id" maxlength="50" placeholder="Todos los permitidos" class="<?php echo $field; ?> mt-1"></label>
+          <button type="submit" class="<?php echo $secondary; ?> bg-primary-container">Consultar informe</button>
+          <button type="button" data-notif-report-export class="<?php echo $secondary; ?>" disabled><span class="material-symbols-outlined text-[18px]" aria-hidden="true">download</span>Descargar CSV</button>
+        </form>
+        <p data-notif-report-summary role="status" class="text-sm text-secondary"></p>
+        <p class="text-xs text-secondary">Fechas de creación en hora de Colombia. «Eliminados» es parte del total y puede coincidir con cualquier estado. El autor es quien creó y solicitó el envío; la entrega la realiza el servicio automático.</p>
+      </div>
+      <div class="overflow-x-auto"><table class="w-full text-sm"><thead class="bg-surface-container-low text-left text-xs text-secondary"><tr><?php foreach (['Funcionario', 'Cargo', 'Canal', 'Total', 'Pendientes', 'Procesando', 'Enviados', 'Fallidos', 'Cancelados', 'Eliminados', 'Última creación'] as $heading): ?><th class="px-4 py-3 whitespace-nowrap"><?php echo $heading; ?></th><?php endforeach; ?></tr></thead><tbody data-notif-report-rows class="divide-y divide-slate-100"></tbody></table></div>
     </div>
   </div>
 </section>

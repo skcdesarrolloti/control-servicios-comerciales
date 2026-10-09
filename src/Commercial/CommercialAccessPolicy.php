@@ -35,6 +35,7 @@ final class CommercialAccessPolicy
     'cambiar_estado' => 'Cambiar estado comercial',
     'reasignar' => 'Reasignar responsable',
     'enviar_notificacion' => 'Enviar notificaciones comerciales',
+    'eliminar_notificacion' => 'Eliminar notificaciones comerciales (solo administradores)',
     'precaptacion_crear' => 'Registrar precaptaciones',
     'precaptacion_editar' => 'Editar resultados de precaptación',
     'precaptacion_ticket' => 'Crear tarea desde precaptación',
@@ -144,6 +145,9 @@ final class CommercialAccessPolicy
 
   public function canAct(string $action): bool
   {
+    if ($action === 'eliminar_notificacion') {
+      return $this->canManage();
+    }
     if (!array_key_exists($action, self::ACTIONS)) {
       return false;
     }

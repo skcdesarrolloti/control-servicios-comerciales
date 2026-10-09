@@ -1641,10 +1641,15 @@
       if (!scope) return;
       var checked = toggle.getAttribute("data-checked") === "true";
       scope.querySelectorAll('input[type="checkbox"][name^="permissions["]').forEach(function (checkbox) {
-        checkbox.checked = checked;
+        if (!checkbox.disabled) checkbox.checked = checked;
       });
     });
     permissionForm.addEventListener("change", function (event) {
+      if (event.target.matches('input[name="admin_cargos[]"]')) {
+        var cargoPanel = event.target.closest('[data-cargo]');
+        var deletePermission = cargoPanel && cargoPanel.querySelector('input[value="eliminar_notificacion"]');
+        if (deletePermission) deletePermission.checked = event.target.checked;
+      }
       var master = event.target.closest(".commercial-permission-master");
       if (master && event.target.matches('input[name="admin_cargos[]"]')) {
         master.classList.toggle("is-checked", event.target.checked);

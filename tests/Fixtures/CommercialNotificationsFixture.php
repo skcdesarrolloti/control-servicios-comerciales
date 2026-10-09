@@ -11,6 +11,33 @@ use SCM\Core\Settings;
 
 final class CommercialNotificationsFixture
 {
+  /** Historial ficticio para revisar vista previa, permisos e informes sin envíos reales. */
+  public static function makeWithAudit(bool $admin = false): array
+  {
+    [$db, $policy, $service] = self::make();
+    $service->prepareDelivery(md5('audit-ui'), []);
+    $service->enqueue('propietarios_activos', [10], ['email', 'sms', 'whatsapp'], 'Información del inmueble', 'Mensaje de prueba para el informe', 'scm_marketing_generica_texto_v1');
+    foreach ([1 => 'sent', 2 => 'pending', 3 => 'failed'] as $id => $status) {
+      $db->update('skc_notification_queue', ['status' => $status, 'created_at' => '2026-10-08 17:30:00', 'sent_at' => $status === 'sent' ? '2026-10-08 17:31:00' : null], ['id' => $id]);
+    }
+    $row = $db->getRow('SELECT * FROM skc_notification_queue WHERE id = 3');
+    unset($row['id']);
+    $db->insert('skc_notification_queue', array_replace($row, ['status' => 'processing', 'dedupe_key' => 'processing-fixture']));
+    $row = $db->getRow('SELECT * FROM skc_notification_queue WHERE id = 1');
+    unset($row['id']);
+    $db->insert('skc_notification_queue', array_replace($row, ['dedupe_key' => 'other-user-fixture', 'meta_json' => '{"commercial_notifications":{"employee_id":"901","nombre_funcionario":"Otro usuario","cargo":"Consultor","user_id":2}}']));
+    $db->insert('skc_notification_queue', array_replace($row, ['dedupe_key' => 'legacy-fixture', 'meta_json' => '{}']));
+    $db->insert('skc_notification_queue', array_replace($row, ['dedupe_key' => 'other-module-fixture', 'source_module' => 'otro_modulo']));
+    $db->insert('skc_notification_queue', array_replace($row, ['dedupe_key' => 'other-project-fixture', 'project_code' => 'otro_proyecto']));
+    if ($admin) {
+      $_SESSION['scm_user_id'] = 3;
+      $_SESSION['scm_employee_id'] = '999';
+      $_SESSION['scm_user_cargo'] = '11';
+      $_SESSION['scm_user'] = 'Administrador';
+    }
+    return [$db, $policy, new CommercialNotificationsService($db, $policy)];
+  }
+
   /** Base en memoria: estas pruebas nunca usan la cola ni los contactos reales. */
   public static function make(bool $admin = false): array
   {

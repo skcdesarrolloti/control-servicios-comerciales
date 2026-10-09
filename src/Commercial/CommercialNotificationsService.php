@@ -275,6 +275,7 @@ final class CommercialNotificationsService extends AdministrativeNotificationsSe
       'meta_json' => json_encode(['commercial_notifications' => [
         'batch_id' => $this->requestId, 'id_actor' => (int) $recipient['_ID'], 'tipo_actor' => $recipient['tipo_actor'],
         'employee_id' => $this->currentEmployeeId(), 'nombre_funcionario' => $sender['name'], 'cargo' => $sender['cargo'], 'celular' => $sender['phone'],
+        'user_id' => Auth::userId(), 'media' => $this->media,
       ], 'sms' => $channel === 'sms' ? CommercialSmsMessage::metrics($text) : null], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
       'status' => 'pending', 'priority' => 100, 'max_attempts' => 3, 'scheduled_at' => $now,
       'created_at' => $now, 'updated_at' => $now, 'created_by' => self::PROJECT_CODE, 'dedupe_key' => $dedupe,
@@ -290,12 +291,8 @@ final class CommercialNotificationsService extends AdministrativeNotificationsSe
   /** Historial limitado al proyecto, módulo y funcionario que realizó el envío. */
   public function notificationQueue(array $filters = []): array
   {
-    $where = '`project_code` = ? AND `source_module` = ?';
-    $args = [self::PROJECT_CODE, self::SOURCE_MODULE];
-    if (!$this->policy->canManage()) {
-      $where .= " AND JSON_UNQUOTE(JSON_EXTRACT(`meta_json`, '$.commercial_notifications.employee_id')) = ?";
-      $args[] = $this->currentEmployeeId();
-    }
+    [$where, $args] = $this->historyScope();
+    $where .= ' AND ' . $this->metadataField('deleted_at') . ' IS NULL';
     $status = (string) ($filters['status'] ?? '');
     $statuses = ['pending', 'processing', 'sent', 'failed', 'cancelled'];
     $counts = array_fill_keys($statuses, 0);
@@ -310,7 +307,140 @@ final class CommercialNotificationsService extends AdministrativeNotificationsSe
     }
     $total = (int) $this->db->getVar('SELECT COUNT(*) FROM `' . self::QUEUE_TABLE . "` WHERE {$where}", $args);
     $page = min(max(1, (int) ($filters['page'] ?? 1)), max(1, (int) ceil($total / 20)));
-    $rows = $this->db->getResults('SELECT `id`,`destination_name`,`destination`,`channel`,`template_name`,`status`,`attempts`,`created_at`,`sent_at`,`last_error` FROM `' . self::QUEUE_TABLE . "` WHERE {$where} ORDER BY `id` DESC LIMIT 20 OFFSET ?", [...$args, ($page - 1) * 20]);
+    $rows = $this->db->getResults('SELECT `id`,`destination_name`,`destination`,`channel`,`template_name`,`status`,`attempts`,`created_at`,`sent_at`,`last_error`,' . $this->creatorColumns() . ' FROM `' . self::QUEUE_TABLE . "` WHERE {$where} ORDER BY `id` DESC LIMIT 20 OFFSET ?", [...$args, ($page - 1) * 20]);
     return ['rows' => $rows, 'counts' => $counts, 'total' => $total, 'page' => $page, 'pages' => max(1, (int) ceil($total / 20))];
+  }
+
+  /** La identidad es una captura del funcionario al crear el mensaje, no del worker. */
+  private function metadataField(string $field): string
+  {
+    return "JSON_UNQUOTE(JSON_EXTRACT(CASE WHEN JSON_VALID(`meta_json`) THEN `meta_json` ELSE '{}' END, '$.commercial_notifications.{$field}'))";
+  }
+
+  private function creatorColumns(): string
+  {
+    return $this->metadataField('employee_id') . ' AS employee_id,'
+      . $this->metadataField('user_id') . ' AS creator_user_id,'
+      . "COALESCE(NULLIF(" . $this->metadataField('nombre_funcionario') . ", ''), 'Sin autor registrado') AS creator_name,"
+      . $this->metadataField('cargo') . ' AS creator_cargo';
+  }
+
+  /** @return array{0:string,1:array<int,mixed>} */
+  private function historyScope(): array
+  {
+    $where = '`project_code` = ? AND `source_module` = ?';
+    $args = [self::PROJECT_CODE, self::SOURCE_MODULE];
+    if (!$this->policy->canManage()) {
+      $where .= ' AND ' . $this->metadataField('employee_id') . ' = ?';
+      $args[] = $this->currentEmployeeId();
+      if ($this->currentEmployeeId() === '') {
+        $where .= ' AND 1=0';
+      }
+    }
+    return [$where, $args];
+  }
+
+  /** @return array<string,mixed>|null */
+  public function notificationDetail(int $id): ?array
+  {
+    [$where, $args] = $this->historyScope();
+    $row = $this->db->getRow('SELECT `id`,`destination_name`,`destination`,`channel`,`subject`,`message_text`,`message_html`,`template_name`,`payload_json`,`meta_json`,`status`,`attempts`,`created_at`,`sent_at`,`last_error`,'
+      . $this->creatorColumns() . ' FROM `' . self::QUEUE_TABLE . "` WHERE {$where} AND `id` = ? AND " . $this->metadataField('deleted_at') . ' IS NULL', [...$args, $id]);
+    if ($row === null) {
+      return null;
+    }
+    $meta = json_decode((string) $row['meta_json'], true);
+    $payload = json_decode((string) $row['payload_json'], true);
+    $media = $meta['commercial_notifications']['media'] ?? [];
+    // Los registros anteriores guardan el encabezado de WhatsApp en el payload.
+    if (!$media) {
+      foreach (($payload['components'] ?? []) as $component) {
+        if (($component['type'] ?? '') !== 'header') { continue; }
+        $parameter = $component['parameters'][0] ?? [];
+        $type = (string) ($parameter['type'] ?? '');
+        $media = ['type' => $type, 'url' => $parameter[$type]['link'] ?? '', 'name' => $parameter[$type]['filename'] ?? 'Archivo adjunto'];
+        break;
+      }
+    }
+    $url = is_array($media) ? (string) ($media['url'] ?? '') : '';
+    $row['media'] = preg_match('~^https?://~i', $url) ? $media : [];
+    unset($row['meta_json'], $row['payload_json']);
+    return $row;
+  }
+
+  /** Eliminación lógica: conserva auditoría/dedupe y cancela pendientes de forma atómica con el claim del worker. */
+  public function deleteNotification(int $id): void
+  {
+    if (!$this->policy->canView('notificaciones') || !$this->policy->canAct('eliminar_notificacion')) {
+      throw new \RuntimeException('Solo los administradores pueden eliminar notificaciones.');
+    }
+    $sender = $this->senderProfile();
+    $now = gmdate('Y-m-d H:i:s');
+    [$where, $args] = $this->historyScope();
+    $row = $this->db->getRow('SELECT `status`,`meta_json` FROM `' . self::QUEUE_TABLE . "` WHERE {$where} AND `id` = ? AND " . $this->metadataField('deleted_at') . ' IS NULL', [...$args, $id]);
+    $unavailable = 'No se pudo eliminar: el mensaje está procesándose, ya fue eliminado o no está disponible. Actualiza la cola.';
+    if ($row === null || !in_array($row['status'], ['pending', 'sent', 'failed', 'cancelled'], true)) {
+      throw new \RuntimeException($unavailable);
+    }
+    $meta = json_decode((string) $row['meta_json'], true);
+    $meta = is_array($meta) ? $meta : [];
+    $audit = $meta['commercial_notifications'] ?? [];
+    $meta['commercial_notifications'] = array_replace(is_array($audit) ? $audit : [], [
+      'deleted_at' => $now, 'deleted_by_user_id' => Auth::userId(), 'deleted_by_employee_id' => $this->currentEmployeeId(),
+      'deleted_by_name' => $sender['name'], 'status_before_deletion' => $row['status'],
+    ]);
+    // Comparar estado y metadatos evita pisar un claim o un cambio del worker posterior a la lectura.
+    $sql = 'UPDATE `' . self::QUEUE_TABLE . '` SET `meta_json` = ?, `status` = ?, `updated_at` = ?'
+      . " WHERE {$where} AND `id` = ? AND `status` = ? AND COALESCE(`meta_json`, '') = ? AND " . $this->metadataField('deleted_at') . ' IS NULL';
+    $statement = $this->db->pdo()->prepare($sql);
+    $statement->execute([json_encode($meta, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR), $row['status'] === 'pending' ? 'cancelled' : $row['status'], $now, ...$args, $id, $row['status'], (string) $row['meta_json']]);
+    if ($statement->rowCount() !== 1) {
+      throw new \RuntimeException($unavailable);
+    }
+  }
+
+  /** Informe completo por autor y canal, incluidos los registros retirados de la cola. */
+  public function notificationReport(array $filters = []): array
+  {
+    [$where, $args] = $this->historyScope();
+    $dates = [];
+    foreach (['date_from', 'date_to'] as $key) {
+      $value = trim((string) ($filters[$key] ?? ''));
+      if ($value === '') { continue; }
+      $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $value, new \DateTimeZone('America/Bogota'));
+      if (!$date || $date->format('Y-m-d') !== $value) {
+        throw new \InvalidArgumentException('Selecciona fechas válidas para el informe.');
+      }
+      $dates[$key] = $date;
+    }
+    if (isset($dates['date_from'], $dates['date_to']) && $dates['date_from'] > $dates['date_to']) {
+      throw new \InvalidArgumentException('La fecha inicial no puede ser posterior a la final.');
+    }
+    foreach ($dates as $key => $date) {
+      $where .= $key === 'date_from' ? ' AND `created_at` >= ?' : ' AND `created_at` < ?';
+      $args[] = ($key === 'date_to' ? $date->modify('+1 day') : $date)->setTimezone(new \DateTimeZone('UTC'))->format('Y-m-d H:i:s');
+    }
+    $employee = trim((string) ($filters['employee_id'] ?? ''));
+    if ($employee !== '') {
+      $where .= ' AND ' . $this->metadataField('employee_id') . ' = ?';
+      $args[] = $employee;
+    }
+    $columns = $this->metadataField('employee_id') . ' AS employee_id,'
+      . "COALESCE(NULLIF(" . $this->metadataField('nombre_funcionario') . ", ''), 'Sin autor registrado') AS creator_name,"
+      . $this->metadataField('cargo') . ' AS creator_cargo, `channel`, COUNT(*) AS total';
+    foreach (['pending', 'processing', 'sent', 'failed', 'cancelled'] as $status) {
+      $columns .= ", SUM(CASE WHEN `status` = '{$status}' THEN 1 ELSE 0 END) AS `{$status}`";
+    }
+    $columns .= ', SUM(CASE WHEN ' . $this->metadataField('deleted_at') . ' IS NOT NULL THEN 1 ELSE 0 END) AS deleted, MAX(`created_at`) AS last_created_at';
+    $rows = $this->db->getResults('SELECT ' . $columns . ' FROM `' . self::QUEUE_TABLE . "` WHERE {$where} GROUP BY employee_id, creator_name, creator_cargo, `channel` ORDER BY creator_name, `channel`", $args);
+    $totals = array_fill_keys(['total', 'pending', 'processing', 'sent', 'failed', 'cancelled', 'deleted'], 0);
+    foreach ($rows as &$row) {
+      foreach ($totals as $key => $_value) {
+        $row[$key] = (int) $row[$key];
+        $totals[$key] += $row[$key];
+      }
+    }
+    unset($row);
+    return ['rows' => $rows, 'totals' => $totals];
   }
 }

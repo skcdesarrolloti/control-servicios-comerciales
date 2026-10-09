@@ -4833,10 +4833,11 @@ final class CommercialDashboardView
                 <?php endforeach; ?>
                 <div class="pt-1">
                   <span class="block font-label-sm text-secondary font-semibold">Acciones Operativas:</span>
+                  <p class="text-[11px] text-secondary">Eliminar notificaciones requiere Acceso Total Administrativo; este permiso no se puede delegar por separado.</p>
                   <div class="grid grid-cols-2 gap-1 pt-1">
                     <?php foreach (CommercialAccessPolicy::ACTIONS as $k => $label): ?>
                       <label class="flex items-center gap-1.5 text-[11px] text-on-surface cursor-pointer">
-                        <input type="checkbox" name="permissions[<?php echo esc_attr($cargo['id']); ?>][actions][]" value="<?php echo esc_attr($k); ?>"<?php checked(in_array($k, $current['actions'], true)); ?> class="rounded text-primary">
+                        <input type="checkbox" name="permissions[<?php echo esc_attr($cargo['id']); ?>][actions][]" value="<?php echo esc_attr($k); ?>"<?php checked($k === 'eliminar_notificacion' ? isset($adminCargoIds[$cargo['id']]) : in_array($k, $current['actions'], true)); ?> <?php echo $k === 'eliminar_notificacion' ? 'disabled' : ''; ?> class="rounded text-primary">
                         <span><?php echo esc_html($label); ?></span>
                       </label>
                     <?php endforeach; ?>

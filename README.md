@@ -62,6 +62,12 @@ En **Configurar permisos** se puede habilitar la vista **Notificaciones comercia
 
 Los mensajes van a `skc_notification_queue` con `project_code=control-servicios-comerciales` y `source_module=commercial_notifications`. Los procesa el worker global existente; no hay envíos directos ni un cron nuevo. Se respetan bloqueos por canal y preferencias de notificaciones; WhatsApp también respeta `permite_marketing_whatsapp`. El identificador del envío y un bloqueo de MySQL/MariaDB impiden duplicados ante reintentos.
 
+La cola muestra **Creada por** (nombre, cargo al crear e `id_empleado`) y **Ver mensaje**, que consulta el texto/HTML realmente guardado, asunto, plantilla, adjunto disponible, fechas de creación/envío y último error. El correo se muestra en un iframe sin permisos de scripts. La autoría identifica al funcionario que solicitó el envío; el transporte lo ejecuta el worker. Se registra también el ID interno de usuario para nuevos mensajes. Los históricos conservan la autoría que ya tenían en `meta_json`; cuando falta se muestran como **Sin autor registrado**.
+
+**Eliminar notificaciones comerciales (solo administradores)** figura en Configurar permisos y está ligado a **Acceso Total Administrativo**. No se puede delegar individualmente y se valida también en la API. Eliminar retira el mensaje de la cola mediante metadatos de auditoría: conserva contenido, autor, intentos y clave de deduplicación, y registra quién eliminó y cuándo. Un pendiente pasa a cancelado con una actualización atómica compatible con el claim del worker; uno en procesamiento no se permite eliminar. Un enviado conserva su estado y no se retira del destinatario. No se requieren nuevas tablas ni migraciones.
+
+**Informe por funcionario** agrupa mensajes por autor/cargo y canal, muestra estados y eliminados, y permite filtrar por ID del funcionario y fechas de creación (días completos de Colombia). Incluye los eliminados en el total; la columna Eliminados se solapa con los estados. Cada mensaje por canal cuenta una vez. Los administradores consultan todos los autores del módulo y los demás solo sus registros, incluso al manipular filtros. **Descargar CSV** exporta el resultado consultado con protección ante fórmulas de hoja de cálculo.
+
 Los botones superiores de WhatsApp, Correo, SMS y Todos los canales abren el editor en un popup para la selección masiva. Cada contacto tiene los mismos cuatro botones para un envío individual, sin alterar la selección masiva. La vista previa cambia por canal: el correo usa `EmailTemplate::render`, incluido el banner configurado, igual que el HTML encolado. WhatsApp incluye saludo y firma automática (nombre, cargo y celular reales del funcionario).
 
 La confirmación de envío usa un popup con destinatarios y canales, permite volver al mensaje y muestra el progreso del encolado. Al terminar, otro popup informa mensajes encolados, sin datos válidos, omitidos por preferencias y con error, y permite abrir la cola. Los errores conservan el editor; encolado indica pendiente de envío, no entrega confirmada.
@@ -85,6 +91,8 @@ php tools/check-commercial-notifications.php
 ```
 
 Para revisar la interfaz con datos ficticios, genera `output/notifications-preview.html` con `php tools/preview-commercial-notifications.php` y sirve el repositorio localmente en `127.0.0.1:8769`. La prueba opcional `tools/check-commercial-notifications-ui.cjs` usa Playwright/Edge y comprueba vista previa, encabezados, selección, cola, API y diseño móvil. Su API de pruebas funciona solo en el servidor CLI local con una base SQLite en memoria.
+
+Para revisar historial, informe y permisos de eliminación usa `php tools/preview-commercial-notifications.php --audit` y `php tools/preview-commercial-notifications.php --audit --admin`. Generan vistas independientes de usuario y administrador. `tools/check-commercial-notifications-audit-ui.cjs` verifica estas pantallas y las nuevas rutas de API. Los fixtures se reconstruyen por petición; la persistencia de eliminación se comprueba en `CommercialNotificationsAuditTest`.
 
 ## Autologin firmado
 

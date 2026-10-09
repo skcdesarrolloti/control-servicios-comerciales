@@ -20,11 +20,19 @@
     var modal = panel.querySelector("[data-notif-modal]"), singleTarget = null, previewChannel = "whatsapp";
     var confirmationModal = panel.querySelector("[data-notif-confirm-modal]"), resultModal = panel.querySelector("[data-notif-result-modal]"), confirming = false;
     var loading = false, suppressReset = false, recipientRequest = null, recipientCache = new Map();
+    var queueSequence = 0, historySequence = 0, reportSequence = 0, queueRows = new Map(), reportRows = [];
+    var historyModal = panel.querySelector('[data-notif-history-modal]'), deleteModal = panel.querySelector('[data-notif-delete-modal]');
+    var deleteId = null, deleting = false;
     var statusLabels = {pending: "Pendiente", processing: "Procesando", sent: "Enviado", failed: "Fallido", cancelled: "Cancelado"};
     function newRequestId() { return Array.from(crypto.getRandomValues(new Uint8Array(16)), function (byte) { return byte.toString(16).padStart(2, "0"); }).join(""); }
 
     function el(selector) { return panel.querySelector(selector); }
     function esc(value) { return String(value == null ? "" : value).replace(/[&<>"']/g, function (char) { return {"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[char]; }); }
+    function dateLabel(value) {
+      if (!value) return "Sin fecha registrada";
+      var date = new Date(value.replace(" ", "T") + "Z");
+      return Number.isNaN(date.getTime()) ? "Sin fecha registrada" : date.toLocaleString("es-CO", {timeZone: "America/Bogota"});
+    }
     function feedback(message, error) {
       el("[data-notif-feedback]").hidden = !message;
       el("[data-notif-feedback]").textContent = message;
@@ -217,17 +225,107 @@
       target.append(node);
     }
     async function loadQueue() {
-      el("[data-notif-queue-rows]").innerHTML = '<tr><td colspan="5" class="p-8 text-center text-secondary">Cargando envíos…</td></tr>';
+      var ticket = ++queueSequence;
+      queueRows.clear();
+      el("[data-notif-queue-rows]").innerHTML = '<tr><td colspan="7" class="p-8 text-center text-secondary">Cargando envíos…</td></tr>';
       try {
         var result = await api("commercial_notifications_queue", {page: queuePage, status: el("[data-notif-queue-status]").value});
-        if (!panel.isConnected) return;
+        if (!panel.isConnected || ticket !== queueSequence) return;
         queuePage = result.page; queuePages = result.pages;
         el("[data-notif-queue-stats]").innerHTML = Object.entries(result.counts).map(function (entry) { return '<div class="rounded-2xl bg-white border border-slate-200 p-4"><span class="block text-xs text-secondary">' + esc(statusLabels[entry[0]]) + '</span><strong class="block text-2xl mt-1">' + entry[1] + '</strong></div>'; }).join("");
-        el("[data-notif-queue-rows]").innerHTML = result.rows.length ? result.rows.map(function (row) { return '<tr><td class="px-5 py-4"><strong class="block text-sm">' + esc(row.destination_name) + '</strong><span class="text-xs text-secondary break-all">' + esc(row.destination) + '</span></td><td class="px-5 py-4 text-xs">' + esc(row.channel) + '</td><td class="px-5 py-4 text-xs whitespace-nowrap">' + esc(statusLabels[row.status] || row.status) + '</td><td class="px-5 py-4 text-xs whitespace-nowrap">' + esc(new Date(row.created_at.replace(" ", "T") + "Z").toLocaleString("es-CO", {timeZone: "America/Bogota"})) + '</td><td class="px-5 py-4 text-xs max-w-xs break-words">' + esc(row.last_error || (row.attempts + " intentos")) + '</td></tr>'; }).join("") : '<tr><td colspan="5" class="p-8 text-center text-secondary">Todavía no hay notificaciones en este estado.</td></tr>';
+        el("[data-notif-queue-rows]").innerHTML = result.rows.length ? result.rows.map(function (row) {
+          queueRows.set(String(row.id), row);
+          var actions = '<button type="button" data-notif-history-id="' + esc(row.id) + '" class="inline-flex items-center justify-center gap-1 min-h-[44px] rounded-xl border border-slate-200 px-3 py-2 text-xs hover:bg-surface-container-low focus-visible:ring-2 focus-visible:ring-primary-container" aria-label="Ver mensaje para ' + esc(row.destination_name) + '"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">visibility</span>Ver mensaje</button>';
+          if (config.can_delete) actions += '<button type="button" data-notif-delete-id="' + esc(row.id) + '" class="inline-flex items-center justify-center gap-1 min-h-[44px] rounded-xl border border-slate-200 px-3 py-2 text-xs text-error hover:bg-surface-container-low focus-visible:ring-2 focus-visible:ring-primary-container disabled:opacity-50 disabled:cursor-not-allowed" aria-label="Eliminar mensaje para ' + esc(row.destination_name) + '" ' + (row.status === 'processing' ? 'disabled title="Espera a que termine el procesamiento"' : '') + '><span class="material-symbols-outlined text-[18px]" aria-hidden="true">delete</span>Eliminar</button>';
+          return '<tr><td class="px-5 py-4"><strong class="block text-sm">' + esc(row.destination_name) + '</strong><span class="text-xs text-secondary break-all">' + esc(row.destination) + '</span></td><td class="px-5 py-4 text-xs"><strong class="block">' + esc(row.creator_name || 'Sin autor registrado') + '</strong><span class="block text-secondary">' + esc(row.creator_cargo) + '</span><span class="block text-secondary">' + (row.employee_id ? 'ID ' + esc(row.employee_id) : '') + '</span></td><td class="px-5 py-4 text-xs">' + esc(row.channel) + '</td><td class="px-5 py-4 text-xs whitespace-nowrap">' + esc(statusLabels[row.status] || row.status) + '</td><td class="px-5 py-4 text-xs whitespace-nowrap">' + esc(dateLabel(row.created_at)) + '</td><td class="px-5 py-4 text-xs max-w-xs break-words">' + esc(row.last_error || (row.attempts + " intentos")) + '</td><td class="px-5 py-4"><div class="flex flex-wrap gap-2">' + actions + '</div></td></tr>';
+        }).join("") : '<tr><td colspan="7" class="p-8 text-center text-secondary">Todavía no hay notificaciones en este estado.</td></tr>';
         el("[data-notif-queue-page]").textContent = "Página " + queuePage + " de " + queuePages + " · " + result.total + " envíos";
         el("[data-notif-queue-prev]").disabled = queuePage <= 1;
         el("[data-notif-queue-next]").disabled = queuePage >= queuePages;
-      } catch (error) { feedback(error.message, true); el("[data-notif-queue-rows]").innerHTML = '<tr><td colspan="5" class="p-8 text-center text-error">No se pudo consultar la cola. Usa Actualizar para reintentar.</td></tr>'; }
+      } catch (error) { if (ticket !== queueSequence || !panel.isConnected) return; feedback(error.message, true); el("[data-notif-queue-rows]").innerHTML = '<tr><td colspan="7" class="p-8 text-center text-error">No se pudo consultar la cola. Usa Actualizar para reintentar.</td></tr>'; }
+    }
+    async function showHistory(id) {
+      var ticket = ++historySequence;
+      el('[data-notif-history-content]').hidden = true;
+      el('[data-notif-history-loading]').hidden = false;
+      el('[data-notif-history-loading]').textContent = 'Cargando mensaje…';
+      historyModal.showModal();
+      try {
+        var row = await api('commercial_notifications_detail', {id: id});
+        if (ticket !== historySequence || !panel.isConnected || !historyModal.open) return;
+        var fields = [['Destinatario', row.destination_name + ' · ' + row.destination], ['Creada por', (row.creator_name || 'Sin autor registrado') + (row.employee_id ? ' · ID ' + row.employee_id : '')], ['Cargo al crear', row.creator_cargo || 'Sin cargo registrado'], ['Canal y estado', row.channel + ' · ' + (statusLabels[row.status] || row.status)], ['Fecha de creación', dateLabel(row.created_at)], ['Fecha de envío', dateLabel(row.sent_at)]];
+        if (row.subject) fields.push(['Asunto', row.subject]);
+        if (row.template_name) fields.push(['Plantilla', row.template_name]);
+        if (row.last_error) fields.push(['Último error', row.last_error]);
+        el('[data-notif-history-info]').innerHTML = fields.map(function (field) { return '<div class="min-w-0"><dt class="text-xs text-secondary">' + esc(field[0]) + '</dt><dd class="mt-1 break-words">' + esc(field[1]) + '</dd></div>'; }).join('');
+        var email = el('[data-notif-history-email]'), text = el('[data-notif-history-text]');
+        text.textContent = row.message_text || 'Sin texto guardado.';
+        text.hidden = row.channel === 'email' && !!row.message_html;
+        email.hidden = !text.hidden;
+        email.srcdoc = text.hidden ? row.message_html : '';
+        var media = el('[data-notif-history-media]'); media.replaceChildren(); media.hidden = true;
+        if (row.media && /^https?:\/\//i.test(row.media.url || '')) {
+          var link = document.createElement('a'); link.href = row.media.url; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.className = 'block text-sm text-secondary underline break-all'; link.textContent = 'Ver archivo: ' + (row.media.name || 'Archivo adjunto');
+          media.append(link); media.hidden = false;
+          if (row.media.type === 'image' || row.media.type === 'video') {
+            var asset = document.createElement(row.media.type === 'image' ? 'img' : 'video'); asset.src = row.media.url; asset.className = 'w-full max-h-48 object-contain rounded-lg'; asset.referrerPolicy = 'no-referrer';
+            if (row.media.type === 'image') asset.alt = 'Encabezado del mensaje'; else { asset.controls = true; asset.preload = 'metadata'; }
+            media.append(asset);
+          }
+        }
+        el('[data-notif-history-loading]').hidden = true;
+        el('[data-notif-history-content]').hidden = false;
+      } catch (error) { if (ticket === historySequence && panel.isConnected) el('[data-notif-history-loading]').textContent = error.message; }
+    }
+    historyModal.addEventListener('close', function () { historySequence++; el('[data-notif-history-email]').srcdoc = ''; el('[data-notif-history-media]').replaceChildren(); });
+    deleteModal.addEventListener('cancel', function (event) { if (deleting) event.preventDefault(); });
+    function openDelete(id) {
+      var row = queueRows.get(String(id));
+      if (!config.can_delete || !row || row.status === 'processing') return;
+      deleteId = id;
+      el('[data-notif-delete-target]').textContent = row.destination_name + ' · ' + row.channel + ' · ' + dateLabel(row.created_at);
+      el('[data-notif-delete-feedback]').hidden = true;
+      deleteModal.showModal(); el('[data-notif-delete-cancel]').focus();
+    }
+    async function confirmDelete() {
+      if (!deleteId || deleting) return;
+      deleting = true;
+      var confirm = el('[data-notif-delete-confirm]'), cancel = el('[data-notif-delete-cancel]');
+      confirm.disabled = true; cancel.disabled = true; confirm.textContent = 'Eliminando…';
+      try {
+        var result = await api('commercial_notifications_delete', {id: deleteId});
+        if (!panel.isConnected) return;
+        deleteModal.close(); deleteId = null; feedback(result.message); await loadQueue();
+      } catch (error) { el('[data-notif-delete-feedback]').hidden = false; el('[data-notif-delete-feedback]').textContent = error.message; }
+      finally { deleting = false; confirm.disabled = false; cancel.disabled = false; confirm.textContent = 'Eliminar notificación'; }
+    }
+    async function loadReport() {
+      var ticket = ++reportSequence;
+      reportRows = []; el('[data-notif-report-export]').disabled = true;
+      el('[data-notif-report-summary]').textContent = 'Consultando informe…';
+      el('[data-notif-report-rows]').replaceChildren();
+      try {
+        var result = await api('commercial_notifications_report', Object.fromEntries(new FormData(el('[data-notif-report-form]')).entries()));
+        if (ticket !== reportSequence || !panel.isConnected) return;
+        reportRows = result.rows;
+        el('[data-notif-report-summary]').textContent = result.totals.total + ' mensajes creados · ' + result.totals.sent + ' enviados · ' + result.totals.failed + ' fallidos · ' + result.totals.deleted + ' eliminados';
+        el('[data-notif-report-rows]').innerHTML = reportRows.length ? reportRows.map(function (row) {
+          return '<tr><td class="px-4 py-3 text-xs"><strong class="block">' + esc(row.creator_name) + '</strong><span class="text-secondary">' + (row.employee_id ? 'ID ' + esc(row.employee_id) : 'Sin ID registrado') + '</span></td>' + [row.creator_cargo || 'Sin cargo registrado', row.channel, row.total, row.pending, row.processing, row.sent, row.failed, row.cancelled, row.deleted, dateLabel(row.last_created_at)].map(function (value) { return '<td class="px-4 py-3 text-xs whitespace-nowrap">' + esc(value) + '</td>'; }).join('') + '</tr>';
+        }).join('') : '<tr><td colspan="11" class="p-8 text-center text-secondary">No hay mensajes para estos filtros.</td></tr>';
+        el('[data-notif-report-export]').disabled = !reportRows.length;
+      } catch (error) { if (ticket === reportSequence && panel.isConnected) el('[data-notif-report-summary]').textContent = error.message; }
+    }
+    function exportReport() {
+      if (!reportRows.length) return;
+      function cell(value) {
+        var text = String(value == null ? '' : value);
+        if (/^\s*[=+\-@]/.test(text) || /^[\t\r\n]/.test(text)) text = "'" + text;
+        return '"' + text.replace(/"/g, '""') + '"';
+      }
+      var lines = [['ID funcionario', 'Funcionario', 'Cargo', 'Canal', 'Total', 'Pendientes', 'Procesando', 'Enviados', 'Fallidos', 'Cancelados', 'Eliminados', 'Última creación (Colombia)']];
+      reportRows.forEach(function (row) { lines.push([row.employee_id, row.creator_name, row.creator_cargo, row.channel, row.total, row.pending, row.processing, row.sent, row.failed, row.cancelled, row.deleted, dateLabel(row.last_created_at)]); });
+      var url = URL.createObjectURL(new Blob(['\uFEFF' + lines.map(function (line) { return line.map(cell).join(';'); }).join('\r\n')], {type: 'text/csv;charset=utf-8;'}));
+      var link = document.createElement('a'); link.href = url; link.download = 'informe-notificaciones.csv'; document.body.append(link); link.click(); link.remove(); setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
     }
     function resetSelection() { selected.clear(); excluded.clear(); allFiltered = false; updateSelection(); }
     panel.addEventListener("click", function (event) {
@@ -237,6 +335,12 @@
       if (button.hasAttribute("data-notif-single-channel")) openComposer(button.dataset.notifSingleChannel, {id: button.dataset.id, name: button.dataset.name});
       if (button.hasAttribute("data-notif-close")) modal.close();
       if (button.hasAttribute("data-notif-result-close")) resultModal.close();
+      if (button.hasAttribute('data-notif-history-id')) showHistory(button.dataset.notifHistoryId);
+      if (button.hasAttribute('data-notif-history-close')) historyModal.close();
+      if (button.hasAttribute('data-notif-delete-id')) openDelete(button.dataset.notifDeleteId);
+      if (button.hasAttribute('data-notif-delete-cancel') && !deleting) deleteModal.close();
+      if (button.hasAttribute('data-notif-delete-confirm')) confirmDelete();
+      if (button.hasAttribute('data-notif-report-export')) exportReport();
       if (button.hasAttribute("data-notif-result-queue")) { resultModal.close(); if (modal.open) modal.close(); queuePage = 1; el("[data-notif-queue-status]").value = ""; el('[data-notif-view="queue"]').click(); }
       if (button.hasAttribute("data-notif-preview-channel")) { previewChannel = button.dataset.notifPreviewChannel; preview(); }
       if (button.dataset.notifType) {
@@ -256,6 +360,7 @@
         panel.querySelectorAll("[data-notif-panel]").forEach(function (node) { node.hidden = node.dataset.notifPanel !== view; });
         panel.querySelectorAll("[data-notif-view]").forEach(function (node) { var active = node === button; node.setAttribute("aria-selected", String(active)); node.classList.toggle("bg-white", active); });
         if (view === "queue") loadQueue();
+        if (view === "report") loadReport();
       }
       if (button.hasAttribute("data-notif-prev")) { page--; loadRecipients(); }
       if (button.hasAttribute("data-notif-next")) { page++; loadRecipients(); }
@@ -285,6 +390,7 @@
       if (target.hasAttribute("data-notif-queue-status")) { queuePage = 1; loadQueue(); }
     });
     compose.addEventListener("input", preview);
+    el('[data-notif-report-form]').addEventListener('submit', function (event) { event.preventDefault(); loadReport(); });
     search.addEventListener("submit", function (event) {
       event.preventDefault(); if (busy || confirming) return;
       var data = new FormData(search); appliedFilters = Object.fromEntries(data.entries());
@@ -327,7 +433,7 @@
       finally { busy = false; confirmationModal.setAttribute("aria-busy", "false"); confirmationModal.close(); panel.querySelectorAll("input, select, textarea").forEach(function (node) { node.disabled = false; }); el("[data-notif-send]").textContent = "Revisar y enviar"; updateSelection(); }
       showSendResult(result, sendError);
     });
-    panel.querySelectorAll('[role="tab"]').forEach(function (tab) { tab.addEventListener("keydown", function (event) { if (event.key === "ArrowLeft" || event.key === "ArrowRight") { event.preventDefault(); var next = panel.querySelector('[role="tab"]:not(#' + tab.id + ')'); next.focus(); next.click(); } }); });
+    panel.querySelectorAll('[role="tab"]').forEach(function (tab) { tab.addEventListener("keydown", function (event) { if (event.key === "ArrowLeft" || event.key === "ArrowRight") { event.preventDefault(); var tabs = Array.from(panel.querySelectorAll('[role="tab"]')); var next = tabs[(tabs.indexOf(tab) + (event.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length]; next.focus(); next.click(); } }); });
     panel.querySelectorAll("[data-notif-select-all], [data-notif-select-page]").forEach(function (button) { button.disabled = true; });
     preview(); updateSelection();
   }

@@ -588,6 +588,39 @@ final class CommercialApiController
     JsonResponse::success($service->notificationQueue($input));
   }
 
+  public function notificationDetail(array $input): never
+  {
+    $service = $this->notificationService($input);
+    $row = $service->notificationDetail((int) ($input['id'] ?? 0));
+    if ($row === null) {
+      JsonResponse::error('La notificación no está disponible.', 404);
+    }
+    JsonResponse::success($row);
+  }
+
+  public function deleteNotification(array $input): never
+  {
+    $service = $this->notificationService($input);
+    $this->authorize('eliminar_notificacion', 'Solo los administradores pueden eliminar notificaciones.');
+    try {
+      $service->deleteNotification((int) ($input['id'] ?? 0));
+      JsonResponse::success(['message' => 'Notificación eliminada de la cola. Se conserva en el informe de auditoría.']);
+    } catch (\RuntimeException $exception) {
+      if ($exception instanceof \PDOException) { throw $exception; }
+      JsonResponse::error($exception->getMessage(), 409);
+    }
+  }
+
+  public function notificationReport(array $input): never
+  {
+    $service = $this->notificationService($input);
+    try {
+      JsonResponse::success($service->notificationReport($input));
+    } catch (\InvalidArgumentException $exception) {
+      JsonResponse::error($exception->getMessage(), 422);
+    }
+  }
+
   public function sendNotifications(array $input): never
   {
     $service = $this->notificationService($input, true);
