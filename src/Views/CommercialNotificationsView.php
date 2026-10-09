@@ -168,16 +168,20 @@ final class CommercialNotificationsView
   <dialog data-notif-actor-modal aria-labelledby="notif-actor-title" class="m-auto w-[calc(100%-2rem)] max-w-5xl max-h-[90dvh] overflow-y-auto p-5 sm:p-7 rounded-2xl border-0 bg-white text-on-surface shadow-modal backdrop:bg-slate-900/50">
     <div class="flex items-center justify-between gap-3"><h3 id="notif-actor-title" class="text-headline-md font-semibold">Editar datos del actor</h3><button type="button" data-notif-actor-close class="<?php echo $secondary; ?>" aria-label="Cerrar editor"><span class="material-symbols-outlined" aria-hidden="true">close</span></button></div>
     <p data-notif-actor-feedback role="status" class="mt-3 text-sm text-secondary"></p>
+    <p data-notif-actor-step class="mt-2 text-xs font-semibold text-secondary">Paso 1 de 2 · Editar y seleccionar registros</p>
     <form data-notif-actor-form class="mt-4 space-y-4" hidden>
       <p data-notif-actor-identity class="text-sm font-semibold"></p>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3"><?php foreach (\SCM\Commercial\CommercialActorEditor::FIELDS as $key => $label): ?><label class="text-xs text-secondary"><?php echo $label; ?><input name="<?php echo $key; ?>" type="<?php echo $key === 'correo' ? 'email' : 'text'; ?>" maxlength="<?php echo in_array($key, ['nombre', 'correo'], true) ? '254' : '40'; ?>" <?php echo $key === 'nombre' ? 'required' : ''; ?> class="<?php echo $field; ?> mt-1"></label><?php endforeach; ?></div>
       <fieldset class="rounded-xl bg-surface-container-low p-4 space-y-3"><legend class="text-sm font-semibold">Registros relacionados donde aplicar los cambios</legend><p class="text-xs text-secondary">Estos son los registros vinculados a este actor. Marca los que deseas actualizar; después verás los valores actuales y cómo quedarán. Solo se guardarán los registros seleccionados que tengan cambios.</p><div data-notif-actor-groups class="flex flex-wrap gap-4"></div><p data-notif-actor-related-summary role="status" class="text-xs font-semibold"></p><div data-notif-actor-related class="space-y-3"></div><p class="text-xs text-secondary">Incluye registros históricos y cerrados. Los documentos PDF ya emitidos conservan su contenido.</p></fieldset>
-      <button type="submit" data-notif-actor-review class="<?php echo $secondary; ?> bg-primary-container">Ver cómo quedarán los datos</button>
     </form>
     <div data-notif-actor-review-panel class="mt-4 space-y-4" hidden>
-      <p class="text-sm font-semibold">Revisa los cambios antes de guardar</p><p class="text-xs text-secondary">El registro principal se actualizará siempre. Marca los registros relacionados que deseas actualizar; cada tabla muestra su valor actual y cómo quedará.</p>
+      <h4 data-notif-actor-comparison-title tabindex="-1" class="text-sm font-semibold">Comparación antes de guardar</h4><p class="text-xs text-secondary">Revisa el valor actual y cómo quedará cada campo de los registros seleccionados. Se resaltan los campos que cambiarán. Nada se guarda hasta confirmar.</p>
       <div data-notif-actor-changes class="space-y-3"></div>
-      <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2"><button type="button" data-notif-actor-back class="<?php echo $secondary; ?>">Volver a editar</button><button type="button" data-notif-actor-save class="<?php echo $secondary; ?> bg-primary-container">Confirmar y guardar cambios</button></div>
+    </div>
+    <div data-notif-actor-actions class="sticky bottom-0 bg-white border-t border-slate-200 mt-4 pt-4 pb-2 space-y-3">
+      <p data-notif-actor-save-hint role="status" class="text-xs text-secondary">Primero abre la comparación para habilitar el guardado.</p>
+      <label data-notif-actor-confirm-wrap class="flex items-start gap-2 text-sm" hidden><input type="checkbox" data-notif-actor-confirm class="mt-1 w-4 h-4 shrink-0 accent-[#735c00]"><span>He revisado los valores actuales y finales y confirmo actualizar los registros seleccionados.</span></label>
+      <div class="flex flex-col sm:flex-row sm:justify-end gap-2"><button type="button" data-notif-actor-back class="<?php echo $secondary; ?>" hidden>Volver a editar</button><button type="button" data-notif-actor-review class="<?php echo $secondary; ?> bg-primary-container">Ver cómo quedarán los datos</button><button type="button" data-notif-actor-save disabled class="<?php echo $secondary; ?> bg-primary-container">Guardar cambios</button></div>
     </div>
   </dialog>
   <?php endif; ?>

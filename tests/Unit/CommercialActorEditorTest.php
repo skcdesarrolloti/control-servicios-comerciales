@@ -69,6 +69,48 @@ final class CommercialActorEditorTest extends TestCase
     self::assertCount(1, $this->preview($editor, ['nombre' => 'Solo principal', 'select_records' => '1', 'records' => []])['items']);
   }
 
+  public function testUneditedActorCanPreviewEverySelectedRecordWithoutCreatingSaveToken(): void
+  {
+    [$db, , $editor] = CommercialNotificationsFixture::makeForActorEditing();
+    $detail = $editor->detail('propietarios_activos', 10);
+    $preview = $editor->preview('propietarios_activos', 10, $detail['values'] + ['version' => $detail['version'], 'groups' => array_keys($detail['groups'])]);
+    self::assertCount(6, $preview['items']);
+    self::assertSame(0, $preview['total']);
+    self::assertSame(6, $preview['records_total']);
+    self::assertSame('', $preview['token']);
+    foreach ($preview['items'] as $item) {
+      self::assertFalse($item['has_changes']);
+      self::assertNotEmpty($item['changes']);
+      foreach ($item['changes'] as $field) {
+        self::assertSame($field['before'], $field['after']);
+        self::assertFalse($field['changed']);
+      }
+    }
+    self::assertSame('Propietario original', $db->getVar('SELECT nombre_1 FROM wp_jet_cct_contrato_mandato WHERE _ID = 1'));
+    self::assertEmpty($_SESSION['scm_actor_previews'] ?? []);
+    $this->expectException(\RuntimeException::class);
+    $editor->save($preview['token'], array_column($preview['items'], 'key'));
+  }
+
+  public function testComparisonIncludesUnchangedFieldsAndOnlyWritesChangedRecords(): void
+  {
+    [$db, , $editor] = CommercialNotificationsFixture::makeForActorEditing();
+    $db->update('wp_jet_cct_inmuebles', ['propietario' => 'Nombre corregido'], ['_ID' => 2]);
+    $preview = $this->preview($editor);
+    self::assertCount(6, $preview['items']);
+    self::assertSame(5, $preview['total']);
+    self::assertFalse($preview['items'][1]['has_changes']);
+    $mandateFields = array_column($preview['items'][2]['changes'], null, 'field');
+    self::assertSame('Nombre corregido', $mandateFields['nombre_1']['after']);
+    self::assertTrue($mandateFields['nombre_1']['changed']);
+    self::assertSame('123456', $mandateFields['documento_1']['after']);
+    self::assertFalse($mandateFields['documento_1']['changed']);
+    self::assertArrayNotHasKey('nombre_2', $mandateFields);
+    self::assertSame(5, $editor->save($preview['token'], array_column($preview['items'], 'key'))['updated']);
+    $impact = json_decode($db->getVar('SELECT impact_json FROM wp_scm_commercial_actor_changes'), true);
+    self::assertNotContains('inmuebles:2', array_column($impact, 'key'));
+  }
+
   public function testSaveUpdatesSelectedRelationsAndRecordsWhoChangedWhat(): void
   {
     [$db, , $editor] = CommercialNotificationsFixture::makeForActorEditing();

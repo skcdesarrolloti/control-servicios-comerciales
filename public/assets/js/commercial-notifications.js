@@ -23,7 +23,7 @@
     var queueSequence = 0, historySequence = 0, reportSequence = 0, queueRows = new Map(), reportRows = [];
     var historyModal = panel.querySelector('[data-notif-history-modal]'), deleteModal = panel.querySelector('[data-notif-delete-modal]');
     var deleteId = null, deleting = false;
-    var actorModal = panel.querySelector('[data-notif-actor-modal]'), actorData = null, actorToken = '', actorBusy = false, actorSequence = 0;
+    var actorModal = panel.querySelector('[data-notif-actor-modal]'), actorData = null, actorToken = '', actorBusy = false, actorSequence = 0, actorReviewed = false;
     var statusLabels = {pending: "Pendiente", processing: "Procesando", sent: "Enviado", failed: "Fallido", cancelled: "Cancelado"};
     function newRequestId() { return Array.from(crypto.getRandomValues(new Uint8Array(16)), function (byte) { return byte.toString(16).padStart(2, "0"); }).join(""); }
 
@@ -329,10 +329,32 @@
       var url = URL.createObjectURL(new Blob(['\uFEFF' + lines.map(function (line) { return line.map(cell).join(';'); }).join('\r\n')], {type: 'text/csv;charset=utf-8;'}));
       var link = document.createElement('a'); link.href = url; link.download = 'informe-notificaciones.csv'; document.body.append(link); link.click(); link.remove(); setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
     }
-    function actorFeedback(message, error) { el('[data-notif-actor-feedback]').textContent = message; el('[data-notif-actor-feedback]').classList.toggle('text-error', !!error); }
+    function actorFeedback(message, error) {
+      var node = el('[data-notif-actor-feedback]'); node.textContent = message; node.classList.toggle('text-error', !!error);
+      if (error) node.scrollIntoView({block: 'nearest'});
+    }
+    function updateActorSaveState() {
+      var count = actorModal.querySelectorAll('[data-notif-actor-target][data-has-changes="1"]:checked').length;
+      var confirmed = el('[data-notif-actor-confirm]').checked;
+      el('[data-notif-actor-save]').disabled = actorBusy || !actorToken || !count || !confirmed;
+      el('[data-notif-actor-save-hint]').textContent = !actorReviewed ? 'Primero abre la comparación para habilitar el guardado.' : (!count ? 'No hay cambios seleccionados para guardar. Vuelve a editar para modificar los datos.' : count + ' registros se actualizarán. ' + (confirmed ? 'Pulsa Guardar cambios para confirmar.' : 'Revisa la comparación y marca la confirmación para habilitar Guardar cambios.'));
+    }
+    function showActorStep(review) {
+      actorReviewed = review;
+      el('[data-notif-actor-form]').hidden = review;
+      el('[data-notif-actor-review-panel]').hidden = !review;
+      el('[data-notif-actor-review]').hidden = review;
+      el('[data-notif-actor-back]').hidden = !review;
+      el('[data-notif-actor-confirm-wrap]').hidden = !review;
+      el('[data-notif-actor-confirm]').checked = false;
+      el('[data-notif-actor-step]').textContent = review ? 'Paso 2 de 2 · Revisar, confirmar y guardar' : 'Paso 1 de 2 · Editar y seleccionar registros';
+      updateActorSaveState();
+      actorModal.scrollTop = 0;
+    }
     function setActorBusy(value) {
       actorBusy = value; actorModal.setAttribute('aria-busy', String(value));
-      actorModal.querySelectorAll('button, input').forEach(function (node) { node.disabled = value || node.hasAttribute('data-actor-required'); });
+      actorModal.querySelectorAll('button, input').forEach(function (node) { node.disabled = value || node.hasAttribute('data-actor-required') || node.hasAttribute('data-actor-unavailable'); });
+      updateActorSaveState();
     }
     function updateActorRelatedSelection() {
       var records = Array.from(actorModal.querySelectorAll('[data-notif-actor-record]'));
@@ -364,7 +386,8 @@
     async function openActor(id) {
       if (!actorModal || actorBusy || !config.can_edit_actor) return;
       var ticket = ++actorSequence, actorType = type;
-      actorData = null; actorToken = '';
+      actorData = null; actorToken = ''; actorReviewed = false;
+      showActorStep(false);
       el('[data-notif-actor-form]').hidden = true; el('[data-notif-actor-review-panel]').hidden = true;
       actorFeedback('Cargando datos del actor…'); actorModal.showModal();
       try {
@@ -376,6 +399,7 @@
           form.elements[field].value = data.values[field] || '';
           form.elements[field].closest('label').hidden = !Object.hasOwn(data.values, field);
           form.elements[field].disabled = !Object.hasOwn(data.values, field);
+          form.elements[field].toggleAttribute('data-actor-unavailable', !Object.hasOwn(data.values, field));
         });
         el('[data-notif-actor-identity]').textContent = data.label + ' · ' + data.values.nombre + ' · ID ' + data.id;
         renderActorRelated(data);
@@ -384,6 +408,7 @@
     }
     async function reviewActor(event) {
       event.preventDefault(); if (actorBusy || !actorData) return;
+      if (!el('[data-notif-actor-form]').reportValidity()) { actorFeedback('Revisa los campos señalados antes de abrir la comparación.', true); return; }
       var data = new FormData(el('[data-notif-actor-form]')); data.set('type', actorData.type); data.set('id', actorData.id); data.set('version', actorData.version);
       data.set('select_records', '1');
       actorToken = ''; setActorBusy(true); actorFeedback('Preparando la comparación de los registros…');
@@ -392,16 +417,16 @@
         if (!panel.isConnected) return;
         actorToken = result.token;
         el('[data-notif-actor-changes]').innerHTML = result.items.map(function (item) {
-          return '<section class="rounded-xl border border-slate-200 overflow-hidden"><div class="p-4 bg-surface-container-low"><label class="flex items-start gap-2 text-sm font-semibold"><input type="checkbox" data-notif-actor-target value="' + esc(item.key) + '" checked ' + (item.group === 'actor' ? 'data-actor-required disabled' : '') + ' class="mt-1 w-4 h-4 accent-[#735c00]"><span>' + esc(item.label) + '<span class="block text-xs text-secondary font-normal mt-1 break-words">' + esc(item.context || 'Registro relacionado') + '</span></span></label></div><div class="overflow-x-auto"><table class="w-full table-fixed text-sm"><thead class="text-left text-xs text-secondary"><tr><th class="p-3">Campo</th><th class="p-3">Valor actual</th><th class="p-3">Así quedará</th></tr></thead><tbody>' + item.changes.map(function (change) { return '<tr class="border-t border-slate-100"><td class="p-3 text-xs break-all">' + esc(change.label || change.field) + '</td><td class="p-3 text-xs break-all">' + esc(change.before || '(vacío)') + '</td><td class="p-3 text-xs font-semibold break-all">' + esc(change.after || '(vacío)') + '</td></tr>'; }).join('') + '</tbody></table></div></section>';
+          return '<section class="rounded-xl border border-slate-200 overflow-hidden"><div class="p-4 bg-surface-container-low"><label class="flex items-start gap-2 text-sm font-semibold"><input type="checkbox" data-notif-actor-target data-has-changes="' + (item.has_changes ? '1' : '0') + '" value="' + esc(item.key) + '" checked ' + (item.group === 'actor' ? 'data-actor-required disabled' : '') + ' class="mt-1 w-4 h-4 accent-[#735c00]"><span>' + esc(item.label) + '<span class="block text-xs text-secondary font-normal mt-1 break-words">' + esc(item.context || 'Registro relacionado') + '</span><span class="block text-xs mt-1">' + (item.has_changes ? 'Se actualizará si está seleccionado' : 'Sin cambios') + '</span></span></label></div><div class="overflow-x-auto"><table class="w-full table-fixed text-sm"><thead class="text-left text-xs text-secondary"><tr><th class="p-3">Campo</th><th class="p-3">Valor actual</th><th class="p-3">Así quedará</th></tr></thead><tbody>' + item.changes.map(function (change) { return '<tr data-notif-actor-field data-changed="' + (change.changed ? '1' : '0') + '" class="border-t border-slate-100' + (change.changed ? ' bg-surface-container-low' : '') + '"><td class="p-3 text-xs break-words">' + esc(change.label || change.field) + '</td><td class="p-3 text-xs break-all">' + esc(change.before || '(vacío)') + '</td><td class="p-3 text-xs break-all' + (change.changed ? ' font-semibold' : '') + '">' + esc(change.after || '(vacío)') + (change.changed ? '<span class="block mt-1 text-secondary">Cambiará</span>' : '') + '</td></tr>'; }).join('') + '</tbody></table></div></section>';
         }).join('');
-        el('[data-notif-actor-form]').hidden = true; el('[data-notif-actor-review-panel]').hidden = false;
-        actorFeedback(result.total + ' registros con cambios. Revisa la selección y confirma para guardar.');
-        el('[data-notif-actor-save]').focus();
+        showActorStep(true);
+        actorFeedback(result.total ? result.records_total + ' registros revisados · ' + result.total + ' con cambios. Revisa los valores antes de confirmar.' : 'No modificaste los datos. Aquí puedes comparar los registros seleccionados; vuelve a editar para hacer cambios.');
+        el('[data-notif-actor-comparison-title]').focus({preventScroll: true});
       } catch (error) { actorFeedback(error.message, true); }
       finally { setActorBusy(false); }
     }
     async function saveActor() {
-      if (actorBusy || !actorToken) return;
+      if (actorBusy || !actorToken || !el('[data-notif-actor-confirm]').checked || el('[data-notif-actor-save]').disabled) return;
       var data = new FormData(); data.set('token', actorToken);
       actorModal.querySelectorAll('[data-notif-actor-target]:checked').forEach(function (node) { data.append('targets[]', node.value); });
       setActorBusy(true); actorFeedback('Guardando los registros seleccionados…');
@@ -435,7 +460,8 @@
       if (button.hasAttribute('data-notif-edit-actor')) openActor(button.dataset.notifEditActor);
       if (button.hasAttribute('data-notif-actor-close') && !actorBusy) actorModal.close();
       if (button.hasAttribute('data-notif-actor-save')) saveActor();
-      if (button.hasAttribute('data-notif-actor-back') && !actorBusy) { actorToken = ''; el('[data-notif-actor-form]').hidden = false; el('[data-notif-actor-review-panel]').hidden = true; el('[data-notif-actor-save]').removeAttribute('data-actor-required'); actorFeedback('Edita los datos y genera una nueva revisión.'); }
+      if (button.hasAttribute('data-notif-actor-review')) reviewActor(event);
+      if (button.hasAttribute('data-notif-actor-back') && !actorBusy) { actorToken = ''; showActorStep(false); el('[data-notif-actor-save]').removeAttribute('data-actor-required'); actorFeedback('Edita los datos y genera una nueva revisión.'); }
       if (button.hasAttribute("data-notif-result-queue")) { resultModal.close(); if (modal.open) modal.close(); queuePage = 1; el("[data-notif-queue-status]").value = ""; el('[data-notif-view="queue"]').click(); }
       if (button.hasAttribute("data-notif-preview-channel")) { previewChannel = button.dataset.notifPreviewChannel; preview(); }
       if (button.dataset.notifType) {
@@ -476,7 +502,10 @@
       if (target.hasAttribute('data-notif-actor-target')) {
         actorModal.querySelectorAll('[data-notif-actor-record]').forEach(function (node) { if (node.value === target.value) node.checked = target.checked; });
         updateActorRelatedSelection();
+        el('[data-notif-actor-confirm]').checked = false;
+        updateActorSaveState();
       }
+      if (target.hasAttribute('data-notif-actor-confirm')) updateActorSaveState();
       if (target.hasAttribute("data-notif-recipient")) {
         if (allFiltered) { if (target.checked) excluded.delete(target.value); else excluded.add(target.value); }
         else if (target.checked) selected.set(target.value, target.dataset.name); else selected.delete(target.value);

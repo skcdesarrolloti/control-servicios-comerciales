@@ -120,7 +120,6 @@ final class CommercialActorEditor
       $value = $this->validate($field, $value);
       if ($value !== (string) ($row[$column] ?? '')) { $changes[$column] = $value; $logical[$field] = $value; }
     }
-    if ($changes === []) { throw new \InvalidArgumentException('No hay cambios para revisar.'); }
     if (isset($logical['documento'])) { $this->assertUniqueDocument($config['table'], $id, $logical['documento']); }
     $fields = $this->fields($config, $row);
     $phone = $logical['celular'] ?? (string) ($row[$fields['celular'] ?? ''] ?? '');
@@ -128,36 +127,43 @@ final class CommercialActorEditor
     if ((isset($logical['celular']) || isset($logical['indicativo'])) && strlen(preg_replace('/\D/', '', $phone . $indicator) ?? '') > 15) {
       throw new \InvalidArgumentException('El celular con indicativo no puede superar 15 dígitos.');
     }
-    $plan = [$this->item($config['table'], $row, $changes, $config['role'] . ' · registro principal', 'actor', 'Datos principales')];
+    $comparison = [];
+    foreach ($fields as $column) { $comparison[$column] = $changes[$column] ?? (string) ($row[$column] ?? ''); }
+    $plan = [$this->item($config['table'], $row, $changes, $config['role'] . ' · registro principal', 'actor', 'Datos principales', $comparison)];
     $groups = array_intersect(['inmuebles', 'mandatos', 'arrendamientos', 'cierres'], (array) ($input['groups'] ?? []));
     $selected = isset($input['select_records']) ? array_map('strval', (array) ($input['records'] ?? [])) : null;
-    foreach ($this->related($type, $id, $row, $logical, $groups) as $item) {
+    foreach ($this->related($type, $id, $row, $logical, $groups, true) as $item) {
       if ($selected === null || in_array($item['key'], $selected, true)) { $plan[] = $item; }
     }
     if (count($plan) > 500) { throw new \RuntimeException('La edición afecta más de 500 registros. Selecciona menos grupos para revisar.'); }
+    $total = count(array_filter($plan, static fn(array $item): bool => $item['data'] !== []));
+    $result = ['token' => '', 'items' => array_map([$this, 'present'], $plan), 'total' => $total, 'records_total' => count($plan)];
+    if ($total === 0) { return $result; }
     $this->assertTransactional(array_unique(array_column($plan, 'table')));
     $token = bin2hex(random_bytes(24));
     $_SESSION['scm_actor_previews'] = array_filter((array) ($_SESSION['scm_actor_previews'] ?? []), static fn(array $entry): bool => $entry['expires'] >= time());
     $_SESSION['scm_actor_previews'] = array_slice($_SESSION['scm_actor_previews'], -9, null, true);
     $_SESSION['scm_actor_previews'][$token] = ['user_id' => Auth::userId(), 'expires' => time() + 900, 'type' => $type, 'id' => $id, 'plan' => $plan, 'document' => $logical['documento'] ?? null];
-    return ['token' => $token, 'items' => array_map([$this, 'present'], $plan), 'total' => count($plan)];
+    $result['token'] = $token;
+    return $result;
   }
 
-  private function item(string $table, array $row, array $data, string $label, string $group, string $context): array
+  private function item(string $table, array $row, array $data, string $label, string $group, string $context, ?array $comparison = null): array
   {
+    $comparison ??= $data;
     return ['key' => $group . ':' . $row['_ID'], 'table' => $table, 'id' => (int) $row['_ID'], 'label' => $label,
-      'group' => $group, 'context' => $context, 'version' => $this->version($row), 'before' => array_intersect_key($row, $data), 'data' => $data];
+      'group' => $group, 'context' => $context, 'version' => $this->version($row), 'before' => array_intersect_key($row, $comparison), 'data' => $data, 'comparison' => $comparison];
   }
 
   private function present(array $item): array
   {
     $changes = [];
-    foreach ($item['data'] as $column => $value) {
+    foreach ($item['comparison'] ?? $item['data'] as $column => $value) {
       $label = preg_match('/documento|^nit/', $column) ? 'Documento / NIT' : (preg_match('/correo|email/', $column) ? 'Correo' : (preg_match('/celular|telefono|contacto/', $column) ? 'Celular' : (str_contains($column, 'indicativo') ? 'Indicativo' : 'Nombre')));
       if (preg_match('/_(\d)$/', $column, $match)) { $label .= ' · titular ' . $match[1]; }
-      $changes[] = ['field' => $column, 'label' => $label, 'before' => (string) ($item['before'][$column] ?? ''), 'after' => $value];
+      $changes[] = ['field' => $column, 'label' => $label, 'before' => (string) ($item['before'][$column] ?? ''), 'after' => $value, 'changed' => array_key_exists($column, $item['data'])];
     }
-    return ['key' => $item['key'], 'id' => $item['id'], 'label' => $item['label'], 'group' => $item['group'], 'context' => $item['context'], 'changes' => $changes];
+    return ['key' => $item['key'], 'id' => $item['id'], 'label' => $item['label'], 'group' => $item['group'], 'context' => $item['context'], 'changes' => $changes, 'has_changes' => $item['data'] !== []];
   }
 
   private function version(array $row): string
@@ -201,6 +207,7 @@ final class CommercialActorEditor
       if (count($rows) > 500) { throw new \RuntimeException('Demasiados registros relacionados en ' . $label . '.'); }
       foreach ($rows as $row) {
         $data = [];
+        $comparison = [];
         $map = ['nombre' => [$party, 'nombre_' . $party], 'documento' => ['documento_' . $party], 'correo' => ['correo_' . $party, 'email_' . $party], 'celular' => ['celular_' . $party], 'indicativo' => ['indicativo_' . $party]];
         if ($party === 'copropiedad') { $map['documento'] = ['nit_copropiedad']; }
         if ($party === 'pph') { $map['nombre'] = ['nombre_pph']; }
@@ -220,14 +227,17 @@ final class CommercialActorEditor
             foreach (['nombre' => $juridical ? 'empresa_1' : 'nombre_1', 'documento' => $juridical ? 'nit_1' : 'documento_1', 'correo' => 'correo_1', 'celular' => 'celular_1', 'indicativo' => 'indicativo_1'] as $field => $column) { $map[$field][] = $column; }
           }
         }
-        foreach ($listing ? array_fill_keys(array_keys(self::FIELDS), '') : $logical as $field => $value) {
-          foreach ($map[$field] ?? [] as $column) {
-            if ($this->schema->columnExists($table, $column) && ($listing || (string) ($row[$column] ?? '') !== $value)) { $data[$column] = $listing ? (string) ($row[$column] ?? '') : $value; }
+        foreach ($map as $field => $columns) {
+          foreach ($columns as $column) {
+            if (!$this->schema->columnExists($table, $column)) { continue; }
+            $current = (string) ($row[$column] ?? '');
+            $comparison[$column] = $logical[$field] ?? $current;
+            if (array_key_exists($field, $logical) && $current !== $logical[$field]) { $data[$column] = $logical[$field]; }
           }
         }
-        if ($data === []) { continue; }
+        if ($comparison === [] || (!$listing && $data === [])) { continue; }
         $context = implode(' · ', array_filter([(string) ($row['estado'] ?? ''), (string) ($row['contrato'] ?? ''), (string) ($row['codigo'] ?? ''), (string) ($row['direccion'] ?? '')]));
-        $out[] = $this->item($table, $row, $data, $label . ' #' . $row['_ID'], $group, $context);
+        $out[] = $this->item($table, $row, $data, $label . ' #' . $row['_ID'], $group, $context, $comparison);
       }
     }
     return $out;
@@ -250,6 +260,8 @@ final class CommercialActorEditor
     $validKeys = array_column($entry['plan'], 'key');
     if (array_diff($keys, $validKeys) !== []) { throw new \InvalidArgumentException('La selección no corresponde a los registros revisados.'); }
     $plan = array_values(array_filter($entry['plan'], static fn(array $item): bool => $item['group'] === 'actor' || in_array($item['key'], $keys, true)));
+    $updates = array_values(array_filter($plan, static fn(array $item): bool => $item['data'] !== []));
+    if ($updates === []) { throw new \InvalidArgumentException('No hay cambios seleccionados para guardar.'); }
     $this->assertTransactional(array_unique(array_column($plan, 'table')));
     $auditTable = $this->ensureAuditTable();
     $this->assertTransactional([$auditTable]);
@@ -263,17 +275,17 @@ final class CommercialActorEditor
       }
       $actor = $this->actor($entry['type'], $entry['id']);
       if ($entry['document'] !== null) { $this->assertUniqueDocument($actor['config']['table'], $entry['id'], $entry['document']); }
-      foreach ($plan as $item) {
+      foreach ($updates as $item) {
         $data = $item['data'];
         if ($this->schema->columnExists($item['table'], 'cct_modified')) { $data['cct_modified'] = gmdate('Y-m-d H:i:s'); }
         if ($this->db->update($item['table'], $data, ['_ID' => $item['id']]) !== 1) { throw new \RuntimeException('No se pudo actualizar ' . $item['label'] . '.'); }
       }
       $this->db->insert($auditTable, ['actor_type' => $entry['type'], 'actor_id' => $entry['id'], 'changed_by' => Auth::userId(), 'employee_id' => Auth::employeeId(),
         'changed_by_name' => (string) $this->db->getVar('SELECT `nombre` FROM `' . $this->db->table('jet_cct_funcionarios') . '` WHERE `_ID` = ?', [Auth::userId()]),
-        'impact_json' => json_encode(array_map([$this, 'present'], $plan), JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR), 'created_at' => gmdate('Y-m-d H:i:s')]);
+        'impact_json' => json_encode(array_map([$this, 'present'], $updates), JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR), 'created_at' => gmdate('Y-m-d H:i:s')]);
       $pdo->commit();
       unset($_SESSION['scm_actor_previews'][$token]);
-      return ['updated' => count($plan), 'message' => 'Datos guardados en el actor y ' . (count($plan) - 1) . ' registros relacionados.'];
+      return ['updated' => count($updates), 'message' => 'Datos guardados en el actor y ' . (count($updates) - 1) . ' registros relacionados.'];
     } catch (\Throwable $exception) {
       if ($pdo->inTransaction()) { $pdo->rollBack(); }
       throw $exception;
