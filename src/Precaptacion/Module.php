@@ -115,6 +115,10 @@ final class Module
       $result = $repository->createCatalog((string) ($input['kind'] ?? ''), $input);
       JsonResponse::success($result + ['message'=>$result['existing'] ? 'Ya existe. Se seleccionó el registro existente.' : 'Registro creado y seleccionado.']);
     }
+    if ($action === 'precaptacion_catalog_lookup') {
+      if (!self::policy()->canAct('precaptacion_catalogos')) JsonResponse::error('No tienes permiso para consultar barrios o inmobiliarias.', 403);
+      JsonResponse::success($repository->catalogLookup((string) ($input['kind'] ?? ''), $input));
+    }
     if ($action === 'precaptacion_create') {
       if (!self::policy()->canAct('precaptacion_crear')) JsonResponse::error('No tienes permiso para registrar precaptaciones.', 403);
       $data = $repository->validate($input);

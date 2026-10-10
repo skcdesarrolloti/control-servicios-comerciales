@@ -41,7 +41,7 @@ final class PrecaptacionDatabase
     $db->insert('wp_jet_cct_club_pph', ['tarjeta_bienvenida'=>'Aliado de prueba','nombre'=>'Aliado','total_puntos'=>'0']);
     $db->insert('wp_jet_cct_paises', ['nombre'=>'Colombia','pais'=>'Colombia','codigo'=>'57','indicativo'=>'57']);
     $glossaries = [];
-    foreach (['185'=>['Recorrido','Club PPH'],'783'=>['Apartamento','Casa'],'160'=>['Propietario','Arrendatario'],'161'=>['Propietario','Inmmobiliaria']] as $id => $values) {
+    foreach (['185'=>['Recorrido','Recaptación','Club PPH'],'783'=>['Apartamento','Casa'],'160'=>['Propietario','Arrendatario','Otro'],'161'=>['Propietario','Inmmobiliaria']] as $id => $values) {
       $glossaries[] = ['id'=>(string) $id,'fields'=>array_map(static fn(string $value): array => ['value'=>$value,'label'=>$value], $values)];
     }
     $db->insert('wp_options', ['option_name'=>'jet_engine_glossaries','option_value'=>serialize($glossaries)]);

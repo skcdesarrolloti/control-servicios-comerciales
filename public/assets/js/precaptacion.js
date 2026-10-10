@@ -47,7 +47,19 @@
         });
         list.appendChild(button);
       });
-      if (!options.length) { var empty = document.createElement("p"); empty.textContent = "No hay coincidencias. Prueba otra búsqueda."; list.appendChild(empty); }
+      if (!options.length) {
+        var empty = document.createElement("p"); empty.textContent = "No hay coincidencias. Prueba otra búsqueda."; list.appendChild(empty);
+        if (select.dataset.precapAddDialog) {
+          var add = document.createElement("button");
+          add.type = "button"; add.className = "precap-picker-add";
+          add.textContent = select.dataset.precapAddDialog === "precap-add-barrio" ? "Añadir barrio" : "Añadir inmobiliaria";
+          add.addEventListener("click", function () {
+            popup.hidden = true; trigger.setAttribute("aria-expanded", "false");
+            openCatalogDialog(select.dataset.precapAddDialog, search.value);
+          });
+          list.appendChild(add);
+        }
+      }
       if (options.length > 100) { var hint = document.createElement("p"); hint.textContent = "Hay " + options.length + " opciones. Escribe para afinar la búsqueda."; list.appendChild(hint); }
     }
     trigger.addEventListener("click", function () { var opening = popup.hidden; document.querySelectorAll(".precap-picker-popup").forEach(function (item) { item.hidden = true; item.previousElementSibling.setAttribute("aria-expanded", "false"); }); popup.hidden = !opening; trigger.setAttribute("aria-expanded", String(opening)); search.value = ""; render(); if (opening) search.focus(); });
@@ -58,6 +70,19 @@
       if (["ArrowDown", "ArrowUp"].includes(event.key)) { event.preventDefault(); var items = [search].concat(Array.from(list.querySelectorAll("button"))); var index = items.indexOf(document.activeElement); items[(index + (event.key === "ArrowDown" ? 1 : -1) + items.length) % items.length].focus(); }
     });
     select.addEventListener("change", render); render();
+  }
+  function openCatalogDialog(id, initialName) {
+    var dialog = document.getElementById(id);
+    if (!dialog) return;
+    var form = dialog.querySelector("[data-precap-catalog]");
+    if (form && initialName) {
+      var field = form.elements[form.dataset.precapCatalog];
+      if (field && !field.value) {
+        field.value = initialName;
+        field.dispatchEvent(new Event("input", {bubbles:true}));
+      }
+    }
+    dialog.showModal();
   }
   document.querySelectorAll("[data-precap-picker]").forEach(picker);
   function validateStep(index) {
@@ -87,6 +112,15 @@
   function conditionalFields() {
     if (!createForm) return;
     var origin = createForm.elements.origen.value;
+    var contactType = createForm.elements.tipo_contacto;
+    var otherContact = createForm.elements.tipo_contacto_otro;
+    if (contactType && otherContact) {
+      var customContact = normalize(contactType.value) === "otro";
+      otherContact.hidden = !customContact;
+      otherContact.disabled = !customContact;
+      otherContact.required = customContact;
+      if (!customContact) otherContact.value = "";
+    }
     var promoter = createForm.elements["promocionado_por[]"] || createForm.elements.promocionado_por;
     var values = promoter && promoter.selectedOptions ? Array.from(promoter.selectedOptions).map(function (option) { return option.value; }) : [promoter ? promoter.value : ""];
     var agency = values.some(function (value) { return value.toLowerCase().includes("mobiliaria"); });
@@ -104,6 +138,10 @@
     var button = form.querySelector('button[type="submit"]');
     var message = form.querySelector("[data-precap-message]");
     var data = new FormData(form);
+    if (action === "precaptacion_create" && form.elements.tipo_contacto_otro && !form.elements.tipo_contacto_otro.disabled && form.elements.tipo_contacto_otro.value.trim() !== "") {
+      data.set("tipo_contacto", form.elements.tipo_contacto_otro.value.trim());
+      data.delete("tipo_contacto_otro");
+    }
     data.set("action", action);
     data.set("nonce", body.dataset.precapNonce);
     Object.keys(extra || {}).forEach(function (key) { data.set(key, extra[key]); });
@@ -132,6 +170,77 @@
       message.textContent = error.message;
       return null;
     } finally { button.disabled = false; }
+  }
+  function activeLocationValue(form, name) {
+    var control = form.querySelector('[data-precap-location-control="' + name + '"]');
+    if (!control) return "";
+    var input = control.querySelector("[data-precap-location-input]:not(:disabled)");
+    var select = control.querySelector("[data-precap-location-select]:not(:disabled)");
+    return (input || select)?.value || "";
+  }
+  function toggleLocationMode(button) {
+    var control = button.closest("[data-precap-location-control]");
+    if (!control) return;
+    var input = control.querySelector("[data-precap-location-input]");
+    var select = control.querySelector("[data-precap-location-select]");
+    var opening = input.disabled;
+    input.disabled = !opening; input.hidden = !opening; input.required = opening;
+    select.disabled = opening; select.hidden = opening; select.required = !opening;
+    button.setAttribute("aria-expanded", String(opening));
+    button.textContent = opening ? "Escoger de lista" : (button.dataset.precapLocationAdd === "pais" ? "Agregar país" : "Agregar ciudad");
+    if (opening) { input.value = select.value && !Array.from(select.options).some(function (option) { return option.value === select.value && !option.hidden; }) ? select.value : ""; input.focus(); }
+    else { input.value = ""; select.focus(); }
+    updateCityOptions(control.closest("form"));
+    scheduleCatalogLookup(control.closest("form"));
+  }
+  function updateCityOptions(form) {
+    if (!form || form.dataset.precapCatalog !== "barrio") return;
+    var country = activeLocationValue(form, "pais");
+    var citySelect = form.querySelector("[data-precap-city-select]");
+    if (!citySelect || citySelect.disabled) return;
+    var current = citySelect.value;
+    Array.from(citySelect.options).forEach(function (option) {
+      if (!option.value) { option.hidden = false; return; }
+      option.hidden = country !== "" && option.dataset.country !== "" && normalize(option.dataset.country) !== normalize(country);
+    });
+    if (current && citySelect.selectedOptions[0]?.hidden) citySelect.value = "";
+  }
+  async function lookupCatalog(form) {
+    if (!form || form.dataset.precapCatalog !== "barrio") return;
+    var status = form.querySelector('[data-precap-catalog-status="barrio"]');
+    if (!status) return;
+    var name = (form.elements.barrio?.value || "").trim();
+    if (!name) { status.textContent = ""; status.className = ""; return; }
+    var data = new FormData(form);
+    data.set("action", "precaptacion_catalog_lookup");
+    data.set("nonce", body.dataset.precapNonce);
+    data.set("kind", "barrio");
+    data.set("pais", activeLocationValue(form, "pais"));
+    data.set("ciudad", activeLocationValue(form, "ciudad"));
+    status.className = "is-checking";
+    status.textContent = "Verificando si el barrio ya existe...";
+    try {
+      var response = await fetch(body.dataset.precapApi, {method:"POST", body:data, credentials:"same-origin"});
+      var result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.data?.message || "No se pudo verificar el barrio.");
+      if (result.data.exists) {
+        var found = result.data.option || {};
+        status.className = "is-existing";
+        status.textContent = "Este barrio ya existe" + (found.ciudad || found.pais ? " en " + [found.ciudad, found.pais].filter(Boolean).join(", ") : "") + ". Al guardar se seleccionará ese registro.";
+      } else {
+        status.className = "is-new";
+        status.textContent = "No existe todavía con ese país y ciudad. Puedes crearlo al guardar.";
+      }
+    } catch (error) {
+      status.className = "is-error";
+      status.textContent = error.message;
+    }
+  }
+  var catalogLookupTimers = new WeakMap();
+  function scheduleCatalogLookup(form) {
+    if (!form || form.dataset.precapCatalog !== "barrio") return;
+    clearTimeout(catalogLookupTimers.get(form));
+    catalogLookupTimers.set(form, setTimeout(function () { lookupCatalog(form); }, 350));
   }
   async function compressPhoto(file) {
     // Keep animation and formats that the browser cannot decode as supplied.
@@ -176,13 +285,19 @@
     if (exportButton) exportCsv(exportButton);
     var open = event.target.closest("[data-precap-open]");
     if (open) {
-      var dialog = document.getElementById(open.dataset.precapOpen);
-      if (dialog) dialog.showModal();
+      openCatalogDialog(open.dataset.precapOpen);
     }
+    var locationAdd = event.target.closest("[data-precap-location-add]");
+    if (locationAdd) toggleLocationMode(locationAdd);
     var close = event.target.closest("[data-precap-close]");
     if (close) close.closest("dialog").close();
   });
   document.addEventListener("change", function (event) {
+    var catalogForm = event.target.closest("[data-precap-catalog]");
+    if (catalogForm && event.target.matches("[data-precap-catalog-check]")) {
+      updateCityOptions(catalogForm);
+      scheduleCatalogLookup(catalogForm);
+    }
     if (event.target.name === "precaptaciones_estado_contacto") document.querySelectorAll("[data-precap-contact-filter]").forEach(function (tab) { var active = tab.dataset.precapContactFilter === event.target.value; tab.classList.toggle("is-active", active); tab.setAttribute("aria-pressed", String(active)); });
     if (!event.target.matches("[data-precap-page-size]")) return;
     var panel = event.target.closest("[data-precaptaciones-panel]");
@@ -210,6 +325,11 @@
     finally { button.disabled = false; }
   }
   document.addEventListener("input", function (event) {
+    var catalogForm = event.target.closest("[data-precap-catalog]");
+    if (catalogForm && event.target.matches("[data-precap-catalog-check]")) {
+      updateCityOptions(catalogForm);
+      scheduleCatalogLookup(catalogForm);
+    }
     var search = event.target.closest("[data-precap-search]");
     if (!search) return;
     var select = document.getElementById(search.dataset.precapSearch);
@@ -250,6 +370,7 @@
     });
   }
   document.querySelectorAll("[data-precap-catalog]").forEach(function (form) {
+    updateCityOptions(form);
     form.addEventListener("submit", async function (event) {
       event.preventDefault();
       var kind = form.dataset.precapCatalog;

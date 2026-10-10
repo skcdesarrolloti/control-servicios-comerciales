@@ -73,17 +73,64 @@ final class Repository
     foreach (['origen'=>'185','tipo_inmueble'=>'783','tipo_contacto'=>'160','promocionado_por'=>'161'] as $field => $id) {
       $out[$field] = $this->glossary($id, $field);
     }
+    $out['origen'] = array_values(array_filter($out['origen'] ?? [], static fn(array $option): bool => !in_array(self::normalizeName((string) ($option['value'] ?? '')), ['recaptacion'], true)));
     $out['categoria'] = array_map(static fn(string $value): array => ['value'=>$value,'label'=>$value], ['Arriendo','Venta','Arriendo o venta']);
     foreach (['barrio'=>['jet_cct_barrios','barrio'], 'competencia'=>['jet_cct_inmobiliarias','inmobiliaria']] as $field => [$table, $column]) {
       $out[$field] = array_map(static fn(array $row): array => ['value'=>(string) ($row[$column] ?? ''),'label'=>(string) ($row[$column] ?? '')], $this->rows($table));
       usort($out[$field], static fn(array $a, array $b): int => strcasecmp($a['label'], $b['label']));
     }
+    $out['pais'] = [];
+    foreach ($this->rows('jet_cct_paises') as $row) {
+      foreach (['pais','nombre'] as $column) {
+        $value = trim((string) ($row[$column] ?? ''));
+        if ($value !== '') $out['pais'][$value] = ['value'=>$value,'label'=>$value];
+      }
+    }
+    $out['ciudad'] = [];
+    foreach ($this->rows('jet_cct_barrios') as $row) {
+      $country = trim((string) ($row['pais'] ?? ''));
+      $city = trim((string) ($row['ciudad'] ?? ''));
+      if ($country !== '') $out['pais'][$country] = ['value'=>$country,'label'=>$country];
+      if ($city !== '') $out['ciudad'][$country . '|' . $city] = ['value'=>$city,'label'=>$city,'country'=>$country];
+    }
+    $out['pais'] = array_values($out['pais']);
+    $out['ciudad'] = array_values($out['ciudad']);
+    usort($out['pais'], static fn(array $a, array $b): int => strcasecmp($a['label'], $b['label']));
+    usort($out['ciudad'], static fn(array $a, array $b): int => strcasecmp(($a['country'] ?? '') . $a['label'], ($b['country'] ?? '') . $b['label']));
     $out['id_pph'] = array_map(static fn(array $row): array => ['value'=>(string) $row['_ID'],'label'=>trim((string) ($row['nombre'] ?? '')) . ' · #' . $row['_ID'] . ' · ' . (string) ($row['tarjeta_bienvenida'] ?? '')], $this->rows('jet_cct_club_pph'));
     $out['indicativo'] = [];
     foreach ($this->rows('jet_cct_paises') as $row) {
       $out['indicativo'][] = ['value'=>(string) ($row['codigo'] ?? $row['indicativo'] ?? ''),'label'=>(string) ($row['pais'] ?? $row['nombre'] ?? '')];
     }
     return $out;
+  }
+
+  public function catalogLookup(string $kind, array $input): array
+  {
+    [$tableName, $field] = match ($kind) {
+      'barrio' => ['jet_cct_barrios','barrio'],
+      'inmobiliaria' => ['jet_cct_inmobiliarias','inmobiliaria'],
+      default => throw new \InvalidArgumentException('Catálogo inválido.'),
+    };
+    if (!in_array($field, $this->columns($tableName), true)) throw new \RuntimeException('El catálogo no tiene la estructura requerida.');
+    $name = sanitize_text_field($input[$field] ?? '');
+    if ($name === '') return ['exists'=>false,'matches'=>[]];
+    $city = sanitize_text_field($input['ciudad'] ?? '');
+    $country = sanitize_text_field($input['pais'] ?? '');
+    $matches = [];
+    foreach ($this->rows($tableName) as $row) {
+      if (self::normalizeName((string) ($row[$field] ?? '')) !== self::normalizeName($name)) continue;
+      if ($kind === 'barrio' && $city !== '' && self::normalizeName((string) ($row['ciudad'] ?? '')) !== self::normalizeName($city)) continue;
+      if ($kind === 'barrio' && $country !== '' && self::normalizeName((string) ($row['pais'] ?? '')) !== self::normalizeName($country)) continue;
+      $matches[] = [
+        'id'=>(int) ($row['_ID'] ?? 0),
+        'value'=>(string) ($row[$field] ?? ''),
+        'label'=>(string) ($row[$field] ?? ''),
+        'pais'=>(string) ($row['pais'] ?? ''),
+        'ciudad'=>(string) ($row['ciudad'] ?? ''),
+      ];
+    }
+    return ['exists'=>$matches !== [], 'option'=>$matches[0] ?? null, 'matches'=>$matches];
   }
 
   public function createCatalog(string $kind, array $input): array
@@ -142,6 +189,7 @@ final class Repository
       $data[$field] = $field === 'observaciones' ? sanitize_textarea_field($input[$field] ?? '') : sanitize_text_field($input[$field] ?? '');
     }
     foreach (['origen','tipo_inmueble','categoria','celular'] as $field) if ($data[$field] === '') throw new \InvalidArgumentException('Completa origen, tipo de inmueble, categoría y celular.');
+    if (self::normalizeName($data['origen']) === 'recaptacion') throw new \InvalidArgumentException('Selecciona un origen válido.');
     if (!preg_match('/^\d{7,15}$/', $data['celular'])) throw new \InvalidArgumentException('El celular debe tener entre 7 y 15 dígitos sin indicativo.');
     if (!in_array($data['categoria'], ['Arriendo','Venta','Arriendo o venta'], true)) throw new \InvalidArgumentException('Categoría inválida.');
     $data['id_pph'] = $data['origen'] === 'Club PPH' ? (int) ($input['id_pph'] ?? 0) : 0;

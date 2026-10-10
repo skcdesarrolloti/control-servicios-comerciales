@@ -81,6 +81,12 @@ final class PrecaptacionTest extends TestCase
     $this->repository->validate(['origen'=>'Recorrido','tipo_inmueble'=>'Casa','categoria'=>'Venta','celular'=>'3001234567','promocionado_por'=>['Inmmobiliaria'],'competencia'=>['No existe']]);
   }
 
+  public function testRecaptacionCannotBeSubmittedAsOrigin(): void
+  {
+    $this->expectException(\InvalidArgumentException::class);
+    $this->repository->validate(['origen'=>'Recaptación','tipo_inmueble'=>'Casa','categoria'=>'Venta','celular'=>'3001234567']);
+  }
+
   public function testOtherEmployeesRecordsCannotBeModified(): void
   {
     $this->expectException(\RuntimeException::class);
@@ -100,10 +106,31 @@ final class PrecaptacionTest extends TestCase
   {
     $html = FormView::render($this->repository);
     self::assertStringContainsString('value="Club PPH"', $html);
+    self::assertStringNotContainsString('value="Recaptación"', $html);
     self::assertStringContainsString('data-precap-conditional="id_pph" hidden', $html);
     self::assertStringContainsString('data-precap-catalog="inmobiliaria"', $html);
     self::assertStringContainsString('name="codigo_postal"', $html);
+    self::assertStringContainsString('data-precap-location-add="pais"', $html);
+    self::assertStringContainsString('data-precap-location-add="ciudad"', $html);
+    self::assertStringContainsString('data-precap-catalog-status="barrio"', $html);
+    self::assertStringContainsString('data-precap-contact-other', $html);
+    self::assertStringContainsString('País / indicativo', $html);
+    self::assertStringContainsString('Este es el indicativo para mensajes por SMS o WS.', $html);
     self::assertStringContainsString('name="competencia[]"', $html);
+  }
+
+  public function testCustomContactTypeIsAcceptedAsText(): void
+  {
+    $data = $this->repository->validate(['origen'=>'Recorrido','tipo_inmueble'=>'Casa','categoria'=>'Arriendo','celular'=>'3001234567','tipo_contacto'=>'Administrador delegado']);
+    self::assertSame('Administrador delegado', $data['tipo_contacto']);
+  }
+
+  public function testCatalogLookupFindsExistingNeighborhoodLive(): void
+  {
+    $match = $this->repository->catalogLookup('barrio', ['barrio'=>' el poblado ', 'pais'=>'Colombia', 'ciudad'=>'Medellin']);
+    self::assertTrue($match['exists']);
+    self::assertSame('El Poblado', $match['option']['value']);
+    self::assertFalse($this->repository->catalogLookup('barrio', ['barrio'=>'Barrio nuevo', 'pais'=>'Colombia', 'ciudad'=>'Medellín'])['exists']);
   }
 
   public function testMetricsCountScopedPendingAndConvertedRecords(): void
