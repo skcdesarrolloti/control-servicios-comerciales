@@ -721,6 +721,59 @@ final class CommercialApiController
     }
   }
 
+  public function taskSignForm(array $input): never
+  {
+    $this->verify($input);
+    $this->authorize('ver_ticket', 'No tienes permiso para ver esta tarea.');
+    $taskId = (int) ($input['ticket_pk'] ?? 0);
+    $this->authorizeTicketScope($taskId);
+    try {
+      $service = new \SCM\Commercial\CommercialSignService($this->db, $this->policy, $this->config);
+      JsonResponse::success(['html'=>'<div class="commercial-entry-shell">' . \SCM\Views\CommercialSignView::render($service, $this->policy, $service->taskContext($taskId)) . '</div>']);
+    } catch (\SCM\Commercial\CommercialSignAccessDenied $exception) {
+      JsonResponse::error($exception->getMessage(), 403);
+    } catch (\InvalidArgumentException $exception) {
+      JsonResponse::error($exception->getMessage(), 422);
+    }
+  }
+
+  public function propertyEntryForm(array $input): never
+  {
+    $this->verify($input);
+    try {
+      $service = new \SCM\Commercial\CommercialPropertyEntryService($this->db, $this->policy, $this->config);
+      JsonResponse::success(['html'=>\SCM\Views\CommercialPropertyEntryView::render($service, (int) ($input['ticket_pk'] ?? 0))]);
+    } catch (\SCM\Commercial\CommercialSignAccessDenied $exception) {
+      JsonResponse::error($exception->getMessage(), 403);
+    } catch (\InvalidArgumentException $exception) {
+      JsonResponse::error($exception->getMessage(), 422);
+    }
+  }
+
+  public function propertyEntrySave(array $input): never
+  {
+    $this->verify($input);
+    try {
+      $service = new \SCM\Commercial\CommercialPropertyEntryService($this->db, $this->policy, $this->config);
+      $document = $_FILES['uso_suelo'] ?? null;
+      $store = is_array($document) && (int) ($document['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE
+        ? static function () use ($document): array {
+          $mime = is_file((string) ($document['tmp_name'] ?? '')) ? (new \finfo(FILEINFO_MIME_TYPE))->file($document['tmp_name']) : '';
+          if ($mime !== 'application/pdf' || (int) ($document['size'] ?? 0) > 6 * 1024 * 1024) throw new \InvalidArgumentException('El uso del suelo debe ser un PDF de hasta 6 MB.');
+          return StoredFileService::fromRuntime()->storeNotificationMedia($document, 'document');
+        } : null;
+      JsonResponse::success($service->save((int) ($input['ticket_pk'] ?? 0), $input, $store));
+    } catch (\SCM\Commercial\CommercialSignAccessDenied $exception) {
+      JsonResponse::error($exception->getMessage(), 403);
+    } catch (\InvalidArgumentException $exception) {
+      JsonResponse::error($exception->getMessage(), 422);
+    } catch (\PDOException $exception) {
+      throw $exception;
+    } catch (\RuntimeException $exception) {
+      JsonResponse::error($exception->getMessage(), 422);
+    }
+  }
+
   private function verify(array $input): void
   {
     if (!$this->csrf->verify('commercial_nonce', (string) ($input['nonce'] ?? ''), false)) {

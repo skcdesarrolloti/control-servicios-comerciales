@@ -43,6 +43,7 @@ final class CommercialAccessPolicy
     'precaptacion_ticket' => 'Crear tarea desde precaptación',
     'precaptacion_catalogos' => 'Crear barrios e inmobiliarias',
     'registrar_aviso' => 'Registrar avisos nuevos y retoques',
+    'ingresar_inmueble' => 'Ingresar inmuebles desde una tarea',
   ];
 
   public const SUBVIEWS = [

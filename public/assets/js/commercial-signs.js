@@ -115,6 +115,7 @@
       ["tipo_inmueble", "categoria"].forEach(function (name) {
         var value = property[name === "categoria" ? "tipo_negocio" : name] || "";
         var select = field(form, name);
+        if (name === "categoria" && field(form, "tipo_aviso").value === "Nuevo" && value === "Arriendo/Venta" && Array.from(select.options).some(function (option) { return option.value === "Arriendo o venta"; })) value = "Arriendo o venta";
         if (field(form, "tipo_aviso").value === "Retoque" && value && !Array.from(select.options).some(function (option) { return option.value === value; })) select.add(new Option(value, value));
         select.value = value;
       });
@@ -168,7 +169,7 @@
     input.setCustomValidity("");
     var files = Array.from(input.files || []);
     var allowed = /\.(jpe?g|png|webp|gif|bmp|tiff?|avif|heic|heif)$/i;
-    var hint = document.getElementById("csg-photo-help");
+    var hint = root.querySelector('[id$="photo-help"]');
     var match = hint && hint.textContent.match(/Máximo ([\d.]+)/);
     var limit = match ? parseFloat(match[1]) * 1024 * 1024 : maxBytes;
     if (files.length > 3 || files.some(function (file) { return file.size > limit || !allowed.test(file.name); })) {
@@ -194,6 +195,7 @@
     if (target.hasAttribute("data-sign-type")) start(root, target.dataset.signType);
     if (target.hasAttribute("data-sign-back") || target.hasAttribute("data-sign-again")) {
       if (root.querySelector("[data-sign-form]")._saving) return;
+      if (root.dataset.signTask) { start(root, "Nuevo"); lookup(root); return; }
       root.querySelector("[data-sign-form]").hidden = true;
       root.querySelector("[data-sign-choices]").hidden = false;
       root.querySelector("[data-sign-result]").hidden = true;
@@ -226,7 +228,7 @@
     if (form._locationKey !== key(form)) { showError(root, "Captura la ubicación actual del inmueble antes de guardar."); root.querySelector("[data-sign-capture]").focus(); return; }
     if (!form.reportValidity()) return;
     var data = new FormData(form);
-    var controls = Array.from(form.querySelectorAll("input,select,textarea,button"));
+    var controls = Array.from(form.querySelectorAll("input,select,textarea,button")).concat(Array.from(root.querySelectorAll("[data-commercial-return-case]")));
     var disabled = controls.map(function (control) { return control.disabled; });
     var submit = root.querySelector("[data-sign-submit]");
     var label = submit.textContent;
@@ -236,6 +238,7 @@
     try {
       var result = await request("commercial_sign_save", data);
       root._saved = true;
+      if (root.dataset.signTask) root.dispatchEvent(new CustomEvent("scm:task-updated", { bubbles: true, detail: { ticketPk: root.dataset.signTask } }));
       form.hidden = true;
       var node = root.querySelector("[data-sign-result]");
       node.replaceChildren();
@@ -250,4 +253,16 @@
       submit.textContent = label; form._saving = false;
     }
   });
+  window.initCommercialTaskSign = function (root) {
+    if (!root) return;
+    start(root, "Nuevo");
+    var form = root.querySelector("[data-sign-form]");
+    field(form, "id_ticket").value = root.dataset.signTask;
+    field(form, "id_ticket").defaultValue = root.dataset.signTask;
+    field(form, "id_ticket").readOnly = true;
+    field(form, "id_inmueble").value = root.dataset.signProperty || "";
+    field(form, "id_inmueble").defaultValue = root.dataset.signProperty || "";
+    root.querySelector("[data-sign-back]").hidden = true;
+    if (field(form, "id_inmueble").value) lookup(root);
+  };
 })();

@@ -553,6 +553,7 @@ final class CommercialDashboardView
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-dashboard.js?v=' . SCM_VERSION); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-notifications.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-notifications.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-signs.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-signs.js')); ?>"></script>
+  <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-property-entry.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-property-entry.js')); ?>"></script>
 </body>
 </html>
 <?php

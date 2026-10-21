@@ -1,0 +1,233 @@
+[
+  {
+    "id": 7,
+    "status": "glossary",
+    "labels": "a:1:{s:4:\"name\";s:7:\"Estrato\";}",
+    "args": "a:1:{s:6:\"source\";s:6:\"manual\";}",
+    "meta_fields": "a:9:{i:0;a:3:{s:5:\"value\";s:1:\"1\";s:5:\"label\";s:1:\"1\";s:10:\"is_checked\";b:0;}i:1;a:3:{s:5:\"value\";s:1:\"2\";s:5:\"label\";s:1:\"2\";s:10:\"is_checked\";b:0;}i:2;a:3:{s:5:\"value\";s:1:\"3\";s:5:\"label\";s:1:\"3\";s:10:\"is_checked\";b:0;}i:3;a:3:{s:5:\"value\";s:1:\"4\";s:5:\"label\";s:1:\"4\";s:10:\"is_checked\";b:0;}i:4;a:3:{s:5:\"value\";s:1:\"5\";s:5:\"label\";s:1:\"5\";s:10:\"is_checked\";b:0;}i:5;a:3:{s:5:\"value\";s:1:\"6\";s:5:\"label\";s:1:\"6\";s:10:\"is_checked\";b:0;}i:6;a:3:{s:5:\"value\";s:9:\"Comercial\";s:5:\"label\";s:9:\"Comercial\";s:10:\"is_checked\";b:0;}i:7;a:3:{s:5:\"value\";s:5:\"Rural\";s:5:\"label\";s:5:\"Rural\";s:10:\"is_checked\";b:0;}i:8;a:3:{s:5:\"value\";s:9:\"Suburbano\";s:5:\"label\";s:9:\"Suburbano\";s:10:\"is_checked\";b:0;}}"
+  },
+  {
+    "id": 10,
+    "status": "glossary",
+    "labels": "a:1:{s:4:\"name\";s:11:\"Procedencia\";}",
+    "args": "a:1:{s:6:\"source\";s:6:\"manual\";}",
+    "meta_fields": "a:22:{i:0;a:3:{s:5:\"value\";s:15:\"Administradores\";s:5:\"label\";s:15:\"Administradores\";s:10:\"is_checked\";b:0;}i:1;a:3:{s:5:\"value\";s:5:\"Aviso\";s:5:\"label\";s:5:\"Aviso\";s:10:\"is_checked\";b:0;}i:2;a:3:{s:5:\"value\";s:10:\"Captadores\";s:5:\"label\";s:10:\"Captadores\";s:10:\"is_checked\";b:0;}i:3;a:3:{s:5:\"value\";s:6:\"Correo\";s:5:\"label\";s:6:\"Correo\";s:10:\"is_checked\";b:0;}i:4;a:3:{s:5:\"value\";s:8:\"Club PPH\";s:5:\"label\";s:8:\"Club PPH\";s:10:\"is_checked\";b:0;}i:5;a:3:{s:5:\"value\";s:8:\"Facebook\";s:5:\"label\";s:8:\"Facebook\";s:10:\"is_checked\";b:0;}i:6;a:3:{s:5:\"value\";s:12:\"Inmobiliaria\";s:5:\"label\";s:12:\"Inmobiliaria\";s:10:\"is_checked\";b:0;}i:7;a:3:{s:5:\"value\";s:8:\"Internet\";s:5:\"label\";s:8:\"Internet\";s:10:\"is_checked\";b:0;}i:8;a:3:{s:5:\"value\";s:14:\"Metro cuadrado\";s:5:\"label\";s:14:\"Metro cuadrado\";s:10:\"is_checked\";b:0;}i:9;a:3:{s:5:\"value\";s:8:\"Por ruta\";s:5:\"label\";s:8:\"Por ruta\";s:10:\"is_checked\";b:0;}i:10;a:3:{s:5:\"value\";s:10:\"Publicidad\";s:5:\"label\";s:10:\"Publicidad\";s:10:\"is_checked\";b:0;}i:11;a:3:{s:5:\"value\";s:8:\"Referido\";s:5:\"label\";s:8:\"Referido\";s:10:\"is_checked\";b:0;}i:12;a:3:{s:5:\"value\";s:18:\"Referido inquilino\";s:5:\"label\";s:18:\"Referido inquilino\";s:10:\"is_checked\";b:0;}i:13;a:3:{s:5:\"value\";s:20:\"Referido propietario\";s:5:\"label\";s:20:\"Referido propietario\";s:10:\"is_checked\";b:0;}i:14;a:3:{s:5:\"value\";s:7:\"Twitter\";s:5:\"label\";s:7:\"Twitter\";s:10:\"is_checked\";b:0;}i:15;a:3:{s:5:\"value\";s:9:\"Sitio web\";s:5:\"label\";s:9:\"Sitio web\";s:10:\"is_checked\";b:0;}i:16;a:3:{s:5:\"value\";s:10:\"Presencial\";s:5:\"label\";s:10:\"Presencial\";s:10:\"is_checked\";b:0;}i:17;a:3:{s:5:\"value\";s:10:\"Finca Raiz\";s:5:\"label\";s:10:\"Finca Raiz\";s:10:\"is_checked\";b:0;}i:18;a:3:{s:5:\"value\";s:8:\"Whatsapp\";s:5:\"label\";s:8:\"Whatsapp\";s:10:\"is_checked\";b:0;}i:19;a:3:{s:5:\"value\";s:9:\"Instagram\";s:5:\"label\";s:9:\"Instagram\";s:10:\"is_checked\";b:0;}i:20;a:3:{s:5:\"value\";s:12:\"Recaptación\";s:5:\"label\";s:12:\"Recaptación\";s:10:\"is_checked\";b:0;}i:21;a:3:{s:5:\"value\";s:10:\"Google ads\";s:5:\"label\";s:10:\"Google ads\";s:10:\"is_checked\";b:0;}}"
+  },
+  {
+    "id": 66,
+    "status": "glossary",
+    "labels": "a:1:{s:4:\"name\";s:6:\"Llaves\";}",
+    "args": "a:1:{s:6:\"source\";s:6:\"manual\";}",
+    "meta_fields": "a:9:{i:0;a:3:{s:5:\"value\";s:10:\"Con colega\";s:5:\"label\";s:10:\"Con colega\";s:10:\"is_checked\";b:0;}i:1;a:3:{s:5:\"value\";s:19:\"Con el arrendatario\";s:5:\"label\";s:19:\"Con el arrendatario\";s:10:\"is_checked\";b:0;}i:2;a:3:{s:5:\"value\";s:18:\"Con el propietario\";s:5:\"label\";s:18:\"Con el propietario\";s:10:\"is_checked\";b:0;}i:3;a:3:{s:5:\"value\";s:13:\"Con encargado\";s:5:\"label\";s:13:\"Con encargado\";s:10:\"is_checked\";b:0;}i:4;a:3:{s:5:\"value\";s:14:\"En el inmueble\";s:5:\"label\";s:14:\"En el inmueble\";s:10:\"is_checked\";b:0;}i:5;a:3:{s:5:\"value\";s:18:\"En la inmobiliaria\";s:5:\"label\";s:18:\"En la inmobiliaria\";s:10:\"is_checked\";b:0;}i:6;a:3:{s:5:\"value\";s:17:\"En poder de otros\";s:5:\"label\";s:17:\"En poder de otros\";s:10:\"is_checked\";b:0;}i:7;a:3:{s:5:\"value\";s:11:\"En porteria\";s:5:\"label\";s:11:\"En porteria\";s:10:\"is_checked\";b:0;}i:8;a:3:{s:5:\"value\";s:17:\"En sala de ventas\";s:5:\"label\";s:17:\"En sala de ventas\";s:10:\"is_checked\";b:0;}}"
+  },
+  {
+    "id": 175,
+    "status": "glossary",
+    "labels": "a:1:{s:4:\"name\";s:5:\"Si/No\";}",
+    "args": "a:1:{s:6:\"source\";s:6:\"manual\";}",
+    "meta_fields": "a:2:{i:0;a:3:{s:5:\"value\";s:2:\"Si\";s:5:\"label\";s:2:\"Si\";s:10:\"is_checked\";b:0;}i:1;a:3:{s:5:\"value\";s:2:\"No\";s:5:\"label\";s:2:\"No\";s:10:\"is_checked\";b:0;}}"
+  },
+  {
+    "id": 333,
+    "status": "glossary",
+    "labels": "a:1:{s:4:\"name\";s:17:\"Tipo de captacion\";}",
+    "args": "a:1:{s:6:\"source\";s:6:\"manual\";}",
+    "meta_fields": "a:2:{i:0;a:3:{s:5:\"value\";s:5:\"Nueva\";s:5:\"label\";s:5:\"Nueva\";s:10:\"is_checked\";b:0;}i:1;a:3:{s:5:\"value\";s:11:\"Recaptacion\";s:5:\"label\";s:11:\"Recaptacion\";s:10:\"is_checked\";b:0;}}"
+  },
+  {
+    "id": 920,
+    "status": "query",
+    "labels": "a:1:{s:4:\"name\";s:6:\"Paises\";}",
+    "args": "a:17:{s:10:\"query_type\";s:19:\"custom-content-type\";s:19:\"custom-content-type\";a:3:{s:5:\"order\";a:1:{i:0;a:4:{s:3:\"_id\";i:616190;s:9:\"collapsed\";b:0;s:7:\"orderby\";s:4:\"pais\";s:5:\"order\";s:3:\"ASC\";}}s:4:\"args\";a:0:{}s:12:\"content_type\";s:6:\"paises\";}s:29:\"__dynamic_custom-content-type\";a:1:{s:4:\"args\";a:0:{}}s:12:\"show_preview\";b:1;s:11:\"cache_query\";b:1;s:12:\"api_endpoint\";b:0;s:12:\"preview_page\";N;s:18:\"preview_page_title\";N;s:20:\"preview_query_string\";N;s:8:\"query_id\";N;s:11:\"description\";s:74:\"Esta consulta muestra los paises que estan ingresados en la base de datos.\";s:13:\"api_namespace\";N;s:8:\"api_path\";N;s:10:\"api_access\";N;s:14:\"api_access_cap\";N;s:15:\"api_access_role\";N;s:10:\"api_schema\";N;}",
+    "meta_fields": "a:0:{}"
+  },
+  {
+    "id": 921,
+    "status": "query",
+    "labels": "a:1:{s:4:\"name\";s:13:\"Departamentos\";}",
+    "args": "a:17:{s:10:\"query_type\";s:19:\"custom-content-type\";s:19:\"custom-content-type\";a:3:{s:5:\"order\";a:1:{i:0;a:4:{s:3:\"_id\";i:616190;s:9:\"collapsed\";b:0;s:7:\"orderby\";s:12:\"departamento\";s:5:\"order\";s:3:\"ASC\";}}s:4:\"args\";a:0:{}s:12:\"content_type\";s:13:\"departamentos\";}s:29:\"__dynamic_custom-content-type\";a:1:{s:4:\"args\";a:0:{}}s:12:\"show_preview\";b:1;s:11:\"cache_query\";b:1;s:12:\"api_endpoint\";b:0;s:12:\"preview_page\";N;s:18:\"preview_page_title\";N;s:20:\"preview_query_string\";N;s:8:\"query_id\";N;s:11:\"description\";s:81:\"Esta consulta muestra los departamentos que estan ingresados en la base de datos.\";s:13:\"api_namespace\";N;s:8:\"api_path\";N;s:10:\"api_access\";N;s:14:\"api_access_cap\";N;s:15:\"api_access_role\";a:0:{}s:10:\"api_schema\";a:1:{i:0;a:2:{s:3:\"arg\";s:0:\"\";s:5:\"value\";s:0:\"\";}}}",
+    "meta_fields": "a:0:{}"
+  },
+  {
+    "id": 922,
+    "status": "query",
+    "labels": "a:1:{s:4:\"name\";s:8:\"Ciudades\";}",
+    "args": "a:17:{s:10:\"query_type\";s:19:\"custom-content-type\";s:19:\"custom-content-type\";a:3:{s:5:\"order\";a:1:{i:0;a:4:{s:3:\"_id\";i:616190;s:9:\"collapsed\";b:0;s:7:\"orderby\";s:6:\"ciudad\";s:5:\"order\";s:3:\"ASC\";}}s:4:\"args\";a:0:{}s:12:\"content_type\";s:8:\"ciudades\";}s:29:\"__dynamic_custom-content-type\";a:1:{s:4:\"args\";a:0:{}}s:12:\"show_preview\";b:1;s:11:\"cache_query\";b:1;s:12:\"api_endpoint\";b:0;s:12:\"preview_page\";N;s:18:\"preview_page_title\";N;s:20:\"preview_query_string\";N;s:8:\"query_id\";N;s:11:\"description\";s:76:\"Esta consulta muestra las ciudades que estan ingresadas en la base de datos.\";s:13:\"api_namespace\";N;s:8:\"api_path\";N;s:10:\"api_access\";N;s:14:\"api_access_cap\";N;s:15:\"api_access_role\";a:0:{}s:10:\"api_schema\";a:1:{i:0;a:2:{s:3:\"arg\";s:0:\"\";s:5:\"value\";s:0:\"\";}}}",
+    "meta_fields": "a:0:{}"
+  },
+  {
+    "id": 923,
+    "status": "query",
+    "labels": "a:1:{s:4:\"name\";s:7:\"Barrios\";}",
+    "args": "a:18:{s:10:\"query_type\";s:19:\"custom-content-type\";s:19:\"custom-content-type\";a:3:{s:5:\"order\";a:1:{i:0;a:4:{s:3:\"_id\";i:616190;s:9:\"collapsed\";b:0;s:7:\"orderby\";s:6:\"barrio\";s:5:\"order\";s:3:\"ASC\";}}s:4:\"args\";a:0:{}s:12:\"content_type\";s:7:\"barrios\";}s:29:\"__dynamic_custom-content-type\";a:1:{s:4:\"args\";a:0:{}}s:12:\"show_preview\";b:1;s:11:\"cache_query\";b:1;s:12:\"api_endpoint\";b:0;s:12:\"preview_page\";N;s:18:\"preview_page_title\";N;s:20:\"preview_query_string\";N;s:8:\"query_id\";s:0:\"\";s:11:\"description\";s:75:\"Esta consulta muestra los barrios que estan ingresados en la base de datos.\";s:13:\"api_namespace\";s:2:\"my\";s:8:\"api_path\";s:7:\"barrios\";s:10:\"api_access\";s:6:\"public\";s:14:\"api_access_cap\";N;s:15:\"api_access_role\";a:0:{}s:10:\"api_schema\";a:1:{i:0;a:2:{s:3:\"arg\";s:0:\"\";s:5:\"value\";s:0:\"\";}}s:13:\"cache_expires\";i:0;}",
+    "meta_fields": "a:0:{}"
+  },
+  {
+    "id": 948,
+    "status": "glossary",
+    "labels": "a:1:{s:4:\"name\";s:23:\"Antiguedad del inmueble\";}",
+    "args": "a:1:{s:6:\"source\";s:6:\"manual\";}",
+    "meta_fields": "a:5:{i:0;a:3:{s:5:\"value\";s:15:\"Menos de 1 año\";s:5:\"label\";s:15:\"Menos de 1 año\";s:10:\"is_checked\";b:0;}i:1;a:3:{s:5:\"value\";s:11:\"1 a 8 años\";s:5:\"label\";s:11:\"1 a 8 años\";s:10:\"is_checked\";b:0;}i:2;a:3:{s:5:\"value\";s:12:\"9 a 15 años\";s:5:\"label\";s:12:\"9 a 15 años\";s:10:\"is_checked\";b:0;}i:3;a:3:{s:5:\"value\";s:13:\"16 a 30 años\";s:5:\"label\";s:13:\"16 a 30 años\";s:10:\"is_checked\";b:0;}i:4;a:3:{s:5:\"value\";s:15:\"Mas de 30 años\";s:5:\"label\";s:16:\"Más de 30 años\";s:10:\"is_checked\";b:0;}}"
+  },
+  {
+    "id": 950,
+    "status": "glossary",
+    "labels": "a:1:{s:4:\"name\";s:19:\"Tipo de apartamento\";}",
+    "args": "a:1:{s:6:\"source\";s:6:\"manual\";}",
+    "meta_fields": "a:3:{i:0;a:3:{s:5:\"value\";s:6:\"Duplex\";s:5:\"label\";s:6:\"Duplex\";s:10:\"is_checked\";b:0;}i:1;a:3:{s:5:\"value\";s:4:\"Loft\";s:5:\"label\";s:4:\"Loft\";s:10:\"is_checked\";b:0;}i:2;a:3:{s:5:\"value\";s:9:\"PentHouse\";s:5:\"label\";s:9:\"PentHouse\";s:10:\"is_checked\";b:0;}}"
+  },
+  {
+    "id": 951,
+    "status": "query",
+    "labels": "a:1:{s:4:\"name\";s:10:\"Interiores\";}",
+    "args": "a:17:{s:10:\"query_type\";s:19:\"custom-content-type\";s:19:\"custom-content-type\";a:3:{s:5:\"order\";a:1:{i:0;a:4:{s:3:\"_id\";i:456629;s:9:\"collapsed\";b:0;s:7:\"orderby\";s:5:\"valor\";s:5:\"order\";s:3:\"ASC\";}}s:4:\"args\";a:0:{}s:12:\"content_type\";s:15:\"caract_internas\";}s:29:\"__dynamic_custom-content-type\";a:1:{s:4:\"args\";a:0:{}}s:12:\"show_preview\";b:0;s:11:\"cache_query\";b:1;s:12:\"api_endpoint\";b:0;s:12:\"preview_page\";N;s:18:\"preview_page_title\";N;s:20:\"preview_query_string\";N;s:8:\"query_id\";N;s:11:\"description\";s:87:\"Esta consulta muestra todas las caracteristicas internas agregadas en la base de datos.\";s:13:\"api_namespace\";N;s:8:\"api_path\";N;s:10:\"api_access\";N;s:14:\"api_access_cap\";N;s:15:\"api_access_role\";a:0:{}s:10:\"api_schema\";a:1:{i:0;a:2:{s:3:\"arg\";s:0:\"\";s:5:\"value\";s:0:\"\";}}}",
+    "meta_fields": "a:0:{}"
+  },
+  {
+    "id": 952,
+    "status": "query",
+    "labels": "a:1:{s:4:\"name\";s:10:\"Exteriores\";}",
+    "args": "a:17:{s:10:\"query_type\";s:19:\"custom-content-type\";s:19:\"custom-content-type\";a:3:{s:5:\"order\";a:1:{i:0;a:4:{s:3:\"_id\";i:996051;s:9:\"collapsed\";b:0;s:7:\"orderby\";s:5:\"valor\";s:5:\"order\";s:3:\"ASC\";}}s:4:\"args\";a:0:{}s:12:\"content_type\";s:15:\"caract_externas\";}s:29:\"__dynamic_custom-content-type\";a:1:{s:4:\"args\";a:0:{}}s:12:\"show_preview\";b:0;s:11:\"cache_query\";b:1;s:12:\"api_endpoint\";b:0;s:12:\"preview_page\";N;s:18:\"preview_page_title\";N;s:20:\"preview_query_string\";N;s:8:\"query_id\";N;s:11:\"description\";s:87:\"Esta consulta muestra todas las caracteristicas externas agregadas en la base de datos.\";s:13:\"api_namespace\";N;s:8:\"api_path\";N;s:10:\"api_access\";N;s:14:\"api_access_cap\";N;s:15:\"api_access_role\";a:0:{}s:10:\"api_schema\";a:1:{i:0;a:2:{s:3:\"arg\";s:0:\"\";s:5:\"value\";s:0:\"\";}}}",
+    "meta_fields": "a:0:{}"
+  },
+  {
+    "id": 953,
+    "status": "query",
+    "labels": "a:1:{s:4:\"name\";s:11:\"Alrededores\";}",
+    "args": "a:17:{s:10:\"query_type\";s:19:\"custom-content-type\";s:19:\"custom-content-type\";a:3:{s:5:\"order\";a:1:{i:0;a:4:{s:3:\"_id\";i:262884;s:9:\"collapsed\";b:0;s:7:\"orderby\";s:5:\"valor\";s:5:\"order\";s:3:\"ASC\";}}s:4:\"args\";a:0:{}s:12:\"content_type\";s:11:\"alrededores\";}s:29:\"__dynamic_custom-content-type\";a:1:{s:4:\"args\";a:0:{}}s:12:\"show_preview\";b:0;s:11:\"cache_query\";b:1;s:12:\"api_endpoint\";b:0;s:12:\"preview_page\";N;s:18:\"preview_page_title\";N;s:20:\"preview_query_string\";N;s:8:\"query_id\";N;s:11:\"description\";s:74:\"Esta consulta muestra todas los alrededores agregados en la base de datos.\";s:13:\"api_namespace\";N;s:8:\"api_path\";N;s:10:\"api_access\";N;s:14:\"api_access_cap\";N;s:15:\"api_access_role\";a:0:{}s:10:\"api_schema\";a:1:{i:0;a:2:{s:3:\"arg\";s:0:\"\";s:5:\"value\";s:0:\"\";}}}",
+    "meta_fields": "a:0:{}"
+  },
+  {
+    "id": 1009,
+    "status": "query",
+    "labels": "a:1:{s:4:\"name\";s:14:\"Zonas sociales\";}",
+    "args": "a:17:{s:10:\"query_type\";s:19:\"custom-content-type\";s:19:\"custom-content-type\";a:3:{s:5:\"order\";a:1:{i:0;a:4:{s:3:\"_id\";i:996051;s:9:\"collapsed\";b:0;s:7:\"orderby\";s:5:\"valor\";s:5:\"order\";s:3:\"ASC\";}}s:4:\"args\";a:0:{}s:12:\"content_type\";s:14:\"zonas_sociales\";}s:29:\"__dynamic_custom-content-type\";a:1:{s:4:\"args\";a:0:{}}s:12:\"show_preview\";b:0;s:11:\"cache_query\";b:1;s:12:\"api_endpoint\";b:0;s:12:\"preview_page\";N;s:18:\"preview_page_title\";N;s:20:\"preview_query_string\";N;s:8:\"query_id\";N;s:11:\"description\";s:77:\"Esta consulta muestra todas las zonas sociales agregadas en la base de datos.\";s:13:\"api_namespace\";N;s:8:\"api_path\";N;s:10:\"api_access\";N;s:14:\"api_access_cap\";N;s:15:\"api_access_role\";a:0:{}s:10:\"api_schema\";a:1:{i:0;a:2:{s:3:\"arg\";s:0:\"\";s:5:\"value\";s:0:\"\";}}}",
+    "meta_fields": "a:0:{}"
+  },
+  {
+    "id": 1054,
+    "status": "query",
+    "labels": "a:1:{s:4:\"name\";s:19:\"Listado de club PPH\";}",
+    "args": "a:17:{s:10:\"query_type\";s:19:\"custom-content-type\";s:19:\"custom-content-type\";a:5:{s:5:\"order\";a:1:{i:0;a:4:{s:3:\"_id\";i:571045;s:9:\"collapsed\";b:0;s:7:\"orderby\";s:3:\"_ID\";s:5:\"order\";s:4:\"DESC\";}}s:4:\"args\";a:1:{i:0;a:5:{s:3:\"_id\";i:244247;s:9:\"collapsed\";b:0;s:5:\"field\";s:6:\"activo\";s:8:\"operator\";s:1:\"=\";s:5:\"value\";s:2:\"Si\";}}s:12:\"content_type\";s:8:\"club_pph\";s:6:\"number\";s:0:\"\";s:6:\"status\";s:0:\"\";}s:29:\"__dynamic_custom-content-type\";a:1:{s:4:\"args\";a:1:{i:244247;a:0:{}}}s:12:\"show_preview\";b:0;s:11:\"cache_query\";b:1;s:12:\"api_endpoint\";b:0;s:12:\"preview_page\";N;s:18:\"preview_page_title\";N;s:20:\"preview_query_string\";N;s:8:\"query_id\";N;s:11:\"description\";s:83:\"Esta consulta muestra todos los registro del club PPH para consultas y formularios.\";s:13:\"api_namespace\";N;s:8:\"api_path\";N;s:10:\"api_access\";N;s:14:\"api_access_cap\";N;s:15:\"api_access_role\";a:0:{}s:10:\"api_schema\";a:1:{i:0;a:2:{s:3:\"arg\";s:0:\"\";s:5:\"value\";s:0:\"\";}}}",
+    "meta_fields": "a:0:{}"
+  },
+  {
+    "id": 1303,
+    "status": "glossary",
+    "labels": "a:1:{s:4:\"name\";s:19:\"Tipo de publicacion\";}",
+    "args": "a:1:{s:6:\"source\";s:6:\"manual\";}",
+    "meta_fields": "a:16:{i:0;a:3:{s:5:\"value\";s:8:\"Inmueble\";s:5:\"label\";s:8:\"Inmueble\";s:10:\"is_checked\";b:0;}i:1;a:3:{s:5:\"value\";s:19:\"Maquinaria y equipo\";s:5:\"label\";s:19:\"Maquinaria y equipo\";s:10:\"is_checked\";b:0;}i:2;a:3:{s:5:\"value\";s:11:\"Semovientes\";s:5:\"label\";s:11:\"Semovientes\";s:10:\"is_checked\";b:0;}i:3;a:3:{s:5:\"value\";s:23:\"Proyectos inmobiliarios\";s:5:\"label\";s:23:\"Proyectos inmobiliarios\";s:10:\"is_checked\";b:0;}i:4;a:3:{s:5:\"value\";s:20:\"Derechos fiduciarios\";s:5:\"label\";s:20:\"Derechos fiduciarios\";s:10:\"is_checked\";b:0;}i:5;a:3:{s:5:\"value\";s:25:\"Bonos / CDT / Inversiones\";s:5:\"label\";s:25:\"Bonos / CDT / Inversiones\";s:10:\"is_checked\";b:0;}i:6;a:3:{s:5:\"value\";s:9:\"Vehiculos\";s:5:\"label\";s:9:\"Vehiculos\";s:10:\"is_checked\";b:0;}i:7;a:3:{s:5:\"value\";s:13:\"Embarcaciones\";s:5:\"label\";s:13:\"Embarcaciones\";s:10:\"is_checked\";b:0;}i:8;a:3:{s:5:\"value\";s:11:\"Franquicias\";s:5:\"label\";s:11:\"Franquicias\";s:10:\"is_checked\";b:0;}i:9;a:3:{s:5:\"value\";s:21:\"Propiedad intelectual\";s:5:\"label\";s:21:\"Propiedad intelectual\";s:10:\"is_checked\";b:0;}i:10;a:3:{s:5:\"value\";s:22:\"Instrumentos musicales\";s:5:\"label\";s:22:\"Instrumentos musicales\";s:10:\"is_checked\";b:0;}i:11;a:3:{s:5:\"value\";s:10:\"Tecnologia\";s:5:\"label\";s:10:\"Tecnologia\";s:10:\"is_checked\";b:0;}i:12;a:3:{s:5:\"value\";s:4:\"Arte\";s:5:\"label\";s:4:\"Arte\";s:10:\"is_checked\";b:0;}i:13;a:3:{s:5:\"value\";s:5:\"Joyas\";s:5:\"label\";s:5:\"Joyas\";s:10:\"is_checked\";b:0;}i:14;a:3:{s:5:\"value\";s:19:\"Activos productivos\";s:5:\"label\";s:19:\"Activos productivos\";s:10:\"is_checked\";b:0;}i:15;a:3:{s:5:\"value\";s:4:\"Otro\";s:5:\"label\";s:4:\"Otro\";s:10:\"is_checked\";b:0;}}"
+  },
+  {
+    "id": 1311,
+    "status": "query",
+    "labels": "a:1:{s:4:\"name\";s:18:\"Tipo de maquinaria\";}",
+    "args": "a:19:{s:10:\"query_type\";s:19:\"custom-content-type\";s:19:\"custom-content-type\";a:3:{s:5:\"order\";a:0:{}s:4:\"args\";a:2:{i:0;a:5:{s:3:\"_id\";i:986788;s:9:\"collapsed\";b:0;s:5:\"field\";s:16:\"tipo_publicacion\";s:8:\"operator\";s:1:\"=\";s:5:\"value\";s:19:\"Maquinaria y equipo\";}i:1;a:5:{s:3:\"_id\";i:970637;s:9:\"collapsed\";b:0;s:5:\"field\";s:15:\"categoria_campo\";s:8:\"operator\";s:1:\"=\";s:5:\"value\";s:12:\"tipo_maquina\";}}s:12:\"content_type\";s:22:\"glosario_publicaciones\";}s:29:\"__dynamic_custom-content-type\";a:1:{s:4:\"args\";a:2:{i:970637;a:0:{}i:986788;a:0:{}}}s:12:\"show_preview\";b:1;s:11:\"cache_query\";b:1;s:12:\"api_endpoint\";b:0;s:16:\"avoid_duplicates\";b:0;s:12:\"preview_page\";N;s:18:\"preview_page_title\";N;s:20:\"preview_query_string\";N;s:8:\"query_id\";N;s:11:\"description\";s:78:\"Esta consulta muestra todas las tipo de maquinaria desde el glosario dinamico.\";s:13:\"api_namespace\";N;s:8:\"api_path\";N;s:10:\"api_access\";N;s:14:\"api_access_cap\";N;s:15:\"api_access_role\";N;s:10:\"api_schema\";N;s:13:\"cache_expires\";N;}",
+    "meta_fields": "a:0:{}"
+  },
+  {
+    "id": 1312,
+    "status": "query",
+    "labels": "a:1:{s:4:\"name\";s:18:\"Tipo de semoviente\";}",
+    "args": "a:19:{s:10:\"query_type\";s:19:\"custom-content-type\";s:19:\"custom-content-type\";a:3:{s:5:\"order\";a:0:{}s:4:\"args\";a:2:{i:0;a:5:{s:3:\"_id\";i:986788;s:9:\"collapsed\";b:0;s:5:\"field\";s:16:\"tipo_publicacion\";s:8:\"operator\";s:1:\"=\";s:5:\"value\";s:11:\"Semovientes\";}i:1;a:5:{s:3:\"_id\";i:970637;s:9:\"collapsed\";b:0;s:5:\"field\";s:15:\"categoria_campo\";s:8:\"operator\";s:1:\"=\";s:5:\"value\";s:7:\"especie\";}}s:12:\"content_type\";s:22:\"glosario_publicaciones\";}s:29:\"__dynamic_custom-content-type\";a:1:{s:4:\"args\";a:2:{i:970637;a:0:{}i:986788;a:0:{}}}s:12:\"show_preview\";b:1;s:11:\"cache_query\";b:1;s:12:\"api_endpoint\";b:0;s:16:\"avoid_duplicates\";b:0;s:12:\"preview_page\";N;s:18:\"preview_page_title\";N;s:20:\"preview_query_string\";N;s:8:\"query_id\";N;s:11:\"description\";s:78:\"Esta consulta muestra todos los tipo de semoviente desde el glosario dinamico.\";s:13:\"api_namespace\";N;s:8:\"api_path\";N;s:10:\"api_access\";N;s:14:\"api_access_cap\";N;s:15:\"api_access_role\";a:0:{}s:10:\"api_schema\";a:1:{i:0;a:2:{s:3:\"arg\";s:0:\"\";s:5:\"value\";s:0:\"\";}}s:13:\"cache_expires\";i:0;}",
+    "meta_fields": "a:0:{}"
+  },
+  {
+    "id": 1313,
+    "status": "query",
+    "labels": "a:1:{s:4:\"name\";s:16:\"Tipo de proyecto\";}",
+    "args": "a:19:{s:10:\"query_type\";s:19:\"custom-content-type\";s:19:\"custom-content-type\";a:3:{s:5:\"order\";a:0:{}s:4:\"args\";a:2:{i:0;a:5:{s:3:\"_id\";i:986788;s:9:\"collapsed\";b:0;s:5:\"field\";s:16:\"tipo_publicacion\";s:8:\"operator\";s:1:\"=\";s:5:\"value\";s:23:\"Proyectos inmobiliarios\";}i:1;a:5:{s:3:\"_id\";i:970637;s:9:\"collapsed\";b:0;s:5:\"field\";s:15:\"categoria_campo\";s:8:\"operator\";s:1:\"=\";s:5:\"value\";s:13:\"tipo_proyecto\";}}s:12:\"content_type\";s:22:\"glosario_publicaciones\";}s:29:\"__dynamic_custom-content-type\";a:1:{s:4:\"args\";a:2:{i:970637;a:0:{}i:986788;a:0:{}}}s:12:\"show_preview\";b:1;s:11:\"cache_query\";b:1;s:12:\"api_endpoint\";b:0;s:16:\"avoid_duplicates\";b:0;s:12:\"preview_page\";N;s:18:\"preview_page_title\";N;s:20:\"preview_query_string\";N;s:8:\"query_id\";N;s:11:\"description\";s:77:\"Esta consulta muestra todos los tipo de proyectos desde el glosario dinamico.\";s:13:\"api_namespace\";N;s:8:\"api_path\";N;s:10:\"api_access\";N;s:14:\"api_access_cap\";N;s:15:\"api_access_role\";a:0:{}s:10:\"api_schema\";a:1:{i:0;a:2:{s:3:\"arg\";s:0:\"\";s:5:\"value\";s:0:\"\";}}s:13:\"cache_expires\";i:0;}",
+    "meta_fields": "a:0:{}"
+  },
+  {
+    "id": 1314,
+    "status": "query",
+    "labels": "a:1:{s:4:\"name\";s:26:\"Tipo de derecho fiduciario\";}",
+    "args": "a:19:{s:10:\"query_type\";s:19:\"custom-content-type\";s:19:\"custom-content-type\";a:3:{s:5:\"order\";a:0:{}s:4:\"args\";a:2:{i:0;a:5:{s:3:\"_id\";i:986788;s:9:\"collapsed\";b:0;s:5:\"field\";s:16:\"tipo_publicacion\";s:8:\"operator\";s:1:\"=\";s:5:\"value\";s:20:\"Derechos fiduciarios\";}i:1;a:5:{s:3:\"_id\";i:970637;s:9:\"collapsed\";b:0;s:5:\"field\";s:15:\"categoria_campo\";s:8:\"operator\";s:1:\"=\";s:5:\"value\";s:17:\"activo_subyacente\";}}s:12:\"content_type\";s:22:\"glosario_publicaciones\";}s:29:\"__dynamic_custom-content-type\";a:1:{s:4:\"args\";a:2:{i:970637;a:0:{}i:986788;a:0:{}}}s:12:\"show_preview\";b:1;s:11:\"cache_query\";b:1;s:12:\"api_endpoint\";b:0;s:16:\"avoid_duplicates\";b:0;s:12:\"preview_page\";N;s:18:\"preview_page_title\";N;s:20:\"preview_query_string\";N;s:8:\"query_id\";N;s:11:\"description\";s:88:\"Esta consulta muestra todos los tipo de derechos fiduciarios desde el glosario dinamico.\";s:13:\"api_namespace\";N;s:8:\"api_path\";N;s:10:\"api_access\";N;s:14:\"api_access_cap\";N;s:15:\"api_access_role\";a:0:{}s:10:\"api_schema\";a:1:{i:0;a:2:{s:3:\"arg\";s:0:\"\";s:5:\"value\";s:0:\"\";}}s:13:\"cache_expires\";i:0;}",
+    "meta_fields": "a:0:{}"
+  },
+  {
+    "id": 1315,
+    "status": "query",
+    "labels": "a:1:{s:4:\"name\";s:19:\"Tipo de instrumento\";}",
+    "args": "a:19:{s:10:\"query_type\";s:19:\"custom-content-type\";s:19:\"custom-content-type\";a:3:{s:5:\"order\";a:0:{}s:4:\"args\";a:2:{i:0;a:5:{s:3:\"_id\";i:986788;s:9:\"collapsed\";b:0;s:5:\"field\";s:16:\"tipo_publicacion\";s:8:\"operator\";s:1:\"=\";s:5:\"value\";s:25:\"Bonos / CDT / Inversiones\";}i:1;a:5:{s:3:\"_id\";i:970637;s:9:\"collapsed\";b:0;s:5:\"field\";s:15:\"categoria_campo\";s:8:\"operator\";s:1:\"=\";s:5:\"value\";s:16:\"tipo_instrumento\";}}s:12:\"content_type\";s:22:\"glosario_publicaciones\";}s:29:\"__dynamic_custom-content-type\";a:1:{s:4:\"args\";a:2:{i:970637;a:0:{}i:986788;a:0:{}}}s:12:\"show_preview\";b:1;s:11:\"cache_query\";b:1;s:12:\"api_endpoint\";b:0;s:16:\"avoid_duplicates\";b:0;s:12:\"preview_page\";N;s:18:\"preview_page_title\";N;s:20:\"preview_query_string\";N;s:8:\"query_id\";N;s:11:\"description\";s:80:\"Esta consulta muestra todos los tipo de instrumentos desde el glosario dinamico.\";s:13:\"api_namespace\";N;s:8:\"api_path\";N;s:10:\"api_access\";N;s:14:\"api_access_cap\";N;s:15:\"api_access_role\";a:0:{}s:10:\"api_schema\";a:1:{i:0;a:2:{s:3:\"arg\";s:0:\"\";s:5:\"value\";s:0:\"\";}}s:13:\"cache_expires\";i:0;}",
+    "meta_fields": "a:0:{}"
+  },
+  {
+    "id": 1316,
+    "status": "query",
+    "labels": "a:1:{s:4:\"name\";s:16:\"Tipo de vehiculo\";}",
+    "args": "a:19:{s:10:\"query_type\";s:19:\"custom-content-type\";s:19:\"custom-content-type\";a:3:{s:5:\"order\";a:0:{}s:4:\"args\";a:2:{i:0;a:5:{s:3:\"_id\";i:986788;s:9:\"collapsed\";b:0;s:5:\"field\";s:16:\"tipo_publicacion\";s:8:\"operator\";s:1:\"=\";s:5:\"value\";s:10:\"Vehículos\";}i:1;a:5:{s:3:\"_id\";i:970637;s:9:\"collapsed\";b:0;s:5:\"field\";s:15:\"categoria_campo\";s:8:\"operator\";s:1:\"=\";s:5:\"value\";s:13:\"tipo_vehiculo\";}}s:12:\"content_type\";s:22:\"glosario_publicaciones\";}s:29:\"__dynamic_custom-content-type\";a:1:{s:4:\"args\";a:2:{i:970637;a:0:{}i:986788;a:0:{}}}s:12:\"show_preview\";b:1;s:11:\"cache_query\";b:1;s:12:\"api_endpoint\";b:0;s:16:\"avoid_duplicates\";b:0;s:12:\"preview_page\";N;s:18:\"preview_page_title\";N;s:20:\"preview_query_string\";N;s:8:\"query_id\";N;s:11:\"description\";s:76:\"Esta consulta muestra todos los tipo de vehiculo desde el glosario dinamico.\";s:13:\"api_namespace\";N;s:8:\"api_path\";N;s:10:\"api_access\";N;s:14:\"api_access_cap\";N;s:15:\"api_access_role\";a:0:{}s:10:\"api_schema\";a:1:{i:0;a:2:{s:3:\"arg\";s:0:\"\";s:5:\"value\";s:0:\"\";}}s:13:\"cache_expires\";i:0;}",
+    "meta_fields": "a:0:{}"
+  },
+  {
+    "id": 1317,
+    "status": "query",
+    "labels": "a:1:{s:4:\"name\";s:19:\"Tipo de embarcacion\";}",
+    "args": "a:19:{s:10:\"query_type\";s:19:\"custom-content-type\";s:19:\"custom-content-type\";a:3:{s:5:\"order\";a:0:{}s:4:\"args\";a:2:{i:0;a:5:{s:3:\"_id\";i:986788;s:9:\"collapsed\";b:0;s:5:\"field\";s:16:\"tipo_publicacion\";s:8:\"operator\";s:1:\"=\";s:5:\"value\";s:13:\"Embarcaciones\";}i:1;a:5:{s:3:\"_id\";i:970637;s:9:\"collapsed\";b:0;s:5:\"field\";s:15:\"categoria_campo\";s:8:\"operator\";s:1:\"=\";s:5:\"value\";s:16:\"tipo_embarcacion\";}}s:12:\"content_type\";s:22:\"glosario_publicaciones\";}s:29:\"__dynamic_custom-content-type\";a:1:{s:4:\"args\";a:2:{i:970637;a:0:{}i:986788;a:0:{}}}s:12:\"show_preview\";b:1;s:11:\"cache_query\";b:1;s:12:\"api_endpoint\";b:0;s:16:\"avoid_duplicates\";b:0;s:12:\"preview_page\";N;s:18:\"preview_page_title\";N;s:20:\"preview_query_string\";N;s:8:\"query_id\";N;s:11:\"description\";s:79:\"Esta consulta muestra todos los tipo de embarcacion desde el glosario dinamico.\";s:13:\"api_namespace\";N;s:8:\"api_path\";N;s:10:\"api_access\";N;s:14:\"api_access_cap\";N;s:15:\"api_access_role\";a:0:{}s:10:\"api_schema\";a:1:{i:0;a:2:{s:3:\"arg\";s:0:\"\";s:5:\"value\";s:0:\"\";}}s:13:\"cache_expires\";i:0;}",
+    "meta_fields": "a:0:{}"
+  },
+  {
+    "id": 1318,
+    "status": "query",
+    "labels": "a:1:{s:4:\"name\";s:18:\"Tipo de franquicia\";}",
+    "args": "a:19:{s:10:\"query_type\";s:19:\"custom-content-type\";s:19:\"custom-content-type\";a:3:{s:5:\"order\";a:0:{}s:4:\"args\";a:2:{i:0;a:5:{s:3:\"_id\";i:986788;s:9:\"collapsed\";b:0;s:5:\"field\";s:16:\"tipo_publicacion\";s:8:\"operator\";s:1:\"=\";s:5:\"value\";s:11:\"Franquicias\";}i:1;a:5:{s:3:\"_id\";i:970637;s:9:\"collapsed\";b:0;s:5:\"field\";s:15:\"categoria_campo\";s:8:\"operator\";s:1:\"=\";s:5:\"value\";s:17:\"sector_franquicia\";}}s:12:\"content_type\";s:22:\"glosario_publicaciones\";}s:29:\"__dynamic_custom-content-type\";a:1:{s:4:\"args\";a:2:{i:970637;a:0:{}i:986788;a:0:{}}}s:12:\"show_preview\";b:1;s:11:\"cache_query\";b:1;s:12:\"api_endpoint\";b:0;s:16:\"avoid_duplicates\";b:0;s:12:\"preview_page\";N;s:18:\"preview_page_title\";N;s:20:\"preview_query_string\";N;s:8:\"query_id\";N;s:11:\"description\";s:78:\"Esta consulta muestra todos los tipo de franquicia desde el glosario dinamico.\";s:13:\"api_namespace\";N;s:8:\"api_path\";N;s:10:\"api_access\";N;s:14:\"api_access_cap\";N;s:15:\"api_access_role\";a:0:{}s:10:\"api_schema\";a:1:{i:0;a:2:{s:3:\"arg\";s:0:\"\";s:5:\"value\";s:0:\"\";}}s:13:\"cache_expires\";i:0;}",
+    "meta_fields": "a:0:{}"
+  },
+  {
+    "id": 1319,
+    "status": "query",
+    "labels": "a:1:{s:4:\"name\";s:29:\"Tipo de propiedad intelectual\";}",
+    "args": "a:19:{s:10:\"query_type\";s:19:\"custom-content-type\";s:19:\"custom-content-type\";a:3:{s:5:\"order\";a:0:{}s:4:\"args\";a:2:{i:0;a:5:{s:3:\"_id\";i:986788;s:9:\"collapsed\";b:0;s:5:\"field\";s:16:\"tipo_publicacion\";s:8:\"operator\";s:1:\"=\";s:5:\"value\";s:21:\"Propiedad intelectual\";}i:1;a:5:{s:3:\"_id\";i:970637;s:9:\"collapsed\";b:0;s:5:\"field\";s:15:\"categoria_campo\";s:8:\"operator\";s:1:\"=\";s:5:\"value\";s:7:\"tipo_PI\";}}s:12:\"content_type\";s:22:\"glosario_publicaciones\";}s:29:\"__dynamic_custom-content-type\";a:1:{s:4:\"args\";a:2:{i:970637;a:0:{}i:986788;a:0:{}}}s:12:\"show_preview\";b:1;s:11:\"cache_query\";b:1;s:12:\"api_endpoint\";b:0;s:16:\"avoid_duplicates\";b:0;s:12:\"preview_page\";N;s:18:\"preview_page_title\";N;s:20:\"preview_query_string\";N;s:8:\"query_id\";N;s:11:\"description\";s:89:\"Esta consulta muestra todos los tipo de propiedad intelectual desde el glosario dinamico.\";s:13:\"api_namespace\";N;s:8:\"api_path\";N;s:10:\"api_access\";N;s:14:\"api_access_cap\";N;s:15:\"api_access_role\";a:0:{}s:10:\"api_schema\";a:1:{i:0;a:2:{s:3:\"arg\";s:0:\"\";s:5:\"value\";s:0:\"\";}}s:13:\"cache_expires\";i:0;}",
+    "meta_fields": "a:0:{}"
+  },
+  {
+    "id": 1320,
+    "status": "query",
+    "labels": "a:1:{s:4:\"name\";s:27:\"Tipo de instrumento musical\";}",
+    "args": "a:19:{s:10:\"query_type\";s:19:\"custom-content-type\";s:19:\"custom-content-type\";a:3:{s:5:\"order\";a:0:{}s:4:\"args\";a:2:{i:0;a:5:{s:3:\"_id\";i:986788;s:9:\"collapsed\";b:0;s:5:\"field\";s:16:\"tipo_publicacion\";s:8:\"operator\";s:1:\"=\";s:5:\"value\";s:22:\"Instrumentos musicales\";}i:1;a:5:{s:3:\"_id\";i:970637;s:9:\"collapsed\";b:0;s:5:\"field\";s:15:\"categoria_campo\";s:8:\"operator\";s:1:\"=\";s:5:\"value\";s:24:\"tipo_instrumento_musical\";}}s:12:\"content_type\";s:22:\"glosario_publicaciones\";}s:29:\"__dynamic_custom-content-type\";a:1:{s:4:\"args\";a:2:{i:970637;a:0:{}i:986788;a:0:{}}}s:12:\"show_preview\";b:1;s:11:\"cache_query\";b:1;s:12:\"api_endpoint\";b:0;s:16:\"avoid_duplicates\";b:0;s:12:\"preview_page\";N;s:18:\"preview_page_title\";N;s:20:\"preview_query_string\";N;s:8:\"query_id\";N;s:11:\"description\";s:87:\"Esta consulta muestra todos los tipo de instrumento musical desde el glosario dinamico.\";s:13:\"api_namespace\";N;s:8:\"api_path\";N;s:10:\"api_access\";N;s:14:\"api_access_cap\";N;s:15:\"api_access_role\";a:0:{}s:10:\"api_schema\";a:1:{i:0;a:2:{s:3:\"arg\";s:0:\"\";s:5:\"value\";s:0:\"\";}}s:13:\"cache_expires\";i:0;}",
+    "meta_fields": "a:0:{}"
+  },
+  {
+    "id": 1321,
+    "status": "query",
+    "labels": "a:1:{s:4:\"name\";s:18:\"Tipo de tecnologia\";}",
+    "args": "a:19:{s:10:\"query_type\";s:19:\"custom-content-type\";s:19:\"custom-content-type\";a:3:{s:5:\"order\";a:0:{}s:4:\"args\";a:2:{i:0;a:5:{s:3:\"_id\";i:986788;s:9:\"collapsed\";b:0;s:5:\"field\";s:16:\"tipo_publicacion\";s:8:\"operator\";s:1:\"=\";s:5:\"value\";s:10:\"Tecnologia\";}i:1;a:5:{s:3:\"_id\";i:970637;s:9:\"collapsed\";b:0;s:5:\"field\";s:15:\"categoria_campo\";s:8:\"operator\";s:1:\"=\";s:5:\"value\";s:16:\"tipo_dispositivo\";}}s:12:\"content_type\";s:22:\"glosario_publicaciones\";}s:29:\"__dynamic_custom-content-type\";a:1:{s:4:\"args\";a:2:{i:970637;a:0:{}i:986788;a:0:{}}}s:12:\"show_preview\";b:1;s:11:\"cache_query\";b:1;s:12:\"api_endpoint\";b:0;s:16:\"avoid_duplicates\";b:0;s:12:\"preview_page\";N;s:18:\"preview_page_title\";N;s:20:\"preview_query_string\";N;s:8:\"query_id\";N;s:11:\"description\";s:78:\"Esta consulta muestra todos los tipo de tecnologia desde el glosario dinamico.\";s:13:\"api_namespace\";N;s:8:\"api_path\";N;s:10:\"api_access\";N;s:14:\"api_access_cap\";N;s:15:\"api_access_role\";a:0:{}s:10:\"api_schema\";a:1:{i:0;a:2:{s:3:\"arg\";s:0:\"\";s:5:\"value\";s:0:\"\";}}s:13:\"cache_expires\";i:0;}",
+    "meta_fields": "a:0:{}"
+  },
+  {
+    "id": 1322,
+    "status": "query",
+    "labels": "a:1:{s:4:\"name\";s:12:\"Tipo de arte\";}",
+    "args": "a:19:{s:10:\"query_type\";s:19:\"custom-content-type\";s:19:\"custom-content-type\";a:3:{s:5:\"order\";a:0:{}s:4:\"args\";a:2:{i:0;a:5:{s:3:\"_id\";i:986788;s:9:\"collapsed\";b:0;s:5:\"field\";s:16:\"tipo_publicacion\";s:8:\"operator\";s:1:\"=\";s:5:\"value\";s:4:\"Arte\";}i:1;a:5:{s:3:\"_id\";i:970637;s:9:\"collapsed\";b:0;s:5:\"field\";s:15:\"categoria_campo\";s:8:\"operator\";s:1:\"=\";s:5:\"value\";s:12:\"tecnica_arte\";}}s:12:\"content_type\";s:22:\"glosario_publicaciones\";}s:29:\"__dynamic_custom-content-type\";a:1:{s:4:\"args\";a:2:{i:970637;a:0:{}i:986788;a:0:{}}}s:12:\"show_preview\";b:1;s:11:\"cache_query\";b:1;s:12:\"api_endpoint\";b:0;s:16:\"avoid_duplicates\";b:0;s:12:\"preview_page\";N;s:18:\"preview_page_title\";N;s:20:\"preview_query_string\";N;s:8:\"query_id\";N;s:11:\"description\";s:72:\"Esta consulta muestra todos los tipo de arte desde el glosario dinamico.\";s:13:\"api_namespace\";N;s:8:\"api_path\";N;s:10:\"api_access\";N;s:14:\"api_access_cap\";N;s:15:\"api_access_role\";a:0:{}s:10:\"api_schema\";a:1:{i:0;a:2:{s:3:\"arg\";s:0:\"\";s:5:\"value\";s:0:\"\";}}s:13:\"cache_expires\";i:0;}",
+    "meta_fields": "a:0:{}"
+  },
+  {
+    "id": 1323,
+    "status": "query",
+    "labels": "a:1:{s:4:\"name\";s:12:\"Tipo de joya\";}",
+    "args": "a:19:{s:10:\"query_type\";s:19:\"custom-content-type\";s:19:\"custom-content-type\";a:3:{s:5:\"order\";a:0:{}s:4:\"args\";a:2:{i:0;a:5:{s:3:\"_id\";i:986788;s:9:\"collapsed\";b:0;s:5:\"field\";s:16:\"tipo_publicacion\";s:8:\"operator\";s:1:\"=\";s:5:\"value\";s:5:\"Joyas\";}i:1;a:5:{s:3:\"_id\";i:970637;s:9:\"collapsed\";b:0;s:5:\"field\";s:15:\"categoria_campo\";s:8:\"operator\";s:1:\"=\";s:5:\"value\";s:15:\"metal_principal\";}}s:12:\"content_type\";s:22:\"glosario_publicaciones\";}s:29:\"__dynamic_custom-content-type\";a:1:{s:4:\"args\";a:2:{i:970637;a:0:{}i:986788;a:0:{}}}s:12:\"show_preview\";b:1;s:11:\"cache_query\";b:1;s:12:\"api_endpoint\";b:0;s:16:\"avoid_duplicates\";b:0;s:12:\"preview_page\";N;s:18:\"preview_page_title\";N;s:20:\"preview_query_string\";N;s:8:\"query_id\";N;s:11:\"description\";s:72:\"Esta consulta muestra todos los tipo de joya desde el glosario dinamico.\";s:13:\"api_namespace\";N;s:8:\"api_path\";N;s:10:\"api_access\";N;s:14:\"api_access_cap\";N;s:15:\"api_access_role\";a:0:{}s:10:\"api_schema\";a:1:{i:0;a:2:{s:3:\"arg\";s:0:\"\";s:5:\"value\";s:0:\"\";}}s:13:\"cache_expires\";i:0;}",
+    "meta_fields": "a:0:{}"
+  },
+  {
+    "id": 1324,
+    "status": "query",
+    "labels": "a:1:{s:4:\"name\";s:25:\"Tipo de activo productivo\";}",
+    "args": "a:19:{s:10:\"query_type\";s:19:\"custom-content-type\";s:19:\"custom-content-type\";a:3:{s:5:\"order\";a:0:{}s:4:\"args\";a:2:{i:0;a:5:{s:3:\"_id\";i:986788;s:9:\"collapsed\";b:0;s:5:\"field\";s:16:\"tipo_publicacion\";s:8:\"operator\";s:1:\"=\";s:5:\"value\";s:19:\"Activos productivos\";}i:1;a:5:{s:3:\"_id\";i:970637;s:9:\"collapsed\";b:0;s:5:\"field\";s:15:\"categoria_campo\";s:8:\"operator\";s:1:\"=\";s:5:\"value\";s:17:\"sector_industrial\";}}s:12:\"content_type\";s:22:\"glosario_publicaciones\";}s:29:\"__dynamic_custom-content-type\";a:1:{s:4:\"args\";a:2:{i:970637;a:0:{}i:986788;a:0:{}}}s:12:\"show_preview\";b:1;s:11:\"cache_query\";b:1;s:12:\"api_endpoint\";b:0;s:16:\"avoid_duplicates\";b:0;s:12:\"preview_page\";N;s:18:\"preview_page_title\";N;s:20:\"preview_query_string\";N;s:8:\"query_id\";N;s:11:\"description\";s:85:\"Esta consulta muestra todos los tipo de activo productivo desde el glosario dinamico.\";s:13:\"api_namespace\";N;s:8:\"api_path\";N;s:10:\"api_access\";N;s:14:\"api_access_cap\";N;s:15:\"api_access_role\";a:0:{}s:10:\"api_schema\";a:1:{i:0;a:2:{s:3:\"arg\";s:0:\"\";s:5:\"value\";s:0:\"\";}}s:13:\"cache_expires\";i:0;}",
+    "meta_fields": "a:0:{}"
+  },
+  {
+    "id": 1325,
+    "status": "query",
+    "labels": "a:1:{s:4:\"name\";s:16:\"Tipo de inmueble\";}",
+    "args": "a:19:{s:10:\"query_type\";s:19:\"custom-content-type\";s:19:\"custom-content-type\";a:3:{s:5:\"order\";a:0:{}s:4:\"args\";a:2:{i:0;a:5:{s:3:\"_id\";i:986788;s:9:\"collapsed\";b:0;s:5:\"field\";s:16:\"tipo_publicacion\";s:8:\"operator\";s:1:\"=\";s:5:\"value\";s:8:\"Inmueble\";}i:1;a:5:{s:3:\"_id\";i:970637;s:9:\"collapsed\";b:0;s:5:\"field\";s:15:\"categoria_campo\";s:8:\"operator\";s:1:\"=\";s:5:\"value\";s:13:\"tipo_inmueble\";}}s:12:\"content_type\";s:22:\"glosario_publicaciones\";}s:29:\"__dynamic_custom-content-type\";a:1:{s:4:\"args\";a:2:{i:970637;a:0:{}i:986788;a:0:{}}}s:12:\"show_preview\";b:1;s:11:\"cache_query\";b:1;s:12:\"api_endpoint\";b:0;s:16:\"avoid_duplicates\";b:0;s:12:\"preview_page\";N;s:18:\"preview_page_title\";N;s:20:\"preview_query_string\";N;s:8:\"query_id\";N;s:11:\"description\";s:76:\"Esta consulta muestra todos los tipo de inmueble desde el glosario dinamico.\";s:13:\"api_namespace\";N;s:8:\"api_path\";N;s:10:\"api_access\";N;s:14:\"api_access_cap\";N;s:15:\"api_access_role\";a:0:{}s:10:\"api_schema\";a:1:{i:0;a:2:{s:3:\"arg\";s:0:\"\";s:5:\"value\";s:0:\"\";}}s:13:\"cache_expires\";i:0;}",
+    "meta_fields": "a:0:{}"
+  },
+  {
+    "id": 1364,
+    "status": "query",
+    "labels": "a:1:{s:4:\"name\";s:12:\"Propietarios\";}",
+    "args": "a:19:{s:10:\"query_type\";s:19:\"custom-content-type\";s:19:\"custom-content-type\";a:4:{s:5:\"order\";a:0:{}s:4:\"args\";a:0:{}s:8:\"relation\";s:3:\"AND\";s:12:\"content_type\";s:12:\"propietarios\";}s:29:\"__dynamic_custom-content-type\";a:1:{s:4:\"args\";a:0:{}}s:12:\"show_preview\";b:0;s:11:\"cache_query\";b:1;s:12:\"api_endpoint\";b:0;s:16:\"avoid_duplicates\";b:0;s:12:\"preview_page\";N;s:18:\"preview_page_title\";N;s:20:\"preview_query_string\";N;s:8:\"query_id\";N;s:11:\"description\";s:70:\"Esta consulta muestra todos los propietarios ingresados en el sistema.\";s:13:\"api_namespace\";N;s:8:\"api_path\";N;s:10:\"api_access\";N;s:14:\"api_access_cap\";N;s:15:\"api_access_role\";N;s:10:\"api_schema\";N;s:13:\"cache_expires\";N;}",
+    "meta_fields": "a:0:{}"
+  }
+]

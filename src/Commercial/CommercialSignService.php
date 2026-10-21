@@ -62,6 +62,18 @@ final class CommercialSignService
     return ['ticket'=>['_ID'=>$ticket['_ID'], 'asunto'=>$ticket['asunto'] ?? ''], 'property'=>array_intersect_key($property, array_flip(['codigo','direccion','barrio','ciudad','ruta','punto_referencia','tipo_inmueble','tipo_negocio','destinacion','ubicacion_google_maps']))];
   }
 
+  public function taskContext(int $ticketId): array
+  {
+    $this->authorize();
+    if (!$this->policy->canAct('ver_ticket')) throw new CommercialSignAccessDenied('No tienes permiso para ver esta tarea.');
+    $ticket = $this->ticket($ticketId);
+    $code = trim((string) ($ticket['id_inmueble'] ?? ''), " \t\n\r\0\x0B\"[]");
+    if ((int) ($ticket['id_inmueble_data'] ?? 0) > 0) {
+      $code = (string) ($this->db->getVar('SELECT codigo FROM `' . $this->db->table('jet_cct_inmuebles') . '` WHERE _ID=?', [(int) $ticket['id_inmueble_data']]) ?? $code);
+    }
+    return ['id_ticket'=>$ticketId,'id_inmueble'=>ctype_digit($code) ? $code : ''];
+  }
+
   private function ticket(int $id): array
   {
     if ($id < 1) throw new \InvalidArgumentException('Escribe el número de la tarea asignada.');

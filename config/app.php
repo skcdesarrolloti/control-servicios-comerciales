@@ -59,6 +59,7 @@ return [
   'upload_max_bytes' => (int) $env('UPLOAD_MAX_BYTES', '10485760'),
   'upload_max_files' => (int) $env('UPLOAD_MAX_FILES', '10'),
   'sign_notification_emails' => $env('SIGN_NOTIFICATION_EMAILS', 'gcorrearivera@gmail.com,sc.dircomercial@gmail.com,sucasacomercial@gmail.com,sucasacorreos@gmail.com,nabuita1@gmail.com'),
+  'property_entry_notification_emails' => $env('PROPERTY_ENTRY_NOTIFICATION_EMAILS', 'sucasacomercial@gmail.com,gcorrearivera@gmail.com,sc.dircomercial@gmail.com'),
 
   'cliente_notifications_override' => [
     'enabled' => $envBool('CLIENTE_NOTIFICATION_OVERRIDE_ENABLED', false),

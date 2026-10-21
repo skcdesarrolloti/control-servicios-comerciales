@@ -706,6 +706,32 @@
     loadCase(currentCasePk, false);
   }
 
+  function loadTaskForm(button) {
+    var ticketPk = button.getAttribute("data-ticket-pk") || currentCasePk;
+    if (!ticketPk || !caseContent) return;
+    if (detailRequest) detailRequest.abort();
+    detailRequest = new AbortController();
+    caseContent.innerHTML = loadingMarkup();
+    caseContent.setAttribute("aria-busy", "true");
+    var action = button.getAttribute("data-commercial-task-form") === "sign" ? "commercial_task_sign_form" : "commercial_property_entry_form";
+    request(action, { ticket_pk: ticketPk }, detailRequest.signal).then(function (response) {
+      caseContent.innerHTML = response.html || "";
+      caseContent.removeAttribute("aria-busy");
+      var sign = caseContent.querySelector("[data-commercial-signs]");
+      if (sign && typeof window.initCommercialTaskSign === "function") window.initCommercialTaskSign(sign);
+      var property = caseContent.querySelector("[data-commercial-property-entry]");
+      if (property && typeof window.initCommercialPropertyEntry === "function") window.initCommercialPropertyEntry(property);
+      var heading = caseContent.querySelector("h1");
+      if (heading) { heading.setAttribute("tabindex", "-1"); heading.focus({ preventScroll: true }); }
+    }).catch(function (error) {
+      if (error.name === "AbortError") return;
+      notify("error", error.message);
+      loadCase(ticketPk, false);
+    });
+  }
+
+  root.addEventListener("scm:task-updated", function () { loadTickets(window.location.href, { history: false, focus: false }); });
+
   function closeWorkflows() {
     if (!caseContent) return;
     var stack = caseContent.querySelector("[data-commercial-workflow-stack]");
@@ -1487,6 +1513,10 @@
         return;
       }
       var workflowButton = event.target.closest("[data-commercial-open-workflow]");
+      var taskFormButton = event.target.closest("[data-commercial-task-form]");
+      if (taskFormButton) { loadTaskForm(taskFormButton); return; }
+      var returnToCase = event.target.closest("[data-commercial-return-case]");
+      if (returnToCase) { loadCase(returnToCase.getAttribute("data-commercial-return-case"), false); return; }
       if (workflowButton) {
         openWorkflow(workflowButton);
         return;

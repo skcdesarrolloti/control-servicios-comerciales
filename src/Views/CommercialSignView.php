@@ -9,7 +9,7 @@ use SCM\Commercial\CommercialSignService;
 
 final class CommercialSignView
 {
-  public static function render(CommercialSignService $service, CommercialAccessPolicy $policy): string
+  public static function render(CommercialSignService $service, CommercialAccessPolicy $policy, array $context = []): string
   {
     if (!$policy->canAct('registrar_aviso')) return '<section class="csg"><h1>Añadir aviso</h1><p>Tu cargo puede consultar esta página, pero no tiene permiso para registrar avisos.</p></section>';
     $options = $service->options();
@@ -21,7 +21,8 @@ final class CommercialSignView
       return $html . '</select>';
     };
     ob_start(); ?>
-    <section class="csg" data-commercial-signs>
+    <section class="csg" data-commercial-signs<?php if ($context): ?> data-sign-task="<?php echo $e($context['id_ticket']); ?>" data-sign-property="<?php echo $e($context['id_inmueble'] ?? ''); ?>"<?php endif; ?>>
+      <?php if ($context): ?><button type="button" class="csg-secondary" data-commercial-return-case="<?php echo $e($context['id_ticket']); ?>">Volver a la tarea</button><?php endif; ?>
       <div class="csg-heading"><span class="csg-eyebrow">Actividades comerciales</span><h1>Añadir aviso</h1><p>Registra la instalación o el retoque de un aviso y deja constancia de tu visita al inmueble.</p></div>
       <div class="csg-choices" data-sign-choices>
         <button type="button" class="csg-choice" data-sign-type="Nuevo" aria-controls="csg-form" aria-expanded="false">
@@ -57,6 +58,12 @@ final class CommercialSignView
         <div class="csg-error" role="alert" data-sign-error hidden></div><div class="csg-footer"><p>Los campos con * son obligatorios.</p><button type="submit" class="csg-primary" data-sign-submit>Guardar aviso</button></div>
       </form>
     </section>
-    <?php return (string) ob_get_clean();
+    <?php
+    $html = (string) ob_get_clean();
+    if ($context) {
+      $prefix = 'csg-task-' . (int) $context['id_ticket'] . '-';
+      $html = str_replace(['id="csg-','for="csg-','aria-controls="csg-','aria-describedby="csg-'], ['id="' . $prefix,'for="' . $prefix,'aria-controls="' . $prefix,'aria-describedby="' . $prefix], $html);
+    }
+    return $html;
   }
 }

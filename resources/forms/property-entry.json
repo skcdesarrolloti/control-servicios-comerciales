@@ -1,0 +1,2561 @@
+{
+  "fields": [
+    {
+      "name": "tipo_captacion",
+      "type": "select",
+      "label": "Tipo de captacion",
+      "section": "Datos de ingreso",
+      "required": true,
+      "multiple": false,
+      "source": "glossary",
+      "glossary": 333,
+      "query": "",
+      "taxonomy": "",
+      "when": []
+    },
+    {
+      "name": "codigo_anterior",
+      "type": "number",
+      "label": "Codigo anterior",
+      "section": "Datos de ingreso",
+      "required": true,
+      "multiple": false,
+      "source": "",
+      "glossary": 0,
+      "query": "",
+      "taxonomy": "",
+      "when": [
+        [
+          [
+            {
+              "field": "tipo_captacion",
+              "operator": "equal",
+              "value": "Recaptacion"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "id_ticket",
+      "type": "number",
+      "label": "Ticket",
+      "section": "Datos de ingreso",
+      "required": true,
+      "multiple": false,
+      "source": "",
+      "glossary": 0,
+      "query": "",
+      "taxonomy": "",
+      "when": []
+    },
+    {
+      "name": "id_propietario",
+      "type": "select",
+      "label": "Propietario",
+      "section": "Datos de ingreso",
+      "required": true,
+      "multiple": false,
+      "source": "generate",
+      "glossary": 0,
+      "query": "1364|_ID|nombre",
+      "taxonomy": "",
+      "when": []
+    },
+    {
+      "name": "titulo",
+      "type": "text",
+      "label": "Titulo",
+      "section": "Describe el inmueble",
+      "required": true,
+      "multiple": false,
+      "source": "",
+      "glossary": 0,
+      "query": "",
+      "taxonomy": "",
+      "when": []
+    },
+    {
+      "name": "descripcion",
+      "type": "textarea",
+      "label": "Descripcion",
+      "section": "Describe el inmueble",
+      "required": true,
+      "multiple": false,
+      "source": "",
+      "glossary": 0,
+      "query": "",
+      "taxonomy": "",
+      "when": []
+    },
+    {
+      "name": "tipo_oferta",
+      "type": "select",
+      "label": "Tipo de oferta",
+      "section": "Cuéntanos sobre el inmueble",
+      "required": true,
+      "multiple": false,
+      "source": "terms",
+      "glossary": 0,
+      "query": "",
+      "taxonomy": "gestion",
+      "when": []
+    },
+    {
+      "name": "tipo_inmueble",
+      "type": "select",
+      "label": "Tipo de inmueble",
+      "section": "Cuéntanos sobre el inmueble",
+      "required": true,
+      "multiple": false,
+      "source": "terms",
+      "glossary": 0,
+      "query": "",
+      "taxonomy": "tipo-de-inmueble",
+      "when": []
+    },
+    {
+      "name": "destinacion",
+      "type": "select",
+      "label": "Destinacion",
+      "section": "Cuéntanos sobre el inmueble",
+      "required": true,
+      "multiple": false,
+      "source": "terms",
+      "glossary": 0,
+      "query": "",
+      "taxonomy": "destinacion",
+      "when": []
+    },
+    {
+      "name": "pertenece_regimen",
+      "type": "checkbox",
+      "label": "¿El inmueble pertenece a propiedad horizontal?",
+      "section": "Tamaño y espacios",
+      "required": true,
+      "multiple": true,
+      "source": "glossary",
+      "glossary": 175,
+      "query": "",
+      "taxonomy": "",
+      "when": []
+    },
+    {
+      "name": "area_construida",
+      "type": "number",
+      "label": "Área construída (m²)",
+      "section": "Tamaño y espacios",
+      "required": true,
+      "multiple": false,
+      "source": "",
+      "glossary": 0,
+      "query": "",
+      "taxonomy": "",
+      "when": []
+    },
+    {
+      "name": "area_privada",
+      "type": "number",
+      "label": "Área privada (m²)",
+      "section": "Tamaño y espacios",
+      "required": true,
+      "multiple": false,
+      "source": "",
+      "glossary": 0,
+      "query": "",
+      "taxonomy": "",
+      "when": [
+        [
+          [
+            {
+              "field": "pertenece_regimen",
+              "operator": "one_of",
+              "value": "Si"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "area_terreno",
+      "type": "number",
+      "label": "Área terreno (m²)",
+      "section": "Tamaño y espacios",
+      "required": true,
+      "multiple": false,
+      "source": "",
+      "glossary": 0,
+      "query": "",
+      "taxonomy": "",
+      "when": [
+        [
+          [
+            {
+              "field": "tipo_inmueble",
+              "operator": "one_of",
+              "value": "113,106,210,109"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "uso-suelo",
+      "type": "media",
+      "label": "Uso del suelo",
+      "section": "Tamaño y espacios",
+      "required": false,
+      "multiple": false,
+      "source": "",
+      "glossary": 0,
+      "query": "",
+      "taxonomy": "",
+      "when": []
+    },
+    {
+      "name": "tiene_parqueadero",
+      "type": "checkbox",
+      "label": "¿Tiene parqueadero?",
+      "section": "Tamaño y espacios",
+      "required": true,
+      "multiple": true,
+      "source": "glossary",
+      "glossary": 175,
+      "query": "",
+      "taxonomy": "",
+      "when": [
+        [
+          [
+            {
+              "field": "tipo_inmueble",
+              "operator": "not_one_of",
+              "value": "113"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "tiene_deposito",
+      "type": "checkbox",
+      "label": "¿Tiene deposito?",
+      "section": "Tamaño y espacios",
+      "required": true,
+      "multiple": true,
+      "source": "glossary",
+      "glossary": 175,
+      "query": "",
+      "taxonomy": "",
+      "when": [
+        [
+          [
+            {
+              "field": "tipo_inmueble",
+              "operator": "not_one_of",
+              "value": "113"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "tiene_vigilancia",
+      "type": "checkbox",
+      "label": "¿Tiene vigilancia?",
+      "section": "Tamaño y espacios",
+      "required": true,
+      "multiple": true,
+      "source": "glossary",
+      "glossary": 175,
+      "query": "",
+      "taxonomy": "",
+      "when": [
+        [
+          [
+            {
+              "field": "tipo_inmueble",
+              "operator": "not_one_of",
+              "value": "113"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "habitaciones",
+      "type": "number",
+      "label": "N° de Habitaciones",
+      "section": "Tamaño y espacios",
+      "required": true,
+      "multiple": false,
+      "source": "",
+      "glossary": 0,
+      "query": "",
+      "taxonomy": "",
+      "when": [
+        [
+          [
+            {
+              "field": "tipo_inmueble",
+              "operator": "not_one_of",
+              "value": "113"
+            }
+          ]
+        ],
+        [
+          [
+            {
+              "field": "tipo_inmueble",
+              "operator": "not_one_of",
+              "value": "107,105,112,114"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "banos",
+      "type": "number",
+      "label": "N° de Baños",
+      "section": "Tamaño y espacios",
+      "required": true,
+      "multiple": false,
+      "source": "",
+      "glossary": 0,
+      "query": "",
+      "taxonomy": "",
+      "when": [
+        [
+          [
+            {
+              "field": "tipo_inmueble",
+              "operator": "not_one_of",
+              "value": "113"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "parqueaderos",
+      "type": "number",
+      "label": "N° de Parqueaderos",
+      "section": "Tamaño y espacios",
+      "required": true,
+      "multiple": false,
+      "source": "",
+      "glossary": 0,
+      "query": "",
+      "taxonomy": "",
+      "when": [
+        [
+          [
+            {
+              "field": "tipo_inmueble",
+              "operator": "not_one_of",
+              "value": "113"
+            }
+          ]
+        ],
+        [
+          [
+            {
+              "field": "tiene_parqueadero",
+              "operator": "one_of",
+              "value": "Si"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "piso",
+      "type": "number",
+      "label": "N° de Piso",
+      "section": "Tamaño y espacios",
+      "required": true,
+      "multiple": false,
+      "source": "",
+      "glossary": 0,
+      "query": "",
+      "taxonomy": "",
+      "when": [
+        [
+          [
+            {
+              "field": "tipo_inmueble",
+              "operator": "not_one_of",
+              "value": "113"
+            }
+          ]
+        ],
+        [
+          [
+            {
+              "field": "tipo_inmueble",
+              "operator": "one_of",
+              "value": "104,103,107,114"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "precio_arriendo",
+      "type": "number",
+      "label": "Precio arriendo",
+      "section": "Precios",
+      "required": true,
+      "multiple": false,
+      "source": "",
+      "glossary": 0,
+      "query": "",
+      "taxonomy": "",
+      "when": [
+        [
+          [
+            {
+              "field": "tipo_oferta",
+              "operator": "one_of",
+              "value": "117,118"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "precio_venta",
+      "type": "number",
+      "label": "Precio venta",
+      "section": "Precios",
+      "required": true,
+      "multiple": false,
+      "source": "",
+      "glossary": 0,
+      "query": "",
+      "taxonomy": "",
+      "when": [
+        [
+          [
+            {
+              "field": "tipo_oferta",
+              "operator": "one_of",
+              "value": "119,118"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "precio_administracion",
+      "type": "number",
+      "label": "Precio administracion",
+      "section": "Precios",
+      "required": true,
+      "multiple": false,
+      "source": "",
+      "glossary": 0,
+      "query": "",
+      "taxonomy": "",
+      "when": [
+        [
+          [
+            {
+              "field": "pertenece_regimen",
+              "operator": "one_of",
+              "value": "Si"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "responsable_iva",
+      "type": "select",
+      "label": "¿El propietario es responsable de IVA?",
+      "section": "Precios",
+      "required": true,
+      "multiple": false,
+      "source": "glossary",
+      "glossary": 175,
+      "query": "",
+      "taxonomy": "",
+      "when": [
+        [
+          [
+            {
+              "field": "destinacion",
+              "operator": "one_of",
+              "value": "122"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "antiguedad_inmueble",
+      "type": "select",
+      "label": "Antigüedad del inmueble",
+      "section": "Estado y comercial",
+      "required": true,
+      "multiple": false,
+      "source": "glossary",
+      "glossary": 948,
+      "query": "",
+      "taxonomy": "",
+      "when": []
+    },
+    {
+      "name": "ano_construccion",
+      "type": "number",
+      "label": "Año de construccion",
+      "section": "Estado y comercial",
+      "required": true,
+      "multiple": false,
+      "source": "",
+      "glossary": 0,
+      "query": "",
+      "taxonomy": "",
+      "when": []
+    },
+    {
+      "name": "edad_inmueble",
+      "type": "calculated",
+      "label": "Edad del inmueble",
+      "section": "Estado y comercial",
+      "required": false,
+      "multiple": false,
+      "source": "",
+      "glossary": 0,
+      "query": "",
+      "taxonomy": "",
+      "when": []
+    },
+    {
+      "name": "avaluo_catastral",
+      "type": "number",
+      "label": "Avaluo catastral",
+      "section": "Estado y comercial",
+      "required": true,
+      "multiple": false,
+      "source": "",
+      "glossary": 0,
+      "query": "",
+      "taxonomy": "",
+      "when": []
+    },
+    {
+      "name": "fecha_avaluo",
+      "type": "date",
+      "label": "Fecha de avaluo",
+      "section": "Estado y comercial",
+      "required": false,
+      "multiple": false,
+      "source": "",
+      "glossary": 0,
+      "query": "",
+      "taxonomy": "",
+      "when": []
+    },
+    {
+      "name": "referencia_catastral",
+      "type": "text",
+      "label": "Referencia catastral",
+      "section": "Estado y comercial",
+      "required": true,
+      "multiple": false,
+      "source": "",
+      "glossary": 0,
+      "query": "",
+      "taxonomy": "",
+      "when": []
+    },
+    {
+      "name": "matricula_inmobiliaria",
+      "type": "text",
+      "label": "Matricula inmobiliaria",
+      "section": "Estado y comercial",
+      "required": false,
+      "multiple": false,
+      "source": "",
+      "glossary": 0,
+      "query": "",
+      "taxonomy": "",
+      "when": []
+    },
+    {
+      "name": "estrato",
+      "type": "select",
+      "label": "Estrato",
+      "section": "Datos comerciales adicionales",
+      "required": true,
+      "multiple": false,
+      "source": "glossary",
+      "glossary": 7,
+      "query": "",
+      "taxonomy": "",
+      "when": []
+    },
+    {
+      "name": "procedencia",
+      "type": "select",
+      "label": "Procedencia",
+      "section": "Datos comerciales adicionales",
+      "required": true,
+      "multiple": false,
+      "source": "glossary",
+      "glossary": 10,
+      "query": "",
+      "taxonomy": "",
+      "when": []
+    },
+    {
+      "name": "restricciones",
+      "type": "textarea",
+      "label": "Restricciones del inmueble",
+      "section": "Datos comerciales adicionales",
+      "required": false,
+      "multiple": false,
+      "source": "",
+      "glossary": 0,
+      "query": "",
+      "taxonomy": "",
+      "when": []
+    },
+    {
+      "name": "observaciones_internas",
+      "type": "textarea",
+      "label": "Observaciones internas del inmueble",
+      "section": "Datos comerciales adicionales",
+      "required": false,
+      "multiple": false,
+      "source": "",
+      "glossary": 0,
+      "query": "",
+      "taxonomy": "",
+      "when": []
+    },
+    {
+      "name": "administracion_incluida",
+      "type": "checkbox",
+      "label": "¿Administración incluida?",
+      "section": "Datos comerciales adicionales",
+      "required": true,
+      "multiple": true,
+      "source": "glossary",
+      "glossary": 175,
+      "query": "",
+      "taxonomy": "",
+      "when": [
+        [
+          [
+            {
+              "field": "pertenece_regimen",
+              "operator": "one_of",
+              "value": "Si"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "amoblado",
+      "type": "checkbox",
+      "label": "¿Es amoblado?",
+      "section": "Datos comerciales adicionales",
+      "required": true,
+      "multiple": true,
+      "source": "glossary",
+      "glossary": 175,
+      "query": "",
+      "taxonomy": "",
+      "when": []
+    },
+    {
+      "name": "desea_aviso",
+      "type": "checkbox",
+      "label": "¿Desea aviso?",
+      "section": "Datos comerciales adicionales",
+      "required": true,
+      "multiple": true,
+      "source": "glossary",
+      "glossary": 175,
+      "query": "",
+      "taxonomy": "",
+      "when": []
+    },
+    {
+      "name": "presenta-aviso",
+      "type": "checkbox",
+      "label": "¿Presenta aviso?",
+      "section": "Datos comerciales adicionales",
+      "required": true,
+      "multiple": true,
+      "source": "glossary",
+      "glossary": 175,
+      "query": "",
+      "taxonomy": "",
+      "when": [],
+      "reserved_only": true
+    },
+    {
+      "name": "pais",
+      "type": "select",
+      "label": "Pais",
+      "section": "Ubicación del inmueble",
+      "required": true,
+      "multiple": false,
+      "source": "generate",
+      "glossary": 0,
+      "query": "920|pais|pais",
+      "taxonomy": "",
+      "when": []
+    },
+    {
+      "name": "departamento",
+      "type": "select",
+      "label": "Departamento",
+      "section": "Ubicación del inmueble",
+      "required": true,
+      "multiple": false,
+      "source": "generate",
+      "glossary": 0,
+      "query": "921|departamento|departamento",
+      "taxonomy": "",
+      "when": []
+    },
+    {
+      "name": "ciudad",
+      "type": "select",
+      "label": "Ciudad",
+      "section": "Ubicación del inmueble",
+      "required": true,
+      "multiple": false,
+      "source": "generate",
+      "glossary": 0,
+      "query": "922|ciudad|ciudad",
+      "taxonomy": "",
+      "when": []
+    },
+    {
+      "name": "barrio",
+      "type": "select",
+      "label": "Barrio",
+      "section": "Ubicación del inmueble",
+      "required": true,
+      "multiple": false,
+      "source": "generate",
+      "glossary": 0,
+      "query": "923|barrio|barrio",
+      "taxonomy": "",
+      "when": []
+    },
+    {
+      "name": "ruta",
+      "type": "text",
+      "label": "Ruta",
+      "section": "Ubicación del inmueble",
+      "required": true,
+      "multiple": false,
+      "source": "",
+      "glossary": 0,
+      "query": "",
+      "taxonomy": "",
+      "when": []
+    },
+    {
+      "name": "nombre_del_conjunto",
+      "type": "text",
+      "label": "Nombre del conjunto",
+      "section": "Ubicación del inmueble",
+      "required": false,
+      "multiple": false,
+      "source": "",
+      "glossary": 0,
+      "query": "",
+      "taxonomy": "",
+      "when": []
+    },
+    {
+      "name": "direccion_completa",
+      "type": "text",
+      "label": "Direccion completa",
+      "section": "Ubicación del inmueble",
+      "required": true,
+      "multiple": false,
+      "source": "",
+      "glossary": 0,
+      "query": "",
+      "taxonomy": "",
+      "when": []
+    },
+    {
+      "name": "punto_referencia",
+      "type": "text",
+      "label": "Punto de referencia",
+      "section": "Ubicación del inmueble",
+      "required": true,
+      "multiple": false,
+      "source": "",
+      "glossary": 0,
+      "query": "",
+      "taxonomy": "",
+      "when": []
+    },
+    {
+      "name": "direccion_fisica",
+      "type": "text",
+      "label": "Direccion fisica",
+      "section": "Ubicación del inmueble",
+      "required": true,
+      "multiple": false,
+      "source": "",
+      "glossary": 0,
+      "query": "",
+      "taxonomy": "",
+      "when": []
+    },
+    {
+      "name": "latitud",
+      "type": "text",
+      "label": "Latitud",
+      "section": "Ubicación del inmueble",
+      "required": false,
+      "multiple": false,
+      "source": "",
+      "glossary": 0,
+      "query": "",
+      "taxonomy": "",
+      "when": []
+    },
+    {
+      "name": "longitud",
+      "type": "text",
+      "label": "Longitud",
+      "section": "Ubicación del inmueble",
+      "required": false,
+      "multiple": false,
+      "source": "",
+      "glossary": 0,
+      "query": "",
+      "taxonomy": "",
+      "when": []
+    },
+    {
+      "name": "codigo_postal",
+      "type": "text",
+      "label": "Codigo postal",
+      "section": "Ubicación del inmueble",
+      "required": false,
+      "multiple": false,
+      "source": "",
+      "glossary": 0,
+      "query": "",
+      "taxonomy": "",
+      "when": []
+    },
+    {
+      "name": "tipo_apartamento",
+      "type": "checkbox",
+      "label": "tipo_apartamento",
+      "section": "Algunos Detalles de tu inmueble",
+      "required": false,
+      "multiple": true,
+      "source": "glossary",
+      "glossary": 950,
+      "query": "",
+      "taxonomy": "",
+      "when": [
+        [
+          [
+            {
+              "field": "tipo_inmueble",
+              "operator": "one_of",
+              "value": "104"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "interiores",
+      "type": "checkbox",
+      "label": "interiores",
+      "section": "Algunos Detalles de tu inmueble",
+      "required": false,
+      "multiple": true,
+      "source": "generate",
+      "glossary": 0,
+      "query": "951|valor|valor",
+      "taxonomy": "",
+      "when": []
+    },
+    {
+      "name": "exteriores",
+      "type": "checkbox",
+      "label": "exteriores",
+      "section": "Algunos Detalles de tu inmueble",
+      "required": false,
+      "multiple": true,
+      "source": "generate",
+      "glossary": 0,
+      "query": "952|valor|valor",
+      "taxonomy": "",
+      "when": []
+    },
+    {
+      "name": "alrededores",
+      "type": "checkbox",
+      "label": "alrededores",
+      "section": "Algunos Detalles de tu inmueble",
+      "required": false,
+      "multiple": true,
+      "source": "generate",
+      "glossary": 0,
+      "query": "953|valor|valor",
+      "taxonomy": "",
+      "when": []
+    },
+    {
+      "name": "zonas_sociales",
+      "type": "checkbox",
+      "label": "zonas_sociales",
+      "section": "zonas sociales",
+      "required": false,
+      "multiple": true,
+      "source": "generate",
+      "glossary": 0,
+      "query": "1009|valor|valor",
+      "taxonomy": "",
+      "when": [
+        [
+          [
+            {
+              "field": "pertenece_regimen",
+              "operator": "one_of",
+              "value": "Si"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "horario-mudanza-inicio-1",
+      "type": "time",
+      "label": "Inicio franja 1",
+      "section": "Horarios",
+      "required": true,
+      "multiple": false,
+      "source": "",
+      "glossary": 0,
+      "query": "",
+      "taxonomy": "",
+      "when": [
+        [
+          [
+            {
+              "field": "pertenece_regimen",
+              "operator": "one_of",
+              "value": "Si"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "horario-mudanza-final-1",
+      "type": "time",
+      "label": "Final franja 1",
+      "section": "Horarios",
+      "required": true,
+      "multiple": false,
+      "source": "",
+      "glossary": 0,
+      "query": "",
+      "taxonomy": "",
+      "when": [
+        [
+          [
+            {
+              "field": "pertenece_regimen",
+              "operator": "one_of",
+              "value": "Si"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "horario-mudanza-inicio-2_copy",
+      "type": "time",
+      "label": "Inicio franja 2",
+      "section": "Horarios",
+      "required": true,
+      "multiple": false,
+      "source": "",
+      "glossary": 0,
+      "query": "",
+      "taxonomy": "",
+      "when": [
+        [
+          [
+            {
+              "field": "pertenece_regimen",
+              "operator": "one_of",
+              "value": "Si"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "horario-mudanza-final-2",
+      "type": "time",
+      "label": "Final franja 2",
+      "section": "Horarios",
+      "required": true,
+      "multiple": false,
+      "source": "",
+      "glossary": 0,
+      "query": "",
+      "taxonomy": "",
+      "when": [
+        [
+          [
+            {
+              "field": "pertenece_regimen",
+              "operator": "one_of",
+              "value": "Si"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "horario-mudanza-inicio-sabado",
+      "type": "time",
+      "label": "Inicio sabado",
+      "section": "Horarios",
+      "required": false,
+      "multiple": false,
+      "source": "",
+      "glossary": 0,
+      "query": "",
+      "taxonomy": "",
+      "when": [
+        [
+          [
+            {
+              "field": "pertenece_regimen",
+              "operator": "one_of",
+              "value": "Si"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "horario-mudanza-final-sabado",
+      "type": "time",
+      "label": "Final sabado",
+      "section": "Horarios",
+      "required": false,
+      "multiple": false,
+      "source": "",
+      "glossary": 0,
+      "query": "",
+      "taxonomy": "",
+      "when": [
+        [
+          [
+            {
+              "field": "pertenece_regimen",
+              "operator": "one_of",
+              "value": "Si"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "horario-zonas-inicio",
+      "type": "time",
+      "label": "Inicio",
+      "section": "Horarios",
+      "required": false,
+      "multiple": false,
+      "source": "",
+      "glossary": 0,
+      "query": "",
+      "taxonomy": "",
+      "when": [
+        [
+          [
+            {
+              "field": "pertenece_regimen",
+              "operator": "one_of",
+              "value": "Si"
+            }
+          ]
+        ],
+        [
+          [
+            {
+              "field": "zonas_sociales",
+              "operator": "one_of",
+              "value": "Bahia de acceso,Baños,Barra,BBQ,Biblioteca,Bodega,Chorros de agua,Cuarto de administracion,Duchas,Guarderia,Juegos de mesa,Lavanderia,Lobby,Mini lockers,Multi escenario,Plazoleta BBQ,Recepcion,Sala de ejecutivos,Sala de estudio,Salon social,Sky bar,Solarium,Spa,Zona zen,Zonas de espera"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "horario-zonas-final",
+      "type": "time",
+      "label": "Final",
+      "section": "Horarios",
+      "required": false,
+      "multiple": false,
+      "source": "",
+      "glossary": 0,
+      "query": "",
+      "taxonomy": "",
+      "when": [
+        [
+          [
+            {
+              "field": "pertenece_regimen",
+              "operator": "one_of",
+              "value": "Si"
+            }
+          ]
+        ],
+        [
+          [
+            {
+              "field": "zonas_sociales",
+              "operator": "one_of",
+              "value": "Bahia de acceso,Baños,Barra,BBQ,Biblioteca,Bodega,Chorros de agua,Cuarto de administracion,Duchas,Guarderia,Juegos de mesa,Lavanderia,Lobby,Mini lockers,Multi escenario,Plazoleta BBQ,Recepcion,Sala de ejecutivos,Sala de estudio,Salon social,Sky bar,Solarium,Spa,Zona zen,Zonas de espera"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "horario-gym-inicio",
+      "type": "time",
+      "label": "Inicio",
+      "section": "Horarios",
+      "required": false,
+      "multiple": false,
+      "source": "",
+      "glossary": 0,
+      "query": "",
+      "taxonomy": "",
+      "when": [
+        [
+          [
+            {
+              "field": "pertenece_regimen",
+              "operator": "one_of",
+              "value": "Si"
+            }
+          ]
+        ],
+        [
+          [
+            {
+              "field": "zonas_sociales",
+              "operator": "one_of",
+              "value": "Gimnasio"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "horario-gym-final",
+      "type": "time",
+      "label": "Final",
+      "section": "Horarios",
+      "required": false,
+      "multiple": false,
+      "source": "",
+      "glossary": 0,
+      "query": "",
+      "taxonomy": "",
+      "when": [
+        [
+          [
+            {
+              "field": "pertenece_regimen",
+              "operator": "one_of",
+              "value": "Si"
+            }
+          ]
+        ],
+        [
+          [
+            {
+              "field": "zonas_sociales",
+              "operator": "one_of",
+              "value": "Gimnasio"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "horario-piscina-inicio",
+      "type": "time",
+      "label": "Inicio",
+      "section": "Horarios",
+      "required": false,
+      "multiple": false,
+      "source": "",
+      "glossary": 0,
+      "query": "",
+      "taxonomy": "",
+      "when": [
+        [
+          [
+            {
+              "field": "pertenece_regimen",
+              "operator": "one_of",
+              "value": "Si"
+            }
+          ]
+        ],
+        [
+          [
+            {
+              "field": "zonas_sociales",
+              "operator": "one_of",
+              "value": "Infinity pool,Piscina,Piscina infantil,Sauna,Turco"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "horario-piscina-final",
+      "type": "time",
+      "label": "Final",
+      "section": "Horarios",
+      "required": false,
+      "multiple": false,
+      "source": "",
+      "glossary": 0,
+      "query": "",
+      "taxonomy": "",
+      "when": [
+        [
+          [
+            {
+              "field": "pertenece_regimen",
+              "operator": "one_of",
+              "value": "Si"
+            }
+          ]
+        ],
+        [
+          [
+            {
+              "field": "zonas_sociales",
+              "operator": "one_of",
+              "value": "Infinity pool,Piscina,Piscina infantil,Sauna,Turco"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "horario-canchas-inicio",
+      "type": "time",
+      "label": "Inicio",
+      "section": "Horarios",
+      "required": false,
+      "multiple": false,
+      "source": "",
+      "glossary": 0,
+      "query": "",
+      "taxonomy": "",
+      "when": [
+        [
+          [
+            {
+              "field": "pertenece_regimen",
+              "operator": "one_of",
+              "value": "Si"
+            }
+          ]
+        ],
+        [
+          [
+            {
+              "field": "zonas_sociales",
+              "operator": "one_of",
+              "value": "Golf,Canchas,Polideportivo"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "horario-canchas-final",
+      "type": "time",
+      "label": "Final",
+      "section": "Horarios",
+      "required": false,
+      "multiple": false,
+      "source": "",
+      "glossary": 0,
+      "query": "",
+      "taxonomy": "",
+      "when": [
+        [
+          [
+            {
+              "field": "pertenece_regimen",
+              "operator": "one_of",
+              "value": "Si"
+            }
+          ]
+        ],
+        [
+          [
+            {
+              "field": "zonas_sociales",
+              "operator": "one_of",
+              "value": "Golf,Canchas,Polideportivo"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "ubicacion_llaves",
+      "type": "text",
+      "label": "Ubicación",
+      "section": "Datos de llamada",
+      "required": false,
+      "multiple": false,
+      "source": "",
+      "glossary": 0,
+      "query": "",
+      "taxonomy": "",
+      "when": []
+    },
+    {
+      "name": "contacto_llaves",
+      "type": "text",
+      "label": "Nombre de persona",
+      "section": "Datos de llamada",
+      "required": false,
+      "multiple": false,
+      "source": "",
+      "glossary": 0,
+      "query": "",
+      "taxonomy": "",
+      "when": []
+    },
+    {
+      "name": "telefono_llaves",
+      "type": "text",
+      "label": "Contacto",
+      "section": "Datos de llamada",
+      "required": false,
+      "multiple": false,
+      "source": "",
+      "glossary": 0,
+      "query": "",
+      "taxonomy": "",
+      "when": []
+    },
+    {
+      "name": "donde_llaves",
+      "type": "checkbox",
+      "label": "¿Donde se encuentran ubicadas?",
+      "section": "Datos de llamada",
+      "required": false,
+      "multiple": true,
+      "source": "glossary",
+      "glossary": 66,
+      "query": "",
+      "taxonomy": "",
+      "when": []
+    },
+    {
+      "name": "tiene_rnt",
+      "type": "select",
+      "label": "¿Tiene RNT?",
+      "section": "Datos adicionales",
+      "required": true,
+      "multiple": false,
+      "source": "glossary",
+      "glossary": 175,
+      "query": "",
+      "taxonomy": "",
+      "when": []
+    },
+    {
+      "name": "rnt",
+      "type": "text",
+      "label": "RNT",
+      "section": "Datos adicionales",
+      "required": true,
+      "multiple": false,
+      "source": "",
+      "glossary": 0,
+      "query": "",
+      "taxonomy": "",
+      "when": [
+        [
+          [
+            {
+              "field": "tiene_rnt",
+              "operator": "equal",
+              "value": "Si"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "vigencia-rnt",
+      "type": "select",
+      "label": "¿Está vigente?",
+      "section": "Datos adicionales",
+      "required": true,
+      "multiple": false,
+      "source": "glossary",
+      "glossary": 175,
+      "query": "",
+      "taxonomy": "",
+      "when": [
+        [
+          [
+            {
+              "field": "tiene_rnt",
+              "operator": "equal",
+              "value": "Si"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "id_pph",
+      "type": "select",
+      "label": "Aliado PPH",
+      "section": "Club PPH",
+      "required": true,
+      "multiple": false,
+      "source": "generate",
+      "glossary": 175,
+      "query": "1054|_ID|tarjeta_bienvenida",
+      "taxonomy": "",
+      "when": [
+        [
+          [
+            {
+              "field": "procedencia",
+              "operator": "equal",
+              "value": "Club PPH"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "acepta_permuta",
+      "type": "select",
+      "label": "¿Acepta permutas?",
+      "section": "Club PPH",
+      "required": true,
+      "multiple": false,
+      "source": "glossary",
+      "glossary": 175,
+      "query": "",
+      "taxonomy": "",
+      "when": [
+        [
+          [
+            {
+              "field": "tipo_oferta_1",
+              "operator": "equal",
+              "value": "Venta"
+            }
+          ],
+          [
+            {
+              "field": "tipo_oferta_1",
+              "operator": "equal",
+              "value": "Arriendo/Venta"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "porcentaje_dinero",
+      "type": "number",
+      "label": "¿Hasta qué porcentaje del valor del inmueble estaría dispuesto a recibir en dinero?",
+      "section": "Permutas",
+      "required": false,
+      "multiple": false,
+      "source": "",
+      "glossary": 0,
+      "query": "",
+      "taxonomy": "",
+      "when": [
+        [
+          [
+            {
+              "field": "acepta_permuta",
+              "operator": "equal",
+              "value": "Si"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "acepta_dinero_copy",
+      "type": "select",
+      "label": "Tipo de permuta",
+      "section": "Permutas",
+      "required": false,
+      "multiple": true,
+      "source": "glossary",
+      "glossary": 1303,
+      "query": "",
+      "taxonomy": "",
+      "when": [
+        [
+          [
+            {
+              "field": "acepta_permuta",
+              "operator": "equal",
+              "value": "Si"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "datos_adicionales_per",
+      "type": "textarea",
+      "label": "Informacion adicional",
+      "section": "Permutas",
+      "required": false,
+      "multiple": false,
+      "source": "",
+      "glossary": 0,
+      "query": "",
+      "taxonomy": "",
+      "when": [
+        [
+          [
+            {
+              "field": "acepta_permuta",
+              "operator": "equal",
+              "value": "Si"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "tipo_inmueble_per",
+      "type": "select",
+      "label": "Tipo de inmueble",
+      "section": "Permutas",
+      "required": true,
+      "multiple": true,
+      "source": "generate",
+      "glossary": 175,
+      "query": "1325|valor|etiqueta",
+      "taxonomy": "",
+      "when": [
+        [
+          [
+            {
+              "field": "acepta_permuta",
+              "operator": "equal",
+              "value": "Si"
+            }
+          ]
+        ],
+        [
+          [
+            {
+              "field": "acepta_dinero_copy",
+              "operator": "one_of",
+              "value": "Inmueble"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "tipo_maquinaria_per",
+      "type": "select",
+      "label": "Tipo de maquinaria",
+      "section": "Permutas",
+      "required": true,
+      "multiple": true,
+      "source": "generate",
+      "glossary": 175,
+      "query": "1311|valor|etiqueta",
+      "taxonomy": "",
+      "when": [
+        [
+          [
+            {
+              "field": "acepta_permuta",
+              "operator": "equal",
+              "value": "Si"
+            }
+          ]
+        ],
+        [
+          [
+            {
+              "field": "acepta_dinero_copy",
+              "operator": "one_of",
+              "value": "Maquinaria y equipo"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "tipo_vehiculo_per",
+      "type": "select",
+      "label": "Tipo de vehiculo",
+      "section": "Permutas",
+      "required": true,
+      "multiple": true,
+      "source": "generate",
+      "glossary": 175,
+      "query": "1316|valor|etiqueta",
+      "taxonomy": "",
+      "when": [
+        [
+          [
+            {
+              "field": "acepta_permuta",
+              "operator": "equal",
+              "value": "Si"
+            }
+          ]
+        ],
+        [
+          [
+            {
+              "field": "acepta_dinero_copy",
+              "operator": "one_of",
+              "value": "Vehiculos"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "tipo_semoviente_per",
+      "type": "select",
+      "label": "Tipo de semoviente",
+      "section": "Permutas",
+      "required": true,
+      "multiple": true,
+      "source": "generate",
+      "glossary": 175,
+      "query": "1312|valor|etiqueta",
+      "taxonomy": "",
+      "when": [
+        [
+          [
+            {
+              "field": "acepta_permuta",
+              "operator": "equal",
+              "value": "Si"
+            }
+          ]
+        ],
+        [
+          [
+            {
+              "field": "acepta_dinero_copy",
+              "operator": "one_of",
+              "value": "Semovientes"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "tipo_proyecto_per",
+      "type": "select",
+      "label": "Tipo de proyecto",
+      "section": "Permutas",
+      "required": true,
+      "multiple": true,
+      "source": "generate",
+      "glossary": 175,
+      "query": "1313|valor|etiqueta",
+      "taxonomy": "",
+      "when": [
+        [
+          [
+            {
+              "field": "acepta_permuta",
+              "operator": "equal",
+              "value": "Si"
+            }
+          ]
+        ],
+        [
+          [
+            {
+              "field": "acepta_dinero_copy",
+              "operator": "one_of",
+              "value": "Proyectos inmobiliarios"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "tipo_derecho_fiduciario_per",
+      "type": "select",
+      "label": "Tipo de derecho fiduciario",
+      "section": "Permutas",
+      "required": true,
+      "multiple": true,
+      "source": "generate",
+      "glossary": 175,
+      "query": "1314|valor|etiqueta",
+      "taxonomy": "",
+      "when": [
+        [
+          [
+            {
+              "field": "acepta_permuta",
+              "operator": "equal",
+              "value": "Si"
+            }
+          ]
+        ],
+        [
+          [
+            {
+              "field": "acepta_dinero_copy",
+              "operator": "one_of",
+              "value": "Derechos fiduciarios"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "tipo_instrumento_per",
+      "type": "select",
+      "label": "Tipo de instrumento",
+      "section": "Permutas",
+      "required": true,
+      "multiple": true,
+      "source": "generate",
+      "glossary": 175,
+      "query": "1315|valor|etiqueta",
+      "taxonomy": "",
+      "when": [
+        [
+          [
+            {
+              "field": "acepta_permuta",
+              "operator": "equal",
+              "value": "Si"
+            }
+          ]
+        ],
+        [
+          [
+            {
+              "field": "acepta_dinero_copy",
+              "operator": "one_of",
+              "value": "Bonos / CDT / Inversiones"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "tipo_embarcacion_per",
+      "type": "select",
+      "label": "Tipo de embarcacion",
+      "section": "Permutas",
+      "required": true,
+      "multiple": true,
+      "source": "generate",
+      "glossary": 175,
+      "query": "1317|valor|etiqueta",
+      "taxonomy": "",
+      "when": [
+        [
+          [
+            {
+              "field": "acepta_permuta",
+              "operator": "equal",
+              "value": "Si"
+            }
+          ]
+        ],
+        [
+          [
+            {
+              "field": "acepta_dinero_copy",
+              "operator": "one_of",
+              "value": "Embarcaciones"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "tipo_franquicia_per",
+      "type": "select",
+      "label": "Tipo de franquicia",
+      "section": "Permutas",
+      "required": true,
+      "multiple": true,
+      "source": "generate",
+      "glossary": 175,
+      "query": "1318|valor|etiqueta",
+      "taxonomy": "",
+      "when": [
+        [
+          [
+            {
+              "field": "acepta_permuta",
+              "operator": "equal",
+              "value": "Si"
+            }
+          ]
+        ],
+        [
+          [
+            {
+              "field": "acepta_dinero_copy",
+              "operator": "one_of",
+              "value": "Franquicias"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "tipo_propiedad_intelectual_per",
+      "type": "select",
+      "label": "Tipo de propiedad intelectual",
+      "section": "Permutas",
+      "required": true,
+      "multiple": true,
+      "source": "generate",
+      "glossary": 175,
+      "query": "1319|valor|etiqueta",
+      "taxonomy": "",
+      "when": [
+        [
+          [
+            {
+              "field": "acepta_permuta",
+              "operator": "equal",
+              "value": "Si"
+            }
+          ]
+        ],
+        [
+          [
+            {
+              "field": "acepta_dinero_copy",
+              "operator": "one_of",
+              "value": "Propiedad intelectual"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "tipo_instrumento_musical_per",
+      "type": "select",
+      "label": "Tipo de instrumento musical",
+      "section": "Permutas",
+      "required": true,
+      "multiple": true,
+      "source": "generate",
+      "glossary": 175,
+      "query": "1320|valor|etiqueta",
+      "taxonomy": "",
+      "when": [
+        [
+          [
+            {
+              "field": "acepta_permuta",
+              "operator": "equal",
+              "value": "Si"
+            }
+          ]
+        ],
+        [
+          [
+            {
+              "field": "acepta_dinero_copy",
+              "operator": "one_of",
+              "value": "Instrumentos musicales"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "tipo_tecnologia_per",
+      "type": "select",
+      "label": "Tipo de tecnologia",
+      "section": "Permutas",
+      "required": true,
+      "multiple": true,
+      "source": "generate",
+      "glossary": 175,
+      "query": "1321|valor|etiqueta",
+      "taxonomy": "",
+      "when": [
+        [
+          [
+            {
+              "field": "acepta_permuta",
+              "operator": "equal",
+              "value": "Si"
+            }
+          ]
+        ],
+        [
+          [
+            {
+              "field": "acepta_dinero_copy",
+              "operator": "one_of",
+              "value": "Tecnologia"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "tipo_arte_per",
+      "type": "select",
+      "label": "Tipo de arte",
+      "section": "Permutas",
+      "required": true,
+      "multiple": true,
+      "source": "generate",
+      "glossary": 175,
+      "query": "1322|valor|etiqueta",
+      "taxonomy": "",
+      "when": [
+        [
+          [
+            {
+              "field": "acepta_permuta",
+              "operator": "equal",
+              "value": "Si"
+            }
+          ]
+        ],
+        [
+          [
+            {
+              "field": "acepta_dinero_copy",
+              "operator": "one_of",
+              "value": "Arte"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "tipo_joya_per",
+      "type": "select",
+      "label": "Tipo de joya",
+      "section": "Permutas",
+      "required": true,
+      "multiple": true,
+      "source": "generate",
+      "glossary": 175,
+      "query": "1323|valor|etiqueta",
+      "taxonomy": "",
+      "when": [
+        [
+          [
+            {
+              "field": "acepta_permuta",
+              "operator": "equal",
+              "value": "Si"
+            }
+          ]
+        ],
+        [
+          [
+            {
+              "field": "acepta_dinero_copy",
+              "operator": "one_of",
+              "value": "Joyas"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "tipo_activo_productivo_per",
+      "type": "select",
+      "label": "Tipo de activo productivo",
+      "section": "Permutas",
+      "required": true,
+      "multiple": true,
+      "source": "generate",
+      "glossary": 175,
+      "query": "1324|valor|etiqueta",
+      "taxonomy": "",
+      "when": [
+        [
+          [
+            {
+              "field": "acepta_permuta",
+              "operator": "equal",
+              "value": "Si"
+            }
+          ]
+        ],
+        [
+          [
+            {
+              "field": "acepta_dinero_copy",
+              "operator": "one_of",
+              "value": "Activos productivos"
+            }
+          ]
+        ]
+      ]
+    }
+  ],
+  "derived": {
+    "tipo_oferta_1": [
+      {
+        "when": [
+          [
+            {
+              "field": "tipo_oferta",
+              "operator": "equal",
+              "value": "117"
+            }
+          ]
+        ],
+        "value": "Arriendo"
+      },
+      {
+        "when": [
+          [
+            {
+              "field": "tipo_oferta",
+              "operator": "equal",
+              "value": "119"
+            }
+          ]
+        ],
+        "value": "Venta"
+      },
+      {
+        "when": [
+          [
+            {
+              "field": "tipo_oferta",
+              "operator": "equal",
+              "value": "118"
+            }
+          ]
+        ],
+        "value": "Arriendo/Venta"
+      }
+    ],
+    "tipo_inmueble_1": [
+      {
+        "when": [
+          [
+            {
+              "field": "tipo_inmueble",
+              "operator": "equal",
+              "value": "103"
+            }
+          ]
+        ],
+        "value": "Apartaestudio"
+      },
+      {
+        "when": [
+          [
+            {
+              "field": "tipo_inmueble",
+              "operator": "equal",
+              "value": "104"
+            }
+          ]
+        ],
+        "value": "Apartamento"
+      },
+      {
+        "when": [
+          [
+            {
+              "field": "tipo_inmueble",
+              "operator": "equal",
+              "value": "105"
+            }
+          ]
+        ],
+        "value": "Bodega"
+      },
+      {
+        "when": [
+          [
+            {
+              "field": "tipo_inmueble",
+              "operator": "equal",
+              "value": "106"
+            }
+          ]
+        ],
+        "value": "Casa"
+      },
+      {
+        "when": [
+          [
+            {
+              "field": "tipo_inmueble",
+              "operator": "equal",
+              "value": "107"
+            }
+          ]
+        ],
+        "value": "Consultorio"
+      },
+      {
+        "when": [
+          [
+            {
+              "field": "tipo_inmueble",
+              "operator": "equal",
+              "value": "108"
+            }
+          ]
+        ],
+        "value": "Edificio"
+      },
+      {
+        "when": [
+          [
+            {
+              "field": "tipo_inmueble",
+              "operator": "equal",
+              "value": "109"
+            }
+          ]
+        ],
+        "value": "Finca"
+      },
+      {
+        "when": [
+          [
+            {
+              "field": "tipo_inmueble",
+              "operator": "equal",
+              "value": "111"
+            }
+          ]
+        ],
+        "value": "Hotel"
+      },
+      {
+        "when": [
+          [
+            {
+              "field": "tipo_inmueble",
+              "operator": "equal",
+              "value": "112"
+            }
+          ]
+        ],
+        "value": "Local"
+      },
+      {
+        "when": [
+          [
+            {
+              "field": "tipo_inmueble",
+              "operator": "equal",
+              "value": "113"
+            }
+          ]
+        ],
+        "value": "Lote"
+      },
+      {
+        "when": [
+          [
+            {
+              "field": "tipo_inmueble",
+              "operator": "equal",
+              "value": "114"
+            }
+          ]
+        ],
+        "value": "Oficina"
+      },
+      {
+        "when": [
+          [
+            {
+              "field": "tipo_inmueble",
+              "operator": "equal",
+              "value": "116"
+            }
+          ]
+        ],
+        "value": "Proyecto"
+      },
+      {
+        "when": [
+          [
+            {
+              "field": "tipo_inmueble",
+              "operator": "equal",
+              "value": "210"
+            }
+          ]
+        ],
+        "value": "Casa lote"
+      }
+    ],
+    "destinacion_1": [
+      {
+        "when": [
+          [
+            {
+              "field": "destinacion",
+              "operator": "equal",
+              "value": "121"
+            }
+          ]
+        ],
+        "value": "Vivienda"
+      },
+      {
+        "when": [
+          [
+            {
+              "field": "destinacion",
+              "operator": "equal",
+              "value": "122"
+            }
+          ]
+        ],
+        "value": "Comercio"
+      },
+      {
+        "when": [
+          [
+            {
+              "field": "destinacion",
+              "operator": "equal",
+              "value": "123"
+            }
+          ]
+        ],
+        "value": "Mixto"
+      }
+    ],
+    "desea_aviso_text": [
+      {
+        "when": [
+          [
+            {
+              "field": "desea_aviso",
+              "operator": "one_of",
+              "value": "Si"
+            }
+          ]
+        ],
+        "value": "Si"
+      },
+      {
+        "when": [
+          [
+            {
+              "field": "desea_aviso",
+              "operator": "one_of",
+              "value": "No"
+            }
+          ]
+        ],
+        "value": "No"
+      }
+    ],
+    "presenta_aviso_text": [
+      {
+        "when": [
+          [
+            {
+              "field": "presenta-aviso",
+              "operator": "one_of",
+              "value": "Si"
+            }
+          ]
+        ],
+        "value": "Si"
+      },
+      {
+        "when": [
+          [
+            {
+              "field": "presenta-aviso",
+              "operator": "one_of",
+              "value": "No"
+            }
+          ]
+        ],
+        "value": "No"
+      }
+    ]
+  },
+  "post_map": {
+    "sucursal": "sucursal",
+    "fecha": "fecha-captado",
+    "tipo_captacion": "tipo-captacion",
+    "codigo_anterior": "codigo-viejo",
+    "titulo": "post_title",
+    "descripcion": "descripcion",
+    "tipo_oferta": "jet_tax__gestion",
+    "tipo_inmueble": "jet_tax__tipo-de-inmueble",
+    "destinacion": "jet_tax__destinacion",
+    "pertenece_regimen": "pertenece-regimen",
+    "area_construida": "area-construida",
+    "area_privada": "area-privada",
+    "tiene_parqueadero": "tiene-parqueadero",
+    "tiene_deposito": "tiene-deposito",
+    "tiene_vigilancia": "tiene-vigilancia",
+    "habitaciones": "habitaciones",
+    "banos": "banos",
+    "parqueaderos": "parqueaderos",
+    "piso": "piso",
+    "precio_arriendo": "valor-arriendo",
+    "precio_venta": "valor-venta",
+    "precio_administracion": "valor-administracion",
+    "antiguedad_inmueble": "antiguedad-inmueble",
+    "ano_construccion": "ano-construccion",
+    "edad_inmueble": "edad-inmueble",
+    "avaluo_catastral": "avaluo-catastral",
+    "fecha_avaluo": "fecha-avaluo",
+    "referencia_catastral": "cedula-catastral",
+    "matricula_inmobiliaria": "matricula",
+    "ruta": "ruta",
+    "estrato": "estrato",
+    "procedencia": "procedencia",
+    "restricciones": "restricciones",
+    "observaciones_internas": "observaciones-internas",
+    "administracion_incluida": "administracion-incluida",
+    "amoblado": "amoblado",
+    "desea_aviso": "desea-aviso",
+    "pais": "pais",
+    "departamento": "departamento",
+    "ciudad": "ciudad",
+    "barrio": "barrio",
+    "nombre_del_conjunto": "nombre-conjuto",
+    "direccion_completa": "direccion-completa",
+    "direccion_fisica": "direccion-fisica",
+    "tipo_apartamento": "tipo-apartamento",
+    "interiores": "caracteristicas-internas",
+    "exteriores": "caracteristicas-externas",
+    "alrededores": "alrededores",
+    "ubicacion_llaves": "ubicacion-llaves",
+    "contacto_llaves": "contacto-llaves",
+    "telefono_llaves": "telefono-llaves",
+    "donde_llaves": "en-donde",
+    "punto_referencia": "punto-referencia",
+    "id_ticket": "id-ticket",
+    "comercial_correo": "correo-comercial",
+    "comercial_celular": "celular-comercial",
+    "zonas_sociales": "zonas-sociales",
+    "horario-mudanza-inicio-1": "horario-mudanza-inicio-1",
+    "horario-mudanza-final-1": "horario-mudanza-final-1",
+    "horario-mudanza-final-2": "horario-mudanza-final-2",
+    "horario-zonas-inicio": "horario-zonas-inicio",
+    "horario-zonas-final": "horario-zonas-final",
+    "horario-gym-inicio": "horario-gym-inicio",
+    "horario-gym-final": "horario-gym-final",
+    "horario-piscina-inicio": "horario-piscina-inicio",
+    "horario-piscina-final": "horario-piscina-final",
+    "horario-canchas-inicio": "horario-canchas-inicio",
+    "horario-canchas-final": "horario-canchas-final",
+    "horario-mudanza-inicio-2_copy": "horario-mudanza-inicio-2",
+    "horario-mudanza-inicio-sabado": "horario-mudanza-inicio-sabado",
+    "horario-mudanza-final-sabado": "horario-mudanza-final-sabado",
+    "responsable_iva": "responsable-iva",
+    "area_terreno": "area-terreno",
+    "tiene_rnt": "tiene-rnt",
+    "rnt": "rnt",
+    "vigencia-rnt": "vigencia-rnt",
+    "uso-suelo": "uso-suelo",
+    "latitud": "latitud",
+    "longitud": "longitud",
+    "codigo_postal": "codigo-postal",
+    "acepta_permuta": "acepta_permuta",
+    "acepta_dinero_copy": "tipo_permuta",
+    "datos_adicionales_per": "datos_adicionales_per",
+    "tipo_inmueble_per": "tipo_inmueble_per",
+    "tipo_maquinaria_per": "tipo_maquinaria_per",
+    "tipo_vehiculo_per": "tipo_vehiculo_per",
+    "tipo_semoviente_per": "tipo_semoviente_per",
+    "tipo_proyecto_per": "tipo_proyecto_per",
+    "tipo_derecho_fiduciario_per": "tipo_derecho_fiduciario_per",
+    "tipo_instrumento_per": "tipo_instrumento_per",
+    "tipo_embarcacion_per": "tipo_embarcacion_per",
+    "tipo_franquicia_per": "tipo_franquicia_per",
+    "tipo_propiedad_intelectual_per": "tipo_propiedad_intelectual_per",
+    "tipo_instrumento_musical_per": "tipo_instrumento_musical_per",
+    "tipo_tecnologia_per": "tipo_tecnologia_per",
+    "tipo_arte_per": "tipo_arte_per",
+    "tipo_joya_per": "tipo_joya_per",
+    "tipo_activo_productivo_per": "tipo_activo_productivo_per",
+    "porcentaje_dinero": "porcentaje_dinero",
+    "presenta-aviso": "presenta-aviso"
+  },
+  "post_defaults": [
+    {
+      "key": "estado",
+      "value": "En borrador"
+    },
+    {
+      "key": "presenta-aviso",
+      "value": "No"
+    },
+    {
+      "key": "punto_pph",
+      "value": "No"
+    },
+    {
+      "key": "publicado-portales",
+      "value": "No"
+    },
+    {
+      "key": "destacado",
+      "value": "No"
+    },
+    {
+      "key": "mercado-libre-destacado",
+      "value": "No"
+    },
+    {
+      "key": "proppit-promocionado",
+      "value": "No"
+    },
+    {
+      "key": "ciencuadras-ascendido",
+      "value": "No"
+    },
+    {
+      "key": "ciencuadras-destacado",
+      "value": "No"
+    },
+    {
+      "key": "finca-raiz-bump",
+      "value": "No"
+    },
+    {
+      "key": "finca-raiz-destacado",
+      "value": "No"
+    },
+    {
+      "key": "inmueble-premium",
+      "value": "No"
+    }
+  ],
+  "cct_map": {
+    "inserted_inmuebles": "codigo",
+    "id_empleado": "id_funcionario",
+    "empleado": "funcionario",
+    "fecha": "fecha_captacion",
+    "id_propietario": "id_propietario",
+    "tipo_oferta_1": "tipo_negocio",
+    "tipo_inmueble_1": "tipo_inmueble",
+    "destinacion_1": "destinacion",
+    "pertenece_regimen": "pertenece_copropiedad",
+    "area_construida": "area_construida",
+    "area_terreno": "area_terreno",
+    "tiene_parqueadero": "parqueadero",
+    "tiene_deposito": "deposito",
+    "tiene_vigilancia": "vigilancia",
+    "habitaciones": "habitaciones",
+    "banos": "banos",
+    "parqueaderos": "parqueaderos",
+    "precio_arriendo": "precio_arriendo",
+    "precio_venta": "precio_venta",
+    "precio_administracion": "precio_admin",
+    "edad_inmueble": "edad",
+    "referencia_catastral": "referencia_catastral",
+    "estrato": "estrato",
+    "procedencia": "procedencia",
+    "amoblado": "amoblado",
+    "ciudad": "ciudad",
+    "barrio": "barrio",
+    "direccion_completa": "direccion",
+    "latitud": "latitud",
+    "longitud": "longitud",
+    "interiores": "interiores",
+    "exteriores": "exteriores",
+    "alrededores": "alrededores",
+    "zonas_sociales": "zonas_sociales",
+    "area_privada": "area_privada",
+    "acepta_permuta": "acepta_permuta",
+    "acepta_dinero": "acepta_dinero",
+    "acepta_dinero_copy": "tipo_permuta",
+    "datos_adicionales_per": "datos_adicionales",
+    "tipo_inmueble_per": "tipo_inmueble_per",
+    "tipo_maquinaria_per": "tipo_maquinaria_per",
+    "tipo_vehiculo_per": "tipo_vehiculo_per",
+    "tipo_semoviente_per": "tipo_semoviente_per",
+    "tipo_proyecto_per": "tipo_proyecto_per",
+    "tipo_derecho_fiduciario_per": "tipo_derecho_fiduciario_per",
+    "tipo_instrumento_per": "tipo_instrumento_per",
+    "tipo_embarcacion_per": "tipo_embarcacion_per",
+    "tipo_franquicia_per": "tipo_franquicia_per",
+    "tipo_propiedad_intelectual_per": "tipo_propiedad_intelectual_per",
+    "tipo_instrumento_musical_per": "tipo_instrumento_musical_per",
+    "tipo_tecnologia_per": "tipo_tecnologia_per",
+    "tipo_arte_per": "tipo_arte_per",
+    "tipo_joya_per": "tipo_joya_per",
+    "tipo_activo_productivo_per": "tipo_activo_productivo_per",
+    "porcentaje_dinero": "porcentaje_dinero",
+    "punto_referencia": "punto_referencia",
+    "desea_aviso": "",
+    "desea_aviso_text": "desea_aviso",
+    "direccion_fisica": "direccion_fisica",
+    "ruta": "ruta",
+    "tipo_captacion": "tipo_captacion",
+    "descripcion": "descripcion",
+    "presenta_aviso_text": "presenta_aviso"
+  },
+  "cct_defaults": {
+    "estado": "En borrador",
+    "presenta_aviso": "No",
+    "fue_retocado": "No",
+    "promocion_premium": "No"
+  }
+}
