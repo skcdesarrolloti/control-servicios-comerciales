@@ -790,6 +790,55 @@ final class CommercialApiController
   public function propertyMediaSave(array $input): never { $this->propertyMediaRequest($input, 'save'); }
   public function imageCleanupStatus(array $input): never { $this->imageCleanupRequest($input, false); }
   public function imageCleanup(array $input): never { $this->imageCleanupRequest($input, true); }
+  public function propertyVideoConfig(array $input): never { $this->propertyVideoRequest($input, 'config'); }
+  public function propertyVideoCreate(array $input): never { $this->propertyVideoRequest($input, 'create'); }
+  public function propertyVideoStatus(array $input): never { $this->propertyVideoRequest($input, 'status'); }
+  public function propertyVideoCancel(array $input): never { $this->propertyVideoRequest($input, 'cancel'); }
+  public function propertyVideoDownload(array $input): never { $this->propertyVideoRequest($input, 'download'); }
+
+  private function propertyVideoRequest(array $input, string $operation): never
+  {
+    $this->verify($input);
+    try {
+      $task = (int) ($input['ticket_pk'] ?? 0);
+      (new \SCM\Commercial\CommercialPropertyEntryService($this->db,$this->policy,$this->config))->task($task);
+      $service = new \SCM\Commercial\CommercialPropertyVideoService($this->config);
+      if ($operation === 'config') JsonResponse::success(['available'=>$service->available()]);
+      if ($operation === 'create') {
+        $manifest = json_decode(is_string($input['manifest'] ?? null) ? $input['manifest'] : '',true);
+        if (!is_array($manifest) || !is_array($manifest['sources'] ?? null) || count($manifest['sources']) < 2 || count($manifest['sources']) > 12) throw new \InvalidArgumentException('Selecciona entre 2 y 12 fotos para el video.');
+        $ids = []; $photos = [];
+        foreach ($manifest['sources'] as $source) {
+          if (!is_array($source) || !is_int($source['attachment'] ?? $source['upload'] ?? null)) throw new \InvalidArgumentException('Fotografía seleccionada inválida.');
+          if (isset($source['attachment'])) $ids[] = $source['attachment'];
+        }
+        $saved = $ids ? (new \SCM\Commercial\CommercialPropertyMediaService($this->db,$this->policy,$this->config))->videoPhotoPaths($task,(int) ($input['id_inmueble'] ?? 0),$ids) : [];
+        foreach ($manifest['sources'] as $source) {
+          if (isset($source['attachment'])) { $photos[] = $saved[$source['attachment']]; continue; }
+          $index = $source['upload']; $file = $_FILES['photos'] ?? [];
+          $path = $file['tmp_name'][$index] ?? '';
+          if (($file['error'][$index] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || !is_string($path) || !is_uploaded_file($path)) throw new \InvalidArgumentException('No se recibió una de las fotos. Reduce su tamaño e intenta de nuevo.');
+          $photos[] = $path;
+        }
+        $audio = $_FILES['audio'] ?? null;
+        if ($audio && !is_uploaded_file((string) ($audio['tmp_name'] ?? ''))) throw new \InvalidArgumentException('No se recibió el archivo de música.');
+        JsonResponse::success($service->create($task,$manifest,$photos,$audio));
+      }
+      if ($operation === 'download') {
+        $path = $service->download($task,$input);
+        try {
+          while (ob_get_level() > 0) ob_end_clean();
+          header('Content-Type: video/mp4'); header('Content-Disposition: attachment; filename="inmueble-' . $task . '.mp4"');
+          header('Cache-Control: private, no-store'); header('X-Content-Type-Options: nosniff'); header('Content-Length: ' . filesize($path));
+          readfile($path);
+        } finally { @unlink($path); }
+        exit;
+      }
+      JsonResponse::success($service->status($task,$input,$operation === 'cancel'));
+    } catch (\SCM\Commercial\CommercialSignAccessDenied $exception) { JsonResponse::error($exception->getMessage(),403); }
+    catch (\PDOException $exception) { throw $exception; }
+    catch (\InvalidArgumentException | \RuntimeException $exception) { JsonResponse::error($exception->getMessage(),422); }
+  }
 
   private function imageCleanupRequest(array $input, bool $process): never
   {

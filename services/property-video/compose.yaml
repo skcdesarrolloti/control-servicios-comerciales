@@ -1,0 +1,17 @@
+services:
+  property-video:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8090:8090"
+    environment:
+      VIDEO_SERVICE_TOKEN: ${VIDEO_SERVICE_TOKEN:?Define VIDEO_SERVICE_TOKEN con al menos 32 caracteres}
+    volumes:
+      - videos:/data
+    mem_limit: 2g
+    cpus: 2
+    pids_limit: 128
+    security_opt:
+      - no-new-privileges:true
+volumes:
+  videos:

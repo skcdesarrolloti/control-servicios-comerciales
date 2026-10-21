@@ -53,6 +53,8 @@ return [
   'minimax_model' => $env('MINIMAX_MODEL', 'MiniMax-M3'),
   'minimax_timeout' => max(10, (int) $env('MINIMAX_TIMEOUT', '45')),
   'clipdrop_api_key' => $env('CLIPDROP_API_KEY', ''),
+  'property_video_url' => $env('PROPERTY_VIDEO_URL', ''),
+  'property_video_token' => $env('PROPERTY_VIDEO_TOKEN', ''),
   'auto_login_enabled' => $envBool('AUTO_LOGIN_ENABLED', false),
   'auto_login_secret' => $env('AUTO_LOGIN_SECRET', ''),
   'auto_login_ttl' => max(60, (int) $env('AUTO_LOGIN_TTL', '300')),

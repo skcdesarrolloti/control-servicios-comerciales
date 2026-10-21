@@ -14,4 +14,7 @@
 !/storage/logs/.gitkeep
 !/storage/uploads/.gitkeep
 /output/
+__pycache__/
+*.pyc
+/services/property-video/.venv/
 /.vscode/mcp.json

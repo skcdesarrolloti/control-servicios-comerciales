@@ -99,6 +99,28 @@ final class CommercialPropertyMediaService
     return $this->state($taskId, $property);
   }
 
+  /** Resolve only this property's selected gallery attachments; never fetch arbitrary URLs. */
+  public function videoPhotoPaths(int $taskId, int $code, array $ids): array
+  {
+    try { $state = $this->context($taskId, $code); }
+    catch (CommercialSignAccessDenied | \InvalidArgumentException $exception) { $state = $this->draftContext($taskId, $code); }
+    $allowed = array_column($state['galeria'], 'id');
+    if ($state['portada']) $allowed[] = $state['portada']['id'];
+    [$directory] = $this->uploadLocation();
+    $base = realpath($directory);
+    if (!$base) throw new \RuntimeException('No se encontró la carpeta de fotos de WordPress.');
+    $paths = [];
+    foreach ($ids as $id) {
+      if (!is_int($id) || !in_array($id, $allowed, true)) throw new CommercialSignAccessDenied('Selecciona solamente fotos de la galería de este inmueble.');
+      $relative = $this->meta($id, '_wp_attached_file');
+      $path = $relative !== '' ? realpath($directory . '/' . $relative) : false;
+      $prefix = rtrim(str_replace('\\', '/', $base), '/') . '/';
+      if (!$path || !str_starts_with(str_replace('\\', '/', $path), $prefix) || !is_file($path)) throw new \InvalidArgumentException('No se encontró una foto seleccionada en la carpeta de WordPress.');
+      $paths[$id] = $path;
+    }
+    return $paths;
+  }
+
   private function state(int $taskId, array $property): array
   {
     $code = (int) $property['codigo'];

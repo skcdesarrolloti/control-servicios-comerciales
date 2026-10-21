@@ -232,6 +232,13 @@ y los archivos de esa prueba se guardan en el directorio temporal, separados del
 
 ## Multimedia del inmueble desde las tareas
 
+**Crear video con fotos** abre un estudio para seleccionar y ordenar de 2 a 12
+fotografías, escribir textos, añadir música opcional y exportar un MP4 vertical.
+Usa un servicio propio de Python/FFmpeg sin créditos de IA; incluye vista previa,
+cola con progreso, cancelación y descarga protegida. Para instalarlo en un VPS y
+activar `PROPERTY_VIDEO_URL`/`PROPERTY_VIDEO_TOKEN`, consultar
+[services/property-video/README.md](services/property-video/README.md).
+
 **Ingresar inmueble** reúne datos, detalles, ubicación, características y fotos/video
 en cinco secciones de un mismo formulario. **Guardar inmueble** registra los datos
 y sube la multimedia seleccionada; si una subida falla, el reintento conserva el código

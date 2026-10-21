@@ -119,4 +119,25 @@ final class CommercialPropertyMediaTest extends TestCase
       try { CommercialPropertyMediaService::validateImage($file); self::fail('Se aceptó una imagen pequeña.'); } catch (\InvalidArgumentException $exception) {}
     } finally { @unlink($file); }
   }
+
+  public function testVideoResolvesOnlyOwnGalleryFilesInsideTheUploadDirectory(): void
+  {
+    $folder = sys_get_temp_dir() . '/scm-video-path-' . bin2hex(random_bytes(6)); mkdir($folder);
+    $outside = tempnam(sys_get_temp_dir(),'scm-other-'); file_put_contents($outside,'outside');
+    file_put_contents($folder . '/photo.jpg','inside');
+    $policy = new CommercialAccessPolicy(new Settings($this->db,false,'control_servicios_comerciales_config'),$this->db,['11']);
+    $service = new CommercialPropertyMediaService($this->db,$policy,['wordpress_upload_path'=>$folder,'wordpress_upload_url'=>'https://example.test/uploads']);
+    $this->db->insert('wp_postmeta',['post_id'=>902,'meta_key'=>'_wp_attached_file','meta_value'=>'photo.jpg']);
+    try {
+      self::assertSame([902=>realpath($folder . '/photo.jpg')],$service->videoPhotoPaths(100,500,[902]));
+      try { $service->videoPhotoPaths(100,500,[904]); self::fail('Se aceptó una imagen de otro inmueble.'); } catch (CommercialSignAccessDenied $exception) {}
+      $this->db->update('wp_postmeta',['meta_value'=>'../' . basename($outside)],['post_id'=>902,'meta_key'=>'_wp_attached_file']);
+      try { $service->videoPhotoPaths(100,500,[902]); self::fail('Se leyó un archivo fuera de uploads.'); } catch (\InvalidArgumentException $exception) {}
+      $this->db->update('wp_postmeta',['meta_value'=>'photo.jpg'],['post_id'=>902,'meta_key'=>'_wp_attached_file']);
+      $this->db->insert('wp_postmeta',['post_id'=>800,'meta_key'=>'galeria-del-inmueble','meta_value'=>serialize([902])]);
+      self::assertSame([902=>realpath($folder . '/photo.jpg')],$service->videoPhotoPaths(100,800,[902]));
+      $this->db->update('wp_postmeta',['meta_value'=>'202'],['post_id'=>800,'meta_key'=>'id_empleado']);
+      $this->expectException(CommercialSignAccessDenied::class); $service->videoPhotoPaths(100,800,[902]);
+    } finally { @unlink($folder . '/photo.jpg'); @rmdir($folder); @unlink($outside); }
+  }
 }

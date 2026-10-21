@@ -80,6 +80,7 @@
     if (root._media) return;
     root._media = JSON.parse(root.dataset.mediaState);
     root.querySelector('[name="video_del_inmueble"]').value = root._media.video_del_inmueble;
+    root.querySelector('[data-property-video-open]').addEventListener('click', function () { if (!root._busy) window.openCommercialPropertyVideo(root); });
     render(root);
     var cleanup = new MutationObserver(function () {
       if (root.isConnected) return;
