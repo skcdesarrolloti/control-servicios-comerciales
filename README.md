@@ -64,13 +64,9 @@ La ubicación GPS es obligatoria en ambos tipos. Se conserva la estructura del p
 
 Los correos al funcionario y a administración se guardan en la cola compartida existente, con `project_code=control-servicios-comerciales`, `source_module=commercial_signs` y una clave única por aviso/destinatario. `SIGN_NOTIFICATION_EMAILS` permite ajustar los destinatarios administrativos. No se ejecutan envíos directos. El registro, la ubicación, los historiales y la cola se confirman en una transacción; si falla algún paso, se revierten. Las tablas implicadas deben usar InnoDB. No se invocan los antiguos hooks desde este panel para evitar duplicar sus efectos.
 
-Si no se pegó aviso por **Arrendado**, **Vendido** o **No quiere promocion**, se conserva la despublicación y su historial. La actualización externa de `panel_inmueble.estado=0` usa las variables privadas `SIGN_PORTAL_HOST`, `SIGN_PORTAL_PORT`, `SIGN_PORTAL_DATABASE`, `SIGN_PORTAL_USER` y `SIGN_PORTAL_PASSWORD` del `.env` del servidor. No incluyas estas credenciales en código versionado.
+Si no se pegó aviso por **Arrendado**, **Vendido** o **No quiere promocion**, se conserva la despublicación y su historial en la base de datos actual: estado del inmueble en el CCT, metadatos WordPress y registro de despublicación. El panel externo anterior se retiró; este flujo no usa otra conexión de base de datos ni requiere configuración adicional de portales.
 
-La tabla auxiliar `wp_scm_commercial_sign_requests` se crea al primer registro (requiere permiso `CREATE` en ese momento). Guarda la solicitud única y las despublicaciones externas pendientes. Si el panel externo no responde o falta su configuración, el formulario confirma el aviso guardado y muestra que la sincronización está pendiente, con un botón **Reintentar sincronización**. Los reintentos del mismo envío reutilizan su aviso, fotografías, contador y correos. Para reintentar en lote las despublicaciones pendientes después de resolver la conexión, ejecuta desde la carpeta del proyecto:
-
-```bash
-php bin/sync-commercial-signs.php
-```
+La tabla auxiliar `wp_scm_commercial_sign_requests` se crea al primer registro (requiere permiso `CREATE` en ese momento) y guarda la solicitud única para evitar duplicados. Los reintentos del mismo envío reutilizan su aviso, fotografías, contador y correos. Las instalaciones que ya tengan esta tabla siguen funcionando sin migraciones: las columnas antiguas de sincronización quedan sin uso.
 
 La verificación aislada del módulo usa `phpunit --filter CommercialSignServiceTest`. La prueba de navegador usa la base SQLite de `tests/Fixtures/commercial-signs.php`, archivos de prueba en `output/` y la cola local; no escribe registros de producción ni envía correos. Inicia `php -S 127.0.0.1:8771 -t .` y ejecuta `node tools/check-commercial-signs.cjs` con Playwright disponible. `SCM_PLAYWRIGHT_MODULE` y `SCM_BROWSER_CHANNEL` permiten seleccionar el módulo y el navegador instalados.
 

@@ -721,19 +721,6 @@ final class CommercialApiController
     }
   }
 
-  public function signSync(array $input): never
-  {
-    $this->verify($input);
-    try {
-      $service = new \SCM\Commercial\CommercialSignService($this->db, $this->policy, $this->config);
-      JsonResponse::success($service->retrySync((string) ($input['request_id'] ?? '')));
-    } catch (\SCM\Commercial\CommercialSignAccessDenied $exception) {
-      JsonResponse::error($exception->getMessage(), 403);
-    } catch (\InvalidArgumentException $exception) {
-      JsonResponse::error($exception->getMessage(), 422);
-    }
-  }
-
   private function verify(array $input): void
   {
     if (!$this->csrf->verify('commercial_nonce', (string) ($input['nonce'] ?? ''), false)) {

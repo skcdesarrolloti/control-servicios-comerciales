@@ -58,7 +58,7 @@ final class CommercialSignServiceTest extends TestCase
     self::assertSame(2, (int) $this->db->getVar("SELECT COUNT(*) FROM skc_notification_queue WHERE status='pending' AND source_module='commercial_signs' AND project_code='control-servicios-comerciales'"));
     self::assertSame('101', $this->db->getVar('SELECT created_by FROM wp_skc_ubicacion_inmuebles_mapa'));
     self::assertEquals(6.2, $this->db->getVar('SELECT latitud FROM wp_skc_ubicacion_inmuebles_mapa'));
-    self::assertFalse($result['portal_pending']);
+    self::assertArrayNotHasKey('warning', $result);
     self::assertSame(0, (int) $this->db->getVar('SELECT COUNT(*) FROM wp_jet_cct_reportes_avisos'));
   }
 
@@ -93,13 +93,14 @@ final class CommercialSignServiceTest extends TestCase
     self::assertSame('1', $this->db->getVar("SELECT meta_value FROM wp_postmeta WHERE meta_key = 'avisos'"));
   }
 
-  public function testUnsuccessfulRetouchUnpublishesAndKeepsExternalSyncPending(): void
+  public function testUnsuccessfulRetouchUnpublishesInTheCurrentDatabaseWithoutExternalSync(): void
   {
     foreach (['Arrendado'=>'Arrendado','Vendido'=>'Vendido','No quiere promocion'=>'Desistido'] as $reason => $state) {
       $result = $this->save(['request_id'=>bin2hex(random_bytes(16)),'tipo_aviso'=>'Retoque','pego_aviso'=>'No','razon'=>$reason,'cantidad'=>'0']);
       self::assertSame($state, $this->db->getVar('SELECT estado FROM wp_jet_cct_inmuebles WHERE codigo=500'));
-      self::assertTrue($result['portal_pending']);
-      self::assertNotEmpty($result['warning']);
+      self::assertArrayNotHasKey('portal_pending', $result);
+      self::assertArrayNotHasKey('warning', $result);
+      self::assertSame($state, $this->db->getVar("SELECT meta_value FROM wp_postmeta WHERE post_id=500 AND meta_key='estado'"));
     }
     self::assertSame(3, (int) $this->db->getVar('SELECT COUNT(*) FROM wp_jet_cct_despublicaciones'));
     self::assertSame(0, (int) $this->db->getVar('SELECT COUNT(*) FROM wp_jet_cct_reportes_avisos'));
@@ -108,26 +109,21 @@ final class CommercialSignServiceTest extends TestCase
   public function testOtherReasonDoesNotUnpublishOrGeneratePayment(): void
   {
     $result = $this->save(['tipo_aviso'=>'Retoque','pego_aviso'=>'No','razon'=>'Otra razon','cantidad'=>'0']);
-    self::assertFalse($result['portal_pending']);
+    self::assertArrayNotHasKey('warning', $result);
     self::assertSame('Publicado', $this->db->getVar('SELECT estado FROM wp_jet_cct_inmuebles WHERE codigo=500'));
     self::assertSame(0, (int) $this->db->getVar('SELECT COUNT(*) FROM wp_jet_cct_reportes_avisos'));
   }
 
-  public function testExternalSyncRetryCannotBeUsedForAnotherEmployeesReceipt(): void
+  public function testExistingReceiptsWithRetiredSyncColumnsRemainCompatible(): void
   {
-    $this->save(['tipo_aviso'=>'Retoque','pego_aviso'=>'No','razon'=>'Arrendado','cantidad'=>'0']);
-    $_SESSION['scm_user_id'] = 2;
-    $_SESSION['scm_employee_id'] = '202';
-    $this->expectException(\SCM\Commercial\CommercialSignAccessDenied::class);
-    $this->service->retrySync(str_repeat('a', 32));
-  }
-
-  public function testExternalSyncRetryKeepsTheBusinessRecordWhenThePortalIsUnavailable(): void
-  {
+    $this->service->ensureRequestsTable();
+    $this->db->pdo()->exec('ALTER TABLE wp_scm_commercial_sign_requests ADD COLUMN portal_pending INTEGER NOT NULL DEFAULT 1');
+    $this->db->pdo()->exec('ALTER TABLE wp_scm_commercial_sign_requests ADD COLUMN last_error TEXT');
     $first = $this->save(['tipo_aviso'=>'Retoque','pego_aviso'=>'No','razon'=>'Arrendado','cantidad'=>'0']);
-    $retry = $this->service->retrySync(str_repeat('a', 32));
+    $retry = $this->save(['tipo_aviso'=>'Retoque','pego_aviso'=>'No','razon'=>'Arrendado','cantidad'=>'0']);
     self::assertSame($first['id_aviso'], $retry['id_aviso']);
-    self::assertTrue($retry['portal_pending']);
+    self::assertArrayNotHasKey('warning', $retry);
+    self::assertArrayNotHasKey('portal_pending', $retry);
     self::assertSame(1, (int) $this->db->getVar('SELECT COUNT(*) FROM wp_jet_cct_retoques'));
     self::assertSame(2, (int) $this->db->getVar('SELECT COUNT(*) FROM skc_notification_queue'));
   }

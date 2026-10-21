@@ -142,8 +142,7 @@ final class CommercialSignService
     if ($this->db->pdo()->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql' && $this->db->getVar('SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?', [$this->db->table('scm_commercial_sign_requests')])) return;
     $this->db->pdo()->exec('CREATE TABLE IF NOT EXISTS `' . $this->db->table('scm_commercial_sign_requests') . '` (
       request_id VARCHAR(32) PRIMARY KEY, user_id BIGINT NOT NULL, id_aviso BIGINT NOT NULL DEFAULT 0,
-      property_code VARCHAR(100) NOT NULL, portal_pending INTEGER NOT NULL DEFAULT 0,
-      created_at VARCHAR(19) NOT NULL, last_error TEXT NULL
+      property_code VARCHAR(100) NOT NULL, created_at VARCHAR(19) NOT NULL
     )' . ($this->db->pdo()->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql' ? ' ENGINE=InnoDB' : ''));
   }
 
@@ -160,9 +159,9 @@ final class CommercialSignService
       if ($existing) {
         if ((int) $existing['user_id'] !== Auth::userId() || $existing['property_code'] !== $data['id_inmueble']) throw new \RuntimeException('La solicitud ya fue utilizada.');
         $pdo->rollBack();
-        return $this->result((int) $existing['id_aviso'], $data['request_id']);
+        return $this->result((int) $existing['id_aviso']);
       }
-      $this->db->insert($this->db->table('scm_commercial_sign_requests'), ['request_id'=>$data['request_id'],'user_id'=>Auth::userId(),'property_code'=>$data['id_inmueble'],'portal_pending'=>(int) $data['unpublish'],'created_at'=>gmdate('Y-m-d H:i:s')]);
+      $this->db->insert($this->db->table('scm_commercial_sign_requests'), ['request_id'=>$data['request_id'],'user_id'=>Auth::userId(),'property_code'=>$data['id_inmueble'],'created_at'=>gmdate('Y-m-d H:i:s')]);
       // Lock the property before incrementing counters or synchronizing metadata.
       $property = $this->db->getRow('SELECT * FROM `' . $this->db->table('jet_cct_inmuebles') . '` WHERE codigo = ?' . ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql' ? ' FOR UPDATE' : ''), [$data['id_inmueble']]);
       if (!$property) throw new \InvalidArgumentException('El inmueble ya no está disponible.');
@@ -220,12 +219,12 @@ final class CommercialSignService
       $this->enqueueEmails($id, $data, $employee);
       $this->db->update($this->db->table('scm_commercial_sign_requests'), ['id_aviso'=>$id], ['request_id'=>$data['request_id']]);
       $pdo->commit();
-      return $this->result($id, $data['request_id']);
+      return $this->result($id);
     } catch (\Throwable $exception) {
       if ($pdo->inTransaction()) $pdo->rollBack();
       // A concurrent retry may have won the unique receipt insert.
       $existing = $this->db->getRow('SELECT * FROM `' . $this->db->table('scm_commercial_sign_requests') . '` WHERE request_id = ?', [$data['request_id']]);
-      if ($existing && (int) $existing['user_id'] === Auth::userId() && $existing['property_code'] === $data['id_inmueble'] && (int) $existing['id_aviso'] > 0) return $this->result((int) $existing['id_aviso'], $data['request_id']);
+      if ($existing && (int) $existing['user_id'] === Auth::userId() && $existing['property_code'] === $data['id_inmueble'] && (int) $existing['id_aviso'] > 0) return $this->result((int) $existing['id_aviso']);
       if ($photos) \SCM\Support\StoredFileService::fromRuntime()->removeImages($photos);
       throw $exception;
     }
@@ -285,40 +284,8 @@ final class CommercialSignService
     }
   }
 
-  private function result(int $id, string $request): array
+  private function result(int $id): array
   {
-    $this->syncPortal($request);
-    $pending = (bool) $this->db->getVar('SELECT portal_pending FROM `' . $this->db->table('scm_commercial_sign_requests') . '` WHERE request_id = ?', [$request]);
-    return ['id_aviso'=>$id,'message'=>'Aviso #' . $id . ' registrado correctamente.','portal_pending'=>$pending,'warning'=>$pending ? 'El registro quedó guardado. La despublicación en portales está pendiente de sincronización.' : ''];
-  }
-
-  public function retrySync(string $request): array
-  {
-    $this->authorize();
-    if (!preg_match('/^[a-f0-9]{32}$/D', $request)) throw new \InvalidArgumentException('Solicitud inválida.');
-    $row = $this->db->getRow('SELECT * FROM `' . $this->db->table('scm_commercial_sign_requests') . '` WHERE request_id = ?', [$request]);
-    if (!$row || (!$this->policy->canManage() && (int) $row['user_id'] !== Auth::userId())) throw new CommercialSignAccessDenied('No tienes permiso para sincronizar este aviso.');
-    return $this->result((int) $row['id_aviso'], $request);
-  }
-
-  /** The durable receipt lets an operator retry a failed external update without duplicating the sign. */
-  public function syncPortal(string $request): bool
-  {
-    $table = $this->db->table('scm_commercial_sign_requests');
-    $row = $this->db->getRow("SELECT * FROM `{$table}` WHERE request_id = ? AND portal_pending = 1", [$request]);
-    if (!$row) return true;
-    try {
-      $database = (string) ($this->config['sign_portal_database'] ?? '');
-      if ($database === '' || !preg_match('/^[a-zA-Z0-9_]+$/D', $database)) throw new \RuntimeException('Falta configurar SIGN_PORTAL_DATABASE.');
-      $portal = new PDO('mysql:host=' . ($this->config['sign_portal_host'] ?? '127.0.0.1') . ';port=' . (int) ($this->config['sign_portal_port'] ?? 3306) . ';dbname=' . $database . ';charset=utf8mb4', (string) ($this->config['sign_portal_user'] ?? ''), (string) ($this->config['sign_portal_password'] ?? ''), [PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT=>5]);
-      $statement = $portal->prepare('UPDATE panel_inmueble SET estado = 0 WHERE codigo = ?');
-      $statement->execute([$row['property_code']]);
-      $this->db->update($table, ['portal_pending'=>0,'last_error'=>null], ['request_id'=>$request]);
-      return true;
-    } catch (\Throwable $exception) {
-      error_log('[commercial-signs:portal] ' . $exception->getMessage());
-      $this->db->update($table, ['last_error'=>'No se pudo sincronizar la despublicación con portales.'], ['request_id'=>$request]);
-      return false;
-    }
+    return ['id_aviso'=>$id,'message'=>'Aviso #' . $id . ' registrado correctamente.'];
   }
 }

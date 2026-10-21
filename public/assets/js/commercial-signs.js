@@ -202,18 +202,6 @@
     }
     if (target.hasAttribute("data-sign-lookup")) lookup(root);
     if (target.hasAttribute("data-sign-capture")) capture(root);
-    if (target.hasAttribute("data-sign-retry")) {
-      target.disabled = true;
-      var syncWarning = root.querySelector("[data-sign-result] .csg-warning");
-      var data = new FormData();
-      data.set("request_id", field(root.querySelector("[data-sign-form]"), "request_id").value);
-      request("commercial_sign_sync", data).then(function (result) {
-        syncWarning.textContent = result.warning || "La despublicación en portales se sincronizó correctamente.";
-        target.hidden = !result.portal_pending;
-      }).catch(function (error) {
-        syncWarning.textContent = error.message;
-      }).finally(function () { target.disabled = false; });
-    }
   });
   document.addEventListener("input", function (event) {
     var root = event.target.closest("[data-commercial-signs]");
@@ -253,10 +241,6 @@
       node.replaceChildren();
       var text = document.createElement("p"); text.textContent = result.message;
       node.append(text);
-      if (result.warning) {
-        var warning = document.createElement("p"); warning.className = "csg-warning"; warning.textContent = result.warning; node.append(warning);
-        var retry = document.createElement("button"); retry.type = "button"; retry.className = "csg-secondary"; retry.dataset.signRetry = ""; retry.textContent = "Reintentar sincronización"; node.append(retry);
-      }
       var again = document.createElement("button"); again.type = "button"; again.className = "csg-secondary"; again.dataset.signAgain = ""; again.textContent = "Registrar otro aviso";
       node.append(again); node.hidden = false; again.focus();
       releasePreviews(root);
