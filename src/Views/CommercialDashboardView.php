@@ -345,6 +345,7 @@ final class CommercialDashboardView
     }
   </style>
   <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/tailwind.css?v=' . filemtime(SCM_PUBLIC_PATH . '/assets/css/tailwind.css')); ?>">
+  <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/commercial-signs.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/commercial-signs.css')); ?>">
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11" defer></script>
 </head>
 <body class="bg-background font-body-md text-on-surface antialiased">
@@ -508,6 +509,8 @@ final class CommercialDashboardView
             echo self::renderPropertiesPage($propertyResult, $propertyFilters, $propertySummaryCounts, $propertyOptions, $policy, $baseUrl);
           } elseif ($bucket === 'precaptacion') {
             echo self::renderPrecaptacion($baseUrl, $_GET);
+          } elseif ($bucket === 'anadir_aviso') {
+            echo CommercialSignView::render($data['sign_service'], $policy);
           } elseif ($bucket === 'notificaciones') {
             echo CommercialNotificationsView::render($data['notifications_service'], $policy);
           } else {
@@ -549,6 +552,7 @@ final class CommercialDashboardView
   <script src="<?php echo esc_url($baseUrl . '/assets/js/admin-dashboard-runtime.js?v=' . SCM_VERSION); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-dashboard.js?v=' . SCM_VERSION); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-notifications.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-notifications.js')); ?>"></script>
+  <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-signs.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-signs.js')); ?>"></script>
 </body>
 </html>
 <?php
@@ -646,17 +650,24 @@ final class CommercialDashboardView
         </div>
       <?php endif; ?>
 
-      <?php if (in_array('precaptacion', $views, true)): ?>
+      <?php if (array_intersect(['precaptacion', 'anadir_aviso'], $views)): ?>
         <div class="relative group/nav" data-commercial-dropdown="comerciales">
-          <button type="button" class="flex items-center gap-space-xs px-2 lg:px-3 py-space-xs font-label-md text-label-md <?php echo $bucket === 'precaptacion' ? ($activeClasses . ' active') : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-dropdown-trigger="comerciales" aria-expanded="false">
+          <button type="button" class="flex items-center gap-space-xs px-2 lg:px-3 py-space-xs font-label-md text-label-md <?php echo in_array($bucket, ['precaptacion', 'anadir_aviso'], true) ? ($activeClasses . ' active') : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-dropdown-trigger="comerciales" aria-expanded="false">
             <span class="material-symbols-outlined text-[16px]" aria-hidden="true">business_center</span>
             <span>Actividades comerciales</span>
             <span class="material-symbols-outlined text-[16px]">expand_more</span>
           </button>
           <div class="absolute left-0 top-full hidden group-hover/nav:block bg-surface-container-lowest shadow-[0_8px_24px_rgba(0,0,0,0.12)] rounded-xl py-space-xs min-w-[230px] z-50 border border-outline-variant/30 text-on-surface" data-commercial-dropdown-menu="comerciales">
+            <?php if (in_array('precaptacion', $views, true)): ?>
             <a class="flex items-center gap-2 px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="precaptacion" href="<?php echo esc_url(self::url($baseUrl, ['tab'=>'precaptacion'])); ?>">
               <span class="material-symbols-outlined text-[18px] text-secondary" aria-hidden="true">add_home_work</span><span>Precaptación</span>
             </a>
+            <?php endif; ?>
+            <?php if (in_array('anadir_aviso', $views, true)): ?>
+            <a class="flex items-center gap-2 px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="anadir_aviso" href="<?php echo esc_url(self::url($baseUrl, ['tab'=>'anadir_aviso'])); ?>">
+              <span class="material-symbols-outlined text-[18px] text-secondary" aria-hidden="true">add_photo_alternate</span><span>Añadir aviso</span>
+            </a>
+            <?php endif; ?>
           </div>
         </div>
       <?php endif; ?>

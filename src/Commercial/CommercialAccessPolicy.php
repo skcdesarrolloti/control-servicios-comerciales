@@ -14,6 +14,7 @@ final class CommercialAccessPolicy
     'inicio' => 'Inicio',
     'calendario' => 'Calendario comercial',
     'precaptacion' => 'Precaptación',
+    'anadir_aviso' => 'Añadir aviso',
     'inmuebles' => 'Inmuebles',
     'abiertos' => 'Tareas abiertas',
     'postergados' => 'Tareas postergadas',
@@ -41,6 +42,7 @@ final class CommercialAccessPolicy
     'precaptacion_editar' => 'Editar resultados de precaptación',
     'precaptacion_ticket' => 'Crear tarea desde precaptación',
     'precaptacion_catalogos' => 'Crear barrios e inmobiliarias',
+    'registrar_aviso' => 'Registrar avisos nuevos y retoques',
   ];
 
   public const SUBVIEWS = [

@@ -93,7 +93,9 @@ final class CommercialApiController
     $myTabCounts = $this->tickets->bucketCounts(['id_empleado' => $currentEmployeeFilter]);
     $tabCounts['mis_tickets'] = (int) ($myTabCounts['mis_tickets'] ?? 0);
     $html = '';
-    if ($bucket === 'precaptacion') {
+    if ($bucket === 'anadir_aviso') {
+      $html = \SCM\Views\CommercialSignView::render(new \SCM\Commercial\CommercialSignService($this->db, $this->policy, $this->config), $this->policy);
+    } elseif ($bucket === 'precaptacion') {
       $html = CommercialDashboardView::renderPrecaptacion($this->baseUrl, $input);
     } elseif ($bucket === 'inicio') {
       $result = $this->tickets->search('abiertos', $filters);
@@ -684,6 +686,50 @@ final class CommercialApiController
       JsonResponse::success($result + ['message' => sprintf('%d notificaciones en cola; %d sin contacto válido, %d bloqueadas por preferencias y %d con error.', $result['queued'], $result['invalid'], $result['filtered'], $result['failed'])]);
     } catch (\InvalidArgumentException | \RuntimeException $exception) {
       if ($exception instanceof \PDOException) { throw $exception; }
+      JsonResponse::error($exception->getMessage(), 422);
+    }
+  }
+
+  public function signLookup(array $input): never
+  {
+    $this->verify($input);
+    try {
+      $service = new \SCM\Commercial\CommercialSignService($this->db, $this->policy, $this->config);
+      JsonResponse::success($service->lookup((int) ($input['id_ticket'] ?? 0), trim((string) ($input['id_inmueble'] ?? ''))));
+    } catch (\SCM\Commercial\CommercialSignAccessDenied $exception) {
+      JsonResponse::error($exception->getMessage(), 403);
+    } catch (\InvalidArgumentException $exception) {
+      JsonResponse::error($exception->getMessage(), 422);
+    }
+  }
+
+  public function signSave(array $input): never
+  {
+    $this->verify($input);
+    try {
+      $service = new \SCM\Commercial\CommercialSignService($this->db, $this->policy, $this->config);
+      $service->authorize();
+      JsonResponse::success($service->save($input, static fn(): array => StoredFileService::fromRuntime()->storeRequiredImages('fotos', 3)));
+    } catch (\SCM\Commercial\CommercialSignAccessDenied $exception) {
+      JsonResponse::error($exception->getMessage(), 403);
+    } catch (\InvalidArgumentException $exception) {
+      JsonResponse::error($exception->getMessage(), 422);
+    } catch (\PDOException $exception) {
+      throw $exception;
+    } catch (\RuntimeException $exception) {
+      JsonResponse::error($exception->getMessage(), 422);
+    }
+  }
+
+  public function signSync(array $input): never
+  {
+    $this->verify($input);
+    try {
+      $service = new \SCM\Commercial\CommercialSignService($this->db, $this->policy, $this->config);
+      JsonResponse::success($service->retrySync((string) ($input['request_id'] ?? '')));
+    } catch (\SCM\Commercial\CommercialSignAccessDenied $exception) {
+      JsonResponse::error($exception->getMessage(), 403);
+    } catch (\InvalidArgumentException $exception) {
       JsonResponse::error($exception->getMessage(), 422);
     }
   }

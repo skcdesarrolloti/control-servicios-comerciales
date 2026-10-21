@@ -29,6 +29,41 @@ final class StoredFileService
     );
   }
 
+  /** Required evidence must be received completely; never silently skip a failed photo. */
+  public function storeRequiredImages(string $fieldName, int $maximumFiles = 3): array
+  {
+    $files = $this->normalizeUploadedFiles($fieldName);
+    if (count($files) < 1 || count($files) > $maximumFiles) throw new \InvalidArgumentException('Adjunta entre una y ' . $maximumFiles . ' fotografías.');
+    foreach ($files as $file) {
+      if (!$this->isAcceptableUpload($file) || filesize($file['tmp_name']) > min($this->maxBytes, 10 * 1024 * 1024)) throw new \InvalidArgumentException('No se recibió una fotografía válida. Revisa el tamaño máximo y vuelve a seleccionarla.');
+      if (!in_array($this->detectMime($file['tmp_name']), ['image/jpeg','image/png','image/gif','image/webp','image/bmp','image/x-ms-bmp','image/heic','image/heif','image/tiff','image/avif'], true)) throw new \InvalidArgumentException('Formato de fotografía no permitido. Usa JPG, PNG, WebP, GIF, BMP, TIFF, AVIF, HEIC o HEIF.');
+    }
+    $stored = [];
+    try {
+      foreach ($files as $file) {
+        $name = $this->storeImage($file);
+        if ($name === '') throw new \RuntimeException('No se pudo guardar una de las fotografías.');
+        $stored[] = $this->urlFor($name);
+      }
+      return $stored;
+    } catch (\Throwable $exception) {
+      $this->removeImages($stored);
+      throw $exception;
+    }
+  }
+
+  public function removeImages(array $urls): void
+  {
+    foreach ($urls as $url) {
+      $parts = [];
+      parse_str((string) parse_url((string) $url, PHP_URL_QUERY), $parts);
+      $name = (string) ($parts['n'] ?? '');
+      if (!$this->isValidSignature($name, (string) ($parts['s'] ?? ''))) continue;
+      $path = $this->pathFor($name);
+      if ($path !== null) @unlink($path);
+    }
+  }
+
   /** @return string[] */
   public function storeImages(string $fieldName, int $maximumFiles = 10): array
   {
@@ -137,6 +172,7 @@ final class StoredFileService
       'image/heic' => 'heic',
       'image/heif' => 'heif',
       'image/tiff' => 'tiff',
+      'image/avif' => 'avif',
     ];
     if (!isset($extensionMap[$mime]) || !$this->ensureDirectory()) {
       return '';

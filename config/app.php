@@ -58,6 +58,12 @@ return [
 
   'upload_max_bytes' => (int) $env('UPLOAD_MAX_BYTES', '10485760'),
   'upload_max_files' => (int) $env('UPLOAD_MAX_FILES', '10'),
+  'sign_notification_emails' => $env('SIGN_NOTIFICATION_EMAILS', 'gcorrearivera@gmail.com,sc.dircomercial@gmail.com,sucasacomercial@gmail.com,sucasacorreos@gmail.com,nabuita1@gmail.com'),
+  'sign_portal_host' => $env('SIGN_PORTAL_HOST', '127.0.0.1'),
+  'sign_portal_port' => (int) $env('SIGN_PORTAL_PORT', '3306'),
+  'sign_portal_database' => $env('SIGN_PORTAL_DATABASE', ''),
+  'sign_portal_user' => $env('SIGN_PORTAL_USER', ''),
+  'sign_portal_password' => $env('SIGN_PORTAL_PASSWORD', ''),
 
   'cliente_notifications_override' => [
     'enabled' => $envBool('CLIENTE_NOTIFICATION_OVERRIDE_ENABLED', false),

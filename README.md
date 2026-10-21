@@ -54,6 +54,26 @@ La configuración compartida está en `tailwind.config.cjs` y la entrada en `res
 
 Las fuentes de Google, Font Awesome y SweetAlert siguen usando sus proveedores externos; este cambio elimina la dependencia externa de Tailwind.
 
+## Añadir aviso
+
+**Actividades comerciales → Añadir aviso** permite elegir primero **Aviso nuevo** o **Retoque de aviso**. La vista `anadir_aviso` y la acción `registrar_aviso` se administran desde **Configurar permisos**; los cargos con una configuración explícita deben tener habilitados ambos permisos. Los administradores conservan acceso total.
+
+El formulario consulta la tarea por su número interno (`_ID`), valida que esté asignada al funcionario y comprueba su relación con el inmueble. En aviso nuevo, el barrio se elige del catálogo y determina la ruta. En retoque, barrio, ruta, tipo y categoría se obtienen del inmueble. La fecha, el funcionario y la sucursal proceden del servidor. La evidencia requiere entre una y tres fotografías de hasta 10 MB, respetando también `UPLOAD_MAX_BYTES` y los límites de PHP (`upload_max_filesize`, `post_max_size`, `max_file_uploads`). Para admitir tres archivos de 10 MB, configura al menos `upload_max_filesize=10M`, `post_max_size=32M` y `max_file_uploads=3`.
+
+La ubicación GPS es obligatoria en ambos tipos. Se conserva la estructura del plugin `ubicacion-inmuebles`: historial en `wp_skc_ubicacion_inmuebles_mapa` y enlace en `wp_jet_cct_inmuebles.ubicacion_google_maps`. Se guardan los registros en `wp_jet_cct_retoques`, metadatos WordPress, historial del inmueble y respuesta del ticket. El retoque también actualiza el ticket a **En proceso / Retocando**. Cuando sí se pegó aviso, genera el reporte correspondiente con la regla original: para el empleado `2038`, `valor_aviso`; para los demás, `(valor_transporte / 2) / factor_prestacional`. Estos valores se consultan en `wp_jet_cct_confi_sistema`, nunca en el navegador. Un aviso nuevo conserva el comportamiento original, sin generar ese reporte de pago.
+
+Los correos al funcionario y a administración se guardan en la cola compartida existente, con `project_code=control-servicios-comerciales`, `source_module=commercial_signs` y una clave única por aviso/destinatario. `SIGN_NOTIFICATION_EMAILS` permite ajustar los destinatarios administrativos. No se ejecutan envíos directos. El registro, la ubicación, los historiales y la cola se confirman en una transacción; si falla algún paso, se revierten. Las tablas implicadas deben usar InnoDB. No se invocan los antiguos hooks desde este panel para evitar duplicar sus efectos.
+
+Si no se pegó aviso por **Arrendado**, **Vendido** o **No quiere promocion**, se conserva la despublicación y su historial. La actualización externa de `panel_inmueble.estado=0` usa las variables privadas `SIGN_PORTAL_HOST`, `SIGN_PORTAL_PORT`, `SIGN_PORTAL_DATABASE`, `SIGN_PORTAL_USER` y `SIGN_PORTAL_PASSWORD` del `.env` del servidor. No incluyas estas credenciales en código versionado.
+
+La tabla auxiliar `wp_scm_commercial_sign_requests` se crea al primer registro (requiere permiso `CREATE` en ese momento). Guarda la solicitud única y las despublicaciones externas pendientes. Si el panel externo no responde o falta su configuración, el formulario confirma el aviso guardado y muestra que la sincronización está pendiente, con un botón **Reintentar sincronización**. Los reintentos del mismo envío reutilizan su aviso, fotografías, contador y correos. Para reintentar en lote las despublicaciones pendientes después de resolver la conexión, ejecuta desde la carpeta del proyecto:
+
+```bash
+php bin/sync-commercial-signs.php
+```
+
+La verificación aislada del módulo usa `phpunit --filter CommercialSignServiceTest`. La prueba de navegador usa la base SQLite de `tests/Fixtures/commercial-signs.php`, archivos de prueba en `output/` y la cola local; no escribe registros de producción ni envía correos. Inicia `php -S 127.0.0.1:8771 -t .` y ejecuta `node tools/check-commercial-signs.cjs` con Playwright disponible. `SCM_PLAYWRIGHT_MODULE` y `SCM_BROWSER_CHANNEL` permiten seleccionar el módulo y el navegador instalados.
+
 ## Notificaciones comerciales
 
 La pestaña **Notificaciones** reutiliza la búsqueda, filtros por contrato y preferencias del módulo inmobiliario. Incluye propietarios activos, propietarios no activos, arrendatarios activos, arrendatarios no activos, copropiedades y Club PPH. Activos significa que tienen al menos un contrato Entregado; no activos significa que tienen un contrato Recibido y ningún contrato Entregado. Esta clasificación se valida al buscar, contar, seleccionar todos y enviar. No incluye proveedores ni selección desde archivos SIMI.
