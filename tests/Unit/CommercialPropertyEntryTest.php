@@ -67,6 +67,34 @@ final class CommercialPropertyEntryTest extends TestCase
     self::assertSame(serialize(['Si']), $this->db->getVar("SELECT meta_value FROM wp_postmeta WHERE post_id=? AND meta_key='desea-aviso'", [$code]));
   }
 
+  public function testNeighborhoodSuggestionsDecodeLegacyValuesAndStayWithinCity(): void
+  {
+    $this->db->update('wp_jet_cct_inmuebles', ['interiores'=>serialize([json_encode(['Sala','Sala','Cocina Integral'])])], ['codigo'=>500]);
+    $this->db->insert('wp_jet_cct_inmuebles', ['codigo'=>'700','barrio'=>'El Poblado','ciudad'=>'Otra ciudad','interiores'=>serialize(['Sala'])]);
+    $result = $this->service->neighborhoodSuggestions(100,['barrio'=>'El Poblado','ciudad'=>'Medellín','pais'=>'Colombia']);
+    self::assertSame(1,$result['sample_size']);
+    self::assertSame(1,$result['groups']['interiores']['Sala']);
+    self::assertSame(1,$result['groups']['alrededores']['Parques cercanos']);
+    self::assertArrayNotHasKey('properties',$result);
+    self::assertSame(['Sala','Cocina Integral'], array_values(array_unique($this->service::featureValues(serialize([json_encode(['Sala','Sala','Cocina Integral'])])))));
+  }
+
+  public function testNeighborhoodSuggestionsRequireTaskScopeAndValidLocation(): void
+  {
+    try { $this->service->neighborhoodSuggestions(200,['barrio'=>'El Poblado','ciudad'=>'Medellín','pais'=>'Colombia']); self::fail('Se permitió otra tarea.'); } catch (\SCM\Commercial\CommercialSignAccessDenied $exception) {}
+    $this->expectException(\InvalidArgumentException::class);
+    $this->service->neighborhoodSuggestions(100,['barrio'=>'El Poblado','ciudad'=>'Otra ciudad','pais'=>'Colombia']);
+  }
+
+  public function testPremiumIconsAndMediaAreIncludedInsideEntryForm(): void
+  {
+    $html = CommercialPropertyEntryView::render($this->service,100);
+    self::assertStringContainsString('data-media-embedded',$html);
+    self::assertStringContainsString('data-choice-value="Sala"',$html);
+    self::assertStringContainsString('fa-couch',$html);
+    self::assertStringNotContainsString('Paso 2: subir multimedia',$html);
+  }
+
   public function testCompletesReservedCodeWithoutCreatingAnotherPost(): void
   {
     $before = (int) $this->db->getVar('SELECT COUNT(*) FROM wp_posts');

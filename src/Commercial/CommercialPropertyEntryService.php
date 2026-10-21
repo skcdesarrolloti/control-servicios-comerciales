@@ -95,6 +95,41 @@ final class CommercialPropertyEntryService
     return $this->catalogs;
   }
 
+  public function neighborhoodSuggestions(int $taskId, array $input): array
+  {
+    $this->task($taskId);
+    $neighborhood = null;
+    foreach ($this->options()['barrio'] ?? [] as $choice) {
+      if ($choice['value'] === ($input['barrio'] ?? '') && ($choice['ciudad'] ?? '') === ($input['ciudad'] ?? '') && ($choice['pais'] ?? '') === ($input['pais'] ?? '')) { $neighborhood = $choice; break; }
+    }
+    if (!$neighborhood) throw new \InvalidArgumentException('Selecciona un barrio válido con su ciudad y país.');
+    $columns = $this->columns('jet_cct_inmuebles');
+    $where = 'barrio=? AND ciudad=?'; $args = [$neighborhood['value'],$neighborhood['ciudad']];
+    if (in_array('pais', $columns, true)) { $where .= ' AND pais=?'; $args[] = $neighborhood['pais']; }
+    $rows = $this->db->getResults('SELECT interiores,exteriores,alrededores,zonas_sociales FROM `' . $this->db->table('jet_cct_inmuebles') . '` WHERE ' . $where . ' ORDER BY _ID DESC LIMIT 200', $args);
+    $groups = [];
+    foreach (['interiores','exteriores','alrededores','zonas_sociales'] as $field) {
+      $counts = []; $allowed = array_column($this->options()[$field] ?? [], 'value');
+      foreach ($rows as $row) {
+        foreach (array_unique(self::featureValues($row[$field] ?? '')) as $value) if (in_array($value, $allowed, true)) $counts[$value] = ($counts[$value] ?? 0) + 1;
+      }
+      arsort($counts); $groups[$field] = $counts;
+    }
+    return ['barrio'=>$neighborhood['value'],'sample_size'=>count($rows),'groups'=>$groups];
+  }
+
+  public static function featureValues($raw, int $depth = 0): array
+  {
+    if ($depth > 5) return [];
+    if (is_array($raw)) { $values = []; foreach ($raw as $item) $values = array_merge($values, self::featureValues($item, $depth + 1)); return $values; }
+    if (!is_string($raw) || trim($raw) === '' || strlen($raw) > 65536) return [];
+    $decoded = @unserialize($raw, ['allowed_classes'=>false]);
+    if (is_array($decoded) || (is_string($decoded) && $decoded !== $raw)) return self::featureValues($decoded, $depth + 1);
+    $decoded = json_decode($raw, true);
+    if (is_array($decoded)) return self::featureValues($decoded, $depth + 1);
+    return [trim($raw)];
+  }
+
   public static function multiple(array $field): bool
   {
     return $field['multiple'] && !($field['source'] === 'glossary' && $field['glossary'] === 175);
@@ -343,6 +378,6 @@ final class CommercialPropertyEntryService
 
   private function result(int $code): array
   {
-    return ['id_inmueble'=>$code,'message'=>'Inmueble #' . $code . ' ingresado correctamente. Continúa con el paso 2: multimedia. La tarea quedó por publicar.'];
+    return ['id_inmueble'=>$code,'message'=>'Datos del inmueble #' . $code . ' guardados. La tarea quedó por publicar.'];
   }
 }

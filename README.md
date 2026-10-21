@@ -232,12 +232,26 @@ y los archivos de esa prueba se guardan en el directorio temporal, separados del
 
 ## Multimedia del inmueble desde las tareas
 
-**Ingresar inmueble** guarda primero los datos y ofrece **Paso 2: subir multimedia**.
+**Ingresar inmueble** reúne datos, detalles, ubicación, características y fotos/video
+en cinco secciones de un mismo formulario. **Guardar inmueble** registra los datos
+y sube la multimedia seleccionada; si una subida falla, el reintento conserva el código
+ya creado. Los códigos adelantados pueden recuperar su multimedia actual antes de guardar.
 La tarea también muestra **Multimedia del inmueble** cuando ya tiene un inmueble asociado.
 Este paso usa el permiso `ingresar_inmueble` y comprueba la asignación de la tarea y
 la relación entre tarea, inmueble y adjuntos. Permite portada, galería ordenable y video
 HTTPS de YouTube; guarda los IDs de WordPress y los campos del CCT sin invocar `portales`
 ni conectar con el antiguo panel externo.
+
+Las características internas, externas, alrededores y zonas sociales se eligen con
+tarjetas de iconos, búsqueda y contadores. Al elegir barrio se consultan hasta 200
+inmuebles registrados en ese barrio y ciudad para mostrar frecuencias; solo se sugieren
+valores existentes en los catálogos. No se marcan automáticamente características
+de otros inmuebles. El mapa de iconos se adapta de `sucasa-inmuebles-premium` mediante
+`tools/import-property-feature-icons.cjs`.
+
+El editor integrado permite tamaño/proporción, calidad JPG, brillo, contraste,
+saturación, desenfoque, giros, texto, figuras y marcos, con deshacer/rehacer.
+Usa una copia local de Fabric.js (licencia en `public/assets/vendor/FABRIC-LICENSE.txt`).
 
 Las imágenes JPG/PNG se envían individualmente, con un máximo de 1 MB y dimensiones
 de 500 × 500 a 1700 × 1200. El navegador ajusta las imágenes grandes; el servidor

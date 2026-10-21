@@ -83,11 +83,29 @@ final class CommercialPropertyMediaService
   public function context(int $taskId, int $code = 0): array
   {
     $property = $this->property($taskId, $code);
+    return $this->state($taskId, $property);
+  }
+
+  public function draftContext(int $taskId, int $code): array
+  {
+    (new CommercialPropertyEntryService($this->db, $this->policy, $this->config))->task($taskId);
+    $post = $this->db->getRow('SELECT ID,post_author FROM `' . $this->db->table('posts') . '` WHERE ID=? AND post_type=? AND post_status<>?', [$code,'inmuebles','trash']);
+    if (!$post) throw new \InvalidArgumentException('No se encontró el código adelantado.');
+    $property = $this->db->getRow('SELECT * FROM `' . $this->db->table('jet_cct_inmuebles') . '` WHERE codigo=?', [$code]) ?? ['codigo'=>$code];
+    $state = $this->meta($code, 'estado') ?: (string) ($property['estado'] ?? '');
+    if (!in_array($state, ['','En borrador','Codigo adelantado','Código adelantado'], true)) throw new \InvalidArgumentException('Solo se pueden completar códigos adelantados o en borrador.');
+    $assigned = $this->meta($code, 'id_empleado') ?: (string) ($property['id_funcionario'] ?? $post['post_author']);
+    if (!$this->policy->canManage() && $assigned !== Auth::employeeId()) throw new CommercialSignAccessDenied('El código adelantado está asignado a otro funcionario.');
+    return $this->state($taskId, $property);
+  }
+
+  private function state(int $taskId, array $property): array
+  {
     $code = (int) $property['codigo'];
     $gallery = self::ids($this->meta($code, 'galeria-del-inmueble') ?: $this->meta($code, 'galeria') ?: (string) ($property['galeria'] ?? ''));
     $types = $this->db->getCol('SELECT t.name FROM `' . $this->db->table('terms') . '` t JOIN `' . $this->db->table('term_taxonomy') . '` tt ON t.term_id=tt.term_id JOIN `' . $this->db->table('term_relationships') . '` tr ON tr.term_taxonomy_id=tt.term_taxonomy_id WHERE tr.object_id=? AND tt.taxonomy=?', [$code,'tipo-de-inmueble']);
     $short = array_intersect(array_map(static fn($type): string => mb_strtolower(trim((string) $type)), $types), ['local','locales','lote','lotes','bodega','bodegas']);
-    return ['ticket_pk'=>$taskId,'id_inmueble'=>$code,'portada'=>$this->attachment((int) ($this->meta($code, '_thumbnail_id') ?: ($property['foto_portada'] ?? 0))), 'galeria'=>array_values(array_filter(array_map(fn(int $id): ?array => $this->attachment($id), $gallery))), 'video_del_inmueble'=>$this->meta($code, 'video_del_inmueble') ?: (string) ($property['video'] ?? ''), 'max_gallery'=>max($short ? 6 : 12, count($gallery))];
+    return ['ticket_pk'=>$taskId,'id_inmueble'=>$code,'portada'=>$this->attachment((int) ($this->meta($code, '_thumbnail_id') ?: ($property['foto_portada'] ?? 0))), 'galeria'=>array_values(array_filter(array_map(fn(int $id): ?array => $this->attachment($id), $gallery))), 'video_del_inmueble'=>$this->meta($code, 'video_del_inmueble') ?: (string) ($property['video'] ?? ''), 'max_gallery'=>max($short ? 6 : 12, count($gallery)), 'baseline_gallery'=>count($gallery)];
   }
 
   public static function validateImage(string $path): array

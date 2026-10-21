@@ -86,6 +86,23 @@ final class CommercialPropertyMediaTest extends TestCase
     foreach (['javascript:alert(1)','http://youtu.be/abcdefghijk','https://youtube.com.evil.test/watch?v=abcdefghijk','https://youtube.com/','https://user@youtube.com/watch?v=abcdefghijk','https://youtube.com/watch?v[]=abcdefghijk'] as $url) self::assertFalse(CommercialPropertyMediaService::validVideo($url), $url);
   }
 
+  public function testCanPreviewOwnReservedMediaBeforeLinkingTask(): void
+  {
+    $result = $this->service->draftContext(100,800);
+    self::assertSame(800,$result['id_inmueble']);
+    self::assertSame([], $result['galeria']);
+    self::assertSame('500',$this->db->getVar('SELECT id_inmueble FROM wp_jet_cct_tickets WHERE _ID=100'));
+    $this->db->update('wp_postmeta',['meta_value'=>'202'],['post_id'=>800,'meta_key'=>'id_empleado']);
+    $this->expectException(CommercialSignAccessDenied::class);
+    $this->service->draftContext(100,800);
+  }
+
+  public function testReservedMediaPreviewRejectsPublishedProperties(): void
+  {
+    $this->expectException(\InvalidArgumentException::class);
+    $this->service->draftContext(100,500);
+  }
+
   public function testImageValidationChecksActualDimensionsAndMime(): void
   {
     $file = tempnam(sys_get_temp_dir(),'scm-media-');

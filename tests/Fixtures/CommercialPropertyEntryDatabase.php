@@ -44,6 +44,10 @@ final class CommercialPropertyEntryDatabase
     $db->pdo()->exec('CREATE TABLE IF NOT EXISTS wp_terms (term_id INTEGER PRIMARY KEY,name TEXT)');
     $db->pdo()->exec('CREATE TABLE IF NOT EXISTS wp_term_taxonomy (term_taxonomy_id INTEGER PRIMARY KEY,term_id INTEGER,taxonomy TEXT,count INTEGER DEFAULT 0)');
     $db->pdo()->exec('CREATE TABLE IF NOT EXISTS wp_term_relationships (object_id INTEGER,term_taxonomy_id INTEGER,term_order INTEGER DEFAULT 0,PRIMARY KEY(object_id,term_taxonomy_id))');
+    foreach (['caract_internas'=>['Sala','Cocina Integral','Balcon','Baño'],'caract_externas'=>['Jardin','Vigilancia'],'alrededores'=>['Parques cercanos','Cerca a colegio'],'zonas_sociales'=>['Piscina','Gimnasio']] as $table=>$values) {
+      foreach ($values as $value) if (!$db->getVar('SELECT _ID FROM `wp_jet_cct_' . $table . '` WHERE valor=?', [$value])) $db->insert('wp_jet_cct_' . $table, ['valor'=>$value,'etiqueta'=>$value]);
+    }
+    if (!$db->getVar('SELECT interiores FROM wp_jet_cct_inmuebles WHERE codigo=500')) $db->update('wp_jet_cct_inmuebles', ['interiores'=>serialize(['Sala','Cocina Integral']),'exteriores'=>serialize(['Jardin']),'alrededores'=>serialize([json_encode(['Parques cercanos','Cerca a colegio'])])], ['codigo'=>'500']);
     if ($db->getVar('SELECT ID FROM wp_posts LIMIT 1')) return $db;
     foreach ([103=>['Apartaestudio','tipo-de-inmueble'],104=>['Apartamento','tipo-de-inmueble'],106=>['Casa','tipo-de-inmueble'],113=>['Lote','tipo-de-inmueble'],117=>['Arriendo','gestion'],118=>['Arriendo/Venta','gestion'],119=>['Venta','gestion'],121=>['Vivienda','destinacion'],122=>['Comercio','destinacion']] as $id => [$label,$taxonomy]) {
       $db->insert('wp_terms', ['term_id'=>$id,'name'=>$label]); $db->insert('wp_term_taxonomy', ['term_taxonomy_id'=>$id,'term_id'=>$id,'taxonomy'=>$taxonomy]);

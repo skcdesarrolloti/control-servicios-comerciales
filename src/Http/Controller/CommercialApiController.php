@@ -774,7 +774,18 @@ final class CommercialApiController
     }
   }
 
+  public function propertyNeighborhood(array $input): never
+  {
+    $this->verify($input);
+    try {
+      $service = new \SCM\Commercial\CommercialPropertyEntryService($this->db, $this->policy, $this->config);
+      JsonResponse::success($service->neighborhoodSuggestions((int) ($input['ticket_pk'] ?? 0), $input));
+    } catch (\SCM\Commercial\CommercialSignAccessDenied $exception) { JsonResponse::error($exception->getMessage(), 403); }
+    catch (\InvalidArgumentException $exception) { JsonResponse::error($exception->getMessage(), 422); }
+  }
+
   public function propertyMediaForm(array $input): never { $this->propertyMediaRequest($input, 'form'); }
+  public function propertyMediaDraft(array $input): never { $this->propertyMediaRequest($input, 'draft'); }
   public function propertyMediaUpload(array $input): never { $this->propertyMediaRequest($input, 'upload'); }
   public function propertyMediaSave(array $input): never { $this->propertyMediaRequest($input, 'save'); }
 
@@ -786,6 +797,7 @@ final class CommercialApiController
       $task = (int) ($input['ticket_pk'] ?? 0); $code = (int) ($input['id_inmueble'] ?? 0);
       $result = match ($operation) {
         'form' => ['html'=>\SCM\Views\CommercialPropertyMediaView::render($service, $task, $code)],
+        'draft' => $service->draftContext($task, $code),
         'upload' => $service->upload($task, $code, (array) ($_FILES['file'] ?? [])),
         default => $service->save($task, $code, $input),
       };

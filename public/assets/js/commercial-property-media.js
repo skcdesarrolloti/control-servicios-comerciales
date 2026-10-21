@@ -20,7 +20,7 @@
   function busy(root, active) {
     root._busy = active;
     root.querySelectorAll("input,button").forEach(function (node) { node.disabled = active; });
-    root.querySelector("form").setAttribute("aria-busy", String(active));
+    root.setAttribute("aria-busy", String(active));
   }
   function render(root) {
     var state = root._media;
@@ -31,11 +31,26 @@
         var image = document.createElement("img"); image.src = item.url; image.alt = group[0] === "cover" ? "Portada del inmueble" : "Fotografía " + (index + 1); card.append(image);
         var actions = document.createElement("div"); actions.className = "cpm-actions";
         function button(label, action) { var node = document.createElement("button"); node.type = "button"; node.textContent = label; node.className = "csg-secondary"; node.addEventListener("click", action); actions.append(node); return node; }
+        button("Editar", async function () {
+          try {
+            await window.openPropertyImageEditor(item, async function (file) {
+              file = await prepare(file);
+              if (item.url.indexOf("blob:") === 0) URL.revokeObjectURL(item.url);
+              item.file = file; item.id = 0; item.url = URL.createObjectURL(file); render(root);
+              message(root, "Edición aplicada. Los cambios se guardarán con el inmueble.", false);
+            });
+          } catch (error) { message(root, error.message, true); }
+        });
         if (group[0] === "gallery") {
+          card.draggable = true;
+          card.addEventListener("dragstart", function (event) { event.dataTransfer.setData("text/plain", String(index)); root._dragIndex = index; });
+          card.addEventListener("dragover", function (event) { if (root._dragIndex !== undefined) event.preventDefault(); });
+          card.addEventListener("drop", function (event) { if (root._dragIndex === undefined) return; event.preventDefault(); state.galeria.splice(index, 0, state.galeria.splice(root._dragIndex, 1)[0]); delete root._dragIndex; render(root); });
+          card.addEventListener("dragend", function () { delete root._dragIndex; });
           button("←", function () { if (index > 0) { state.galeria.splice(index - 1, 0, state.galeria.splice(index, 1)[0]); render(root); } }).setAttribute("aria-label", "Mover foto " + (index + 1) + " antes");
           button("→", function () { if (index + 1 < state.galeria.length) { state.galeria.splice(index + 1, 0, state.galeria.splice(index, 1)[0]); render(root); } }).setAttribute("aria-label", "Mover foto " + (index + 1) + " después");
         }
-        button("Quitar", function () { if (group[0] === "cover") state.portada = null; else state.galeria.splice(index, 1); render(root); }).setAttribute("aria-label", group[0] === "cover" ? "Quitar portada" : "Quitar foto " + (index + 1));
+        button("Quitar", function () { if (item.url.indexOf("blob:") === 0) URL.revokeObjectURL(item.url); if (group[0] === "cover") state.portada = null; else state.galeria.splice(index, 1); render(root); }).setAttribute("aria-label", group[0] === "cover" ? "Quitar portada" : "Quitar foto " + (index + 1));
         card.append(actions); container.append(card);
       });
     });
@@ -62,9 +77,16 @@
     } finally { URL.revokeObjectURL(url); }
   }
   window.initCommercialPropertyMedia = function (root) {
+    if (root._media) return;
     root._media = JSON.parse(root.dataset.mediaState);
     root.querySelector('[name="video_del_inmueble"]').value = root._media.video_del_inmueble;
     render(root);
+    var cleanup = new MutationObserver(function () {
+      if (root.isConnected) return;
+      cleanup.disconnect();
+      [root._media.portada].concat(root._media.galeria).filter(Boolean).forEach(function (item) { if (item.url.indexOf("blob:") === 0) URL.revokeObjectURL(item.url); });
+    });
+    cleanup.observe(document.body,{childList:true,subtree:true});
     root.querySelectorAll("[data-media-input]").forEach(function (input) {
       input.addEventListener("change", async function () {
         var files = Array.from(input.files), state = root._media, cover = input.dataset.mediaInput === "cover";
@@ -73,30 +95,68 @@
         busy(root, true);
         try {
           for (var index = 0; index < files.length; index++) {
-            message(root, "Subiendo imagen " + (index + 1) + " de " + files.length + "…", false);
-            var data = new FormData(); data.set("file", await prepare(files[index]));
-            var image = await request(root, "commercial_property_media_upload", data);
+            message(root, "Preparando imagen " + (index + 1) + " de " + files.length + "…", false);
+            var file = await prepare(files[index]);
+            var image = {id:0, file:file, url:URL.createObjectURL(file)};
+            if (cover && state.portada && state.portada.url.indexOf("blob:") === 0) URL.revokeObjectURL(state.portada.url);
             if (cover) state.portada = image; else state.galeria.push(image);
             render(root); busy(root, true);
           }
-          message(root, "Imágenes cargadas. Pulsa «Guardar multimedia» para aplicar los cambios.", false);
+          message(root, root.hasAttribute("data-media-embedded") ? "Fotos listas. Se guardarán al pulsar «Guardar inmueble»." : "Fotos listas. Pulsa «Guardar multimedia» para aplicar los cambios.", false);
         } catch (error) { message(root, error.message, true); }
         finally { input.value = ""; busy(root, false); }
       });
     });
+    root.querySelectorAll("[data-media-drop]").forEach(function (zone) {
+      zone.addEventListener("dragover", function (event) { if (event.dataTransfer.types.includes("Files")) { event.preventDefault(); zone.classList.add("is-dragging"); } });
+      zone.addEventListener("dragleave", function () { zone.classList.remove("is-dragging"); });
+      zone.addEventListener("drop", function (event) { event.preventDefault(); zone.classList.remove("is-dragging"); if (root._busy) return; var input = zone.querySelector("input"), transfer = new DataTransfer(); Array.from(event.dataTransfer.files).slice(0, input.multiple ? undefined : 1).forEach(function (file) { transfer.items.add(file); }); input.files = transfer.files; input.dispatchEvent(new Event("change", {bubbles:true})); });
+    });
+    if (root.hasAttribute("data-media-embedded")) return;
     root.querySelector("form").addEventListener("submit", async function (event) {
       event.preventDefault(); if (root._busy) return;
-      var state = root._media;
-      if (!state.portada || !state.galeria.length) { message(root, "Selecciona una portada y al menos una imagen de galería.", true); return; }
-      var data = new FormData(event.target); data.set("portada_id", state.portada.id);
-      state.galeria.forEach(function (image) { data.append("galeria_ids[]", image.id); });
-      busy(root, true); message(root, "Guardando multimedia…", false);
       try {
-        var result = await request(root, "commercial_property_media_save", data);
+        var result = await window.commercialPropertyMedia.save(root, root._media.id_inmueble);
         message(root, result.message, false);
         root.dispatchEvent(new CustomEvent("scm:task-updated", {bubbles:true}));
       } catch (error) { message(root, error.message, true); }
       finally { busy(root, false); }
     });
+  };
+  window.commercialPropertyMedia = {
+    setLimit: function (root, limit) { root._media.max_gallery = limit; render(root); },
+    loadDraft: async function (root, code) {
+      if (root._busy || root._media.galeria.length || root._media.portada) return;
+      root._media.id_inmueble = code; var requested = code;
+      try {
+        var state = await request(root,"commercial_property_media_draft",new FormData());
+        if (root._media.id_inmueble !== requested || root._media.galeria.length || root._media.portada) return;
+        root._media = state; root.querySelector('[name="video_del_inmueble"]').value = state.video_del_inmueble; render(root);
+        message(root,"Multimedia actual del código adelantado cargada. Puedes conservarla o editarla.",false);
+      } catch (exception) { message(root,exception.message,true); }
+    },
+    resetDraft: function (root) { root._media.id_inmueble = 0; root._media.baseline_gallery = 0; root._media.galeria = root._media.galeria.filter(function (item) { return !!item.file; }); if (root._media.portada && !root._media.portada.file) root._media.portada = null; root.querySelector('[name="video_del_inmueble"]').value = ""; render(root); },
+    validate: function (root) {
+      if (root._busy) throw new Error("Espera a que termine de preparar las imágenes.");
+      if (!root._media.portada || !root._media.galeria.length) throw new Error("Selecciona una portada y al menos una imagen de galería.");
+      if (root._media.galeria.length > root._media.max_gallery) throw new Error("La galería admite hasta " + root._media.max_gallery + " fotografías para este tipo de inmueble.");
+    },
+    save: async function (root, code) {
+      this.validate(root); root._media.id_inmueble = code;
+      busy(root, true);
+      try {
+        var items = [root._media.portada].concat(root._media.galeria), pending = items.filter(function (item) { return !!item.file; });
+        for (var index = 0; index < pending.length; index++) {
+          message(root, "Subiendo foto " + (index + 1) + " de " + pending.length + "…", false);
+          var data = new FormData(); data.set("file", pending[index].file);
+          var saved = await request(root, "commercial_property_media_upload", data);
+          URL.revokeObjectURL(pending[index].url); Object.assign(pending[index], saved); delete pending[index].file;
+        }
+        var body = new FormData(); body.set("portada_id", root._media.portada.id); body.set("video_del_inmueble", root.querySelector('[name="video_del_inmueble"]').value);
+        root._media.galeria.forEach(function (image) { body.append("galeria_ids[]", image.id); });
+        var result = await request(root, "commercial_property_media_save", body);
+        message(root, result.message, false); render(root); return result;
+      } finally { busy(root, false); }
+    }
   };
 })();
