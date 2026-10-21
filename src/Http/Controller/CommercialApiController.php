@@ -774,6 +774,31 @@ final class CommercialApiController
     }
   }
 
+  public function propertyMediaForm(array $input): never { $this->propertyMediaRequest($input, 'form'); }
+  public function propertyMediaUpload(array $input): never { $this->propertyMediaRequest($input, 'upload'); }
+  public function propertyMediaSave(array $input): never { $this->propertyMediaRequest($input, 'save'); }
+
+  private function propertyMediaRequest(array $input, string $operation): never
+  {
+    $this->verify($input);
+    try {
+      $service = new \SCM\Commercial\CommercialPropertyMediaService($this->db, $this->policy, $this->config);
+      $task = (int) ($input['ticket_pk'] ?? 0); $code = (int) ($input['id_inmueble'] ?? 0);
+      $result = match ($operation) {
+        'form' => ['html'=>\SCM\Views\CommercialPropertyMediaView::render($service, $task, $code)],
+        'upload' => $service->upload($task, $code, (array) ($_FILES['file'] ?? [])),
+        default => $service->save($task, $code, $input),
+      };
+      JsonResponse::success($result);
+    } catch (\SCM\Commercial\CommercialSignAccessDenied $exception) {
+      JsonResponse::error($exception->getMessage(), 403);
+    } catch (\PDOException $exception) {
+      throw $exception;
+    } catch (\InvalidArgumentException | \RuntimeException $exception) {
+      JsonResponse::error($exception->getMessage(), 422);
+    }
+  }
+
   private function verify(array $input): void
   {
     if (!$this->csrf->verify('commercial_nonce', (string) ($input['nonce'] ?? ''), false)) {

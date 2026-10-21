@@ -57,6 +57,8 @@ return [
   'auto_login_ttl' => max(60, (int) $env('AUTO_LOGIN_TTL', '300')),
 
   'upload_max_bytes' => (int) $env('UPLOAD_MAX_BYTES', '10485760'),
+  'wordpress_upload_path' => $env('WORDPRESS_UPLOAD_PATH', ''),
+  'wordpress_upload_url' => $env('WORDPRESS_UPLOAD_URL', ''),
   'upload_max_files' => (int) $env('UPLOAD_MAX_FILES', '10'),
   'sign_notification_emails' => $env('SIGN_NOTIFICATION_EMAILS', 'gcorrearivera@gmail.com,sc.dircomercial@gmail.com,sucasacomercial@gmail.com,sucasacorreos@gmail.com,nabuita1@gmail.com'),
   'property_entry_notification_emails' => $env('PROPERTY_ENTRY_NOTIFICATION_EMAILS', 'sucasacomercial@gmail.com,gcorrearivera@gmail.com,sc.dircomercial@gmail.com'),

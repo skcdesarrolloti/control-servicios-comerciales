@@ -21,7 +21,7 @@ final class CommercialPropertyEntryDatabase
       'jet_cct_recaptaciones'=>['fecha','id_inmueble','id_empleado','id_ticket','empleado'],
       'jet_rel_941'=>['created','rel_id','parent_rel','parent_object_id','child_object_id'],
       'jet_rel_658'=>['created','rel_id','parent_rel','parent_object_id','child_object_id'],
-      'jet_cct_inmuebles'=>array_values(array_filter(CommercialPropertyEntryService::definition()['cct_map'])),
+      'jet_cct_inmuebles'=>array_merge(array_values(array_filter(CommercialPropertyEntryService::definition()['cct_map'])), ['foto_portada','galeria','video']),
       'jet_cct_tickets'=>['id_inmueble_data','id_propietario'],
     ];
     foreach ($definitions as $definition) {

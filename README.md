@@ -229,3 +229,33 @@ node tools/check-precaptacion-ui.cjs RUTA_A_NODE_MODULES
 La prueba de navegador comprueba registro con fotografías, catálogos, campos
 condicionales, permisos, edición y creación de tickets con reintentos. La base de datos
 y los archivos de esa prueba se guardan en el directorio temporal, separados del entorno real.
+
+## Multimedia del inmueble desde las tareas
+
+**Ingresar inmueble** guarda primero los datos y ofrece **Paso 2: subir multimedia**.
+La tarea también muestra **Multimedia del inmueble** cuando ya tiene un inmueble asociado.
+Este paso usa el permiso `ingresar_inmueble` y comprueba la asignación de la tarea y
+la relación entre tarea, inmueble y adjuntos. Permite portada, galería ordenable y video
+HTTPS de YouTube; guarda los IDs de WordPress y los campos del CCT sin invocar `portales`
+ni conectar con el antiguo panel externo.
+
+Las imágenes JPG/PNG se envían individualmente, con un máximo de 1 MB y dimensiones
+de 500 × 500 a 1700 × 1200. El navegador ajusta las imágenes grandes; el servidor
+vuelve a validar el archivo. La galería admite 12 imágenes, o 6 para locales, lotes y
+bodegas; conserva el límite superior de galerías históricas ya existentes.
+
+Los archivos públicos se guardan en `../wp-content/uploads` respecto a la carpeta del
+proyecto, con registros `attachment`, `_wp_attached_file` y `_wp_attachment_metadata`.
+Si WordPress usa otra ubicación, configurar `WORDPRESS_UPLOAD_PATH` y
+`WORDPRESS_UPLOAD_URL`. No se carga el núcleo de WordPress ni sus hooks. Quitar una
+foto del formulario la retira de la selección; no borra el adjunto de la biblioteca.
+
+Después de actualizar el servidor hay que recargar las pestañas abiertas. Los scripts
+usan el hash de su contenido para que el navegador solicite la versión correspondiente.
+Si falla la apertura de un formulario, el modal conserva el mensaje del servidor y
+ofrece reintentar o volver a la tarea.
+
+Pruebas aisladas: `php .vendor-test-junction/phpunit/phpunit/phpunit --filter
+'CommercialPropertyMediaTest|CommercialPropertyEntryTest|CommercialSignServiceTest'`.
+Con el servidor PHP en `127.0.0.1:8771`, `node tools/check-commercial-property-entry.cjs`
+comprueba además las subidas, redimensionado, persistencia, errores 422 y vista móvil.

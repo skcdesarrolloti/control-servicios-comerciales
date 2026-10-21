@@ -708,25 +708,36 @@
 
   function loadTaskForm(button) {
     var ticketPk = button.getAttribute("data-ticket-pk") || currentCasePk;
+    var kind = button.getAttribute("data-commercial-task-form");
+    var propertyCode = button.getAttribute("data-property-code") || "";
     if (!ticketPk || !caseContent) return;
     if (detailRequest) detailRequest.abort();
     detailRequest = new AbortController();
     caseContent.innerHTML = loadingMarkup();
     caseContent.setAttribute("aria-busy", "true");
-    var action = button.getAttribute("data-commercial-task-form") === "sign" ? "commercial_task_sign_form" : "commercial_property_entry_form";
-    request(action, { ticket_pk: ticketPk }, detailRequest.signal).then(function (response) {
+    var action = kind === "sign" ? "commercial_task_sign_form" : (kind === "media" ? "commercial_property_media_form" : "commercial_property_entry_form");
+    request(action, { ticket_pk: ticketPk, id_inmueble: propertyCode }, detailRequest.signal).then(function (response) {
       caseContent.innerHTML = response.html || "";
       caseContent.removeAttribute("aria-busy");
       var sign = caseContent.querySelector("[data-commercial-signs]");
       if (sign && typeof window.initCommercialTaskSign === "function") window.initCommercialTaskSign(sign);
       var property = caseContent.querySelector("[data-commercial-property-entry]");
       if (property && typeof window.initCommercialPropertyEntry === "function") window.initCommercialPropertyEntry(property);
+      var media = caseContent.querySelector("[data-commercial-property-media]");
+      if (media && typeof window.initCommercialPropertyMedia === "function") window.initCommercialPropertyMedia(media);
+      if ((property && typeof window.initCommercialPropertyEntry !== "function") || (media && typeof window.initCommercialPropertyMedia !== "function")) throw new Error("Actualiza la página para cargar la versión actual del formulario.");
       var heading = caseContent.querySelector("h1");
       if (heading) { heading.setAttribute("tabindex", "-1"); heading.focus({ preventScroll: true }); }
     }).catch(function (error) {
       if (error.name === "AbortError") return;
-      notify("error", error.message);
-      loadCase(ticketPk, false);
+      caseContent.removeAttribute("aria-busy");
+      var panel = document.createElement("div"); panel.className = "csg commercial-entry-shell";
+      var heading = document.createElement("h1"); heading.textContent = "No se pudo abrir el formulario";
+      var message = document.createElement("p"); message.className = "csg-error"; message.setAttribute("role", "alert"); message.textContent = error.message;
+      var retry = document.createElement("button"); retry.type = "button"; retry.className = "csg-primary"; retry.textContent = "Reintentar";
+      retry.setAttribute("data-commercial-task-form", kind); retry.setAttribute("data-ticket-pk", ticketPk); retry.setAttribute("data-property-code", propertyCode);
+      var back = document.createElement("button"); back.type = "button"; back.className = "csg-secondary"; back.textContent = "Volver a la tarea"; back.setAttribute("data-commercial-return-case", ticketPk);
+      panel.append(heading, message, retry, back); caseContent.replaceChildren(panel);
     });
   }
 

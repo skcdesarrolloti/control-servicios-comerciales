@@ -46,7 +46,7 @@ final class CommercialPropertyEntryView
             <input id="<?php echo $e($id); ?>" name="<?php echo $e($name); ?>" type="<?php echo $e($type); ?>" value="<?php echo $e($default); ?>"<?php echo $type === 'number' ? ' min="0" step="any"' : ''; ?><?php echo in_array($name, ['id_ticket','ruta','edad_inmueble'], true) ? ' readonly' : ''; ?>>
           <?php endif; ?>
         </div><?php endforeach; if ($section !== null) echo '</div></details>'; ?>
-        <p class="csg-help">La información se guardará en borrador y esta tarea pasará a «Por publicar».</p><div class="csg-error" role="alert" data-property-error hidden></div>
+        <p class="csg-help">Paso 1 de 2: guarda los datos del inmueble; después podrás subir portada, galería y video. La información se guardará en borrador y esta tarea pasará a «Por publicar».</p><div class="csg-error" role="alert" data-property-error hidden></div>
         <div class="csg-footer"><span class="csg-help">Los campos con * son obligatorios.</span><button type="submit" class="csg-primary" data-property-submit>Guardar inmueble</button></div>
       </form>
       <div class="csg-result" role="status" data-property-result hidden></div>

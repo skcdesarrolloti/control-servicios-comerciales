@@ -404,6 +404,12 @@
     font-size:16px
   }
 }
+.cpm-grid {display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:16px;margin-top:16px}
+.cpm-card {border:1px solid #dce3ee;border-radius:12px;overflow:hidden;background:#fff}
+.cpm-card img {display:block;width:100%;height:150px;object-fit:cover}
+.cpm-actions {display:flex;flex-wrap:wrap;gap:4px;padding:8px}
+.cpm-actions .csg-secondary {min-width:44px;min-height:44px;padding:8px}
+.cpm [data-media-status] {color:#1e3c76;margin:16px 0;font-weight:600}
 @media(prefers-reduced-motion:reduce) {
   .csg * {
     transition:none!important;

@@ -201,6 +201,9 @@ final class CommercialTicketModalView
           <?php endif; ?>
           <?php if ($policy->canAct('ingresar_inmueble')): ?>
             <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-[#EBF1FB] text-slate-700 border border-slate-200 text-xs font-semibold transition-all cursor-pointer" data-commercial-task-form="property" data-ticket-pk="<?php echo esc_attr((string) $pk); ?>"><span class="material-symbols-outlined text-[16px]">add_home_work</span><span>Ingresar inmueble</span></button>
+            <?php if ($propertyCode !== '' || (int) ($ticket['id_inmueble_data'] ?? 0) > 0): ?>
+              <button type="button" class="csg-secondary" data-commercial-task-form="media" data-ticket-pk="<?php echo esc_attr((string) $pk); ?>"><span class="material-symbols-outlined text-[16px]">photo_library</span><span>Multimedia del inmueble</span></button>
+            <?php endif; ?>
           <?php endif; ?>
           <?php if ($policy->canAct('responder')): ?>
             <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-[#EBF1FB] hover:text-[#1E3C76] text-slate-700 border border-slate-200 text-xs font-semibold transition-all group cursor-pointer" data-commercial-open-workflow="reply">

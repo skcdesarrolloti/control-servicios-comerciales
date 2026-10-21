@@ -343,6 +343,6 @@ final class CommercialPropertyEntryService
 
   private function result(int $code): array
   {
-    return ['id_inmueble'=>$code,'message'=>'Inmueble #' . $code . ' ingresado correctamente. La tarea quedó por publicar.','photos_url'=>'https://sucasainmobiliaria.com.co/mi-cuenta/fotos-inmuebles/?id_inmueble=' . $code];
+    return ['id_inmueble'=>$code,'message'=>'Inmueble #' . $code . ' ingresado correctamente. Continúa con el paso 2: multimedia. La tarea quedó por publicar.'];
   }
 }

@@ -20,7 +20,7 @@ $settings = new SCM\Core\Settings($db, false, 'control_servicios_comerciales_con
 $csrf = new SCM\Core\Csrf(str_repeat('x', 40));
 SCM\Core\App::init($db, new SCM\Core\Auth($db), $csrf, $settings);
 $policy = new SCM\Commercial\CommercialAccessPolicy($settings, $db, ['11']);
-$config = ['base_url'=>SCM_BASE_URL,'dashboard_admin_cargos'=>['11'],'sign_notification_emails'=>'admin@example.test','property_entry_notification_emails'=>'admin@example.test'];
+$config = ['base_url'=>SCM_BASE_URL,'dashboard_admin_cargos'=>['11'],'sign_notification_emails'=>'admin@example.test','property_entry_notification_emails'=>'admin@example.test','wordpress_upload_path'=>dirname(__DIR__, 2) . '/output/wp-media','wordpress_upload_url'=>'http://127.0.0.1:8771/output/wp-media'];
 $cards = '<section class="p-8"><h1 class="text-xl font-bold mb-4">Tareas comerciales</h1><button type="button" class="px-4 py-3 rounded-xl bg-primary text-white" data-commercial-open-case="100">Abrir tarea #100</button></section>';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   header('Content-Type: application/json');

@@ -90,7 +90,8 @@
       form.hidden = true;
       var result = root.querySelector("[data-property-result]"); result.replaceChildren();
       var text = document.createElement("p"); text.textContent = payload.data.message; result.append(text);
-      var photos = document.createElement("a"); photos.textContent = "Continuar con las fotografías del inmueble"; photos.href = payload.data.photos_url; photos.target = "_blank"; photos.rel = "noopener noreferrer"; photos.className = "csg-secondary"; result.append(photos);
+      var photos = document.createElement("button"); photos.type = "button"; photos.textContent = "Paso 2: subir multimedia"; photos.className = "csg-primary";
+      photos.setAttribute("data-commercial-task-form", "media"); photos.setAttribute("data-ticket-pk", data.get("ticket_pk")); photos.setAttribute("data-property-code", payload.data.id_inmueble); result.append(photos);
       result.hidden = false; result.scrollIntoView({ block: "nearest" });
       root.dispatchEvent(new CustomEvent("scm:task-updated", { bubbles: true, detail: { ticketPk: data.get("ticket_pk") } }));
     } catch (exception) { error(root, exception.message || "No se pudo guardar el inmueble."); }
