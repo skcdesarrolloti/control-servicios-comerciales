@@ -41,6 +41,39 @@ final class CommercialSignServiceTest extends TestCase
 
   private function save(array $overrides = []): array { return $this->service->save($this->input($overrides), static fn(): array => ['https://example.test/evidence.jpg']); }
 
+  public function testOptionsUseSerializedJetEngineGlossariesWithoutTheLegacyOptionsTable(): void
+  {
+    $this->db->pdo()->exec('DROP TABLE wp_options');
+    $options = $this->service->options();
+    self::assertCount(12, $options['tipo_inmueble']);
+    self::assertSame(['Arriendo','Arriendo o venta','Venta'], array_column($options['categoria'], 'value'));
+    self::assertSame(['Directo','Inmmobiliaria'], array_column($options['promocionado_por'], 'value'));
+    self::assertContains('No quiere promocion', array_column($options['razon'], 'value'));
+    $html = CommercialSignView::render($this->service, $this->policy);
+    self::assertStringContainsString('value="Apartaestudio"', $html);
+    self::assertStringContainsString('value="Arriendo o venta"', $html);
+  }
+
+  public function testGlossariesPreserveDifferentValuesAndLabelsForSavingAndDisplay(): void
+  {
+    $items = [['value'=>'Casa','label'=>'Casa residencial','is_checked'=>false], ['value'=>'0','label'=>'Sin clasificar']];
+    $this->db->update('wp_jet_post_types', ['meta_fields'=>serialize($items)], ['id'=>783]);
+    self::assertSame([['value'=>'Casa','label'=>'Casa residencial'],['value'=>'0','label'=>'Sin clasificar']], $this->service->options()['tipo_inmueble']);
+    self::assertSame('Casa', $this->service->validate($this->input())['tipo_inmueble']);
+    self::assertStringContainsString('value="Casa">Casa residencial</option>', CommercialSignView::render($this->service, $this->policy));
+  }
+
+  public function testNonGlossaryRowsAndMalformedSerializedChoicesAreIgnored(): void
+  {
+    $this->db->update('wp_jet_post_types', ['status'=>'post_type'], ['id'=>783]);
+    $this->db->update('wp_jet_post_types', ['meta_fields'=>'invalid serialized data'], ['id'=>784]);
+    $this->db->update('wp_jet_post_types', ['meta_fields'=>serialize([['value'=>['invalid']], ['value'=>'Directo','label'=>['invalid']], ['value'=>'Inmmobiliaria','label'=>'Inmobiliaria']])], ['id'=>161]);
+    $options = $this->service->options();
+    self::assertSame([], $options['tipo_inmueble']);
+    self::assertSame([], $options['categoria']);
+    self::assertSame([['value'=>'Inmmobiliaria','label'=>'Inmobiliaria']], $options['promocionado_por']);
+  }
+
   public function testNewSignWritesTheExistingTablesAndQueuesEmailAtomically(): void
   {
     $result = $this->save(['id_empleado'=>'202','creador'=>'Impostor','fecha'=>'1','ruta'=>'999','sucursal'=>'999']);

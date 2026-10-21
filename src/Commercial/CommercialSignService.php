@@ -24,16 +24,23 @@ final class CommercialSignService
   public function options(): array
   {
     $out = [];
-    $raw = (string) $this->db->getVar('SELECT option_value FROM `' . $this->db->table('options') . '` WHERE option_name = ?', ['jet_engine_glossaries']);
-    $glossaries = @unserialize($raw, ['allowed_classes' => false]);
-    if (!is_array($glossaries)) $glossaries = json_decode($raw, true) ?: [];
-    foreach (['tipo_inmueble'=>'783', 'categoria'=>'784', 'promocionado_por'=>'161', 'razon'=>'940'] as $field => $id) {
+    $fields = ['tipo_inmueble'=>783, 'categoria'=>784, 'promocionado_por'=>161, 'razon'=>940];
+    $placeholders = implode(',', array_fill(0, count($fields), '?'));
+    $rows = $this->db->getResults('SELECT id, meta_fields FROM `' . $this->db->table('jet_post_types') . '` WHERE status = ? AND id IN (' . $placeholders . ')', ['glossary', ...array_values($fields)]);
+    $glossaries = [];
+    foreach ($rows as $row) {
+      // JetEngine stores glossary choices as a serialized PHP array in meta_fields.
+      $items = @unserialize((string) $row['meta_fields'], ['allowed_classes' => false]);
+      if (is_array($items)) $glossaries[(int) $row['id']] = $items;
+    }
+    foreach ($fields as $field => $id) {
       $out[$field] = [];
-      foreach ($glossaries as $key => $glossary) {
-        if (!is_array($glossary) || (string) ($glossary['id'] ?? $key) !== $id) continue;
-        foreach (($glossary['fields'] ?? $glossary['items'] ?? []) as $item) {
-          if (is_array($item) && (string) ($item['value'] ?? '') !== '') $out[$field][] = ['value'=>(string) $item['value'], 'label'=>(string) ($item['label'] ?? $item['value'])];
-        }
+      foreach ($glossaries[$id] ?? [] as $item) {
+        if (!is_array($item) || !is_scalar($item['value'] ?? null) || (string) $item['value'] === '') continue;
+        $value = (string) $item['value'];
+        $label = $item['label'] ?? $value;
+        if (!is_scalar($label)) continue;
+        $out[$field][] = ['value'=>$value, 'label'=>(string) $label];
       }
     }
     $out['barrio'] = $this->db->getResults('SELECT _ID, barrio, ciudad, ruta_asignada FROM `' . $this->db->table('jet_cct_barrios') . '` ORDER BY barrio, ciudad');

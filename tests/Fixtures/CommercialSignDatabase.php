@@ -33,6 +33,18 @@ final class CommercialSignDatabase
     $db->pdo()->exec('CREATE TABLE IF NOT EXISTS wp_skc_ubicacion_inmuebles_mapa (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo_inmueble TEXT, barrio TEXT, ruta TEXT, latitud REAL, longitud REAL, precision_metros REAL, fuente TEXT, google_maps_url TEXT, page_url TEXT, user_agent TEXT, created_by TEXT, cct_created TEXT)');
     $queueFields = ['project_code','source_module','channel','provider','destination','destination_name','subject','message_html','message_text','payload_json','meta_json','status','priority','max_attempts','scheduled_at','created_at','updated_at','created_by','dedupe_key'];
     $db->pdo()->exec('CREATE TABLE IF NOT EXISTS skc_notification_queue (id INTEGER PRIMARY KEY AUTOINCREMENT,' . implode(',', array_map(static fn(string $column): string => '`' . $column . '` TEXT', $queueFields)) . ', UNIQUE(dedupe_key))');
+    $db->pdo()->exec('CREATE TABLE IF NOT EXISTS wp_jet_post_types (id INTEGER PRIMARY KEY, status TEXT, labels TEXT, args TEXT, meta_fields TEXT)');
+    // Mirror the real JetEngine storage, independently of the older wp_options fixture.
+    if (!$db->getVar('SELECT id FROM wp_jet_post_types LIMIT 1')) {
+      foreach ([
+        '783'=>['Apartaestudio','Apartamento','Bodega','Casa','Consultorio','Edificio','Finca','Hotel','Local','Lote','Oficina','Proyecto'],
+        '784'=>['Arriendo','Arriendo o venta','Venta'],
+        '161'=>['Directo','Inmmobiliaria'],
+        '940'=>['Arrendado','Vendido','No quiere promocion','Otra razon'],
+      ] as $id => $values) {
+        $db->insert('wp_jet_post_types', ['id'=>$id,'status'=>'glossary','meta_fields'=>serialize(array_map(static fn(string $value): array => ['value'=>$value,'label'=>$value,'is_checked'=>false], $values))]);
+      }
+    }
     if ($db->getVar('SELECT _ID FROM wp_jet_cct_inmuebles LIMIT 1')) return $db;
     $db->insert('wp_jet_cct_inmuebles', ['_ID'=>1,'codigo'=>'500','direccion'=>'Calle de prueba 10','barrio'=>'El Poblado','ciudad'=>'Medellín','ruta'=>'1','punto_referencia'=>'Frente al parque','tipo_inmueble'=>'Casa','tipo_negocio'=>'Arriendo','destinacion'=>'Vivienda','estado'=>'Publicado']);
     $db->insert('wp_jet_cct_inmuebles', ['_ID'=>2,'codigo'=>'600','barrio'=>'Otro barrio','tipo_inmueble'=>'Apartamento']);
@@ -40,9 +52,6 @@ final class CommercialSignDatabase
     $db->insert('wp_jet_cct_tickets', ['_ID'=>200,'id_ticket'=>'200','id_inmueble'=>'600','id_empleado'=>'202','asunto'=>'Otra tarea']);
     $db->update('wp_jet_cct_funcionarios', ['id_sucursal'=>'3'], ['_ID'=>1]);
     $db->update('wp_jet_cct_barrios', ['ruta_asignada'=>'1'], ['_ID'=>1]);
-    $glossaries = unserialize((string) $db->getVar('SELECT option_value FROM wp_options WHERE option_name = ?', ['jet_engine_glossaries']), ['allowed_classes'=>false]);
-    foreach (['784'=>['Arriendo','Venta','Arriendo o venta'], '940'=>['Arrendado','Vendido','No quiere promocion','Otra razon']] as $id => $values) $glossaries[] = ['id'=>(string) $id,'fields'=>array_map(static fn(string $value): array => ['value'=>$value,'label'=>$value], $values)];
-    $db->update('wp_options', ['option_value'=>serialize($glossaries)], ['option_name'=>'jet_engine_glossaries']);
     foreach (['valor_aviso'=>'3000','valor_transporte'=>'4000','factor_prestacional'=>'1.52'] as $key => $value) $db->insert('wp_jet_cct_confi_sistema', ['funcion'=>$key,'valor'=>$value]);
     return $db;
   }
