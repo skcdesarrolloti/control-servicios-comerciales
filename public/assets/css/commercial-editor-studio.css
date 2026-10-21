@@ -1,0 +1,54 @@
+.cpm-studio[open]{display:flex;flex-direction:column;width:min(1540px,97vw);height:94dvh;max-height:94dvh;max-width:97vw;overflow:hidden;border-radius:16px;background:#fff;font-family:inherit}
+.cpm-studio header{position:relative;flex-shrink:0;min-height:76px;padding:16px 22px;box-shadow:0 1px 10px #12315108;z-index:4;flex-direction:row;align-items:center}
+.cpm-studio header h2{display:flex;align-items:center;gap:11px;font-size:17px;letter-spacing:-.3px;white-space:nowrap}
+.cpm-studio header h2>span:last-child{display:flex;flex-direction:column;gap:2px}
+.cpm-studio header h2 small{font-size:10px;letter-spacing:1.4px;font-weight:500;text-transform:uppercase;color:#7689a1}
+.cpm-studio-logo{display:flex;align-items:center;justify-content:center;border-radius:11px;width:38px;height:38px;background:#15385f;color:#f6d46c;font-size:17px}
+.cpm-studio .cpm-editor-body{display:grid;grid-template-columns:76px 270px minmax(0,1fr);gap:0;padding:0;min-height:0;flex:1;align-items:stretch;overflow:hidden}
+.cpm-studio-rail{display:flex;flex-direction:column;align-items:stretch;gap:8px;background:#f7f9fc;border-right:1px solid #e0e6ee;padding:16px 7px;overflow:auto;min-height:0}
+.cpm-studio-rail button{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;min-height:65px;width:100%;padding:10px 3px;border:0;border-radius:10px;background:transparent;font-size:10px;font-weight:500;color:#60728c;cursor:pointer}
+.cpm-studio-rail button>i{font-size:19px}
+.cpm-studio-rail button:hover{background:#eaf0f8;color:#173d69}
+.cpm-studio-rail button[aria-pressed=true]{background:#e2ebf8;color:#133e73;font-weight:700}
+.cpm-studio .cpm-editor-tools{padding:20px 18px;max-height:none;min-height:0;overflow:auto;background:#fff;display:block;border-right:1px solid #e0e6ee}
+.cpm-studio-panel h3{font-size:17px;font-weight:700;margin:0 0 18px;color:#1a3557}
+.cpm-studio-panel>p,.cpm-studio-panel details p{font-size:12px;color:#657890;line-height:1.7;margin:8px 0 16px}
+.cpm-studio .cpm-editor-tools details{margin:18px 0;padding:0 0 17px}
+.cpm-studio .cpm-editor-tools summary{font-size:12px;margin-bottom:14px}
+.cpm-studio .cpm-editor-tools label{font-size:11px;color:#536981;margin:12px 0}
+.cpm-studio .cpm-editor-tools input,.cpm-studio .cpm-editor-tools select{font-size:12px;color:#294a70}
+.cpm-studio .cpm-editor-tools input[type=range]{height:26px;min-height:26px;padding:0;cursor:pointer}
+.cpm-studio .cpm-editor-tools button{min-height:44px;font-size:11px;font-weight:500;border-radius:8px;transition:background .15s;line-height:1.45}
+.cpm-studio .cpm-editor-tools .cpm-studio-action{background:#173d69;color:#fff;border-color:#173d69;width:100%;padding:12px;margin:9px 0}
+.cpm-studio .cpm-editor-tools .cpm-studio-action:hover{background:#234f82}
+.cpm-studio-quick{background:#f3f7fd;border:1px solid #e1eafa;border-radius:11px;padding:10px 12px;margin:0 0 20px}
+.cpm-studio-quick p{font-size:10px;color:#607c9c;line-height:1.6;margin:4px 0 12px}
+.cpm-studio-quick button:last-child{width:100%;background:#fff}
+.cpm-studio .cpm-editor-workspace{min-height:0;min-width:0;display:flex;flex-direction:column;background:#152236;overflow:hidden;position:relative}
+.cpm-studio-viewport{flex:1;min-width:0;min-height:0;overflow:auto;background:radial-gradient(ellipse at center,#2b3d55,#162334)}
+.cpm-studio .cpm-editor-stage{position:relative;display:block;box-sizing:border-box;min-width:100%;min-height:100%;width:max-content;max-width:none;overflow:visible;padding:24px;background:transparent;border:0;border-radius:0}
+.cpm-studio .canvas-container{max-width:none;flex-shrink:0;margin:0 auto;box-shadow:0 6px 30px #0005}
+.cpm-studio .canvas-container canvas{max-width:none}
+.cpm-studio .cpm-studio-mask{position:absolute;inset:0;width:100%!important;height:100%!important;z-index:3;cursor:crosshair;touch-action:none}
+.cpm-studio-original{position:absolute;inset:24px;width:calc(100% - 48px);height:calc(100% - 48px);object-fit:contain;pointer-events:none;z-index:3}
+.cpm-studio-zoom{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;flex-shrink:0;background:#fff;border-top:1px solid #dfe6ef;padding:9px 14px;min-height:58px}
+.cpm-studio-zoom button{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:40px;min-width:40px;background:#fff;border:1px solid #e0e7f0;border-radius:8px;padding:7px 12px;color:#3f5a7b;font-size:11px;font-weight:600}
+.cpm-studio-zoom button:hover,.cpm-studio-zoom button[aria-pressed=true]{background:#eaf1fc;color:#173d69}
+.cpm-studio-zoom>span{width:1px;height:24px;background:#e1e8f2;margin:0 4px}
+.cpm-studio-zoom output{min-width:42px;text-align:center;color:#4a6280;font-size:11px}
+.cpm-studio .cpm-editor-status{flex-shrink:0;min-height:32px;padding:9px 18px;margin:0;border-top:1px solid #e1e7ef;background:#f8fafd;color:#5f7795;font-size:11px}
+.cpm-studio-ai{padding:16px 12px;margin-top:20px;border:1px solid #dddff1;border-radius:11px;background:#f7f6ff}
+.cpm-studio-ai strong{font-size:12px;color:#555181}
+.cpm-studio-ai p{font-size:11px;line-height:1.6;color:#6e7190;margin:10px 0}
+.cpm-studio-ai button{width:100%}
+.cpm-studio [data-studio=brush][aria-pressed=true]{background:#fbe8ed;border-color:#c46b82;color:#922e4b}
+.cpm-studio-layer{display:flex;align-items:stretch;gap:6px;margin:8px 0;padding:5px;border:1px solid #e0e6ef;border-radius:9px;background:#f9fbfe}
+.cpm-studio-layer button:first-child{flex:1;text-align:left;overflow:hidden;text-overflow:ellipsis;background:transparent;border:0;font-size:12px}
+.cpm-studio-layer button[aria-pressed=true]{color:#173d69;font-weight:700}
+.cpm-studio-layer button:last-child{min-width:38px;flex-shrink:0;background:#fff;border:0}
+.cpm-studio button:disabled{opacity:.45;cursor:default}
+.cpm-studio button:focus-visible,.cpm-studio input:focus-visible,.cpm-studio select:focus-visible{outline:3px solid #c08d1c;outline-offset:2px}
+.cpm-studio[data-editor-ready=false] .cpm-studio-viewport:after{content:'Cargando fotografía…';position:absolute;top:45%;left:50%;transform:translate(-50%,-50%);padding:12px 20px;background:#fff;border-radius:8px;color:#3e5b7e;font-size:13px;pointer-events:none}
+@media(max-width:900px){.cpm-studio .cpm-editor-body{grid-template-columns:64px 235px minmax(0,1fr)}.cpm-studio .cpm-editor-tools{padding:16px 14px}.cpm-studio header{padding:12px 16px;gap:10px}.cpm-studio header h2{font-size:15px}.cpm-studio header .cpm-editor-toolbar{gap:5px}.cpm-studio header button{font-size:11px;padding:8px 10px}}
+@media(max-width:650px){.cpm-studio[open]{width:98vw;max-width:98vw;height:96dvh;max-height:96dvh;border-radius:12px}.cpm-studio header{display:flex;flex-wrap:wrap;padding:12px;min-height:0;gap:10px}.cpm-studio header h2{font-size:14px}.cpm-studio-logo{width:31px;height:31px;font-size:14px}.cpm-studio header h2 small{font-size:9px}.cpm-studio header .cpm-editor-toolbar{flex:1;justify-content:flex-end}.cpm-studio header button{min-height:40px;font-size:10px;padding:7px 9px}.cpm-studio header .cpm-editor-toolbar [data-edit=undo],.cpm-studio header .cpm-editor-toolbar [data-edit=redo]{font-size:0;width:34px;padding:5px}.cpm-studio [data-edit=undo]:before{content:'↶';font-size:20px}.cpm-studio [data-edit=redo]:before{content:'↷';font-size:20px}.cpm-studio .cpm-editor-body{display:grid;grid-template-columns:1fr;grid-template-rows:54px minmax(190px,40dvh) minmax(130px,1fr);overflow:hidden}.cpm-studio-rail{grid-row:1;flex-direction:row;gap:4px;padding:4px 6px;border-right:0;border-bottom:1px solid #e1e7ef;overflow-x:auto}.cpm-studio-rail button{min-height:44px;min-width:48px;gap:4px;padding:5px 2px;font-size:9px}.cpm-studio-rail button>i{font-size:16px}.cpm-studio .cpm-editor-workspace{grid-row:2}.cpm-studio .cpm-editor-tools{grid-row:3;padding:18px;overflow:auto;border-top:1px solid #e0e7ef}.cpm-studio-zoom{min-height:44px;padding:4px 7px;gap:4px}.cpm-studio-zoom button{min-height:36px;min-width:34px;padding:5px 8px;font-size:10px}.cpm-studio-zoom output{font-size:10px;min-width:34px}.cpm-studio .cpm-editor-status{font-size:10px;line-height:1.4;padding:7px 10px}.cpm-studio .cpm-editor-tools details{margin:12px 0}.cpm-studio-panel h3{font-size:15px;margin-bottom:12px}.cpm-studio .cpm-editor-stage{padding:12px}.cpm-studio-original{inset:12px;width:calc(100% - 24px);height:calc(100% - 24px)}}
+@media(prefers-reduced-motion:reduce){.cpm-studio *{transition:none!important}}

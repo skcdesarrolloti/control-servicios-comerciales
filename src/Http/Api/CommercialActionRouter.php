@@ -53,6 +53,8 @@ final class CommercialActionRouter
       'commercial_property_media_draft' => 'propertyMediaDraft',
       'commercial_property_media_upload' => 'propertyMediaUpload',
       'commercial_property_media_save' => 'propertyMediaSave',
+      'commercial_image_cleanup_status' => 'imageCleanupStatus',
+      'commercial_image_cleanup' => 'imageCleanup',
       'commercial_property_detail' => 'propertyDetail',
       'commercial_highlight_request' => 'requestHighlight',
       'commercial_highlight_cancel_request' => 'cancelHighlightRequest',

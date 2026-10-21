@@ -38,7 +38,7 @@
               if (item.url.indexOf("blob:") === 0) URL.revokeObjectURL(item.url);
               item.file = file; item.id = 0; item.url = URL.createObjectURL(file); render(root);
               message(root, "Edición aplicada. Los cambios se guardarán con el inmueble.", false);
-            });
+            }, {ticketPk:root._media.ticket_pk,propertyId:root._media.id_inmueble});
           } catch (error) { message(root, error.message, true); }
         });
         if (group[0] === "gallery") {

@@ -788,6 +788,22 @@ final class CommercialApiController
   public function propertyMediaDraft(array $input): never { $this->propertyMediaRequest($input, 'draft'); }
   public function propertyMediaUpload(array $input): never { $this->propertyMediaRequest($input, 'upload'); }
   public function propertyMediaSave(array $input): never { $this->propertyMediaRequest($input, 'save'); }
+  public function imageCleanupStatus(array $input): never { $this->imageCleanupRequest($input, false); }
+  public function imageCleanup(array $input): never { $this->imageCleanupRequest($input, true); }
+
+  private function imageCleanupRequest(array $input, bool $process): never
+  {
+    $this->verify($input);
+    try {
+      (new \SCM\Commercial\CommercialPropertyEntryService($this->db,$this->policy,$this->config))->task((int) ($input['ticket_pk'] ?? 0));
+      $service = new \SCM\Commercial\CommercialImageCleanupService($this->config);
+      if (!$process) JsonResponse::success(['available'=>$service->available()]);
+      foreach (['image_file','mask_file'] as $field) if ((int) ($_FILES[$field]['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || !is_uploaded_file((string) ($_FILES[$field]['tmp_name'] ?? ''))) throw new \InvalidArgumentException('Selecciona la fotografía y pinta la zona que deseas eliminar.');
+      JsonResponse::success($service->cleanup($_FILES['image_file']['tmp_name'],$_FILES['mask_file']['tmp_name']));
+    } catch (\SCM\Commercial\CommercialSignAccessDenied $exception) { JsonResponse::error($exception->getMessage(),403); }
+    catch (\PDOException $exception) { throw $exception; }
+    catch (\InvalidArgumentException | \RuntimeException $exception) { JsonResponse::error($exception->getMessage(),422); }
+  }
 
   private function propertyMediaRequest(array $input, string $operation): never
   {

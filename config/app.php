@@ -52,6 +52,7 @@ return [
   'minimax_base_url' => rtrim((string) $env('MINIMAX_BASE_URL', 'https://api.minimax.io/v1'), '/'),
   'minimax_model' => $env('MINIMAX_MODEL', 'MiniMax-M3'),
   'minimax_timeout' => max(10, (int) $env('MINIMAX_TIMEOUT', '45')),
+  'clipdrop_api_key' => $env('CLIPDROP_API_KEY', ''),
   'auto_login_enabled' => $envBool('AUTO_LOGIN_ENABLED', false),
   'auto_login_secret' => $env('AUTO_LOGIN_SECRET', ''),
   'auto_login_ttl' => max(60, (int) $env('AUTO_LOGIN_TTL', '300')),

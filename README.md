@@ -253,6 +253,29 @@ El editor integrado permite tamaño/proporción, calidad JPG, brillo, contraste,
 saturación, desenfoque, giros, texto, figuras y marcos, con deshacer/rehacer.
 Usa una copia local de Fabric.js (licencia en `public/assets/vendor/FABRIC-LICENSE.txt`).
 
+**SuCasa Studio** añade zoom/ajuste a la ventana, comparación con el original,
+recorte, volteos, capas y atajos de deshacer/rehacer. La vista inicial conserva el
+backstore del lienzo en pantallas Retina/DPR 2 y 3. La mejora automática ajusta
+luminancia, balance de color y nitidez en un Web Worker. El pincel de retoque local
+reconstruye zonas pequeñas desde los píxeles vecinos, sin enviar la foto a una API;
+funciona mejor en superficies simples y no equivale a inpainting generativo.
+
+El borrado generativo está preparado para [Clipdrop Cleanup](https://clipdrop.co/apis/docs/cleanup).
+Para activarlo, configurar `CLIPDROP_API_KEY` en el `.env` del servidor. La clave nunca
+se incluye en el navegador. El usuario marca una máscara y pulsa explícitamente
+**Eliminar objeto con IA**; solo entonces se envían foto y máscara a Clipdrop.
+El endpoint exige sesión, nonce, permiso de ingreso y alcance de la tarea; valida
+formatos, dimensiones, tamaños y la imagen devuelta. Las pruebas usan un transporte
+simulado y no consumen créditos. El estado sin clave mantiene las herramientas locales.
+
+La [API de imagen de MiniMax](https://platform.minimax.io/docs/guides/image-generation)
+documenta generación con referencia de sujeto; no se usa para este borrado por máscara.
+La integración existente de MiniMax para tareas continúa independiente.
+
+Prueba de editor: `node tools/check-commercial-editor.cjs`, con la misma fixture local
+en `127.0.0.1:8771`. Verifica píxeles visibles al abrir en DPR 2, redimensionado,
+retoque sin modificar el exterior de la máscara, mejora, recorte, capas y exportación.
+
 Las imágenes JPG/PNG se envían individualmente, con un máximo de 1 MB y dimensiones
 de 500 × 500 a 1700 × 1200. El navegador ajusta las imágenes grandes; el servidor
 vuelve a validar el archivo. La galería admite 12 imágenes, o 6 para locales, lotes y

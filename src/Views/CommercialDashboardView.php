@@ -347,6 +347,7 @@ final class CommercialDashboardView
   <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/tailwind.css?v=' . filemtime(SCM_PUBLIC_PATH . '/assets/css/tailwind.css')); ?>">
   <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/commercial-signs.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/commercial-signs.css')); ?>">
   <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/commercial-property-entry.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/commercial-property-entry.css')); ?>">
+  <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/commercial-editor-studio.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/commercial-editor-studio.css')); ?>">
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11" defer></script>
 </head>
 <body class="bg-background font-body-md text-on-surface antialiased">
@@ -556,6 +557,7 @@ final class CommercialDashboardView
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-signs.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-signs.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-property-entry.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-property-entry.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-property-media.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-property-media.js')); ?>"></script>
+  <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-editor-tools.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-editor-tools.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-media-editor.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-media-editor.js')); ?>"></script>
 </body>
 </html>
