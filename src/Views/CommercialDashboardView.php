@@ -346,6 +346,7 @@ final class CommercialDashboardView
   </style>
   <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/tailwind.css?v=' . filemtime(SCM_PUBLIC_PATH . '/assets/css/tailwind.css')); ?>">
   <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/commercial-signs.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/commercial-signs.css')); ?>">
+  <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/commercial-credit-request.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/commercial-credit-request.css')); ?>">
   <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/commercial-property-entry.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/commercial-property-entry.css')); ?>">
   <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/commercial-editor-studio.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/commercial-editor-studio.css')); ?>">
   <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/commercial-property-video.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/commercial-property-video.css')); ?>">
@@ -514,6 +515,8 @@ final class CommercialDashboardView
             echo self::renderPrecaptacion($baseUrl, $_GET);
           } elseif ($bucket === 'anadir_aviso') {
             echo CommercialSignView::render($data['sign_service'], $policy);
+          } elseif ($bucket === 'solicitud_credito') {
+            echo CommercialCreditRequestView::render($data['credit_service'], $policy);
           } elseif ($bucket === 'notificaciones') {
             echo CommercialNotificationsView::render($data['notifications_service'], $policy);
           } else {
@@ -556,6 +559,7 @@ final class CommercialDashboardView
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-dashboard.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-dashboard.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-notifications.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-notifications.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-signs.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-signs.js')); ?>"></script>
+  <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-credit-request.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-credit-request.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-property-entry.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-property-entry.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-property-media.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-property-media.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-property-video.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-property-video.js')); ?>"></script>
@@ -658,9 +662,9 @@ final class CommercialDashboardView
         </div>
       <?php endif; ?>
 
-      <?php if (array_intersect(['precaptacion', 'anadir_aviso'], $views)): ?>
+      <?php if (array_intersect(['precaptacion', 'anadir_aviso', 'solicitud_credito'], $views)): ?>
         <div class="relative group/nav" data-commercial-dropdown="comerciales">
-          <button type="button" class="flex items-center gap-space-xs px-2 lg:px-3 py-space-xs font-label-md text-label-md <?php echo in_array($bucket, ['precaptacion', 'anadir_aviso'], true) ? ($activeClasses . ' active') : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-dropdown-trigger="comerciales" aria-expanded="false">
+          <button type="button" class="flex items-center gap-space-xs px-2 lg:px-3 py-space-xs font-label-md text-label-md <?php echo in_array($bucket, ['precaptacion', 'anadir_aviso', 'solicitud_credito'], true) ? ($activeClasses . ' active') : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-dropdown-trigger="comerciales" aria-expanded="false">
             <span class="material-symbols-outlined text-[16px]" aria-hidden="true">business_center</span>
             <span>Actividades comerciales</span>
             <span class="material-symbols-outlined text-[16px]">expand_more</span>
@@ -674,6 +678,11 @@ final class CommercialDashboardView
             <?php if (in_array('anadir_aviso', $views, true)): ?>
             <a class="flex items-center gap-2 px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="anadir_aviso" href="<?php echo esc_url(self::url($baseUrl, ['tab'=>'anadir_aviso'])); ?>">
               <span class="material-symbols-outlined text-[18px] text-secondary" aria-hidden="true">add_photo_alternate</span><span>Añadir aviso</span>
+            </a>
+            <?php endif; ?>
+            <?php if (in_array('solicitud_credito', $views, true)): ?>
+            <a class="flex items-center gap-2 px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="solicitud_credito" href="<?php echo esc_url(self::url($baseUrl, ['tab'=>'solicitud_credito'])); ?>">
+              <span class="material-symbols-outlined text-[18px] text-secondary" aria-hidden="true">payments</span><span>Solicitud de crédito</span>
             </a>
             <?php endif; ?>
           </div>

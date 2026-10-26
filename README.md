@@ -86,6 +86,18 @@ Los correos administrativos y del funcionario se encolan en `skc_notification_qu
 
 Para regenerar la definición a partir de una actualización de los exports, usa `node tools/import-property-entry-form.cjs <anadir-inmueble.json> <anadir-inmueble-por-codigo-adelantado.json>`. El importador extrae definiciones y mapas; no ejecuta HTML ni scripts de los archivos de origen. Las pruebas del flujo usan SQLite y catálogos de prueba, sin crear inmuebles ni enviar mensajes en producción: `phpunit --filter CommercialPropertyEntryTest` y, con el servidor local de pruebas en el puerto `8771`, `node tools/check-commercial-property-entry.cjs`.
 
+## Solicitud de crédito
+
+**Actividades comerciales → Solicitud de crédito** replica la "Nueva solicitud de crédito" del liquidador de Control de Servicios Inmobiliarios para que el equipo comercial registre lo que pide un propietario. Requiere la vista **Solicitud de crédito** y la acción **Registrar solicitudes de crédito de propietarios** en **Configurar permisos**; los cargos con configuración explícita deben habilitar ambas.
+
+El consultor elige para quién es el crédito (hoy solo propietarios), busca la cédula o el NIT y elige el contrato Entregado o Por entregar del que se descontarán las cuotas; luego indica valor, plazo y destinación. La búsqueda revisa `documento_propietario` del contrato, los propietarios del contrato de mandato (1 a 6) y la ficha del propietario. El plazo no se bloquea frente a la fecha fin: solo se informa y el analista lo revisa.
+
+La solicitud se guarda como **Pendiente** en las mismas tablas del liquidador (`wp_scm_owner_credits` y `wp_scm_owner_credit_events`), con el canon y los descuentos del mandato (o el porcentaje sin mandato configurado en el panel inmobiliario), y queda en los historiales del contrato y del inmueble. Este panel solo crea la solicitud: la evaluación, aprobación o rechazo y el seguimiento de su estado se hacen en el liquidador del panel inmobiliario.
+
+Se avisa al evento interno `credito_propietario_solicitado` con los funcionarios elegidos en **Notificaciones internas** del panel inmobiliario; la configuración de créditos y los destinatarios se leen sin modificar de `control_servicios_config`. `OWNER_CREDITS_URL` es el enlace al liquidador: se usa en el botón del correo y es obligatorio para el WhatsApp a funcionarios (si la configuración de créditos lo tiene activo).
+
+Pruebas: `phpunit --filter CommercialCreditRequestTest` y, con el servidor local en el puerto `8771`, `node tools/check-commercial-credit.cjs`.
+
 ## Notificaciones comerciales
 
 La pestaña **Notificaciones** reutiliza la búsqueda, filtros por contrato y preferencias del módulo inmobiliario. Incluye propietarios activos, propietarios no activos, arrendatarios activos, arrendatarios no activos, copropiedades y Club PPH. Activos significa que tienen al menos un contrato Entregado; no activos significa que tienen un contrato Recibido y ningún contrato Entregado. Esta clasificación se valida al buscar, contar, seleccionar todos y enviar. No incluye proveedores ni selección desde archivos SIMI.

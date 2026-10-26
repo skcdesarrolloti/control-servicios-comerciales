@@ -46,6 +46,8 @@ final class CommercialActionRouter
       'commercial_sign_lookup' => 'signLookup',
       'commercial_sign_save' => 'signSave',
       'commercial_task_sign_form' => 'taskSignForm',
+      'commercial_credit_contracts' => 'creditContracts',
+      'commercial_credit_create' => 'creditCreate',
       'commercial_property_entry_form' => 'propertyEntryForm',
       'commercial_property_entry_save' => 'propertyEntrySave',
       'commercial_property_neighborhood' => 'propertyNeighborhood',

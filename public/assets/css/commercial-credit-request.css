@@ -1,0 +1,117 @@
+/* Solicitud de crédito: complementa los estilos de Añadir aviso (.csg). */
+.ccr label.ccr-type,
+.ccr label.ccr-contract {
+  display:flex;
+  margin:0
+}
+.ccr input[type=radio] {
+  width:18px;
+  min-height:0;
+  height:18px;
+  padding:0;
+  margin:2px 0 0;
+  flex:none;
+  accent-color:var(--csg-navy)
+}
+.ccr-types {
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  margin-top:14px
+}
+.ccr-type {
+  align-items:center;
+  gap:8px;
+  padding:10px 14px;
+  border:1px solid #cbd5e1;
+  border-radius:12px;
+  background:#fff;
+  cursor:pointer;
+  font-size:13px;
+  font-weight:600
+}
+.ccr-type:has(input:checked) {
+  border-color:var(--csg-navy);
+  background:#eef2f8
+}
+.ccr-type.is-disabled {
+  cursor:not-allowed;
+  color:#8391a7;
+  background:#f8fafc
+}
+.ccr-type small {
+  font-size:10px;
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:.06em;
+  color:#8391a7
+}
+.ccr-search {
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:14px;
+  align-items:end;
+  margin-top:16px
+}
+.ccr-search .csg-lookup {
+  margin:0;
+  min-height:46px
+}
+.ccr-person {
+  margin-top:12px;
+  padding:12px 14px;
+  border-radius:12px;
+  background:#f8fafc;
+  border:1px solid #dce3ed
+}
+.ccr-person strong {
+  display:block;
+  font-size:14px;
+  color:var(--csg-navy)
+}
+.ccr-person span {
+  display:block;
+  font-size:12px;
+  color:#526178;
+  margin-top:2px
+}
+.ccr-contracts {
+  display:grid;
+  gap:10px;
+  margin-top:12px
+}
+.ccr-contract {
+  align-items:flex-start;
+  gap:12px;
+  padding:14px;
+  border:1px solid #dce3ed;
+  border-radius:12px;
+  background:#fff;
+  cursor:pointer;
+  font-weight:400
+}
+.ccr-contract:hover {
+  border-color:var(--csg-blue)
+}
+.ccr-contract:has(input:checked) {
+  border-color:var(--csg-navy);
+  box-shadow:0 0 0 1px var(--csg-navy) inset
+}
+.ccr-contract strong {
+  display:block;
+  font-size:14px;
+  color:var(--csg-navy)
+}
+.ccr-contract span span {
+  display:block;
+  font-size:12px;
+  line-height:1.6;
+  color:#526178
+}
+.ccr-hint[data-warning=true] {
+  color:#854d0e;
+  font-weight:600
+}
+@media (max-width:720px) {
+  .ccr-search { grid-template-columns:1fr }
+}

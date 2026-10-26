@@ -95,6 +95,8 @@ final class CommercialApiController
     $html = '';
     if ($bucket === 'anadir_aviso') {
       $html = \SCM\Views\CommercialSignView::render(new \SCM\Commercial\CommercialSignService($this->db, $this->policy, $this->config), $this->policy);
+    } elseif ($bucket === 'solicitud_credito') {
+      $html = \SCM\Views\CommercialCreditRequestView::render($this->creditService(), $this->policy);
     } elseif ($bucket === 'precaptacion') {
       $html = CommercialDashboardView::renderPrecaptacion($this->baseUrl, $input);
     } elseif ($bucket === 'inicio') {
@@ -730,6 +732,35 @@ final class CommercialApiController
     try {
       $service = new \SCM\Commercial\CommercialSignService($this->db, $this->policy, $this->config);
       JsonResponse::success(['html'=>'<div class="commercial-entry-shell">' . \SCM\Views\CommercialSignView::render($service, $this->policy, $service->taskContext($taskId)) . '</div>']);
+    } catch (\SCM\Commercial\CommercialSignAccessDenied $exception) {
+      JsonResponse::error($exception->getMessage(), 403);
+    } catch (\InvalidArgumentException $exception) {
+      JsonResponse::error($exception->getMessage(), 422);
+    }
+  }
+
+  private function creditService(): \SCM\Commercial\CommercialCreditRequestService
+  {
+    return new \SCM\Commercial\CommercialCreditRequestService($this->db, $this->policy, $this->config);
+  }
+
+  public function creditContracts(array $input): never
+  {
+    $this->verify($input);
+    try {
+      JsonResponse::success(['contracts' => $this->creditService()->contractsByOwnerDocument(trim((string) ($input['document'] ?? '')))]);
+    } catch (\SCM\Commercial\CommercialSignAccessDenied $exception) {
+      JsonResponse::error($exception->getMessage(), 403);
+    } catch (\InvalidArgumentException $exception) {
+      JsonResponse::error($exception->getMessage(), 422);
+    }
+  }
+
+  public function creditCreate(array $input): never
+  {
+    $this->verify($input);
+    try {
+      JsonResponse::success($this->creditService()->create($input));
     } catch (\SCM\Commercial\CommercialSignAccessDenied $exception) {
       JsonResponse::error($exception->getMessage(), 403);
     } catch (\InvalidArgumentException $exception) {
