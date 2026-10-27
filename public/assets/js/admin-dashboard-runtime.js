@@ -269,8 +269,8 @@
       var weekQuickPopover = null;
       var WEEK_SLOT_MINUTES = 15;
       var WEEK_DEFAULT_EVENT_MINUTES = 30;
-      var WEEK_DAY_START_MINUTES = 8 * 60;
-      var WEEK_DAY_END_MINUTES = 21 * 60;
+      var WEEK_DAY_START_MINUTES = 0;
+      var WEEK_DAY_END_MINUTES = 24 * 60;
 
       panel.querySelectorAll("[data-scm-calendar-open-path]").forEach(function (btn) {
         btn.addEventListener("click", function () {
@@ -1428,55 +1428,190 @@
         return (Number(match[1]) * 60) + Number(match[2]);
       }
 
-      function weekSlotEvents(dateKey, startMinutes, endMinutes) {
-        return calendarEvents.filter(function (row) {
-          if (eventDateKey(row) !== dateKey) return false;
-          var start = eventMinutes(row, "fecha_inicio");
-          return start !== null && start >= startMinutes && start < endMinutes;
+      // Los vencimientos sin hora llegan como 08:00 - 18:00: se pintan en la franja "Todo el día".
+      function isAllDayRow(row) {
+        if (Number((row && row.todo_el_dia) || 0) === 1) return true;
+        if (!isDueCalendar) return false;
+        return eventMinutes(row, "fecha_inicio") === 8 * 60 && eventMinutes(row, "fecha_fin") === 18 * 60;
+      }
+
+      function allDayEvents(dateKey) {
+        return gridRows().filter(function (row) {
+          return eventDateKey(row) === dateKey && isAllDayRow(row);
         }).sort(function (a, b) {
-          return String(a.fecha_inicio || "").localeCompare(String(b.fecha_inicio || ""));
+          return Number(b.dias_vencido || 0) - Number(a.dias_vencido || 0) || String(a.titulo || "").localeCompare(String(b.titulo || ""));
         });
+      }
+
+      function eventRange(row) {
+        var start = eventMinutes(row, "fecha_inicio");
+        if (start === null) return null;
+        var end = eventMinutes(row, "fecha_fin");
+        var endDate = String(row.fecha_fin || "").slice(0, 10);
+        if (endDate && endDate > eventDateKey(row)) {
+          end = WEEK_DAY_END_MINUTES;
+        } else if (end === null || end <= start) {
+          end = start + WEEK_DEFAULT_EVENT_MINUTES;
+        }
+        return { start: start, end: Math.min(end, WEEK_DAY_END_MINUTES) };
       }
 
       function timeGridEvents(dateKey) {
         return gridRows().filter(function (row) {
-          if (eventDateKey(row) !== dateKey) return false;
-          var start = eventMinutes(row, "fecha_inicio");
-          if (start === null) return false;
-          var end = eventMinutes(row, "fecha_fin");
-          if (end === null || end <= start) end = start + WEEK_DEFAULT_EVENT_MINUTES;
-          return start < WEEK_DAY_END_MINUTES && end > WEEK_DAY_START_MINUTES;
+          if (eventDateKey(row) !== dateKey || isAllDayRow(row)) return false;
+          var range = eventRange(row);
+          return !!range && range.start < WEEK_DAY_END_MINUTES && range.end > WEEK_DAY_START_MINUTES;
         }).sort(function (a, b) {
-          return String(a.fecha_inicio || "").localeCompare(String(b.fecha_inicio || ""));
+          var ra = eventRange(a);
+          var rb = eventRange(b);
+          return ra.start - rb.start || (rb.end - rb.start) - (ra.end - ra.start);
         });
       }
 
-      function timeGridEventHtml(row, columnIndex, totalDays) {
-        var start = eventMinutes(row, "fecha_inicio");
-        if (start === null) return "";
-        var end = eventMinutes(row, "fecha_fin");
-        if (end === null || end <= start) end = start + WEEK_DEFAULT_EVENT_MINUTES;
-        var visibleStart = Math.max(WEEK_DAY_START_MINUTES, start);
-        var visibleEnd = Math.min(WEEK_DAY_END_MINUTES, end);
-        if (visibleEnd <= visibleStart) return "";
+      // Reparte en columnas los eventos que se cruzan, como Google Calendar.
+      function layoutTimeGridEvents(rows) {
+        var placed = [];
+        var cluster = [];
+        var columns = [];
+        var clusterEnd = -1;
+        function closeCluster() {
+          cluster.forEach(function (item) { item.cols = columns.length; });
+          cluster = [];
+          columns = [];
+        }
+        rows.forEach(function (row) {
+          var range = eventRange(row);
+          if (cluster.length && range.start >= clusterEnd) closeCluster();
+          var col = 0;
+          while (col < columns.length && columns[col] > range.start) col += 1;
+          columns[col] = range.end;
+          var item = { row: row, start: range.start, end: range.end, col: col, cols: 1 };
+          cluster.push(item);
+          placed.push(item);
+          clusterEnd = Math.max(cluster.length > 1 ? clusterEnd : range.end, range.end);
+        });
+        closeCluster();
+        return placed;
+      }
+
+      function calendarRowRef(row) {
+        return String(calendarEvents.indexOf(row));
+      }
+
+      function timeGridItemAttrs(row) {
+        if (isDueCalendar) {
+          return ' type="button" data-scm-calendar-due-ref="' + escHtml(calendarRowRef(row)) + '"';
+        }
+        var id = String(row.id || row._ID || row.event_id || "").trim();
+        if (!id) return ' type="button" disabled';
+        var kind = calendarItemKind(row);
+        return kind === "evento"
+          ? ' type="button" data-scm-calendar-view-event data-event-id="' + escHtml(id) + '"'
+          : ' type="button" data-scm-calendar-view-item data-item-id="' + escHtml(id) + '" data-item-kind="' + escHtml(kind) + '"';
+      }
+
+      function timeGridRowColor(row) {
+        var color = isDueCalendar ? dueTypeTheme(row).color : row.color;
+        return String(color || "#1E3C76").trim() || "#1E3C76";
+      }
+
+      function timeGridEventHtml(item, columnIndex) {
+        var row = item.row;
+        var visibleStart = Math.max(WEEK_DAY_START_MINUTES, item.start);
+        var visibleEnd = Math.max(visibleStart + WEEK_SLOT_MINUTES, Math.min(WEEK_DAY_END_MINUTES, item.end));
         var startSlot = Math.floor((visibleStart - WEEK_DAY_START_MINUTES) / WEEK_SLOT_MINUTES);
         var span = Math.max(1, Math.ceil((visibleEnd - visibleStart) / WEEK_SLOT_MINUTES));
-        var color = String(row.color || "#f97316").trim() || "#f97316";
-        var id = String(row.id || row._ID || row.event_id || "").trim();
-        var kind = calendarItemKind(row);
-        var tag = id ? "button" : "div";
-        var attrs = tag === "button"
-          ? (kind === "evento"
-            ? ' type="button" data-scm-calendar-view-event data-event-id="' + escHtml(id) + '"'
-            : ' type="button" data-scm-calendar-view-item data-item-id="' + escHtml(id) + '" data-item-kind="' + escHtml(kind) + '"')
-          : ' role="group"';
-        var timeLabel = (timePartFromDateTime(row.fecha_inicio) || timeFromMinutes(start)) + " - " + (timePartFromDateTime(row.fecha_fin) || timeFromMinutes(end));
-        var dayIndex = Math.max(0, columnIndex - 2);
-        var daysCount = Math.max(1, totalDays || 7);
-        return '<' + tag + attrs + ' class="scm-calendar-time-event scm-calendar-time-event--' + escHtml(kind) + '" style="--event-day:' + String(dayIndex) + ';--event-days:' + String(daysCount) + ';--event-start-slot:' + String(startSlot) + ';--event-slot-span:' + String(span) + ';--event-color:' + escHtml(color) + '">' +
-          '<strong>' + escHtml(row.titulo || calendarItemKindLabel(row)) + '</strong>' +
-          '<em>' + escHtml(timeLabel) + '</em>' +
-          '</' + tag + '>';
+        var kind = isDueCalendar ? "vencimiento" : calendarItemKind(row);
+        var done = !isDueCalendar && calendarItemIsDone(row);
+        var timeLabel = timeFromMinutes(item.start) + (isDueCalendar ? "" : " - " + timeFromMinutes(item.end));
+        var title = row.titulo || (isDueCalendar ? "Vencimiento" : calendarItemKindLabel(row));
+        var compact = span <= 2;
+        return '<button' + timeGridItemAttrs(row) + ' class="scm-calendar-time-event scm-calendar-time-event--' + escHtml(kind) + (compact ? " is-compact" : "") + (done ? " is-done" : "") + '"' +
+          ' style="grid-column:' + columnIndex + ';grid-row:' + (startSlot + 3) + ' / span ' + span + ';--event-col:' + item.col + ';--event-cols:' + item.cols + ';--event-color:' + escHtml(timeGridRowColor(row)) + '"' +
+          ' title="' + escHtml(title + " · " + timeLabel) + '">' +
+          '<strong>' + escHtml(title) + (compact ? '<em>, ' + escHtml(timeLabel) + '</em>' : '') + '</strong>' +
+          (compact ? '' : '<em>' + escHtml(timeLabel) + '</em>') +
+          '</button>';
+      }
+
+      function allDayChipHtml(row) {
+        var title = row.titulo || (isDueCalendar ? "Vencimiento" : calendarItemKindLabel(row));
+        var overdue = isDueCalendar && Number(row.dias_vencido || 0) > 0;
+        return '<button' + timeGridItemAttrs(row) + ' class="scm-calendar-allday-chip' + (overdue ? " is-overdue" : "") + '" style="--event-color:' + escHtml(timeGridRowColor(row)) + '" title="' + escHtml(title + (row.descripcion ? " · " + row.descripcion : "")) + '">' +
+          '<span>' + escHtml(title) + '</span></button>';
+      }
+
+      function allDayCellHtml(dateKey, columnIndex, limit) {
+        var rows = allDayEvents(dateKey);
+        var shown = rows.length > limit ? rows.slice(0, limit - 1) : rows;
+        var html = '<div class="scm-calendar-allday-cell" style="grid-row:2;grid-column:' + columnIndex + '">';
+        html += shown.map(allDayChipHtml).join("");
+        if (rows.length > shown.length) {
+          html += '<button type="button" class="scm-calendar-allday-more" data-scm-calendar-open-day="' + escHtml(dateKey) + '">' + (rows.length - shown.length) + ' más</button>';
+        }
+        return html + '</div>';
+      }
+
+      function closeDuePopover() {
+        var current = panel.querySelector("[data-scm-calendar-due-popover]");
+        if (current) current.remove();
+        document.removeEventListener("keydown", handleDuePopoverKeydown);
+        document.removeEventListener("mousedown", handleDuePopoverOutside, true);
+      }
+
+      function handleDuePopoverKeydown(event) {
+        if (event.key === "Escape") closeDuePopover();
+      }
+
+      function handleDuePopoverOutside(event) {
+        var current = panel.querySelector("[data-scm-calendar-due-popover]");
+        if (current && !current.contains(event.target) && !(event.target.closest && event.target.closest("[data-scm-calendar-due-ref]"))) closeDuePopover();
+      }
+
+      // Tarjeta flotante con el detalle del vencimiento, junto al elemento pulsado.
+      function openDuePopover(row, anchor) {
+        closeDuePopover();
+        if (!row) return;
+        var theme = dueTypeTheme(row);
+        var overdueDays = Number(row.dias_vencido || 0);
+        var status = overdueDays > 0
+          ? '<span class="text-rose-600 font-medium">' + overdueDays + (overdueDays === 1 ? " día vencido" : " días vencido") + '</span>'
+          : '<span>Pendiente</span>';
+        var actions = dueActionsHtml(row);
+        var popover = document.createElement("div");
+        popover.setAttribute("data-scm-calendar-due-popover", "");
+        popover.setAttribute("role", "dialog");
+        popover.className = "scm-calendar-due-popover";
+        popover.innerHTML = '<div class="flex justify-end -mt-1 -mr-1"><button type="button" class="w-8 h-8 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-100 cursor-pointer" data-scm-calendar-due-popover-close aria-label="Cerrar"><span class="material-symbols-outlined text-[20px]">close</span></button></div>' +
+          '<div class="flex gap-3"><i class="mt-1.5 w-3 h-3 rounded shrink-0" style="background:' + escHtml(theme.color) + '" aria-hidden="true"></i><div class="min-w-0">' +
+          '<p class="text-[15px] font-medium text-slate-900 leading-snug">' + escHtml(row.titulo || "Vencimiento") + '</p>' +
+          '<p class="text-[13px] text-slate-500 mt-0.5">' + escHtml(calendarDayTitle(eventDateKey(row))) + '</p>' +
+          '</div></div>' +
+          '<dl class="mt-3 grid grid-cols-[18px_1fr] gap-x-3 gap-y-2 text-[13px] text-slate-700">' +
+          '<span class="material-symbols-outlined text-[18px] text-slate-400">sell</span><dd>' + escHtml(dueTypeLabel(row.tipo_vencimiento)) + '</dd>' +
+          (row.descripcion ? '<span class="material-symbols-outlined text-[18px] text-slate-400">notes</span><dd>' + escHtml(row.descripcion) + '</dd>' : '') +
+          '<span class="material-symbols-outlined text-[18px] text-slate-400">event</span><dd>Vence ' + escHtml(row.fecha_vencimiento || eventDateKey(row)) + ' · ' + status + '</dd>' +
+          (row.funcionario ? '<span class="material-symbols-outlined text-[18px] text-slate-400">person</span><dd>' + escHtml(row.funcionario) + '</dd>' : '') +
+          '</dl>' +
+          (actions ? '<div class="flex flex-wrap items-center gap-x-2 gap-y-1 mt-3 pt-3 border-t border-slate-100">' + actions + '</div>' : '');
+        panel.appendChild(popover);
+        var rect = anchor.getBoundingClientRect();
+        var width = popover.offsetWidth;
+        var height = popover.offsetHeight;
+        var left = rect.right + 8;
+        if (left + width > window.innerWidth - 12) left = rect.left - width - 8;
+        left = Math.max(12, Math.min(left, window.innerWidth - width - 12));
+        var top = Math.max(12, Math.min(rect.top, window.innerHeight - height - 12));
+        popover.style.left = left + "px";
+        popover.style.top = top + "px";
+        popover.querySelector("[data-scm-calendar-due-popover-close]").addEventListener("click", closeDuePopover);
+        popover.addEventListener("click", function (event) {
+          if (event.target.closest && event.target.closest("[data-commercial-open-case], a")) window.setTimeout(closeDuePopover, 0);
+        });
+        window.setTimeout(function () {
+          document.addEventListener("keydown", handleDuePopoverKeydown);
+          document.addEventListener("mousedown", handleDuePopoverOutside, true);
+        }, 0);
       }
 
       function updateWeekSelection(grid, dateKey, startMinutes, endMinutes) {
@@ -1955,96 +2090,96 @@
         });
       }
 
-      function renderWeekGrid() {
+      var timeGridScroll = { key: "", top: 0 };
+
+      // Semana y día comparten la grilla: encabezado, franja "Todo el día" y horas con scroll propio.
+      function renderTimeGrid(days, isDay) {
         if (!monthGrid) return;
         updateCalendarViewButtons();
+        closeDuePopover();
+        var todayKey = toDateKey(new Date());
+        var previousGrid = monthGrid.querySelector("[data-scm-calendar-week-grid]");
+        var viewKey = calendarDisplayMode + ":" + toDateKey(days[0]);
+        if (previousGrid) timeGridScroll.top = previousGrid.scrollTop;
+        var keepScroll = previousGrid && timeGridScroll.key === viewKey;
+        timeGridScroll.key = viewKey;
+        var slotsCount = (WEEK_DAY_END_MINUTES - WEEK_DAY_START_MINUTES) / WEEK_SLOT_MINUTES;
+        var html = '<div class="scm-calendar-time-grid' + (isDay ? ' scm-calendar-time-grid--day' : '') + '" data-scm-calendar-week-grid>';
+        html += '<div class="scm-calendar-time-gutter scm-calendar-time-gutter--head" style="grid-row:1;grid-column:1"></div>';
+        html += '<div class="scm-calendar-time-gutter scm-calendar-time-gutter--allday" style="grid-row:2;grid-column:1">Todo el día</div>';
+        days.forEach(function (date, index) {
+          var key = toDateKey(date);
+          var classes = "scm-calendar-week-head";
+          if (key === todayKey) classes += " is-today";
+          if (!isDay && key === selectedDay) classes += " is-selected";
+          html += '<button type="button" class="' + classes + '" style="grid-row:1;grid-column:' + (index + 2) + '" ' + (isDay ? 'disabled' : 'data-scm-calendar-open-day="' + escHtml(key) + '" title="Ver el día"') + '>' +
+            '<span>' + escHtml(date.toLocaleDateString("es-CO", { weekday: "short" }).replace(/\./g, "")) + '</span>' +
+            '<strong>' + String(date.getDate()) + '</strong>' +
+            '</button>';
+          html += allDayCellHtml(key, index + 2, isDay ? 8 : 3);
+        });
+        for (var minutes = WEEK_DAY_START_MINUTES; minutes < WEEK_DAY_END_MINUTES; minutes += WEEK_SLOT_MINUTES) {
+          var slotRow = (minutes - WEEK_DAY_START_MINUTES) / WEEK_SLOT_MINUTES + 3;
+          var slotEnd = minutes + WEEK_SLOT_MINUTES;
+          var hourEnd = slotEnd % 60 === 0 ? " is-hour-end" : "";
+          html += '<div class="scm-calendar-time-gutter' + hourEnd + '" style="grid-row:' + slotRow + ';grid-column:1">' + (minutes % 60 === 0 && minutes > 0 ? '<span>' + escHtml(displayHourFromMinutes(minutes)) + '</span>' : '') + '</div>';
+          days.forEach(function (date, index) {
+            var key = toDateKey(date);
+            var slotClasses = "scm-calendar-time-slot" + hourEnd;
+            if (key === todayKey) slotClasses += " is-today";
+            html += '<button type="button" class="' + slotClasses + '" style="grid-row:' + slotRow + ';grid-column:' + (index + 2) + '" data-scm-calendar-week-slot data-date="' + escHtml(key) + '" data-start="' + String(minutes) + '" data-end="' + String(slotEnd) + '" aria-label="' + escHtml(calendarDayTitle(key) + " " + timeFromMinutes(minutes)) + '"></button>';
+          });
+        }
+        var now = new Date();
+        days.forEach(function (date, index) {
+          var key = toDateKey(date);
+          layoutTimeGridEvents(timeGridEvents(key)).forEach(function (item) {
+            html += timeGridEventHtml(item, index + 2);
+          });
+          if (key === todayKey) {
+            var nowMinutes = now.getHours() * 60 + now.getMinutes();
+            var pct = ((nowMinutes - WEEK_DAY_START_MINUTES) / (WEEK_DAY_END_MINUTES - WEEK_DAY_START_MINUTES)) * 100;
+            html += '<div class="scm-calendar-now-line" style="grid-column:' + (index + 2) + ';grid-row:3 / span ' + slotsCount + ';--now-top:' + pct.toFixed(3) + '%" aria-hidden="true"></div>';
+          }
+        });
+        html += '</div>';
+        monthGrid.innerHTML = html;
+        var grid = monthGrid.querySelector("[data-scm-calendar-week-grid]");
+        if (keepScroll) {
+          grid.scrollTop = timeGridScroll.top;
+        } else {
+          var hasToday = days.some(function (date) { return toDateKey(date) === todayKey; });
+          // Arranca en la primera cita visible (o la hora actual si es antes); sin citas, a las 7 a. m.
+          var focusMinutes = hasToday ? now.getHours() * 60 - 60 : 7 * 60;
+          var timed = [];
+          days.forEach(function (date) { timed = timed.concat(timeGridEvents(toDateKey(date))); });
+          if (timed.length) {
+            var firstStart = Math.min.apply(null, timed.map(function (row) { return eventRange(row).start; })) - 30;
+            focusMinutes = hasToday ? Math.min(focusMinutes, firstStart) : firstStart;
+          }
+          focusMinutes = Math.max(0, Math.min(focusMinutes, hasToday ? focusMinutes : 7 * 60));
+          var focusSlot = grid.querySelector('[data-scm-calendar-week-slot][data-start="' + String(Math.max(0, Math.floor(focusMinutes / 60) * 60)) + '"]');
+          var head = grid.querySelector(".scm-calendar-time-gutter--allday");
+          if (focusSlot) grid.scrollTop = Math.max(0, focusSlot.offsetTop - (head ? head.offsetTop + head.offsetHeight : 0));
+        }
+        bindTimeGridInteractions(grid);
+      }
+
+      function renderWeekGrid() {
         var base = dateFromKey(selectedDay) || currentMonth || new Date();
         var start = startOfWeek(base);
-        var todayKey = toDateKey(new Date());
         if (titleEl) titleEl.textContent = weekLabel(base);
         var days = [];
         for (var dayIndex = 0; dayIndex < 7; dayIndex += 1) {
           days.push(addDays(start, dayIndex));
         }
-        var html = '<div class="scm-calendar-time-grid" data-scm-calendar-week-grid>';
-        html += '<div class="scm-calendar-time-gutter scm-calendar-time-gutter--head" style="grid-row:1;grid-column:1">Hora</div>';
-        days.forEach(function (date, headIndex) {
-          var key = toDateKey(date);
-          var classes = "scm-calendar-week-head";
-          if (key === todayKey) classes += " is-today";
-          if (key === selectedDay) classes += " is-selected";
-          html += '<button type="button" class="' + classes + '" style="grid-row:1;grid-column:' + (headIndex + 2) + '" data-scm-calendar-week-day="' + escHtml(key) + '">' +
-            '<span>' + escHtml(date.toLocaleDateString("es-CO", { weekday: "short" }).replace(/\./g, "")) + '</span>' +
-            '<strong>' + String(date.getDate()) + '</strong>' +
-            '</button>';
-        });
-        for (var minutes = WEEK_DAY_START_MINUTES; minutes < WEEK_DAY_END_MINUTES; minutes += WEEK_SLOT_MINUTES) {
-          var label = minutes % 60 === 0 ? displayHourFromMinutes(minutes) : "";
-          var slotRow = (minutes - WEEK_DAY_START_MINUTES) / WEEK_SLOT_MINUTES + 2;
-          html += '<div class="scm-calendar-time-gutter" style="grid-row:' + slotRow + ';grid-column:1">' + escHtml(label) + '</div>';
-          days.forEach(function (date, slotDayIndex) {
-            var key = toDateKey(date);
-            var slotEnd = minutes + WEEK_SLOT_MINUTES;
-            var slotClasses = "scm-calendar-time-slot";
-            if (key === todayKey) slotClasses += " is-today";
-            if (key === selectedDay) slotClasses += " is-selected-day";
-            html += '<button type="button" class="' + slotClasses + '" style="grid-row:' + slotRow + ';grid-column:' + (slotDayIndex + 2) + '" data-scm-calendar-week-slot data-date="' + escHtml(key) + '" data-start="' + String(minutes) + '" data-end="' + String(slotEnd) + '" aria-label="' + escHtml(calendarDayTitle(key) + " " + timeFromMinutes(minutes)) + '">';
-            html += '</button>';
-          });
-        }
-        days.forEach(function (date, dayIndex) {
-          var key = toDateKey(date);
-          timeGridEvents(key).forEach(function (row) {
-            html += timeGridEventHtml(row, dayIndex + 2, 7);
-          });
-        });
-        html += '</div>';
-        monthGrid.innerHTML = html;
-        var grid = monthGrid.querySelector("[data-scm-calendar-week-grid]");
-        monthGrid.querySelectorAll("[data-scm-calendar-week-day]").forEach(function (btn) {
-          btn.addEventListener("click", function () {
-            selectedDay = btn.getAttribute("data-scm-calendar-week-day") || selectedDay;
-            var parsed = dateFromKey(selectedDay);
-            if (parsed) currentMonth = startOfMonth(parsed);
-            renderCalendarGrid();
-            renderSelectedDay();
-          });
-        });
-        bindTimeGridInteractions(grid);
+        renderTimeGrid(days, false);
       }
 
       function renderDayGrid() {
-        if (!monthGrid) return;
-        updateCalendarViewButtons();
         var date = dateFromKey(selectedDay) || currentMonth || new Date();
-        var key = toDateKey(date);
-        var todayKey = toDateKey(new Date());
         if (titleEl) titleEl.textContent = dayViewLabel(date);
-        var html = '<div class="scm-calendar-time-grid scm-calendar-time-grid--day" data-scm-calendar-week-grid>';
-        html += '<div class="scm-calendar-time-gutter scm-calendar-time-gutter--head" style="grid-row:1;grid-column:1">Hora</div>';
-        var headClasses = "scm-calendar-week-head";
-        if (key === todayKey) headClasses += " is-today";
-        headClasses += " is-selected";
-        html += '<button type="button" class="' + headClasses + '" style="grid-row:1;grid-column:2" data-scm-calendar-week-day="' + escHtml(key) + '">' +
-          '<span>' + escHtml(date.toLocaleDateString("es-CO", { weekday: "short" }).replace(/\./g, "")) + '</span>' +
-          '<strong>' + String(date.getDate()) + '</strong>' +
-          '</button>';
-        for (var minutes = WEEK_DAY_START_MINUTES; minutes < WEEK_DAY_END_MINUTES; minutes += WEEK_SLOT_MINUTES) {
-          var label = minutes % 60 === 0 ? displayHourFromMinutes(minutes) : "";
-          var slotEnd = minutes + WEEK_SLOT_MINUTES;
-          var slotClasses = "scm-calendar-time-slot is-selected-day";
-          if (key === todayKey) slotClasses += " is-today";
-          var slotRow = (minutes - WEEK_DAY_START_MINUTES) / WEEK_SLOT_MINUTES + 2;
-          html += '<div class="scm-calendar-time-gutter" style="grid-row:' + slotRow + ';grid-column:1">' + escHtml(label) + '</div>';
-          html += '<button type="button" class="' + slotClasses + '" style="grid-row:' + slotRow + ';grid-column:2" data-scm-calendar-week-slot data-date="' + escHtml(key) + '" data-start="' + String(minutes) + '" data-end="' + String(slotEnd) + '" aria-label="' + escHtml(calendarDayTitle(key) + " " + timeFromMinutes(minutes)) + '">';
-          html += '</button>';
-        }
-        timeGridEvents(key).forEach(function (row) {
-          html += timeGridEventHtml(row, 2, 1);
-        });
-        html += '</div>';
-        monthGrid.innerHTML = html;
-        bindTimeGridInteractions(monthGrid.querySelector("[data-scm-calendar-week-grid]"));
+        renderTimeGrid([date], true);
       }
 
       function renderMonthGrid() {
@@ -5232,6 +5367,26 @@
         if (dueCaseBtn && panel.contains(dueCaseBtn) && typeof window.scmOpenCase === "function") {
           e.preventDefault();
           openDueCase(dueCaseBtn);
+          return;
+        }
+        var dueRefBtn = e.target && e.target.closest ? e.target.closest("[data-scm-calendar-due-ref]") : null;
+        if (dueRefBtn && panel.contains(dueRefBtn)) {
+          e.preventDefault();
+          openDuePopover(calendarEvents[Number(dueRefBtn.getAttribute("data-scm-calendar-due-ref"))], dueRefBtn);
+          return;
+        }
+        var openDayBtn = e.target && e.target.closest ? e.target.closest("[data-scm-calendar-open-day]") : null;
+        if (openDayBtn && panel.contains(openDayBtn)) {
+          e.preventDefault();
+          selectedDay = openDayBtn.getAttribute("data-scm-calendar-open-day") || selectedDay;
+          currentMonth = startOfMonth(dateFromKey(selectedDay) || new Date());
+          if (calendarDisplayMode === "day") {
+            renderCalendarGrid();
+          } else {
+            calendarDisplayMode = "day";
+            loadEvents();
+          }
+          renderSelectedDay();
           return;
         }
         var eventViewBtn = e.target && e.target.closest ? e.target.closest("[data-scm-calendar-view-event]") : null;

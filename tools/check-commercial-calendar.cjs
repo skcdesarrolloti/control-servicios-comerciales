@@ -96,6 +96,36 @@ async function closeSwal(page) {
   assert(dueText.includes('Tarea #1') && dueText.includes('Seguimiento tarea #1'), 'Faltan los vencimientos de tareas y seguimientos');
   assert(await page.locator('[data-scm-calendar-due-type-filter] [name="due_type"]').count() === 7, 'Faltan tipos de vencimiento comercial');
 
+  // Semana y día estilo Google Calendar: los vencimientos sin hora van en "Todo el día" y abren su propio detalle.
+  await page.locator('[data-scm-calendar-view-mode="week"]').click();
+  await page.locator('[data-scm-calendar-week-grid] .scm-calendar-allday-cell').first().waitFor();
+  assert(await page.locator('[data-scm-calendar-week-grid] .scm-calendar-allday-chip, [data-scm-calendar-week-grid] .scm-calendar-allday-more').count() > 0, 'La semana no muestra los vencimientos en la franja Todo el día');
+  const tallDue = await page.locator('[data-scm-calendar-week-grid] .scm-calendar-time-event').evaluateAll(nodes => nodes.filter(node => node.getBoundingClientRect().height > 200).length);
+  assert(tallDue === 0, 'Siguen apareciendo vencimientos como bloques de 08:00 a 18:00');
+  const firstChip = page.locator('[data-scm-calendar-week-grid] .scm-calendar-allday-chip').first();
+  const chipTitle = (await firstChip.textContent()).trim();
+  await firstChip.click();
+  await page.locator('[data-scm-calendar-due-popover]').waitFor();
+  assert((await page.locator('[data-scm-calendar-due-popover]').textContent()).includes(chipTitle), 'El detalle no corresponde al vencimiento pulsado');
+  assert(!(await page.locator('.swal2-container').count()), 'El vencimiento abre el detalle de evento');
+  await page.keyboard.press('Escape');
+  await page.locator('[data-scm-calendar-week-grid] [data-scm-calendar-open-day]').first().click();
+  await page.locator('[data-scm-calendar-week-grid].scm-calendar-time-grid--day').waitFor();
+  assert(await page.locator('[data-scm-calendar-view-mode="day"]').getAttribute('aria-pressed') === 'true', 'Clic en el día no abre la vista diaria');
+
+  await page.goto(endpoint + '?tab=calendario&subtab=mine');
+  await page.waitForFunction(() => document.querySelector('[data-scm-calendar-total]').textContent === '2');
+  await page.locator('[data-scm-calendar-view-mode="week"]').click();
+  const weekEvent = page.locator('[data-scm-calendar-week-grid] .scm-calendar-time-event[data-event-id="501"]');
+  await weekEvent.waitFor();
+  const eventBox = await weekEvent.boundingBox();
+  assert(eventBox && eventBox.height > 40 && eventBox.height < 60, 'El evento de una hora no ocupa una hora en la semana');
+  await weekEvent.click();
+  await page.locator('.scm-calendar-event-detail-swal').waitFor();
+  assert((await page.locator('.scm-calendar-event-detail-swal').textContent()).includes('Visita apartamento Manga'), 'El clic en la semana abre otro evento');
+  await page.locator('.scm-calendar-event-detail-swal [data-scm-calendar-close]').first().click();
+  await page.locator('.swal2-container').waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
+
   // Agendar desde la tarea conserva el estado administrativo y vincula la tarea.
   await page.goto(endpoint + '?tab=tarea');
   await page.locator('[data-commercial-calendar-task] [data-commercial-calendar-schedule]').click();

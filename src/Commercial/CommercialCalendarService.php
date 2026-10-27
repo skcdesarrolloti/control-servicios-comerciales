@@ -436,6 +436,7 @@ final class CommercialCalendarService
       'fecha_calendario' => $calendar->format('Y-m-d'),
       'fecha_inicio' => $start->format('Y-m-d H:i:s'),
       'fecha_fin' => $end->format('Y-m-d H:i:s'),
+      'todo_el_dia' => $keepTime ? 0 : 1,
       'acumulado_vencido' => $calendar->format('Y-m-d') !== $due->format('Y-m-d') ? 1 : 0,
       'dias_limite' => (int) ($data['days_limit'] ?? 0),
       'dias_transcurridos' => $baseTs > 0 ? max(0, (int) floor(($todayTs - $baseTs) / 86400)) : 0,

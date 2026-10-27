@@ -210,125 +210,203 @@ final class CommercialDashboardView
     .swal2-popup .scm-calendar-create-shell {
       text-align: left;
     }
-    /* Grilla de Tiempo para Vistas Semanal y Diaria del Calendario */
+    /* Grilla de Tiempo para Vistas Semanal y Diaria del Calendario (estilo Google Calendar) */
     .scm-calendar-time-grid {
       display: grid;
-      grid-template-columns: 56px repeat(7, minmax(110px, 1fr));
-      grid-auto-rows: 24px;
+      grid-template-columns: 64px repeat(7, minmax(104px, 1fr));
+      grid-template-rows: 56px auto;
+      grid-auto-rows: 12px;
       position: relative;
       background-color: #ffffff;
-      border-radius: 1rem;
+      border-radius: 0.75rem;
       border: 1px solid #e2e8f0;
-      overflow-x: auto;
-      max-height: 600px;
+      overflow: auto;
+      max-height: min(680px, calc(100vh - 240px));
+      overscroll-behavior: contain;
     }
     .scm-calendar-time-grid--day {
-      grid-template-columns: 56px minmax(260px, 1fr);
+      grid-template-columns: 64px minmax(260px, 1fr);
     }
     .scm-calendar-time-gutter {
-      font-size: 11px;
-      font-weight: 500;
+      position: relative;
+      font-size: 10px;
       color: #64748b;
-      border-bottom: 1px solid #f1f5f9;
       border-right: 1px solid #e2e8f0;
-      padding: 2px 6px;
       text-align: right;
       user-select: none;
-      background-color: #f8fafc;
-      line-height: 20px;
+      background-color: #ffffff;
     }
-    .scm-calendar-time-gutter--head {
-      position: sticky;
-      top: 0;
-      z-index: 20;
-      height: 48px;
-      line-height: 44px;
-      background-color: #f1f5f9;
-      font-weight: 700;
+    .scm-calendar-time-gutter > span {
+      position: absolute;
+      right: 8px;
+      top: -7px;
+      line-height: 14px;
+      background: #ffffff;
+      padding-left: 2px;
     }
+    .scm-calendar-time-gutter--head,
     .scm-calendar-week-head {
       position: sticky;
       top: 0;
-      z-index: 20;
-      height: 48px;
+      z-index: 30;
+      background-color: #ffffff;
+    }
+    .scm-calendar-time-gutter--allday {
+      position: sticky;
+      top: 56px;
+      z-index: 30;
+      padding: 6px 8px 6px 0;
+      font-size: 10px;
+      line-height: 1.2;
+      border-bottom: 1px solid #cbd5e1;
+    }
+    .scm-calendar-week-head {
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      background-color: #f8fafc;
-      border-bottom: 1px solid #e2e8f0;
+      gap: 2px;
       border-right: 1px solid #f1f5f9;
-      font-size: 12px;
-      color: #475569;
+      font-size: 11px;
+      font-weight: 500;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
       cursor: pointer;
+    }
+    .scm-calendar-week-head:disabled {
+      cursor: default;
+    }
+    .scm-calendar-week-head strong {
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 9999px;
+      font-size: 18px;
+      font-weight: 500;
+      color: #1e293b;
       transition: background 0.15s;
     }
-    .scm-calendar-week-head:hover {
+    .scm-calendar-week-head:not(:disabled):hover strong {
       background-color: #f1f5f9;
     }
     .scm-calendar-week-head.is-today {
       color: #1e3c76;
-      font-weight: 700;
     }
-    .scm-calendar-week-head.is-today strong {
+    .scm-calendar-week-head.is-today strong,
+    .scm-calendar-week-head.is-today:hover strong {
       background-color: #1e3c76;
       color: #ffffff;
-      border-radius: 9999px;
-      width: 22px;
-      height: 22px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
     }
-    .scm-calendar-week-head.is-selected {
-      background-color: #ebf1fb;
-      border-bottom: 2px solid #1e3c76;
+    .scm-calendar-allday-cell {
+      position: sticky;
+      top: 56px;
+      z-index: 25;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-height: 28px;
+      padding: 3px 4px 4px;
+      background: #ffffff;
+      border-right: 1px solid #f1f5f9;
+      border-bottom: 1px solid #cbd5e1;
+      min-width: 0;
+    }
+    .scm-calendar-allday-chip {
+      display: block;
+      width: 100%;
+      min-width: 0;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: color-mix(in srgb, var(--event-color, #1e3c76) 14%, #ffffff);
+      color: #0f172a;
+      font-size: 11px;
+      line-height: 16px;
+      text-align: left;
+      cursor: pointer;
+    }
+    .scm-calendar-allday-chip span {
+      display: block;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+    .scm-calendar-allday-chip::before {
+      content: "";
+      float: left;
+      width: 6px;
+      height: 6px;
+      margin: 5px 5px 0 0;
+      border-radius: 9999px;
+      background: var(--event-color, #1e3c76);
+    }
+    .scm-calendar-allday-chip:hover {
+      background: color-mix(in srgb, var(--event-color, #1e3c76) 24%, #ffffff);
+    }
+    .scm-calendar-allday-more {
+      align-self: flex-start;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #475569;
+      cursor: pointer;
+    }
+    .scm-calendar-allday-more:hover {
+      background: #f1f5f9;
+      color: #0f172a;
     }
     .scm-calendar-time-slot {
-      border-bottom: 1px dashed #f1f5f9;
+      border: 0;
       border-right: 1px solid #f1f5f9;
       background: transparent;
       cursor: pointer;
-      transition: background 0.1s;
       padding: 0;
     }
+    .scm-calendar-time-gutter.is-hour-end {
+      border-bottom: 0;
+    }
+    .scm-calendar-time-slot.is-hour-end {
+      border-bottom: 1px solid #eef2f6;
+    }
     .scm-calendar-time-slot:hover {
-      background-color: rgba(30, 60, 118, 0.06);
-    }
-    .scm-calendar-time-slot.is-selected-day {
-      background-color: rgba(30, 60, 118, 0.02);
-    }
-    .scm-calendar-time-slot.is-today {
-      background-color: rgba(30, 60, 118, 0.03);
+      background-color: rgba(30, 60, 118, 0.04);
     }
     .scm-calendar-time-slot.is-selecting {
-      background-color: rgba(30, 60, 118, 0.15) !important;
+      background-color: rgba(30, 60, 118, 0.14) !important;
     }
     .scm-calendar-time-event {
-      grid-column-start: calc(var(--event-day, 0) + 2);
-      grid-column-end: span 1;
-      grid-row-start: calc(var(--event-start-slot, 0) + 2);
-      grid-row-end: span var(--event-slot-span, 2);
+      position: relative;
       z-index: 10;
-      margin: 1px 3px;
-      padding: 3px 6px;
-      border-radius: 8px;
-      background-color: #ffffff;
+      align-self: stretch;
+      justify-self: start;
+      width: calc((100% - 10px) / var(--event-cols, 1) - 1px);
+      margin: 0 0 1px calc(2px + (100% - 10px) * var(--event-col, 0) / var(--event-cols, 1));
+      min-height: 0;
+      padding: 2px 6px;
+      border-radius: 6px;
+      background: color-mix(in srgb, var(--event-color, #1e3c76) 16%, #ffffff);
       border-left: 3px solid var(--event-color, #1e3c76);
-      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      box-shadow: 0 0 0 1px #ffffff;
       font-size: 11px;
-      line-height: 1.25;
+      line-height: 1.3;
       text-align: left;
       overflow: hidden;
       cursor: pointer;
-      transition: transform 0.1s, box-shadow 0.1s;
       display: flex;
       flex-direction: column;
     }
     .scm-calendar-time-event:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 4px 8px rgba(0,0,0,0.12);
+      background: color-mix(in srgb, var(--event-color, #1e3c76) 26%, #ffffff);
       z-index: 15;
+    }
+    .scm-calendar-time-event.is-done {
+      opacity: 0.55;
+    }
+    .scm-calendar-time-event.is-done strong {
+      text-decoration: line-through;
     }
     .scm-calendar-time-event strong {
       font-weight: 600;
@@ -339,9 +417,50 @@ final class CommercialDashboardView
     }
     .scm-calendar-time-event em {
       font-style: normal;
+      font-weight: 400;
       font-size: 10px;
-      color: #64748b;
-      margin-top: 1px;
+      color: #475569;
+    }
+    .scm-calendar-time-event.is-compact {
+      justify-content: center;
+      padding-top: 0;
+      padding-bottom: 0;
+    }
+    .scm-calendar-now-line {
+      position: relative;
+      z-index: 20;
+      pointer-events: none;
+    }
+    .scm-calendar-now-line::before,
+    .scm-calendar-now-line::after {
+      content: "";
+      position: absolute;
+      top: var(--now-top, 0%);
+      background: #ea4335;
+    }
+    .scm-calendar-now-line::before {
+      left: 0;
+      right: 0;
+      height: 2px;
+      margin-top: -1px;
+    }
+    .scm-calendar-now-line::after {
+      left: -6px;
+      width: 12px;
+      height: 12px;
+      margin-top: -6px;
+      border-radius: 9999px;
+    }
+    .scm-calendar-due-popover {
+      position: fixed;
+      z-index: 60;
+      width: min(360px, calc(100vw - 24px));
+      max-height: calc(100vh - 24px);
+      overflow-y: auto;
+      padding: 12px 16px 16px;
+      background: #ffffff;
+      border-radius: 12px;
+      box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18), 0 2px 6px rgba(15, 23, 42, 0.08);
     }
   </style>
   <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/tailwind.css?v=' . filemtime(SCM_PUBLIC_PATH . '/assets/css/tailwind.css')); ?>">
