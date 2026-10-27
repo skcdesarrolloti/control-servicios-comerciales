@@ -1,7 +1,7 @@
 /*
  * Menú "Configuración" del encabezado comercial. Cada opción abre un popup con su sección:
  * calendario, tiempos de atención, avisos, actualizaciones de inmuebles y cupos de destacados.
- * Permisos y guías reutilizan sus modales existentes.
+ * Permisos reutiliza su modal existente.
  */
 (function () {
   "use strict";
@@ -267,11 +267,6 @@
     if (!item) return;
     var action = item.getAttribute("data-commercial-config-action");
     setMenu(false);
-    if (action === "guide") {
-      var guide = document.getElementById("scm-open-guide");
-      if (guide) guide.click();
-      return;
-    }
     // "permissions" abre su modal desde commercial-dashboard.js (id commercial-open-permissions).
     if (action !== "permissions") openSection(action);
   });

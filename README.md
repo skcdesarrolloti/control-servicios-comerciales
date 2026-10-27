@@ -176,7 +176,6 @@ El menú **Configuración** del encabezado (solo cargos administradores) reúne 
 | Avisos en fachada | Días de retoque e instalación, valor del aviso, transporte y factor prestacional | Filas `dia-retoque-*`, `dias-atraso-aviso-nuevo`, `valor_aviso`, `valor_transporte`, `factor_prestacional` |
 | Actualizaciones de inmuebles | Días de alerta y vencimiento por tipo de negocio | `commercial_property_update_limits` |
 | Cupos de destacados | Máximo de destacados por portal | Filas de cada portal en `jet_cct_confi_sistema` |
-| Guías del sistema | Abre la guía de estados | — |
 
 ## Autologin firmado
 

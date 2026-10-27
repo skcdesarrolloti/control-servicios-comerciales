@@ -615,7 +615,7 @@
         fillEmployeeOptions(
           Array.prototype.slice.call(panel.querySelectorAll("[data-scm-calendar-filter-employees]")),
           allowedEmployees,
-          "Selecciona funcionario",
+          lockCurrentEmployee ? "Mi calendario" : "Todo el equipo",
         );
         enforceLockedEmployeeFilter();
       }
@@ -1248,40 +1248,47 @@
         var kind = calendarItemKind(row);
         var isEventKind = kind === "evento";
         var isDone = calendarItemIsDone(row);
-        var estado = calendarItemStatusLabel(row);
         var color = String(row.color || "#f59e0b").trim() || "#f59e0b";
         var kindLabel = calendarItemKindLabel(row);
-        var descriptionHtml = calendarRichTextHtml(row.descripcion || "");
-        var statusBadgeClass = isDone ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800";
-        var kindBadgeClass = kind === "tarea" ? "bg-primary/10 text-primary" : (kind === "recordatorio" ? "bg-purple-100 text-purple-800" : "bg-sky-100 text-sky-800");
+        var category = categoryNameForRow(row);
+        var start = timePartFromDateTime(row.fecha_inicio);
+        var end = isEventKind ? timePartFromDateTime(row.fecha_fin) : "";
+        var detailAttr = isEventKind
+          ? ' data-scm-calendar-view-event data-event-id="' + escHtml(id) + '"'
+          : ' data-scm-calendar-view-item data-item-id="' + escHtml(id) + '" data-item-kind="' + escHtml(kind) + '"';
+        function iconButton(attrs, icon, label, tone) {
+          return '<button type="button" class="w-8 h-8 rounded-lg flex items-center justify-center transition-colors cursor-pointer ' + (tone || "text-slate-500 hover:text-[#061D49] hover:bg-slate-100") + '"' + attrs + ' title="' + escHtml(label) + '" aria-label="' + escHtml(label) + '"><span class="material-symbols-outlined text-[18px]">' + icon + '</span></button>';
+        }
+        var actions = "";
+        if (isEventKind && id) {
+          if (!isDone) actions += iconButton(' data-scm-calendar-complete-event data-event-id="' + escHtml(id) + '"', "check_circle", "Marcar realizado", "text-emerald-600 hover:bg-emerald-50");
+          actions += iconButton(' data-scm-calendar-reschedule-event data-event-id="' + escHtml(id) + '"', "event_repeat", "Trasladar");
+          actions += iconButton(' data-scm-calendar-edit-event data-event-id="' + escHtml(id) + '"', "edit", "Editar");
+          if (ticket) actions += iconButton(' data-scm-calendar-view-ticket data-event-id="' + escHtml(id) + '" data-ticket-id="' + escHtml(ticket) + '"', "assignment", "Ver tarea #" + ticket);
+        }
+        if (kind === "recordatorio" && id && !isDone) {
+          actions += iconButton(' data-scm-calendar-send-reminder data-reminder-id="' + escHtml(id) + '"', "mark_email_read", "Marcar enviado", "text-emerald-600 hover:bg-emerald-50");
+          actions += iconButton(' data-scm-calendar-edit-item data-item-id="' + escHtml(id) + '" data-item-kind="recordatorio"', "edit", "Editar");
+          actions += iconButton(' data-scm-calendar-cancel-reminder data-reminder-id="' + escHtml(id) + '"', "cancel", "Cancelar recordatorio", "text-rose-600 hover:bg-rose-50");
+        }
 
-        return '<article class="p-3 bg-surface-container-low rounded-xl border border-surface-container relative overflow-hidden transition-all space-y-2">' +
-          '<div class="absolute left-0 top-0 bottom-0 w-1" style="background:' + escHtml(color) + '"></div>' +
-          '<div class="pl-1.5 flex items-start justify-between gap-2">' +
-          '<h5 class="font-title-sm font-semibold text-on-surface leading-snug">' + escHtml(row.titulo || kindLabel) + '</h5>' +
-          '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 uppercase tracking-wide ' + statusBadgeClass + '">' + escHtml(estado) + '</span>' +
+        return '<article class="flex gap-3 p-2.5 rounded-xl border bg-white hover:shadow-sm transition-shadow ' + (isDone ? "border-slate-100 opacity-75" : "border-slate-200") + '">' +
+          '<div class="w-14 shrink-0 text-center pt-0.5">' +
+          '<strong class="block text-sm font-bold text-[#061D49]">' + escHtml(start || "—") + '</strong>' +
+          (end ? '<span class="block text-[11px] text-slate-400">' + escHtml(end) + '</span>' : '') +
           '</div>' +
-          (descriptionHtml ? '<div class="pl-1.5 text-xs text-secondary/90 leading-relaxed font-body-sm line-clamp-3">' + descriptionHtml + '</div>' : '') +
-          '<div class="pl-1.5 flex flex-wrap items-center gap-1.5 text-[11px] text-secondary">' +
-          '<span class="flex items-center gap-1 font-medium"><span class="material-symbols-outlined text-[14px]">schedule</span>' + escHtml(formatDateTime(row.fecha_inicio)) + '</span>' +
-          '<span class="text-secondary/40">·</span>' +
-          '<span class="font-medium">' + escHtml(row.funcionario || row.nombre || "Funcionario") + '</span>' +
-          '<span class="text-secondary/40">·</span>' +
-          '<span class="px-1.5 py-0.5 rounded font-medium ' + kindBadgeClass + '">' + escHtml(kindLabel) + '</span>' +
-          (ticket ? '<span class="text-secondary/40">·</span><span class="font-semibold text-primary">Tarea #' + escHtml(ticket) + '</span>' : '') +
+          '<div class="w-1 rounded-full shrink-0" style="background:' + escHtml(color) + '"></div>' +
+          '<div class="min-w-0 flex-1">' +
+          '<button type="button" class="block w-full text-left cursor-pointer group"' + (id ? detailAttr : ' disabled') + '>' +
+          '<strong class="block text-sm font-semibold leading-snug group-hover:text-[#1E3C76] ' + (isDone ? "text-slate-500 line-through" : "text-slate-800") + '">' + escHtml(row.titulo || kindLabel) + '</strong>' +
+          '<span class="block text-[11px] text-slate-500 truncate mt-0.5">' + escHtml([kindLabel, category, row.funcionario || row.nombre || "", row.ubicacion || ""].filter(Boolean).join(" · ")) + '</span>' +
+          '</button>' +
+          '<div class="flex items-center justify-between gap-2 mt-1.5">' +
+          '<span class="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ' + (isDone ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700") + '">' + escHtml(calendarItemStatusLabel(row)) + '</span>' +
+          '<div class="flex items-center">' + actions + '</div>' +
           '</div>' +
-          '<div class="pl-1.5 pt-1 flex flex-wrap items-center gap-1.5 border-t border-surface-container/60">' +
-          (isEventKind && id ? '<button type="button" class="px-2.5 py-1 bg-surface-container hover:bg-surface-container-high text-on-surface rounded-lg text-xs font-semibold transition-colors cursor-pointer" data-scm-calendar-view-event data-event-id="' + escHtml(id) + '">Ver evento</button>' : '') +
-          (isEventKind && ticket ? '<button type="button" class="px-2.5 py-1 bg-surface-container hover:bg-surface-container-high text-on-surface rounded-lg text-xs font-semibold transition-colors cursor-pointer" data-scm-calendar-view-ticket data-event-id="' + escHtml(id) + '" data-ticket-id="' + escHtml(ticket) + '">Ver tarea</button>' : '') +
-          (isEventKind && id && !isDone ? '<button type="button" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer" data-scm-calendar-complete-event data-event-id="' + escHtml(id) + '">Realizado</button>' : '') +
-          (isEventKind && id ? '<button type="button" class="px-2.5 py-1 bg-surface-container hover:bg-surface-container-high text-on-surface rounded-lg text-xs font-semibold transition-colors cursor-pointer" data-scm-calendar-reschedule-event data-event-id="' + escHtml(id) + '">Trasladar</button>' : '') +
-          (isEventKind && id ? '<button type="button" class="px-2.5 py-1 bg-surface-container hover:bg-surface-container-high text-on-surface rounded-lg text-xs font-semibold transition-colors cursor-pointer" data-scm-calendar-edit-event data-event-id="' + escHtml(id) + '">Editar</button>' : '') +
-          (kind === "recordatorio" && id ? '<button type="button" class="px-2.5 py-1 bg-surface-container hover:bg-surface-container-high text-on-surface rounded-lg text-xs font-semibold transition-colors cursor-pointer" data-scm-calendar-view-item data-item-id="' + escHtml(id) + '" data-item-kind="recordatorio">Ver</button>' : '') +
-          (kind === "recordatorio" && id && !isDone ? '<button type="button" class="px-2.5 py-1 bg-surface-container hover:bg-surface-container-high text-on-surface rounded-lg text-xs font-semibold transition-colors cursor-pointer" data-scm-calendar-edit-item data-item-id="' + escHtml(id) + '" data-item-kind="recordatorio">Editar</button>' : '') +
-          (kind === "tarea" && id && !isDone ? '<button type="button" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer" data-scm-calendar-complete-task data-task-id="' + escHtml(id) + '">Marcar realizada</button>' : '') +
-          (kind === "recordatorio" && id && !isDone ? '<button type="button" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer" data-scm-calendar-send-reminder data-reminder-id="' + escHtml(id) + '">Marcar enviado</button>' : '') +
-          (kind === "recordatorio" && id && !isDone ? '<button type="button" class="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer" data-scm-calendar-cancel-reminder data-reminder-id="' + escHtml(id) + '">Cancelar</button>' : '') +
-          '</div></article>';
+          '</div>' +
+          '</article>';
       }
 
       function upcomingItemHtml(row) {
@@ -1292,12 +1299,12 @@
         var kindLabel = isDueCalendar ? category : calendarItemKindLabel(row);
         var time = isDueCalendar
           ? ("Vence: " + (row.fecha_vencimiento || dateKey || "-"))
-          : (formatDateTime(row.fecha_inicio) + " - " + formatDateTime(row.fecha_fin));
+          : [timePartFromDateTime(row.fecha_inicio), timePartFromDateTime(row.fecha_fin)].filter(function (value, index, list) { return value && list.indexOf(value) === index; }).join(" - ");
         var monthName = shortMonthLabel(dateKey) || "MES";
         var dayNum = String(Number(String(dateKey).slice(8, 10)) || "");
 
-        return '<button type="button" class="w-full text-left p-2.5 bg-surface-container-low hover:bg-surface-container-high rounded-xl border border-surface-container transition-all flex items-center gap-3 cursor-pointer group" data-scm-calendar-upcoming-day="' + escHtml(dateKey) + '">' +
-          '<div class="w-10 h-10 rounded-lg bg-surface-container-lowest border border-surface-container flex flex-col items-center justify-center shrink-0 text-center">' +
+        return '<button type="button" class="w-full text-left p-2 bg-white hover:bg-[#F6F8FC] rounded-xl border border-slate-200 transition-colors flex items-center gap-3 cursor-pointer group" data-scm-calendar-upcoming-day="' + escHtml(dateKey) + '">' +
+          '<div class="w-11 h-11 rounded-xl bg-[#EBF1FB] text-[#1E3C76] flex flex-col items-center justify-center shrink-0 text-center">' +
           '<strong class="text-[9px] text-secondary uppercase font-bold tracking-wider leading-none">' + escHtml(monthName) + '</strong>' +
           '<span class="text-xs font-bold text-on-surface leading-tight mt-0.5">' + escHtml(dayNum) + '</span>' +
           '</div>' +
@@ -1320,7 +1327,7 @@
           return String(eventDateKey(a)).localeCompare(String(eventDateKey(b))) || String(a.fecha_inicio || "").localeCompare(String(b.fecha_inicio || ""));
         });
         var visibleRows = showAllUpcoming ? rows : rows.slice(0, 2);
-        upcomingWrap.innerHTML = visibleRows.length ? visibleRows.map(upcomingItemHtml).join("") : '<div class="scm-calendar-empty-day scm-calendar-empty-day--compact"><span class="material-symbols-outlined">event_available</span><strong>Sin próximos eventos</strong><p>No hay eventos próximos en este mes.</p></div>';
+        upcomingWrap.innerHTML = visibleRows.length ? visibleRows.map(upcomingItemHtml).join("") : '<p class="py-6 text-center text-xs text-slate-400">' + (isDueCalendar ? "No hay vencimientos próximos en este mes." : "No hay eventos próximos en este mes.") + "</p>";
         if (upcomingAllBtn) {
           upcomingAllBtn.hidden = rows.length <= 2;
           upcomingAllBtn.textContent = showAllUpcoming ? "Ver menos" : "Ver todos";
@@ -1335,12 +1342,14 @@
       }
 
       function renderSelectedDay() {
-        var dayRows = calendarEvents.filter(function (row) { return eventDateKey(row) === selectedDay; });
+        var dayRows = calendarEvents.filter(function (row) { return eventDateKey(row) === selectedDay; }).sort(function (a, b) {
+          return String(a.fecha_inicio || "").localeCompare(String(b.fecha_inicio || ""));
+        });
         var holiday = holidayForDateKey(selectedDay);
         if (dayTitleEl) dayTitleEl.textContent = calendarDayTitle(selectedDay);
-        if (daySubtitleEl) daySubtitleEl.textContent = (holiday ? "Festivo Colombia: " + holiday + ". " : "") + (dayRows.length ? dayRows.length + (isDueCalendar ? " vencimiento(s) para este dia." : visibleCalendarItemWord(dayRows.length) + " para este dia.") : (isDueCalendar ? "Sin vencimientos para este dia." : "Sin items para este dia."));
+        if (daySubtitleEl) daySubtitleEl.textContent = (holiday ? "Festivo: " + holiday + " · " : "") + (dayRows.length ? dayRows.length + (isDueCalendar ? " vencimiento(s)" : visibleCalendarItemWord(dayRows.length)) : (isDueCalendar ? "Sin vencimientos" : "Sin eventos"));
         if (!eventsWrap) return;
-        eventsWrap.innerHTML = dayRows.length ? dayRows.map(eventCardHtml).join("") : '<div class="scm-calendar-empty-day"><span class="material-symbols-outlined">event_busy</span><strong>' + (isDueCalendar ? "Sin vencimientos para este día" : "Sin items para este día") + '</strong><p>' + (isDueCalendar ? "No hay controles vencidos o pendientes en la fecha seleccionada." : "No hay elementos visibles con los filtros activos.") + "</p></div>";
+        eventsWrap.innerHTML = dayRows.length ? dayRows.map(eventCardHtml).join("") : '<div class="py-10 px-4 text-center"><span class="material-symbols-outlined text-[36px] text-slate-300">' + (isDueCalendar ? "task_alt" : "event_available") + '</span><strong class="block text-sm font-semibold text-slate-600 mt-1">' + (isDueCalendar ? "Sin vencimientos este día" : "Día libre") + '</strong><p class="text-xs text-slate-400 mt-0.5">' + (isDueCalendar ? "No hay controles vencidos o pendientes en esta fecha." : "No hay eventos con los filtros activos.") + "</p></div>";
       }
 
       function openCreateEventWithDefaults(defaults) {
@@ -1378,17 +1387,12 @@
           var active = mode === calendarDisplayMode;
           btn.classList.toggle("active", active);
           btn.setAttribute("aria-pressed", active ? "true" : "false");
-          if (active) {
-            btn.classList.add("bg-primary-container", "text-on-surface", "shadow-sm");
-            btn.classList.remove("text-secondary", "hover:text-on-surface");
-          } else {
-            btn.classList.remove("bg-primary-container", "shadow-sm");
-            btn.classList.add("text-secondary", "hover:text-on-surface");
-          }
+          ["bg-white", "text-[#061D49]", "shadow-sm"].forEach(function (cls) { btn.classList.toggle(cls, active); });
+          ["text-slate-500", "hover:text-slate-800"].forEach(function (cls) { btn.classList.toggle(cls, !active); });
         });
         panel.classList.toggle("scm-calendar-panel--week", calendarDisplayMode === "week");
         panel.classList.toggle("scm-calendar-panel--day", calendarDisplayMode === "day");
-        var kicker = panel.querySelector("[data-scm-calendar-board-kicker]") || panel.querySelector(".scm-calendar-board-card .scm-calendar-action-kicker");
+        var kicker = panel.querySelector("[data-scm-calendar-board-kicker]");
         if (kicker) kicker.textContent = calendarDisplayMode === "day" ? "Vista diaria" : (calendarDisplayMode === "week" ? "Vista semanal" : "Vista mensual");
         var weekdaysHeader = panel.querySelector("[data-scm-calendar-weekdays-header]");
         if (weekdaysHeader) {
@@ -1942,27 +1946,28 @@
           days.push(addDays(start, dayIndex));
         }
         var html = '<div class="scm-calendar-time-grid" data-scm-calendar-week-grid>';
-        html += '<div class="scm-calendar-time-gutter scm-calendar-time-gutter--head">GMT-05</div>';
-        days.forEach(function (date) {
+        html += '<div class="scm-calendar-time-gutter scm-calendar-time-gutter--head" style="grid-row:1;grid-column:1">Hora</div>';
+        days.forEach(function (date, headIndex) {
           var key = toDateKey(date);
           var classes = "scm-calendar-week-head";
           if (key === todayKey) classes += " is-today";
           if (key === selectedDay) classes += " is-selected";
-          html += '<button type="button" class="' + classes + '" data-scm-calendar-week-day="' + escHtml(key) + '">' +
+          html += '<button type="button" class="' + classes + '" style="grid-row:1;grid-column:' + (headIndex + 2) + '" data-scm-calendar-week-day="' + escHtml(key) + '">' +
             '<span>' + escHtml(date.toLocaleDateString("es-CO", { weekday: "short" }).replace(/\./g, "")) + '</span>' +
             '<strong>' + String(date.getDate()) + '</strong>' +
             '</button>';
         });
         for (var minutes = WEEK_DAY_START_MINUTES; minutes < WEEK_DAY_END_MINUTES; minutes += WEEK_SLOT_MINUTES) {
           var label = minutes % 60 === 0 ? displayHourFromMinutes(minutes) : "";
-          html += '<div class="scm-calendar-time-gutter">' + escHtml(label) + '</div>';
-          days.forEach(function (date) {
+          var slotRow = (minutes - WEEK_DAY_START_MINUTES) / WEEK_SLOT_MINUTES + 2;
+          html += '<div class="scm-calendar-time-gutter" style="grid-row:' + slotRow + ';grid-column:1">' + escHtml(label) + '</div>';
+          days.forEach(function (date, slotDayIndex) {
             var key = toDateKey(date);
             var slotEnd = minutes + WEEK_SLOT_MINUTES;
             var slotClasses = "scm-calendar-time-slot";
             if (key === todayKey) slotClasses += " is-today";
             if (key === selectedDay) slotClasses += " is-selected-day";
-            html += '<button type="button" class="' + slotClasses + '" data-scm-calendar-week-slot data-date="' + escHtml(key) + '" data-start="' + String(minutes) + '" data-end="' + String(slotEnd) + '" aria-label="' + escHtml(calendarDayTitle(key) + " " + timeFromMinutes(minutes)) + '">';
+            html += '<button type="button" class="' + slotClasses + '" style="grid-row:' + slotRow + ';grid-column:' + (slotDayIndex + 2) + '" data-scm-calendar-week-slot data-date="' + escHtml(key) + '" data-start="' + String(minutes) + '" data-end="' + String(slotEnd) + '" aria-label="' + escHtml(calendarDayTitle(key) + " " + timeFromMinutes(minutes)) + '">';
             html += '</button>';
           });
         }
@@ -1995,11 +2000,11 @@
         var todayKey = toDateKey(new Date());
         if (titleEl) titleEl.textContent = dayViewLabel(date);
         var html = '<div class="scm-calendar-time-grid scm-calendar-time-grid--day" data-scm-calendar-week-grid>';
-        html += '<div class="scm-calendar-time-gutter scm-calendar-time-gutter--head">GMT-05</div>';
+        html += '<div class="scm-calendar-time-gutter scm-calendar-time-gutter--head" style="grid-row:1;grid-column:1">Hora</div>';
         var headClasses = "scm-calendar-week-head";
         if (key === todayKey) headClasses += " is-today";
         headClasses += " is-selected";
-        html += '<button type="button" class="' + headClasses + '" data-scm-calendar-week-day="' + escHtml(key) + '">' +
+        html += '<button type="button" class="' + headClasses + '" style="grid-row:1;grid-column:2" data-scm-calendar-week-day="' + escHtml(key) + '">' +
           '<span>' + escHtml(date.toLocaleDateString("es-CO", { weekday: "short" }).replace(/\./g, "")) + '</span>' +
           '<strong>' + String(date.getDate()) + '</strong>' +
           '</button>';
@@ -2008,8 +2013,9 @@
           var slotEnd = minutes + WEEK_SLOT_MINUTES;
           var slotClasses = "scm-calendar-time-slot is-selected-day";
           if (key === todayKey) slotClasses += " is-today";
-          html += '<div class="scm-calendar-time-gutter">' + escHtml(label) + '</div>';
-          html += '<button type="button" class="' + slotClasses + '" data-scm-calendar-week-slot data-date="' + escHtml(key) + '" data-start="' + String(minutes) + '" data-end="' + String(slotEnd) + '" aria-label="' + escHtml(calendarDayTitle(key) + " " + timeFromMinutes(minutes)) + '">';
+          var slotRow = (minutes - WEEK_DAY_START_MINUTES) / WEEK_SLOT_MINUTES + 2;
+          html += '<div class="scm-calendar-time-gutter" style="grid-row:' + slotRow + ';grid-column:1">' + escHtml(label) + '</div>';
+          html += '<button type="button" class="' + slotClasses + '" style="grid-row:' + slotRow + ';grid-column:2" data-scm-calendar-week-slot data-date="' + escHtml(key) + '" data-start="' + String(minutes) + '" data-end="' + String(slotEnd) + '" aria-label="' + escHtml(calendarDayTitle(key) + " " + timeFromMinutes(minutes)) + '">';
           html += '</button>';
         }
         timeGridEvents(key).forEach(function (row) {
@@ -2024,72 +2030,95 @@
         if (!monthGrid) return;
         updateCalendarViewButtons();
         if (titleEl) titleEl.textContent = monthLabel(currentMonth);
-        var prevMonthBtn = panel.querySelector("[data-scm-calendar-prev]");
-        var nextMonthBtn = panel.querySelector("[data-scm-calendar-next]");
-        if (prevMonthBtn) prevMonthBtn.textContent = "‹";
-        if (nextMonthBtn) nextMonthBtn.textContent = "›";
         var first = startOfMonth(currentMonth);
         var start = new Date(first);
         var weekday = first.getDay();
         start.setDate(first.getDate() + (weekday === 0 ? -6 : 1 - weekday));
         var todayKey = toDateKey(new Date());
-        var html = '<div class="grid grid-cols-7 gap-1 bg-surface-container/40 p-1 rounded-xl border border-surface-container">';
+        var canCreate = !isDueCalendar && !!panel.querySelector('[data-scm-calendar-open-create][data-calendar-mode="single"]');
+        var html = '<div class="grid grid-cols-7 gap-px rounded-2xl overflow-hidden border border-slate-200 bg-slate-200">';
         for (var i = 0; i < 42; i += 1) {
           var cellDate = new Date(start);
           cellDate.setDate(start.getDate() + i);
           var key = toDateKey(cellDate);
           var holiday = holidayForDateKey(key);
-          var dayEvents = calendarEvents.filter(function (row) { return eventDateKey(row) === key; });
+          var dayEvents = calendarEvents.filter(function (row) { return eventDateKey(row) === key; }).sort(function (a, b) {
+            return String(a.fecha_inicio || "").localeCompare(String(b.fecha_inicio || ""));
+          });
           var isCurrentMonth = cellDate.getMonth() === currentMonth.getMonth();
           var isToday = key === todayKey;
           var isSelected = key === selectedDay;
+          var isWeekend = cellDate.getDay() === 0;
 
-          var cellClasses = "min-h-[105px] p-2 rounded-xl text-left flex flex-col justify-between transition-all cursor-pointer border ";
-          if (isSelected) {
-            cellClasses += "bg-surface-container-lowest border-primary shadow-md ring-2 ring-primary/20 ";
-          } else if (isToday) {
-            cellClasses += "bg-primary-container/20 border-primary/40 hover:bg-primary-container/30 ";
-          } else if (!isCurrentMonth) {
-            cellClasses += "bg-surface-container-low/40 border-transparent text-secondary/40 hover:bg-surface-container-lowest/80 ";
-          } else {
-            cellClasses += "bg-surface-container-lowest border-surface-container/60 hover:border-outline-variant/60 hover:shadow-sm ";
-          }
+          var cellClasses = "group relative min-h-[112px] p-1.5 sm:p-2 text-left flex flex-col gap-1 transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#1E3C76] ";
+          if (isSelected) cellClasses += "bg-[#EBF1FB] ";
+          else if (!isCurrentMonth) cellClasses += "bg-slate-50 text-slate-400 hover:bg-slate-100 ";
+          else if (isWeekend || holiday) cellClasses += "bg-slate-50/70 hover:bg-[#F6F8FC] ";
+          else cellClasses += "bg-white hover:bg-[#F6F8FC] ";
 
-          html += '<button type="button" class="' + cellClasses + '" data-scm-calendar-day="' + escHtml(key) + '">';
-          html += '<div class="flex items-center justify-between w-full mb-1">';
-          html += '<span class="text-xs font-bold ' + (isToday ? 'w-6 h-6 rounded-full bg-primary text-on-primary flex items-center justify-center font-bold text-[11px]' : (isSelected ? 'text-primary font-bold' : (isCurrentMonth ? 'text-on-surface' : 'text-secondary/50'))) + '">' + String(cellDate.getDate()) + '</span>';
-          if (dayEvents.length) {
-            html += '<span class="text-[10px] px-1.5 py-0.2 rounded-full font-semibold ' + (isDueCalendar ? 'bg-error/15 text-error' : 'bg-surface-container text-secondary') + '">' + dayEvents.length + (isDueCalendar ? ' venc.' : '') + '</span>';
+          html += '<div role="button" tabindex="0" class="' + cellClasses + '" data-scm-calendar-day="' + escHtml(key) + '" aria-label="' + escHtml(calendarDayTitle(key) + (dayEvents.length ? ", " + dayEvents.length + (isDueCalendar ? " vencimientos" : " elementos") : "")) + '"' + (isSelected ? ' aria-current="date"' : '') + '>';
+          html += '<div class="flex items-center justify-between gap-1">';
+          var dayNumberClass = isToday
+            ? "w-7 h-7 rounded-full bg-[#F8CF4A] text-[#061D49] shadow-sm"
+            : (isSelected ? "w-7 h-7 rounded-full bg-[#1E3C76] text-white" : "w-7 h-7 rounded-full " + (isCurrentMonth ? "text-slate-700" : "text-slate-400"));
+          html += '<span class="flex items-center justify-center text-xs font-bold ' + dayNumberClass + '">' + String(cellDate.getDate()) + '</span>';
+          if (canCreate) {
+            html += '<button type="button" class="w-6 h-6 rounded-lg flex items-center justify-center text-[#1E3C76] bg-white border border-slate-200 opacity-0 group-hover:opacity-100 focus:opacity-100 hover:bg-[#F8CF4A] hover:border-[#F8CF4A] transition-opacity cursor-pointer" data-scm-calendar-add-day="' + escHtml(key) + '" title="Crear evento este día" aria-label="Crear evento el ' + escHtml(calendarDayTitle(key)) + '"><span class="material-symbols-outlined text-[16px]">add</span></button>';
+          } else if (dayEvents.length) {
+            html += '<span class="text-[10px] px-1.5 rounded-full font-bold ' + (isDueCalendar ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500') + '">' + dayEvents.length + '</span>';
           }
           html += '</div>';
-
           if (holiday) {
-            html += '<span class="text-[10px] text-error font-medium truncate w-full block mb-0.5" title="' + escHtml(holiday) + '">★ ' + escHtml(holiday) + '</span>';
+            html += '<span class="text-[10px] text-rose-600 font-medium truncate" title="' + escHtml(holiday) + '">' + escHtml(holiday) + '</span>';
           }
-
-          html += '<div class="space-y-1 w-full flex-1 overflow-hidden">';
-          dayEvents.slice(0, 2).forEach(function (row) {
+          html += '<div class="space-y-1 min-w-0">';
+          dayEvents.slice(0, 3).forEach(function (row) {
             if (isDueCalendar) {
               var dueTheme = dueTypeTheme(row);
-              html += '<span class="block text-[10.5px] px-1.5 py-0.5 rounded font-medium truncate leading-tight" style="' + dueTypeStyleAttr(dueTheme) + '">' + escHtml(row.titulo || dueTypeLabel(row.tipo_vencimiento || "")) + '</span>';
+              html += '<span class="block text-[11px] px-1.5 py-0.5 rounded-md font-medium truncate leading-snug" style="background:' + escHtml(dueTheme.bg) + ';color:' + escHtml(dueTheme.text) + '" title="' + escHtml(row.titulo || "") + '">' + escHtml(row.titulo || dueTypeLabel(row.tipo_vencimiento || "")) + '</span>';
             } else {
-              var eventColor = row.color || '#3b82f6';
-              html += '<span class="block text-[10.5px] px-1.5 py-0.5 rounded font-medium truncate leading-tight text-on-surface bg-surface-container-low border-l-2" style="border-left-color:' + escHtml(eventColor) + '">' + escHtml(row.titulo || calendarItemKindLabel(row)) + '</span>';
+              var eventColor = row.color || "#3b82f6";
+              var done = calendarItemIsDone(row);
+              var time = timePartFromDateTime(row.fecha_inicio);
+              html += '<span class="flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded-md truncate leading-snug ' + (done ? 'text-slate-400 line-through bg-slate-100' : 'text-slate-700 bg-slate-100/80') + '" title="' + escHtml((time ? time + " · " : "") + (row.titulo || "")) + '">' +
+                '<i class="w-1.5 h-1.5 rounded-full shrink-0" style="background:' + escHtml(eventColor) + '"></i>' +
+                (time ? '<b class="font-semibold text-slate-500">' + escHtml(time) + '</b>' : '') +
+                '<span class="truncate">' + escHtml(row.titulo || calendarItemKindLabel(row)) + '</span></span>';
             }
           });
-          if (dayEvents.length > 2) {
-            html += '<span class="text-[10px] text-primary font-semibold block leading-tight">+' + (dayEvents.length - 2) + ' más</span>';
+          if (dayEvents.length > 3) {
+            html += '<span class="block text-[11px] text-[#1E3C76] font-semibold pl-1">+' + (dayEvents.length - 3) + ' más</span>';
           }
-          html += '</div>';
-          html += '</button>';
+          html += '</div></div>';
         }
         html += '</div>';
         monthGrid.innerHTML = html;
-        monthGrid.querySelectorAll("[data-scm-calendar-day]").forEach(function (btn) {
-          btn.addEventListener("click", function () {
-            selectedDay = btn.getAttribute("data-scm-calendar-day") || selectedDay;
-            renderCalendarGrid();
-            renderSelectedDay();
+        function selectDay(cell) {
+          selectedDay = cell.getAttribute("data-scm-calendar-day") || selectedDay;
+          renderCalendarGrid();
+          renderSelectedDay();
+        }
+        monthGrid.querySelectorAll("[data-scm-calendar-day]").forEach(function (cell) {
+          cell.addEventListener("click", function (event) {
+            if (event.target.closest("[data-scm-calendar-add-day]")) return;
+            selectDay(cell);
+          });
+          cell.addEventListener("keydown", function (event) {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              selectDay(cell);
+            }
+          });
+          if (canCreate) {
+            cell.addEventListener("dblclick", function () {
+              openCreateEventWithDefaults({ date: cell.getAttribute("data-scm-calendar-day") || selectedDay });
+            });
+          }
+        });
+        monthGrid.querySelectorAll("[data-scm-calendar-add-day]").forEach(function (btn) {
+          btn.addEventListener("click", function (event) {
+            event.stopPropagation();
+            openCreateEventWithDefaults({ date: btn.getAttribute("data-scm-calendar-add-day") || selectedDay });
           });
         });
       }
