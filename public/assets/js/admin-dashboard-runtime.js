@@ -5079,79 +5079,14 @@
         fillCategoryOptions(panel.querySelector("[data-scm-calendar-filter-categories]"), calendarAdminCategories(), "Todas las categorías");
       }
 
-      function openCalendarCategorySettings() {
-        if (!window.Swal || !actions.calendar_categories_save) {
-          showToast("error", "La configuración de categorías no está disponible.");
-          return;
-        }
-        var promise = allCalendarCategories.length ? Promise.resolve(allCalendarCategories) : calendarApi("listar_categorias").then(function (json) {
-          allCalendarCategories = json && json.success && Array.isArray(json.data) ? json.data : [];
-          return allCalendarCategories;
-        });
-        promise.then(function (rows) {
-          if (!rows.length) throw new Error("No se encontraron categorías en el calendario.");
-          var allowed = Array.isArray(runtime.calendarCategoryIds) ? runtime.calendarCategoryIds.map(String) : [];
-          var sorted = rows.slice().sort(function (left, right) {
-            return String(calendarCategoryLabel(left) || "").localeCompare(String(calendarCategoryLabel(right) || ""), "es");
-          });
-          var items = sorted.map(function (row) {
-            var id = String(row.id || row._ID || row.id_categoria || "").trim();
-            if (!id) return "";
-            var checked = !allowed.length || allowed.indexOf(id) !== -1;
-            return '<label class="flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white cursor-pointer hover:bg-slate-50 text-left">' +
-              '<input type="checkbox" name="calendar_categories" value="' + escHtml(id) + '"' + (checked ? " checked" : "") + '>' +
-              '<i class="inline-block w-3 h-3 rounded-full shrink-0" style="background:' + escHtml(row.color || "#94a3b8") + '"></i>' +
-              '<span class="text-sm text-slate-800">' + escHtml(calendarCategoryLabel(row) || "Categoría") + '</span></label>';
-          }).join("");
-          return window.Swal.fire({
-            title: "Categorías del calendario comercial",
-            html: '<p class="text-sm text-slate-600 mb-3 text-left">Elige qué categorías se usan en el calendario comercial para crear, filtrar y agendar. Los eventos ya creados conservan su categoría.</p>' +
-              '<div class="flex gap-2 mb-3"><button type="button" class="px-3 py-1 rounded-lg bg-slate-100 text-sm font-semibold" data-scm-category-toggle="1">Marcar todas</button><button type="button" class="px-3 py-1 rounded-lg bg-slate-100 text-sm font-semibold" data-scm-category-toggle="0">Quitar todas</button></div>' +
-              '<form class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[52vh] overflow-y-auto" data-scm-calendar-category-form>' + items + '</form>',
-            width: 760,
-            showCancelButton: true,
-            confirmButtonText: "Guardar categorías",
-            cancelButtonText: "Cerrar",
-            customClass: { popup: "scm-calendar-swal-popup" },
-            didOpen: function () {
-              var popup = window.Swal.getPopup();
-              popup.querySelectorAll("[data-scm-category-toggle]").forEach(function (button) {
-                button.addEventListener("click", function () {
-                  var value = button.getAttribute("data-scm-category-toggle") === "1";
-                  popup.querySelectorAll('[name="calendar_categories"]').forEach(function (input) { input.checked = value; });
-                });
-              });
-            },
-            preConfirm: function () {
-              var popup = window.Swal.getPopup();
-              var selected = Array.prototype.slice.call(popup.querySelectorAll('[name="calendar_categories"]:checked')).map(function (input) { return input.value; });
-              if (!selected.length) {
-                window.Swal.showValidationMessage("Selecciona al menos una categoría.");
-                return false;
-              }
-              var available = Array.prototype.slice.call(popup.querySelectorAll('[name="calendar_categories"]')).map(function (input) { return input.value; });
-              return dashboardAjax(actions.calendar_categories_save, {
-                categories: JSON.stringify(selected),
-                available: JSON.stringify(available),
-              }).catch(function (err) {
-                window.Swal.showValidationMessage(err.message || "No se pudieron guardar las categorías.");
-                return false;
-              });
-            },
-          });
-        }).then(function (result) {
-          if (!result || !result.isConfirmed || !result.value) return;
-          runtime.calendarCategoryIds = Array.isArray(result.value.category_ids) ? result.value.category_ids : [];
-          applyCalendarCategoryWhitelist();
-          showToast("success", result.value.message || "Categorías guardadas.");
-          loadEvents();
-        }).catch(function (err) {
-          showToast("error", (err && err.message) || "No se pudieron cargar las categorías.");
-        });
-      }
-
-      var categorySettingsBtn = panel.querySelector("[data-scm-calendar-configure-categories]");
-      if (categorySettingsBtn) categorySettingsBtn.addEventListener("click", openCalendarCategorySettings);
+      // Configuración → Calendario comercial avisa cuando cambian las categorías habilitadas.
+      document.addEventListener("scm:calendar-categories-changed", function (event) {
+        if (!panel.isConnected) return;
+        var ids = event && event.detail && Array.isArray(event.detail.category_ids) ? event.detail.category_ids : [];
+        runtime.calendarCategoryIds = ids;
+        applyCalendarCategoryWhitelist();
+        loadEvents();
+      });
 
       if (!isDueCalendar) {
         var reminderRefreshTimer = window.setInterval(function () {

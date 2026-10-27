@@ -183,23 +183,6 @@ final class CommercialApiController
   }
 
   /** @param array<string,mixed> $input */
-  public function calendarCategoriesSave(array $input): never
-  {
-    $this->verify($input);
-    try {
-      $ids = $this->calendarService()->saveCategoryIds($this->idList($input['categories'] ?? []), $this->idList($input['available'] ?? []));
-    } catch (\RuntimeException $exception) {
-      JsonResponse::error($exception->getMessage(), 403);
-    } catch (\InvalidArgumentException $exception) {
-      JsonResponse::error($exception->getMessage(), 422);
-    }
-    JsonResponse::success([
-      'message' => $ids === [] ? 'El calendario comercial mostrará todas las categorías.' : 'Categorías del calendario comercial guardadas.',
-      'category_ids' => $ids,
-    ]);
-  }
-
-  /** @param array<string,mixed> $input */
   public function calendarCitaNotify(array $input): never
   {
     $this->verify($input);
@@ -216,19 +199,40 @@ final class CommercialApiController
     JsonResponse::success($result);
   }
 
+  /** @param array<string,mixed> $input */
+  public function settingsLoad(array $input): never
+  {
+    $this->verify($input);
+    try {
+      JsonResponse::success(['settings' => $this->settingsService()->load()]);
+    } catch (\RuntimeException $exception) {
+      JsonResponse::error($exception->getMessage(), 403);
+    }
+  }
+
+  /** @param array<string,mixed> $input */
+  public function settingsSave(array $input): never
+  {
+    $this->verify($input);
+    $payload = json_decode((string) ($input['payload'] ?? '{}'), true);
+    try {
+      $message = $this->settingsService()->save(trim((string) ($input['section'] ?? '')), is_array($payload) ? $payload : []);
+      JsonResponse::success(['message' => $message, 'settings' => $this->settingsService()->load()]);
+    } catch (\InvalidArgumentException $exception) {
+      JsonResponse::error($exception->getMessage(), 422);
+    } catch (\RuntimeException $exception) {
+      JsonResponse::error($exception->getMessage(), 403);
+    }
+  }
+
+  private function settingsService(): \SCM\Commercial\CommercialSettingsService
+  {
+    return new \SCM\Commercial\CommercialSettingsService($this->db, $this->settings, $this->policy, $this->config);
+  }
+
   private function calendarService(): \SCM\Commercial\CommercialCalendarService
   {
     return new \SCM\Commercial\CommercialCalendarService($this->db, $this->settings, $this->policy, $this->config);
-  }
-
-  /** @param mixed $raw @return array<int,string> */
-  private function idList($raw): array
-  {
-    if (is_string($raw)) {
-      $decoded = json_decode($raw, true);
-      $raw = is_array($decoded) ? $decoded : explode(',', $raw);
-    }
-    return is_array($raw) ? array_values(array_map(static fn($id): string => trim((string) $id), $raw)) : [];
   }
 
   /** @param array<string,mixed> $input */

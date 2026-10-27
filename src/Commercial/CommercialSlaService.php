@@ -9,7 +9,7 @@ use SCM\Support\ColombiaBusinessCalendar;
 
 final class CommercialSlaService
 {
-  private const CONFIG_KEY = 'control_tickets_sla_config';
+  public const CONFIG_KEY = 'control_tickets_sla_config';
 
   private Database $db;
 
@@ -147,6 +147,18 @@ final class CommercialSlaService
     ];
   }
 
+  /** Regla vigente de un tema (la misma que usa el cálculo del SLA). @return array{warning_from:int,overdue_after:int} */
+  public function ruleFor(string $topic): array
+  {
+    return $this->findRule($topic);
+  }
+
+  /** Clave de comparación de temas: sin tildes, minúsculas y "arriendo y venta" = "arriendo o venta". */
+  public function topicKey(string $topic): string
+  {
+    return $this->normalizeTopic($topic);
+  }
+
   /** @return array{warning_from:int,overdue_after:int} */
   private function findRule(string $topic): array
   {
@@ -219,7 +231,7 @@ final class CommercialSlaService
   }
 
   /** @return array{version:int,topics:array<string,array{warning_from:int,overdue_after:int}>} */
-  private static function defaultConfig(): array
+  public static function defaultConfig(): array
   {
     return [
       'version' => 1,

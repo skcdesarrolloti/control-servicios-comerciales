@@ -125,7 +125,6 @@ final class CommercialCalendarService
   {
     return [
       'admin_due_calendar' => 'commercial_calendar_due',
-      'calendar_categories_save' => 'commercial_calendar_categories_save',
       'calendar_cita_notify' => 'commercial_calendar_cita_notify',
     ];
   }

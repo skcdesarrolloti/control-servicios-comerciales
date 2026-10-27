@@ -59,15 +59,29 @@ async function closeSwal(page) {
   assert(!(await page.locator('[name="item_type"][value="tarea"]').count()), 'Sigue la capa de tareas que el calendario ya no soporta');
   assert(await page.locator('[data-scm-calendar-events] [data-scm-calendar-edit-event]').count() === 1, 'El evento del día no ofrece Editar');
 
-  // Solo las categorías habilitadas para comercial se ofrecen al crear.
-  await page.locator('[data-scm-calendar-configure-categories]').click();
-  await page.locator('[data-scm-calendar-category-form]').waitFor();
-  await page.locator('[data-scm-category-toggle="0"]').click();
-  await page.locator('[name="calendar_categories"][value="3"]').check();
-  await page.locator('[name="calendar_categories"][value="26"]').check();
+  // Configuración → Calendario comercial: solo las categorías habilitadas se ofrecen al crear.
+  assert(!(await page.locator('[data-scm-calendar-configure-categories]').count()), 'La configuración no debe quedar como botón dentro del panel');
+  await page.locator('#commercial-config-trigger').click();
+  await page.locator('[data-commercial-config-action="calendario"]').click();
+  await page.locator('[data-config-form] [name="category_ids"]').first().waitFor();
+  await page.locator('[data-toggle-all="category_ids"][data-value="0"]').click();
+  await page.locator('[name="category_ids"][value="3"]').check();
+  await page.locator('[name="category_ids"][value="26"]').check();
   await page.locator('.swal2-confirm').click();
-  await page.locator('.swal2-popup:has-text("Categorías del calendario comercial guardadas")').waitFor();
+  await page.locator('.swal2-popup:has-text("Configuración del calendario comercial guardada")').waitFor();
   await closeSwal(page);
+  const configSaves = calls.length;
+
+  // Las demás secciones cargan y guardan desde el mismo menú.
+  for (const [section, message] of [['tiempos', 'Tiempos de atención de tareas guardados'], ['avisos', 'Plazos y valores de avisos guardados'], ['actualizaciones', 'Plazos de actualización de inmuebles guardados'], ['destacados', 'Cupos de destacados guardados']]) {
+    await page.locator('#commercial-config-trigger').click();
+    await page.locator(`[data-commercial-config-action="${section}"]`).click();
+    await page.locator('[data-config-form] input').first().waitFor();
+    await page.locator('.swal2-confirm').click();
+    await page.locator(`.swal2-popup:has-text("${message}")`).waitFor();
+    await closeSwal(page);
+  }
+  assert(configSaves > 0, 'No se consultaron las categorías del calendario');
   await page.locator('[data-scm-calendar-open-create][data-calendar-mode="single"]:not([data-calendar-kind])').first().click();
   await page.locator('.scm-calendar-create-form').waitFor();
   const createCategories = await page.locator('.scm-calendar-create-form [name="id_categoria"] option').allTextContents();
@@ -97,6 +111,6 @@ async function closeSwal(page) {
   await closeSwal(page);
 
   if (errors.length) throw new Error(errors.join('\n'));
-  console.log('Calendario comercial UI: agenda, edición, categorías comerciales, vencimientos y agendar desde la tarea: OK');
+  console.log('Calendario comercial UI: agenda, edición, menú Configuración, categorías comerciales, vencimientos y agendar desde la tarea: OK');
   await browser.close();
 })().catch(async error => { console.error(error); await browser?.close(); process.exitCode = 1; });

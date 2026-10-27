@@ -27,6 +27,8 @@ final class CommercialTicketsRepository
   private Database $db;
   private CommercialSlaService $sla;
   private SchemaInspector $schema;
+  /** @var array<string,array{alerta:int,vencido:int}>|null */
+  private ?array $propertyUpdateLimitsCache = null;
   /** @var array<string,int> */
   private array $systemConfigIntCache = [];
 
@@ -1500,16 +1502,21 @@ final class CommercialTicketsRepository
   /** @return array{0:int,1:int} */
   private function propertyUpdateLimits(string $businessType): array
   {
+    // Plazos editables en Configuración → Actualizaciones de inmuebles.
+    if ($this->propertyUpdateLimitsCache === null) {
+      try {
+        $settings = \SCM\Core\App::settings();
+      } catch (\Throwable) {
+        $settings = null;
+      }
+      $this->propertyUpdateLimitsCache = CommercialSettingsService::propertyUpdateLimits($settings);
+    }
     $type = mb_strtolower($businessType, 'UTF-8');
     $hasSale = str_contains($type, 'venta');
     $hasRent = str_contains($type, 'arriendo');
-    if ($hasSale && !$hasRent) {
-      return [110, 120];
-    }
-    if ($hasSale && $hasRent) {
-      return [100, 110];
-    }
-    return [80, 90];
+    $key = $hasSale && !$hasRent ? 'venta' : ($hasSale && $hasRent ? 'arriendo_venta' : 'arriendo');
+    $limits = $this->propertyUpdateLimitsCache[$key];
+    return [$limits['alerta'], $limits['vencido']];
   }
 
   /** @param array<string,mixed> $row */

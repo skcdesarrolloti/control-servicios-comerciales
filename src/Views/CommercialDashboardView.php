@@ -385,10 +385,41 @@ final class CommercialDashboardView
             <span>Ver guías</span>
           </button>
           <?php if ($policy instanceof CommercialAccessPolicy && $policy->canManage()): ?>
-            <button type="button" class="hidden lg:flex items-center gap-space-xs font-label-md text-label-md text-on-primary bg-surface-container-lowest/15 hover:bg-surface-container-lowest/25 px-space-md py-space-xs rounded-lg transition-colors cursor-pointer" id="commercial-open-permissions">
-              <span class="material-symbols-outlined text-[18px]">shield_person</span>
-              <span>Configurar permisos</span>
-            </button>
+            <!-- Configuración: toda configuración del panel se abre desde este menú -->
+            <div class="relative" data-commercial-config>
+              <button type="button" class="flex items-center gap-space-xs font-label-md text-label-md text-on-primary bg-surface-container-lowest/15 hover:bg-surface-container-lowest/25 px-space-md py-space-xs rounded-lg transition-colors cursor-pointer" id="commercial-config-trigger" aria-haspopup="true" aria-expanded="false" aria-controls="commercial-config-menu">
+                <span class="material-symbols-outlined text-[18px]">settings</span>
+                <span class="hidden lg:inline">Configuración</span>
+                <span class="material-symbols-outlined text-[16px]">expand_more</span>
+              </button>
+              <div id="commercial-config-menu" class="hidden absolute right-0 top-full mt-2 w-72 bg-surface-container-lowest rounded-2xl shadow-[0_16px_36px_rgba(0,0,0,0.18)] border border-outline-variant/30 z-50 overflow-hidden text-on-surface" role="menu">
+                <div class="px-4 py-2.5 bg-surface-container-low border-b border-surface-container">
+                  <p class="text-[10px] font-bold uppercase tracking-wider text-secondary">Configuración comercial</p>
+                </div>
+                <div class="p-1 flex flex-col gap-0.5">
+                  <?php
+                    $configItems = [
+                      ['permissions', 'lock', 'Permisos del panel', 'Vistas, acciones y cargos visibles'],
+                      ['calendario', 'calendar_month', 'Calendario comercial', 'Categorías y funcionarios del calendario'],
+                      ['tiempos', 'timer', 'Tiempos de atención', 'Alerta y vencimiento de tareas por tema'],
+                      ['avisos', 'signpost', 'Avisos en fachada', 'Plazos de retoque, instalación y valores'],
+                      ['actualizaciones', 'update', 'Actualizaciones de inmuebles', 'Plazos por tipo de negocio'],
+                      ['destacados', 'star', 'Cupos de destacados', 'Inmuebles destacados por portal'],
+                      ['guide', 'menu_book', 'Guías del sistema', 'Estados y flujo comercial'],
+                    ];
+                  ?>
+                  <?php foreach ($configItems as [$configKey, $configIcon, $configLabel, $configHint]): ?>
+                    <button type="button" class="flex items-start gap-2.5 w-full text-left px-3 py-2 rounded-xl hover:bg-surface-container-low transition-colors cursor-pointer" role="menuitem" data-commercial-config-action="<?php echo esc_attr($configKey); ?>"<?php echo $configKey === 'permissions' ? ' id="commercial-open-permissions"' : ''; ?>>
+                      <span class="material-symbols-outlined text-[18px] text-secondary mt-0.5"><?php echo esc_html($configIcon); ?></span>
+                      <span class="min-w-0">
+                        <span class="block text-xs font-semibold text-on-surface"><?php echo esc_html($configLabel); ?></span>
+                        <span class="block text-[11px] text-secondary"><?php echo esc_html($configHint); ?></span>
+                      </span>
+                    </button>
+                  <?php endforeach; ?>
+                </div>
+              </div>
+            </div>
           <?php endif; ?>
           <!-- Campana de Notificaciones (Últimas tareas creadas) -->
           <div class="relative" data-commercial-dropdown="notifications">
@@ -558,6 +589,7 @@ final class CommercialDashboardView
   <script src="<?php echo esc_url($baseUrl . '/assets/js/scm-admin.js?v=' . SCM_VERSION); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/admin-dashboard-runtime.js?v=' . SCM_VERSION); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-dashboard.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-dashboard.js')); ?>"></script>
+  <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-settings.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-settings.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-calendar-schedule.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-calendar-schedule.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-notifications.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-notifications.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-signs.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-signs.js')); ?>"></script>
@@ -2909,12 +2941,6 @@ final class CommercialDashboardView
               <button type="button" class="flex items-center gap-1.5 px-space-lg py-2 rounded-xl font-label-md font-semibold bg-primary-container hover:bg-primary-fixed-dim text-on-surface shadow-sm transition-all cursor-pointer" data-scm-calendar-open-create data-calendar-mode="single">
                 <span class="material-symbols-outlined text-[18px]">add</span>
                 <span>Crear evento</span>
-              </button>
-            <?php endif; ?>
-            <?php if ($canConfigure && $view !== 'pending'): ?>
-              <button type="button" class="flex items-center gap-1.5 px-space-md py-2 rounded-xl font-label-md bg-surface-container hover:bg-surface-container-high text-on-surface transition-colors cursor-pointer" data-scm-calendar-configure-categories title="Elegir qué categorías del calendario se usan en comercial">
-                <span class="material-symbols-outlined text-[18px] text-secondary">tune</span>
-                <span>Categorías</span>
               </button>
             <?php endif; ?>
             <?php if ($showReportAction): ?>

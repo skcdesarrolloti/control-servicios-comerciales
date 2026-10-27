@@ -153,8 +153,7 @@ La misma vista de administrador incluye datos ficticios de los cuatro tipos de a
 Usa el mismo motor y la misma API de `calendario-actividades` que el panel administrativo (`CALENDAR_API_URL`), con contenido comercial:
 
 - **Mi calendario / Calendario equipo**: eventos y recordatorios con vista mes/semana/día, creación simple, múltiple y recurrente, edición, traslado, cierre, pendientes vencidos, informe del día y sincronización con Google Calendar (cada funcionario autoriza su propia cuenta). Las tareas del calendario ya no existen en la API, por eso no hay capa ni botón de "Tarea".
-- **Categorías**: los cargos administradores eligen en el botón **Categorías** cuáles se usan en comercial (setting `commercial_calendar_categories`; vacío = todas). Los eventos existentes conservan su categoría.
-- **Funcionarios**: cargos del setting `commercial_calendar_cargos` o, si no existe, `CALENDAR_ALLOWED_CARGOS`.
+- **Categorías y funcionarios**: se eligen en **Configuración → Calendario comercial** (settings `commercial_calendar_categories`, vacío = todas, y `commercial_calendar_cargos`; sin este último se usa `CALENDAR_ALLOWED_CARGOS`). Los eventos existentes conservan su categoría.
 - **Vencimientos**: `commercial_calendar_due` (`CommercialCalendarService`) arma tareas atrasadas y por vencer según el SLA por tema (días hábiles de Colombia), seguimientos programados (`fecha_seguimiento`), actualizaciones de inmuebles, retoques y avisos nuevos, y llamadas de precaptación. Cada tipo exige la vista correspondiente; lo vencido antes del mes visible se acumula en el día de hoy.
 - **Desde la tarea**: la tarjeta **Agenda comercial** del popup permite agendar una cita vinculada (`id_ticket`), ver la agenda del responsable con cruces de horario y sus pendientes vencidos. La API del calendario reescribe `estado_comercial` y `estado_administrativo` de la tarea, así que se envían el estado comercial elegido y el administrativo actual. Las citas encolan WhatsApp al funcionario y al solicitante (`commercial_calendar_cita_notify`).
 
@@ -164,6 +163,20 @@ Prueba de navegador con SQLite aislado y la API del calendario simulada:
 php -S 127.0.0.1:8769 -t .
 node tools/check-commercial-calendar.cjs RUTA_A_NODE_MODULES
 ```
+
+## Configuración
+
+El menú **Configuración** del encabezado (solo cargos administradores) reúne toda la configuración del panel, como en el panel administrativo. Cada sección se carga y guarda con `commercial_settings_load` / `commercial_settings_save` (`CommercialSettingsService`):
+
+| Sección | Qué configura | Dónde se guarda |
+|---|---|---|
+| Permisos del panel | Vistas, subvistas, acciones y cargos visibles | `commercial_permissions`, `commercial_admin_cargos`, `commercial_employee_cargos` |
+| Calendario comercial | Categorías y cargos de los funcionarios | `commercial_calendar_categories`, `commercial_calendar_cargos` |
+| Tiempos de atención | Alerta y vencimiento por tema comercial (días hábiles) | `control_tickets_sla_config` (compartido con los informes de tareas) |
+| Avisos en fachada | Días de retoque e instalación, valor del aviso, transporte y factor prestacional | Filas `dia-retoque-*`, `dias-atraso-aviso-nuevo`, `valor_aviso`, `valor_transporte`, `factor_prestacional` |
+| Actualizaciones de inmuebles | Días de alerta y vencimiento por tipo de negocio | `commercial_property_update_limits` |
+| Cupos de destacados | Máximo de destacados por portal | Filas de cada portal en `jet_cct_confi_sistema` |
+| Guías del sistema | Abre la guía de estados | — |
 
 ## Autologin firmado
 
