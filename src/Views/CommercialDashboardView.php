@@ -345,6 +345,7 @@ final class CommercialDashboardView
     }
   </style>
   <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/tailwind.css?v=' . filemtime(SCM_PUBLIC_PATH . '/assets/css/tailwind.css')); ?>">
+  <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/commercial-calendar.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/commercial-calendar.css')); ?>">
   <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/commercial-signs.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/commercial-signs.css')); ?>">
   <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/commercial-credit-request.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/commercial-credit-request.css')); ?>">
   <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/commercial-property-entry.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/commercial-property-entry.css')); ?>">
@@ -557,6 +558,7 @@ final class CommercialDashboardView
   <script src="<?php echo esc_url($baseUrl . '/assets/js/scm-admin.js?v=' . SCM_VERSION); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/admin-dashboard-runtime.js?v=' . SCM_VERSION); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-dashboard.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-dashboard.js')); ?>"></script>
+  <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-calendar-schedule.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-calendar-schedule.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-notifications.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-notifications.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-signs.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-signs.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-credit-request.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-credit-request.js')); ?>"></script>
@@ -812,6 +814,14 @@ final class CommercialDashboardView
                   <span>Tareas Cerradas</span>
                 </span>
                 <span class="font-label-sm text-label-sm bg-surface-container px-space-xs py-0.5 rounded text-on-surface font-semibold"><?php echo esc_html(number_format($closedCount)); ?></span>
+              </a>
+            <?php endif; ?>
+            <?php if (in_array('calendario', $views, true) && (!$policy instanceof CommercialAccessPolicy || $policy->canSubview('calendario', 'due'))): ?>
+              <a class="flex items-center justify-between px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="calendario" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'calendario', 'subtab' => 'due'])); ?>">
+                <span class="flex items-center gap-2">
+                  <span class="material-symbols-outlined text-[18px] text-error">event_upcoming</span>
+                  <span>Calendario de vencimientos</span>
+                </span>
               </a>
             <?php endif; ?>
           </div>
@@ -2776,6 +2786,17 @@ final class CommercialDashboardView
     $employeeJson = json_encode($employees, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP);
     $allowedCargos = is_array($config['calendar_allowed_cargos'] ?? null) ? $config['calendar_allowed_cargos'] : ['9', '10', '17'];
     $currentEmployeeId = trim((string) ($config['calendar_current_employee_id'] ?? ''));
+    $canConfigure = !empty($config['calendar_can_configure']);
+    $dueTypes = is_array($config['calendar_due_types'] ?? null) ? $config['calendar_due_types'] : \SCM\Commercial\CommercialCalendarService::DUE_TYPES;
+    $dueTypeIcons = [
+      'tarea_atrasada' => ['assignment_late', 'text-error'],
+      'tarea_por_vencer' => ['hourglass_top', 'text-warning'],
+      'tarea_seguimiento' => ['support_agent', 'text-primary'],
+      'actualizacion_inmueble' => ['update', 'text-tertiary'],
+      'aviso_retoque' => ['format_paint', 'text-secondary'],
+      'aviso_nuevo' => ['signpost', 'text-secondary'],
+      'precaptacion_llamada' => ['call', 'text-warning'],
+    ];
 
     $subtab = in_array($subtab, ['mine', 'team', 'due'], true) ? $subtab : 'mine';
     $mode = $subtab === 'mine' ? 'personal' : ($subtab === 'due' ? 'due' : 'team');
@@ -2784,7 +2805,7 @@ final class CommercialDashboardView
     if ($subtab === 'mine') {
       $title = 'Mi Calendario Operativo';
       $kicker = 'Agenda Personal';
-      $description = 'Gestiona tus actividades, citas, tareas y recordatorios comerciales con sincronización en Google Calendar.';
+      $description = 'Gestiona tus citas, visitas y recordatorios comerciales con sincronización en Google Calendar.';
       $showCreateActions = true;
       $showPendingAction = true;
       $showReportAction = true;
@@ -2792,7 +2813,7 @@ final class CommercialDashboardView
     } elseif ($subtab === 'due') {
       $title = 'Control de Vencimientos';
       $kicker = 'Seguimiento y Plazos';
-      $description = 'Monitorea vencimientos agrupados de preventivas, cotizaciones y compromisos comerciales.';
+      $description = 'Monitorea plazos de tareas, seguimientos, actualizaciones de inmuebles, avisos y llamadas de precaptación.';
       $showCreateActions = false;
       $showPendingAction = false;
       $showReportAction = false;
@@ -2851,7 +2872,7 @@ final class CommercialDashboardView
         data-calendar-lock-current="<?php echo $mode === 'personal' ? '1' : '0'; ?>"
         data-calendar-app-url="<?php echo esc_attr((string) ($config['calendar_app_url'] ?? '')); ?>"
         data-calendar-api-url="<?php echo esc_attr((string) ($config['calendar_api_url'] ?? '')); ?>"
-        data-calendar-can-configure="1"
+        data-calendar-can-configure="<?php echo $canConfigure ? '1' : '0'; ?>"
         data-calendar-current-employee-id="<?php echo esc_attr($currentEmployeeId); ?>"
         data-calendar-allowed-cargos="<?php echo esc_attr(implode(',', $allowedCargos)); ?>"
         data-calendar-employees-json="<?php echo esc_attr($employeeJson ?: '[]'); ?>">
@@ -2880,10 +2901,6 @@ final class CommercialDashboardView
                   <span class="material-symbols-outlined text-[18px] text-tertiary">notifications_active</span>
                   <span>Recordatorio</span>
                 </button>
-                <button type="button" class="flex items-center gap-1.5 px-space-md py-2 rounded-xl font-label-md bg-surface-container hover:bg-surface-container-high text-on-surface transition-colors cursor-pointer" data-scm-calendar-open-create data-calendar-mode="single" data-calendar-kind="task">
-                  <span class="material-symbols-outlined text-[18px] text-primary">task_alt</span>
-                  <span>Tarea</span>
-                </button>
               <?php endif; ?>
               <button type="button" class="flex items-center gap-1.5 px-space-md py-2 rounded-xl font-label-md bg-surface-container hover:bg-surface-container-high text-on-surface transition-colors cursor-pointer" data-scm-calendar-open-create data-calendar-mode="multiple">
                 <span class="material-symbols-outlined text-[18px] text-secondary">inventory_2</span>
@@ -2892,6 +2909,12 @@ final class CommercialDashboardView
               <button type="button" class="flex items-center gap-1.5 px-space-lg py-2 rounded-xl font-label-md font-semibold bg-primary-container hover:bg-primary-fixed-dim text-on-surface shadow-sm transition-all cursor-pointer" data-scm-calendar-open-create data-calendar-mode="single">
                 <span class="material-symbols-outlined text-[18px]">add</span>
                 <span>Crear evento</span>
+              </button>
+            <?php endif; ?>
+            <?php if ($canConfigure && $view !== 'pending'): ?>
+              <button type="button" class="flex items-center gap-1.5 px-space-md py-2 rounded-xl font-label-md bg-surface-container hover:bg-surface-container-high text-on-surface transition-colors cursor-pointer" data-scm-calendar-configure-categories title="Elegir qué categorías del calendario se usan en comercial">
+                <span class="material-symbols-outlined text-[18px] text-secondary">tune</span>
+                <span>Categorías</span>
               </button>
             <?php endif; ?>
             <?php if ($showReportAction): ?>
@@ -2989,11 +3012,6 @@ final class CommercialDashboardView
                   <span>Eventos</span>
                 </label>
                 <label class="flex items-center gap-1.5 px-2.5 py-1 bg-surface-container-lowest border border-surface-container rounded-xl text-body-sm font-medium cursor-pointer hover:bg-surface-container transition-colors">
-                  <input type="checkbox" name="item_type" value="tarea" checked class="accent-primary rounded">
-                  <span class="material-symbols-outlined text-[15px] text-tertiary">task_alt</span>
-                  <span>Tareas</span>
-                </label>
-                <label class="flex items-center gap-1.5 px-2.5 py-1 bg-surface-container-lowest border border-surface-container rounded-xl text-body-sm font-medium cursor-pointer hover:bg-surface-container transition-colors">
                   <input type="checkbox" name="item_type" value="recordatorio" checked class="accent-primary rounded">
                   <span class="material-symbols-outlined text-[15px] text-secondary">notifications_active</span>
                   <span>Recordatorios</span>
@@ -3022,31 +3040,14 @@ final class CommercialDashboardView
               <p class="font-body-sm text-secondary">Filtra el calendario por el control o gestión que necesitas revisar.</p>
             </div>
             <form class="flex flex-wrap items-center gap-2 pt-2" data-scm-calendar-due-type-filter autocomplete="off">
-              <label class="flex items-center gap-1.5 px-3 py-1.5 bg-surface-container-lowest border border-surface-container rounded-xl text-body-sm font-medium cursor-pointer hover:bg-surface-container transition-colors">
-                <input type="checkbox" name="due_type" value="preventiva_sin_enviar" checked class="accent-primary rounded">
-                <span class="material-symbols-outlined text-[16px] text-secondary">task_alt</span>
-                <span>Preventivas sin enviar</span>
-              </label>
-              <label class="flex items-center gap-1.5 px-3 py-1.5 bg-surface-container-lowest border border-surface-container rounded-xl text-body-sm font-medium cursor-pointer hover:bg-surface-container transition-colors">
-                <input type="checkbox" name="due_type" value="ticket_preventiva_sin_cita" checked class="accent-primary rounded">
-                <span class="material-symbols-outlined text-[16px] text-warning">event_busy</span>
-                <span>Tickets sin cita</span>
-              </label>
-              <label class="flex items-center gap-1.5 px-3 py-1.5 bg-surface-container-lowest border border-surface-container rounded-xl text-body-sm font-medium cursor-pointer hover:bg-surface-container transition-colors">
-                <input type="checkbox" name="due_type" value="preventiva_cita_sin_realizar" checked class="accent-primary rounded">
-                <span class="material-symbols-outlined text-[16px] text-error">pending_actions</span>
-                <span>Citas sin realizar</span>
-              </label>
-              <label class="flex items-center gap-1.5 px-3 py-1.5 bg-surface-container-lowest border border-surface-container rounded-xl text-body-sm font-medium cursor-pointer hover:bg-surface-container transition-colors">
-                <input type="checkbox" name="due_type" value="cotizacion_sin_enviar" checked class="accent-primary rounded">
-                <span class="material-symbols-outlined text-[16px] text-tertiary">receipt_long</span>
-                <span>Cotizaciones sin enviar</span>
-              </label>
-              <label class="flex items-center gap-1.5 px-3 py-1.5 bg-surface-container-lowest border border-surface-container rounded-xl text-body-sm font-medium cursor-pointer hover:bg-surface-container transition-colors">
-                <input type="checkbox" name="due_type" value="cotizacion_enviada_sin_respuesta" checked class="accent-primary rounded">
-                <span class="material-symbols-outlined text-[16px] text-secondary">mark_email_unread</span>
-                <span>Cotizaciones sin respuesta</span>
-              </label>
+              <?php foreach ($dueTypes as $dueKey => $dueType): ?>
+                <?php [$dueIcon, $dueIconClass] = $dueTypeIcons[$dueKey] ?? ['event_upcoming', 'text-secondary']; ?>
+                <label class="flex items-center gap-1.5 px-3 py-1.5 bg-surface-container-lowest border border-surface-container rounded-xl text-body-sm font-medium cursor-pointer hover:bg-surface-container transition-colors">
+                  <input type="checkbox" name="due_type" value="<?php echo esc_attr((string) $dueKey); ?>" checked class="accent-primary rounded">
+                  <span class="material-symbols-outlined text-[16px] <?php echo esc_attr($dueIconClass); ?>"><?php echo esc_html($dueIcon); ?></span>
+                  <span><?php echo esc_html((string) ($dueType['label'] ?? $dueKey)); ?></span>
+                </label>
+              <?php endforeach; ?>
             </form>
           </section>
         <?php endif; ?>

@@ -143,6 +143,25 @@ final class ColombiaBusinessCalendar
     return intdiv($seconds, 86400);
   }
 
+  /** Fecha que resulta de sumar días útiles (lunes a sábado, sin festivos) a partir de la fecha dada. */
+  public static function addBusinessDays($from, int $days): ?DateTimeImmutable
+  {
+    $date = self::parse($from);
+    if (!$date) {
+      return null;
+    }
+
+    $remaining = max(0, $days);
+    while ($remaining > 0) {
+      $date = $date->modify('+1 day');
+      if (self::isBusinessDay($date)) {
+        $remaining--;
+      }
+    }
+
+    return $date;
+  }
+
   private static function countFullDates(DateTimeImmutable $start, DateTimeImmutable $end): int
   {
     $count = 0;

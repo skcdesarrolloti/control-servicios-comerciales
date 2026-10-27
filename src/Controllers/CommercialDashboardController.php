@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace SCM\Controllers;
 
 use SCM\Commercial\CommercialAccessPolicy;
+use SCM\Commercial\CommercialCalendarService;
 use SCM\Commercial\CommercialNotificationsService;
 use SCM\Commercial\CommercialPropertiesRepository;
 use SCM\Commercial\CommercialStatusCatalog;
 use SCM\Commercial\CommercialTicketsRepository;
-use SCM\Core\Auth;
 use SCM\Core\Csrf;
 use SCM\Core\Database;
 use SCM\Core\Settings;
@@ -37,7 +37,6 @@ final class CommercialDashboardController
   {
     $repository = new CommercialTicketsRepository($this->db);
     $adminCargos = is_array($this->config['dashboard_admin_cargos'] ?? null) ? $this->config['dashboard_admin_cargos'] : ['11', '12', '13', '14'];
-    $calendarCargos = is_array($this->config['calendar_allowed_cargos'] ?? null) ? $this->config['calendar_allowed_cargos'] : ['9', '10', '17'];
     $defaultCommercialEmployeeCargos = is_array($this->config['commercial_employee_cargos'] ?? null) ? $this->config['commercial_employee_cargos'] : ['1', '6', '9', '10', '11', '12', '13', '14', '17'];
     $commercialEmployeeCargos = $this->configuredCargoIds('commercial_employee_cargos', $defaultCommercialEmployeeCargos);
     $policy = new CommercialAccessPolicy($this->settings, $this->db, $adminCargos);
@@ -87,27 +86,12 @@ final class CommercialDashboardController
       ? $propertiesRepository->search($propertyFilters, $canSeeAll, (int) ($propertyFilters['page'] ?? 1), 24)
       : ['rows' => [], 'total' => 0, 'pagination' => []];
     $propertyOptions = $propertiesRepository->filterOptions();
-    $calendarEmployees = $repository->activeEmployeesByCargos($calendarCargos);
-    $currentCalendarEmployeeId = trim(Auth::employeeId());
-    if ($currentCalendarEmployeeId === '') {
-      foreach ($calendarEmployees as $employee) {
-        if ((int) ($employee['_pk'] ?? 0) === Auth::userId() || (string) ($employee['id_empleado'] ?? '') === (string) Auth::userId()) {
-          $currentCalendarEmployeeId = (string) ($employee['id_empleado'] ?? '');
-          break;
-        }
-      }
-    }
-    if ($currentCalendarEmployeeId === '') {
-      $currentCalendarEmployeeId = $repository->currentEmployeeTicketFilter($calendarCargos);
-    }
-    if ($currentCalendarEmployeeId === '' && !empty($calendarEmployees)) {
-      $currentCalendarEmployeeId = (string) ($calendarEmployees[0]['id_empleado'] ?? '');
-    }
-
     $subtab = trim((string) ($input['subtab'] ?? 'mine'));
     if (!in_array($subtab, ['mine', 'team', 'due'], true)) {
       $subtab = 'mine';
     }
+    $calendarService = new CommercialCalendarService($this->db, $this->settings, $policy, $this->config);
+    $calendar = $calendarService->panelConfig($subtab);
     $isNonAdmin = !$policy->canSeeAllCommercialTickets();
     $recentTickets = $repository->latestCreatedTickets($isNonAdmin, $currentEmployeeFilter, 12);
     $recentCount = count($recentTickets);
@@ -118,17 +102,11 @@ final class CommercialDashboardController
       'ajaxUrl' => rtrim((string) SCM_BASE_URL, '/') . '/api.php',
       'nonce' => $this->csrf->token('commercial_nonce'),
       'initialTab' => $panelId,
-      'actions' => [],
-      'config' => [
+      'actions' => CommercialCalendarService::runtimeActions(),
+      'calendarCategoryIds' => $calendarService->categoryIds(),
+      'config' => array_merge($calendar['config'], [
         'commercial_statuses' => CommercialStatusCatalog::all(),
-        'calendar_allowed_cargos' => array_values(array_map('strval', $calendarCargos)),
-        'calendar_allowed_employee_ids' => array_values(array_map(static fn(array $employee): string => (string) ($employee['id_empleado'] ?? ''), $calendarEmployees)),
-        'calendar_current_employee_id' => $currentCalendarEmployeeId,
-        'calendar_app_url' => (string) ($this->config['calendar_app_url'] ?? 'https://calendar-skc.netlify.app'),
-        'calendar_api_url' => (string) ($this->config['calendar_api_url'] ?? 'https://sucasainmobiliaria.com.co/calendario-actividades/index.php?action='),
-        'calendar_initial_subtab' => $subtab,
-        'is_admin' => $policy->canManage(),
-      ],
+      ]),
     ];
 
     return CommercialDashboardView::render([
@@ -148,7 +126,7 @@ final class CommercialDashboardController
       'employee_filter_locked' => $employeeFilterLocked,
       'personal_task_scope' => $personalTaskScope,
       'filter_options' => $repository->filterOptions(),
-      'calendar_employees' => $calendarEmployees,
+      'calendar_employees' => $calendar['employees'],
       'topic_hierarchy' => $topicHierarchy,
       'recent_tickets' => $recentTickets,
       'recent_count' => $recentCount,

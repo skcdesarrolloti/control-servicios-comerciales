@@ -126,34 +126,9 @@ final class CommercialApiController
         $this->policy
       );
     } elseif ($bucket === 'calendario') {
-      $calendarCargos = $this->configuredCargoIds('commercial_calendar_cargos', [9, 10, 17]);
-      $calendarEmployees = $this->tickets->activeEmployeesByCargos($calendarCargos);
-      $currentCalendarEmployeeId = trim(\SCM\Core\Auth::employeeId());
-      if ($currentCalendarEmployeeId === '') {
-        foreach ($calendarEmployees as $employee) {
-          if ((int) ($employee['_pk'] ?? 0) === \SCM\Core\Auth::userId() || (string) ($employee['id_empleado'] ?? '') === (string) \SCM\Core\Auth::userId()) {
-            $currentCalendarEmployeeId = (string) ($employee['id_empleado'] ?? '');
-            break;
-          }
-        }
-      }
-      if ($currentCalendarEmployeeId === '') {
-        $currentCalendarEmployeeId = $this->tickets->currentEmployeeTicketFilter($calendarCargos);
-      }
-      if ($currentCalendarEmployeeId === '' && !empty($calendarEmployees)) {
-        $currentCalendarEmployeeId = (string) ($calendarEmployees[0]['id_empleado'] ?? '');
-      }
       $subtab = trim((string) ($input['subtab'] ?? 'mine'));
-      $calendarConfig = array_merge($this->config, [
-        'calendar_allowed_cargos' => array_values(array_map('strval', $calendarCargos)),
-        'calendar_allowed_employee_ids' => array_values(array_map(static fn(array $employee): string => (string) ($employee['id_empleado'] ?? ''), $calendarEmployees)),
-        'calendar_current_employee_id' => $currentCalendarEmployeeId,
-        'calendar_app_url' => (string) ($this->config['calendar_app_url'] ?? 'https://calendar-skc.netlify.app'),
-        'calendar_api_url' => (string) ($this->config['calendar_api_url'] ?? 'https://sucasainmobiliaria.com.co/calendario-actividades/index.php?action='),
-        'calendar_initial_subtab' => $subtab,
-        'is_admin' => $this->policy->canManage(),
-      ]);
-      $html = CommercialDashboardView::renderCalendarPage($calendarConfig, $calendarEmployees, $subtab, $this->policy, $this->baseUrl);
+      $calendar = $this->calendarService()->panelConfig($subtab);
+      $html = CommercialDashboardView::renderCalendarPage(array_merge($this->config, $calendar['config']), $calendar['employees'], $subtab, $this->policy, $this->baseUrl);
     } elseif ($bucket === 'notificaciones') {
       $html = CommercialNotificationsView::render(new CommercialNotificationsService($this->db, $this->policy), $this->policy);
     } elseif ($bucket === 'inmuebles') {
@@ -190,6 +165,70 @@ final class CommercialApiController
       'tabs_html' => CommercialDashboardView::renderTabs($visibleViews, $bucket, $filters, $tabCounts, $this->baseUrl, $topicHierarchy, $this->policy),
       'tab' => $bucket,
     ]);
+  }
+
+  /** @param array<string,mixed> $input */
+  public function calendarDue(array $input): never
+  {
+    $this->verify($input);
+    if (!$this->policy->canSubview('calendario', 'due')) {
+      JsonResponse::error('No tienes permiso para consultar los vencimientos comerciales.', 403);
+    }
+    $from = trim((string) ($input['fecha_inicio'] ?? ''));
+    $to = trim((string) ($input['fecha_fin'] ?? ''));
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $from) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $to)) {
+      JsonResponse::error('El rango de fechas del calendario no es válido.', 422);
+    }
+    JsonResponse::success($this->calendarService()->dueCalendar($from, $to, trim((string) ($input['id_empleado'] ?? ''))));
+  }
+
+  /** @param array<string,mixed> $input */
+  public function calendarCategoriesSave(array $input): never
+  {
+    $this->verify($input);
+    try {
+      $ids = $this->calendarService()->saveCategoryIds($this->idList($input['categories'] ?? []), $this->idList($input['available'] ?? []));
+    } catch (\RuntimeException $exception) {
+      JsonResponse::error($exception->getMessage(), 403);
+    } catch (\InvalidArgumentException $exception) {
+      JsonResponse::error($exception->getMessage(), 422);
+    }
+    JsonResponse::success([
+      'message' => $ids === [] ? 'El calendario comercial mostrará todas las categorías.' : 'Categorías del calendario comercial guardadas.',
+      'category_ids' => $ids,
+    ]);
+  }
+
+  /** @param array<string,mixed> $input */
+  public function calendarCitaNotify(array $input): never
+  {
+    $this->verify($input);
+    if (!$this->policy->canView('calendario')) {
+      JsonResponse::error('No tienes permiso para usar el calendario comercial.', 403);
+    }
+    $appointments = json_decode((string) ($input['appointments'] ?? '[]'), true);
+    try {
+      $result = (new \SCM\Commercial\CommercialCalendarNotifier($this->db))->notify(is_array($appointments) ? $appointments : []);
+    } catch (\Throwable $exception) {
+      error_log('control-servicios-comerciales: error preparando WhatsApp de cita: ' . $exception->getMessage());
+      $result = ['message' => 'Evento creado, pero no se pudo preparar WhatsApp.', 'queued' => 0, 'skipped' => 0, 'errors' => ['Error preparando WhatsApp: ' . $exception->getMessage()]];
+    }
+    JsonResponse::success($result);
+  }
+
+  private function calendarService(): \SCM\Commercial\CommercialCalendarService
+  {
+    return new \SCM\Commercial\CommercialCalendarService($this->db, $this->settings, $this->policy, $this->config);
+  }
+
+  /** @param mixed $raw @return array<int,string> */
+  private function idList($raw): array
+  {
+    if (is_string($raw)) {
+      $decoded = json_decode($raw, true);
+      $raw = is_array($decoded) ? $decoded : explode(',', $raw);
+    }
+    return is_array($raw) ? array_values(array_map(static fn($id): string => trim((string) $id), $raw)) : [];
   }
 
   /** @param array<string,mixed> $input */

@@ -250,6 +250,44 @@ final class CommercialTicketModalView
         </div>
       </div>
 
+      <?php if ($policy->canView('calendario')): ?>
+        <!-- Agenda comercial: agendar citas de la tarea en el calendario y consultar la agenda del responsable -->
+        <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-card" data-purpose="case-calendar"
+          data-commercial-calendar-task
+          data-ticket-pk="<?php echo esc_attr((string) $pk); ?>"
+          data-ticket="<?php echo esc_attr($logicalId); ?>"
+          data-asunto="<?php echo esc_attr($subject); ?>"
+          data-tema="<?php echo esc_attr($theme); ?>"
+          data-solicitante="<?php echo esc_attr($requester); ?>"
+          data-direccion="<?php echo esc_attr(trim(implode(', ', array_filter([$address, $neighborhood, $city])))); ?>"
+          data-inmueble="<?php echo esc_attr($propertyCode); ?>"
+          data-empleado-id="<?php echo esc_attr($assigneeId); ?>"
+          data-empleado="<?php echo esc_attr($assignee); ?>"
+          data-estado-comercial="<?php echo esc_attr(trim((string) ($ticket['estado_comercial'] ?? ''))); ?>"
+          data-estado-administrativo="<?php echo esc_attr(trim((string) ($ticket['estado_administrativo'] ?? ''))); ?>">
+          <div class="flex items-center justify-between mb-3.5 pb-2 border-b border-slate-100">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Agenda comercial</span>
+            <span class="text-[11px] text-[#1E3C76] font-medium" data-commercial-calendar-task-status>Calendario de <?php echo esc_html($assignee); ?></span>
+          </div>
+          <div class="grid grid-cols-2 gap-2.5">
+            <button type="button" class="col-span-2 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-[#F8CF4A] hover:bg-[#E5BD3B] text-[#061D49] text-xs font-bold transition-all cursor-pointer" data-commercial-calendar-schedule>
+              <span class="material-symbols-outlined text-[16px]">event_available</span>
+              <span>Agendar cita de la tarea</span>
+            </button>
+            <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-[#EBF1FB] text-slate-700 border border-slate-200 text-xs font-semibold transition-all cursor-pointer" data-commercial-calendar-agenda>
+              <span class="material-symbols-outlined text-[16px]">calendar_month</span>
+              <span>Ver agenda</span>
+            </button>
+            <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold transition-all cursor-pointer" data-commercial-calendar-pending>
+              <span class="material-symbols-outlined text-[16px] text-rose-600">warning</span>
+              <span>Pendientes</span>
+              <em class="not-italic ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-700" data-commercial-calendar-pending-count hidden>0</em>
+            </button>
+          </div>
+          <div class="mt-3 space-y-1.5" data-commercial-calendar-task-events aria-live="polite"></div>
+        </div>
+      <?php endif; ?>
+
       <!-- Customer and Property Details Card -->
       <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-card flex flex-col gap-4" data-purpose="customer-property-summary">
         <div class="flex items-center justify-between border-b border-slate-100 pb-3">

@@ -246,6 +246,7 @@
       }
       var allowedEmployeeIds = {};
       var categories = [];
+      var allCalendarCategories = [];
       var categoriesById = {};
       var currentMonth = startOfMonth(new Date());
       var selectedDay = toDateKey(new Date());
@@ -289,18 +290,18 @@
           options.body = JSON.stringify(payload);
         }
         return fetch(calendarApiUrl + encodeURIComponent(action), options).then(function (r) {
-          if (!r.ok) {
-            return r.text().then(function (txt) {
-              var msg = "HTTP " + r.status + " en " + action;
-              try {
-                var j = JSON.parse(txt);
-                if (j && j.message) msg = j.message;
-              } catch (_) {}
-              throw new Error(msg);
-            });
-          }
-          return r.json().catch(function () {
-            throw new Error("Respuesta no válida de " + action);
+          return r.text().then(function (body) {
+            try {
+              var json = JSON.parse(body);
+              if (json && !json.success && json.data && json.data.error_detail) {
+                json.message = (json.message || "Error del calendario.") + " Detalle: " + json.data.error_detail + (json.data.error_id ? " (Referencia: " + json.data.error_id + ")" : "");
+              }
+              return json;
+            } catch (err) {
+              var responseError = new Error("No se pudo confirmar la respuesta del calendario (HTTP " + r.status + "). Revisa si el elemento ya aparece en el calendario antes de volver a guardarlo.");
+              responseError.calendarResponseInvalid = true;
+              throw responseError;
+            }
           });
         });
       }
@@ -317,21 +318,46 @@
         );
       }
 
-      function waitForGoogleCalendarConnection(employeeId, attempts) {
-        attempts = attempts || 0;
-        return calendarApi("estado_google_oauth", { id_empleado: employeeId }).then(function (json) {
-          var data = json && json.data ? json.data : {};
-          if (json && json.success && data.connected) {
-            return true;
+      function waitForGoogleCalendarConnection(employeeId, authWindow) {
+        return new Promise(function (resolve, reject) {
+          var settled = false;
+          var attempts = 0;
+          var timer = null;
+          function finish(error) {
+            if (settled) return;
+            settled = true;
+            if (timer) window.clearTimeout(timer);
+            window.removeEventListener("message", onMessage);
+            if (error) reject(error);
+            else resolve(true);
           }
-          if (attempts >= 60) {
-            throw new Error("No se confirmó la conexión con Google Calendar. Autoriza la cuenta y vuelve a guardar.");
+          function onMessage(event) {
+            var data = event.data || {};
+            if (event.origin !== window.location.origin || event.source !== authWindow ||
+                data.type !== "scm-google-calendar-connected" || String(data.id_empleado) !== employeeId) return;
+            finish();
           }
-          return new Promise(function (resolve) {
-            window.setTimeout(resolve, 2000);
-          }).then(function () {
-            return waitForGoogleCalendarConnection(employeeId, attempts + 1);
-          });
+          function checkConnection() {
+            if (settled) return;
+            calendarApi("estado_google_oauth", { id_empleado: employeeId }).then(function (json) {
+              if (settled) return;
+              if (json && json.success && json.data && json.data.connected) {
+                finish();
+                return;
+              }
+              if (authWindow.closed) {
+                finish(new Error("Se cerró la autorización de Google sin conectar la cuenta."));
+                return;
+              }
+              if (++attempts >= 60) {
+                finish(new Error("No se confirmó la conexión con Google Calendar. Autoriza la cuenta y vuelve a guardar."));
+                return;
+              }
+              timer = window.setTimeout(checkConnection, 2000);
+            }).catch(finish);
+          }
+          window.addEventListener("message", onMessage);
+          checkConnection();
         });
       }
 
@@ -357,12 +383,20 @@
             if (!data.configured) {
               throw new Error("Google Calendar aún no está configurado en el servidor.");
             }
+            if (!data.sync_enabled) {
+              throw new Error("La sincronización con Google Calendar está desactivada en el servidor. Activa CALENDARIO_GOOGLE_SYNC_ENABLED=1 o desmarca Google Calendar para guardar solo en el panel.");
+            }
             if (data.connected) {
               return ensureIndex(index + 1);
             }
+            if (!currentCalendarEmployeeId || employeeId !== currentCalendarEmployeeId) {
+              throw new Error(employeeDisplayName(employeeId) + " debe conectar personalmente su cuenta de Google. Desmarca Google Calendar para guardar solo en el panel.");
+            }
+            var redirectUrl = new URL(window.location.href);
+            redirectUrl.searchParams.set("scm_google_popup", "1");
             return calendarApi("iniciar_google_oauth", {
               id_empleado: employeeId,
-              redirect_after: window.location.href,
+              redirect_after: redirectUrl.toString(),
             }).then(function (authJson) {
               var authUrl = authJson && authJson.data ? authJson.data.auth_url : "";
               if (!authJson || !authJson.success || !authUrl) {
@@ -375,7 +409,7 @@
               if (window.Swal && typeof window.Swal.showValidationMessage === "function") {
                 window.Swal.showValidationMessage("Autoriza Google Calendar en la ventana abierta. Guardaremos al confirmar la conexión.");
               }
-              return waitForGoogleCalendarConnection(employeeId).then(function () {
+              return waitForGoogleCalendarConnection(employeeId, authWindow).then(function () {
                 try { authWindow.close(); } catch (err) {}
                 return ensureIndex(index + 1);
               });
@@ -402,6 +436,17 @@
             return json.data || {};
           });
       }
+
+      // Alias de las utilidades del tablero administrativo que reutiliza el motor del calendario.
+      var dashboardAction = dashboardAjax;
+
+      function dashboardDueTotal(rows) {
+        return (Array.isArray(rows) ? rows : []).filter(function (row) {
+          return String((row && row.estado) || "").toLowerCase() === "vencido";
+        }).length;
+      }
+
+      function elevateDashboardDueCaseModal() {}
 
       function parseCalendarEmployees(raw) {
         try {
@@ -477,6 +522,13 @@
           cotizacion_enviada_sin_respuesta: { color: "#dc2626", bg: "#fef2f2", text: "#b91c1c", border: "#fecaca" },
           preventiva_pendiente: { color: "#0891b2", bg: "#ecfeff", text: "#0e7490", border: "#a5f3fc" },
           servicios_publicos_pendientes: { color: "#0284c7", bg: "#f0f9ff", text: "#0369a1", border: "#bae6fd" },
+          tarea_atrasada: { color: "#dc2626", bg: "#fef2f2", text: "#b91c1c", border: "#fecaca" },
+          tarea_por_vencer: { color: "#f59e0b", bg: "#fffbeb", text: "#92400e", border: "#fde68a" },
+          tarea_seguimiento: { color: "#2563eb", bg: "#eff6ff", text: "#1d4ed8", border: "#bfdbfe" },
+          actualizacion_inmueble: { color: "#7c3aed", bg: "#f5f3ff", text: "#6d28d9", border: "#ddd6fe" },
+          aviso_retoque: { color: "#0f766e", bg: "#ecfdf5", text: "#0f766e", border: "#99f6e4" },
+          aviso_nuevo: { color: "#0891b2", bg: "#ecfeff", text: "#0e7490", border: "#a5f3fc" },
+          precaptacion_llamada: { color: "#ea580c", bg: "#fff7ed", text: "#9a3412", border: "#fed7aa" },
         };
         var theme = themes[key] || { color: "#475569", bg: "#f8fafc", text: "#334155", border: "#cbd5e1" };
         if (typeof rowOrType !== "string" && rowOrType && rowOrType.color) {
@@ -492,7 +544,7 @@
 
       function calendarItemIsDone(row) {
         var estado = String((row && row.estado) || "").toLowerCase().trim();
-        return estado === "si" || estado === "realizada" || estado === "enviado" || estado === "cancelada" || estado === "cancelado";
+        return estado === "si" || estado === "realizada" || estado === "finalizado" || estado === "enviado" || estado === "cancelada" || estado === "cancelado";
       }
 
       function calendarItemStatusLabel(row) {
@@ -505,6 +557,7 @@
           return "Pendiente";
         }
         if (kind === "recordatorio") {
+          if (estado === "finalizado") return "Finalizado";
           if (estado === "enviado") return "Enviado";
           if (estado === "cancelado") return "Cancelado";
           if (estado === "programado") return "Programado";
@@ -924,7 +977,7 @@
       }
 
       function activeCalendarTypes() {
-        if (!layerFilterForm) return ["evento", "tarea", "recordatorio"];
+        if (!layerFilterForm) return ["evento", "recordatorio"];
         return Array.prototype.slice.call(layerFilterForm.querySelectorAll('input[name="item_type"]:checked'))
           .map(function (input) { return String(input.value || "").trim(); })
           .filter(Boolean);
@@ -1151,13 +1204,23 @@
 
       function dueEventCardHtml(row) {
         var caseData = row && row.case ? row.case : {};
-        var sourceHtml = String(caseData.case_source_html || "").trim();
-        var isCreateTicket = String(caseData.admin_ticket_create || "") === "1";
-        var isPublicServices = String(caseData.public_services_review || "") === "1";
-        var canOpen = sourceHtml !== "";
+        var ticketPk = String(caseData.ticket_pk || "").trim();
+        var linkUrl = String(caseData.link_url || "").trim();
+        var propertyUrl = String(caseData.property_url || "").trim();
         var overdue = String(row.estado || "").toLowerCase() === "vencido";
         var theme = dueTypeTheme(row);
         var color = String(theme.color || row.color || (overdue ? "#dc2626" : "#f59e0b")).trim();
+        var actionClass = "px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer";
+        var actions = "";
+        if (ticketPk) {
+          actions += '<button type="button" class="' + actionClass + ' bg-primary hover:bg-primary/90 text-white" data-commercial-open-case="' + escHtml(ticketPk) + '">Ver tarea</button>';
+        }
+        if (linkUrl) {
+          actions += '<a class="' + actionClass + ' bg-surface-container hover:bg-surface-container-high text-on-surface" href="' + escHtml(linkUrl) + '" target="_blank" rel="noopener">' + escHtml(caseData.link_label || "Abrir") + '</a>';
+        }
+        if (propertyUrl) {
+          actions += '<a class="' + actionClass + ' bg-surface-container hover:bg-surface-container-high text-on-surface" href="' + escHtml(propertyUrl) + '" target="_blank" rel="noopener">Ver inmueble</a>';
+        }
         return '<article class="p-3 bg-surface-container-low rounded-xl border border-surface-container relative overflow-hidden transition-all space-y-2" style="border-left-width:4px;border-left-color:' + escHtml(color) + '">' +
           '<div class="flex items-start justify-between gap-2">' +
           '<h5 class="font-title-sm font-semibold text-on-surface leading-snug">' + escHtml(row.titulo || "Vencimiento") + '</h5>' +
@@ -1165,18 +1228,15 @@
           '</div>' +
           '<div class="text-xs text-secondary/90 leading-relaxed font-body-sm">' + escHtml(row.descripcion || "Control de vencimiento comercial.") + '</div>' +
           '<div class="flex flex-wrap items-center gap-1.5 text-[11px] text-secondary">' +
-          '<span class="font-medium">' + escHtml(row.grupo || "Vencimiento") + '</span>' +
-          '<span class="text-secondary/40">·</span>' +
-          '<span>Base: ' + escHtml(row.fecha_base || "-") + '</span>' +
+          '<span class="font-medium" style="color:' + escHtml(theme.text || color) + '">' + escHtml(dueTypeLabel(row.tipo_vencimiento) || row.grupo || "Vencimiento") + '</span>' +
+          (row.fecha_base ? '<span class="text-secondary/40">·</span><span>Base: ' + escHtml(row.fecha_base) + '</span>' : '') +
           '<span class="text-secondary/40">·</span>' +
           '<span class="font-semibold text-error">Vence: ' + escHtml(row.fecha_vencimiento || "-") + '</span>' +
-          '<span class="text-secondary/40">·</span>' +
-          '<span>' + escHtml(String(row.dias_transcurridos || 0)) + ' d transcurridos</span>' +
           (Number(row.dias_vencido || 0) > 0 ? '<span class="text-secondary/40">·</span><span class="text-red-600 font-bold">' + escHtml(String(row.dias_vencido)) + ' d vencido</span>' : '') +
+          (Number(row.acumulado_vencido || 0) > 0 ? '<span class="text-secondary/40">·</span><span>Acumulado en hoy</span>' : '') +
           '</div>' +
-          '<div class="pt-1 flex flex-wrap items-center gap-1.5 border-t border-surface-container/60">' +
-          (isCreateTicket ? '<button type="button" class="px-2.5 py-1 bg-surface-container hover:bg-surface-container-high text-on-surface rounded-lg text-xs font-semibold transition-colors cursor-pointer" data-scm-open-admin-ticket data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dueCaseAttrsHtml(caseData) + '>Crear ticket</button>' : (isPublicServices ? '<button type="button" class="px-2.5 py-1 bg-surface-container hover:bg-surface-container-high text-on-surface rounded-lg text-xs font-semibold transition-colors cursor-pointer" data-scm-open-public-services-review data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dueCaseAttrsHtml(caseData) + '>Ver revisión</button>' : (canOpen ? '<button type="button" class="px-2.5 py-1 bg-primary hover:bg-primary/90 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer" data-scm-due-open-case data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dueCaseAttrsHtml(caseData) + '>Ver caso</button>' : '<button type="button" class="px-2.5 py-1 bg-surface-container text-secondary/60 rounded-lg text-xs font-medium cursor-not-allowed" disabled>Sin caso asociado</button>'))) +
-          '</div><div class="scm-case-source" aria-hidden="true" style="display:none;">' + sourceHtml + '</div></article>';
+          (actions ? '<div class="pt-1 flex flex-wrap items-center gap-1.5 border-t border-surface-container/60">' + actions + '</div>' : '') +
+          '</article>';
       }
 
       function eventCardHtml(row) {
@@ -1208,13 +1268,16 @@
           '<span class="font-medium">' + escHtml(row.funcionario || row.nombre || "Funcionario") + '</span>' +
           '<span class="text-secondary/40">·</span>' +
           '<span class="px-1.5 py-0.5 rounded font-medium ' + kindBadgeClass + '">' + escHtml(kindLabel) + '</span>' +
-          (ticket ? '<span class="text-secondary/40">·</span><span class="font-semibold text-primary">Ticket #' + escHtml(ticket) + '</span>' : '') +
+          (ticket ? '<span class="text-secondary/40">·</span><span class="font-semibold text-primary">Tarea #' + escHtml(ticket) + '</span>' : '') +
           '</div>' +
           '<div class="pl-1.5 pt-1 flex flex-wrap items-center gap-1.5 border-t border-surface-container/60">' +
           (isEventKind && id ? '<button type="button" class="px-2.5 py-1 bg-surface-container hover:bg-surface-container-high text-on-surface rounded-lg text-xs font-semibold transition-colors cursor-pointer" data-scm-calendar-view-event data-event-id="' + escHtml(id) + '">Ver evento</button>' : '') +
-          (isEventKind && ticket ? '<button type="button" class="px-2.5 py-1 bg-surface-container hover:bg-surface-container-high text-on-surface rounded-lg text-xs font-semibold transition-colors cursor-pointer" data-scm-calendar-view-ticket data-event-id="' + escHtml(id) + '" data-ticket-id="' + escHtml(ticket) + '">Ver caso</button>' : '') +
+          (isEventKind && ticket ? '<button type="button" class="px-2.5 py-1 bg-surface-container hover:bg-surface-container-high text-on-surface rounded-lg text-xs font-semibold transition-colors cursor-pointer" data-scm-calendar-view-ticket data-event-id="' + escHtml(id) + '" data-ticket-id="' + escHtml(ticket) + '">Ver tarea</button>' : '') +
           (isEventKind && id && !isDone ? '<button type="button" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer" data-scm-calendar-complete-event data-event-id="' + escHtml(id) + '">Realizado</button>' : '') +
           (isEventKind && id ? '<button type="button" class="px-2.5 py-1 bg-surface-container hover:bg-surface-container-high text-on-surface rounded-lg text-xs font-semibold transition-colors cursor-pointer" data-scm-calendar-reschedule-event data-event-id="' + escHtml(id) + '">Trasladar</button>' : '') +
+          (isEventKind && id ? '<button type="button" class="px-2.5 py-1 bg-surface-container hover:bg-surface-container-high text-on-surface rounded-lg text-xs font-semibold transition-colors cursor-pointer" data-scm-calendar-edit-event data-event-id="' + escHtml(id) + '">Editar</button>' : '') +
+          (kind === "recordatorio" && id ? '<button type="button" class="px-2.5 py-1 bg-surface-container hover:bg-surface-container-high text-on-surface rounded-lg text-xs font-semibold transition-colors cursor-pointer" data-scm-calendar-view-item data-item-id="' + escHtml(id) + '" data-item-kind="recordatorio">Ver</button>' : '') +
+          (kind === "recordatorio" && id && !isDone ? '<button type="button" class="px-2.5 py-1 bg-surface-container hover:bg-surface-container-high text-on-surface rounded-lg text-xs font-semibold transition-colors cursor-pointer" data-scm-calendar-edit-item data-item-id="' + escHtml(id) + '" data-item-kind="recordatorio">Editar</button>' : '') +
           (kind === "tarea" && id && !isDone ? '<button type="button" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer" data-scm-calendar-complete-task data-task-id="' + escHtml(id) + '">Marcar realizada</button>' : '') +
           (kind === "recordatorio" && id && !isDone ? '<button type="button" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer" data-scm-calendar-send-reminder data-reminder-id="' + escHtml(id) + '">Marcar enviado</button>' : '') +
           (kind === "recordatorio" && id && !isDone ? '<button type="button" class="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer" data-scm-calendar-cancel-reminder data-reminder-id="' + escHtml(id) + '">Cancelar</button>' : '') +
@@ -1376,9 +1439,11 @@
         var color = String(row.color || "#f97316").trim() || "#f97316";
         var id = String(row.id || row._ID || row.event_id || "").trim();
         var kind = calendarItemKind(row);
-        var tag = kind === "evento" && id ? "button" : "div";
+        var tag = id ? "button" : "div";
         var attrs = tag === "button"
-          ? ' type="button" data-scm-calendar-view-event data-event-id="' + escHtml(id) + '"'
+          ? (kind === "evento"
+            ? ' type="button" data-scm-calendar-view-event data-event-id="' + escHtml(id) + '"'
+            : ' type="button" data-scm-calendar-view-item data-item-id="' + escHtml(id) + '" data-item-kind="' + escHtml(kind) + '"')
           : ' role="group"';
         var timeLabel = (timePartFromDateTime(row.fecha_inicio) || timeFromMinutes(start)) + " - " + (timePartFromDateTime(row.fecha_fin) || timeFromMinutes(end));
         var dayIndex = Math.max(0, columnIndex - 2);
@@ -1605,6 +1670,7 @@
         var title = String(fd.get("titulo") || "").trim();
         var categoryId = String(fd.get("id_categoria") || "").trim();
         var kind = String(fd.get("kind") || "event").trim();
+        if (["event", "reminder"].indexOf(kind) === -1) kind = "event";
         var location = String(fd.get("ubicacion") || "").trim();
         var tipoItem = kind === "task" ? "tarea" : (kind === "reminder" ? "recordatorio" : "evento");
         var itemLabel = tipoItem === "tarea" ? "tarea" : (tipoItem === "recordatorio" ? "recordatorio" : "evento");
@@ -1631,6 +1697,8 @@
           fecha_inicio: selection.date + " " + timeFromMinutes(selection.start) + ":00",
           fecha_fin: selection.date + " " + timeFromMinutes(selection.end) + ":00",
           id_empleado: employeeId,
+          creado_por: currentCalendarEmployeeId || "",
+          sincronizar_google: googleRequested ? "1" : "0",
         };
         if (tipoItem === "tarea") {
           payload.fecha_limite = payload.fecha_fin;
@@ -1638,6 +1706,7 @@
         if (tipoItem === "recordatorio") {
           payload.recordatorio_at = payload.fecha_inicio;
           payload.recordatorio_canal = "whatsapp";
+          payload.aviso_minutos_antes = Number(fd.get("aviso_minutos_antes") || 30);
         }
         if (googleRequested) {
           payload.sincronizar_google = "1";
@@ -1659,10 +1728,17 @@
         }).then(function (json) {
           if (!json || !json.success) throw new Error((json && json.message) || "No se pudo crear el " + itemLabel + ".");
           showToast("success", json.message || (itemLabel.charAt(0).toUpperCase() + itemLabel.slice(1) + " creado."));
+          if (googleRequested && json.data && (json.data.google_pendiente || (json.data.item && !json.data.item.google_event_id))) {
+            showToast("error", "Se guardó en el panel, pero quedó pendiente en Google Calendar. " + (json.data.google_error || "") + (json.data.google_error_detail ? " Detalle: " + json.data.google_error_detail : ""), "Google Calendar pendiente");
+          }
+          if (tipoItem === "recordatorio" && json.data && json.data.aviso_programado === false) {
+            showToast("warning", "El recordatorio se guardó, pero no se pudo programar el aviso. " + (json.data.aviso_error || ""), "Aviso pendiente");
+          }
           closeWeekQuickPopover();
           return loadEvents();
         }).catch(function (err) {
-          showToast("error", err.message || "No se pudo crear el " + itemLabel + ".");
+          showToast(err.calendarResponseInvalid ? "warning" : "error", err.message || "No se pudo crear el " + itemLabel + ".", err.calendarResponseInvalid ? "Guardado sin confirmar" : undefined);
+          if (err.calendarResponseInvalid) loadEvents().catch(function () {});
           if (submit) {
             submit.disabled = false;
             submit.textContent = "Guardar";
@@ -1693,13 +1769,13 @@
           '<label class="scm-calendar-week-quick-title"><span class="sr-only">Titulo</span><input name="titulo" placeholder="A&ntilde;ade un t&iacute;tulo" required data-week-quick-title-input></label>' +
           '<div class="scm-calendar-week-quick-tabs" aria-label="Tipo">' +
           '<button type="button" class="active" data-week-quick-kind="event">Evento</button>' +
-          '<button type="button" data-week-quick-kind="task">Tarea</button>' +
           '<button type="button" data-week-quick-kind="reminder">Recordatorio</button>' +
           '</div>' +
           '<div class="scm-calendar-week-quick-row"><span class="material-symbols-outlined">schedule</span><div><strong>' + escHtml(dateLabel) + '</strong><em>' + escHtml(timeLabel) + '</em></div></div>' +
           '<div class="scm-calendar-week-quick-location" data-week-quick-location-row><span class="material-symbols-outlined">location_on</span><div><input name="ubicacion" placeholder="A&ntilde;adir ubicaci&oacute;n o direcci&oacute;n"><div class="scm-calendar-week-quick-location-presets" aria-label="Ubicaciones r&aacute;pidas"><button type="button" data-week-quick-location="Oficina Manga">Oficina Manga</button> <button type="button" data-week-quick-location="Oficina Corredor">Oficina Corredor</button></div></div></div>' +
           '<label class="scm-calendar-week-quick-category"><span class="material-symbols-outlined">sell</span><select name="id_categoria" required><option value="">Selecciona categoría</option>' + categoryOptions + '</select></label>' +
-          '<label class="scm-calendar-week-quick-google" data-week-quick-google-row><input type="checkbox" name="sincronizar_google" value="1"><span><strong>Google Calendar</strong><em>Agregar y usar sus recordatorios</em></span></label>' +
+          '<label class="scm-calendar-week-quick-google" data-week-quick-google-row><input type="checkbox" name="sincronizar_google" value="1" checked><span><strong>Google Calendar</strong><em>Se usa la cuenta conectada del funcionario</em></span></label>' +
+          '<input type="hidden" name="aviso_minutos_antes" value="30">' +
           '<div class="scm-calendar-week-quick-actions">' +
           '<button type="button" data-week-quick-more>Más opciones</button>' +
           '<button type="submit" data-week-quick-save>Guardar</button>' +
@@ -2065,21 +2141,10 @@
       function computeDueStats(rows) {
         rows = Array.isArray(rows) ? rows : [];
         var todayKey = toDateKey(new Date());
-        var stats = {
-          total: rows.length,
-          vencidos: 0,
-          hoy: 0,
-          preventiva_pendiente: 0,
-          preventiva_sin_enviar: 0,
-          ticket_preventiva_sin_cita: 0,
-          preventiva_cita_sin_realizar: 0,
-          servicios_publicos_pendientes: 0,
-          cotizacion_sin_enviar: 0,
-          cotizacion_enviada_sin_respuesta: 0,
-        };
+        var stats = { total: rows.length, vencidos: 0, hoy: 0 };
         rows.forEach(function (row) {
           var type = String(row.tipo_vencimiento || "");
-          if (Object.prototype.hasOwnProperty.call(stats, type)) stats[type] += 1;
+          if (type) stats[type] = Number(stats[type] || 0) + 1;
           if (String(row.estado || "").toLowerCase() === "vencido") stats.vencidos += 1;
           if (String(row.fecha_vencimiento || "").slice(0, 10) === todayKey) stats.hoy += 1;
         });
@@ -2087,13 +2152,8 @@
       }
 
       function dueTypeLabel(type) {
-        if (type === "preventiva_sin_enviar") return "Preventivas sin enviar";
-        if (type === "preventiva_pendiente") return "Preventivas pendientes";
-        if (type === "ticket_preventiva_sin_cita") return "Tickets sin cita preventiva";
-        if (type === "preventiva_cita_sin_realizar") return "Preventivas con cita sin realizar";
-        if (type === "servicios_publicos_pendientes") return "Servicios públicos pendientes";
-        if (type === "cotizacion_sin_enviar") return "Cotizaciones sin enviar";
-        if (type === "cotizacion_enviada_sin_respuesta") return "Cotizaciones sin respuesta";
+        var configured = config && config.calendar_due_types && config.calendar_due_types[type];
+        if (configured && configured.label) return String(configured.label);
         return type || "Vencimientos";
       }
 
@@ -2229,6 +2289,9 @@
         return dashboardAjax(actionAdminDueCalendar, { fecha_inicio: range.from, fecha_fin: range.to, include_summary: "1" })
           .then(function (data) {
             renderDueCalendar(data || {});
+            if (data && Array.isArray(data.failed_sources) && data.failed_sources.length) {
+              showToast("warning", "No se pudieron calcular algunos vencimientos (" + data.failed_sources.join(", ") + "). Se muestran los demás.");
+            }
           })
           .catch(function (err) {
             calendarEvents = [];
@@ -2305,12 +2368,17 @@
             return json.data || [];
           });
         }
-        return calendarApi("listar_items_calendario", Object.assign({}, filters, { tipos_item: ["evento", "tarea", "recordatorio"] }))
+        return calendarApi("listar_items_calendario", Object.assign({}, filters, { tipos_item: ["evento", "recordatorio"] }))
           .then(function (json) {
-            if (!json || !json.success) throw new Error((json && json.message) || "No se pudieron cargar items.");
+            if (!json || !json.success) {
+              var loadError = new Error((json && json.message) || "No se pudieron cargar items.");
+              loadError.calendarBackendError = !!(json && json.data && json.data.error_code);
+              throw loadError;
+            }
             return extractRows(json.data || json);
           })
-          .catch(function () {
+          .catch(function (err) {
+            if (err.calendarBackendError) throw err;
             return loadLegacyEvents();
           })
           .then(function (rows) {
@@ -2319,7 +2387,7 @@
           .catch(function (err) {
             if (monthGrid) monthGrid.innerHTML = '<div class="scm-calendar-loading">No se pudo cargar el calendario.</div>';
             if (eventsWrap) eventsWrap.innerHTML = '<div class="scm-empty scm-empty-cards">No se pudieron cargar eventos.</div>';
-            showToast("error", err.message || "No se pudieron cargar eventos.");
+            showToast("error", err.message || "No se pudieron cargar eventos.", "No se pudo cargar el calendario");
           })
           .finally(function () {
             if (spinner) spinner.classList.remove("active");
@@ -2994,6 +3062,9 @@
         }).then(function (result) {
           if (!result.isConfirmed || !result.value) return;
           showToast("success", result.value.message || successMessage);
+          if (result.value.data && result.value.data.google_pendiente) {
+            showToast("error", "El cambio se guardo aqui, pero no se pudo actualizar en Google Calendar.", "Google Calendar pendiente");
+          }
           loadEvents();
         });
       }
@@ -3096,6 +3167,7 @@
           '<div>' +
           (eventId && !isDone ? '<button type="button" class="scm-calendar-modern-btn scm-calendar-modern-btn--success" data-scm-calendar-complete-event data-event-id="' + escHtml(eventId) + '"><span class="material-symbols-outlined" aria-hidden="true">check_circle</span>Marcar como realizado</button>' : '<span class="scm-calendar-modern-done-pill"><span class="material-symbols-outlined" aria-hidden="true">task_alt</span>Realizado</span>') +
           (eventId ? '<button type="button" class="scm-calendar-modern-btn scm-calendar-modern-btn--soft" data-scm-calendar-reschedule-event data-event-id="' + escHtml(eventId) + '"><span class="material-symbols-outlined" aria-hidden="true">event_repeat</span>Trasladar evento</button>' : "") +
+          (eventId ? '<button type="button" class="scm-calendar-modern-btn scm-calendar-modern-btn--soft" data-scm-calendar-edit-event data-event-id="' + escHtml(eventId) + '">Editar evento</button>' : "") +
           '</div>' +
           '<button type="button" class="scm-calendar-modern-btn scm-calendar-modern-btn--dark" data-scm-calendar-close>Cerrar</button>' +
           '</footer>' +
@@ -3108,6 +3180,21 @@
           return window.CSS.escape(value);
         }
         return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+      }
+
+      // En el panel comercial el caso relacionado es una tarea: se abre su modal de gestión.
+      function openCommercialTaskModal(ticketId) {
+        ticketId = String(ticketId || "").trim();
+        if (!/^\d+$/.test(ticketId) || !document.getElementById("commercial-case-modal")) return false;
+        if (window.Swal && typeof window.Swal.isVisible === "function" && window.Swal.isVisible()) window.Swal.close();
+        var opener = document.createElement("button");
+        opener.type = "button";
+        opener.hidden = true;
+        opener.setAttribute("data-commercial-open-case", ticketId);
+        root.appendChild(opener);
+        opener.click();
+        opener.remove();
+        return true;
       }
 
       function openLoadedNativeTicket(ticketId) {
@@ -3322,11 +3409,156 @@
             }, 50);
             return;
           }
+          var editBtn = event.target && event.target.closest ? event.target.closest("[data-scm-calendar-edit-event]") : null;
+          if (editBtn) {
+            event.preventDefault();
+            var editId = editBtn.getAttribute("data-event-id") || "";
+            state.navigating = true;
+            window.Swal.close();
+            window.setTimeout(function () {
+              openCalendarEditPopup(editId, "evento", {
+                returnTo: function () { openCalendarEventDetailPopup(editId, { returnTo: options.returnTo }); },
+              });
+            }, 50);
+            return;
+          }
           var closeBtn = event.target && event.target.closest ? event.target.closest("[data-scm-calendar-close]") : null;
           if (closeBtn) {
             event.preventDefault();
             window.Swal.close();
           }
+        });
+      }
+
+      function openCalendarEditPopup(itemId, kind, options) {
+        options = options || {};
+        if (!window.Swal || typeof window.Swal.fire !== "function") return;
+        var row = calendarItemById(itemId, kind);
+        if (!row || (kind !== "evento" && kind !== "recordatorio")) {
+          showToast("error", "No encontre el elemento para editar.");
+          return;
+        }
+        var isReminder = kind === "recordatorio";
+        if (isReminder && calendarItemIsDone(row)) {
+          showToast("error", "Solo se pueden editar recordatorios pendientes.");
+          return;
+        }
+        var categoryId = getCategoryId(row);
+        var categoryOptions = calendarAdminCategories().map(function (category) {
+          var id = String(category.id || category._ID || category.id_categoria || "").trim();
+          return id ? '<option value="' + escHtml(id) + '"' + (id === categoryId ? ' selected' : '') + '>' + escHtml(calendarCategoryLabel(category) || "Categoria") + '</option>' : "";
+        }).join("");
+        if (categoryId && categoryOptions.indexOf('value="' + escHtml(categoryId) + '"') === -1) {
+          categoryOptions += '<option value="' + escHtml(categoryId) + '" selected>' + escHtml(row.categoria || "Categoria actual") + '</option>';
+        }
+        var dateValue = datePartFromDateTime(row.recordatorio_at || row.fecha_inicio);
+        var timeValue = timePartFromDateTime(row.recordatorio_at || row.fecha_inicio);
+        var noticeMinutes = Number(row.meta && row.meta.aviso_minutos_antes !== undefined ? row.meta.aviso_minutos_antes : 0);
+        var html = '<div class="scm-calendar-create-shell"><div class="scm-calendar-create-head"><div class="scm-calendar-create-title"><strong>Editar ' + (isReminder ? 'recordatorio' : 'evento') + '</strong><span>Los cambios se actualizar&aacute;n en Google Calendar si est&aacute; vinculado.</span></div></div>' +
+          '<form class="scm-calendar-popup-form scm-calendar-create-form" data-scm-calendar-edit-form autocomplete="off"><div class="scm-calendar-create-main">' +
+          '<label class="scm-seg-field scm-calendar-field-full"><span>T&iacute;tulo</span><input class="input input-bordered input-sm scm-input" name="titulo" required value="' + escHtml(row.titulo || "") + '"></label>' +
+          '<label class="scm-seg-field scm-calendar-field-full"><span>Descripci&oacute;n</span><textarea class="textarea textarea-bordered textarea-sm scm-textarea" name="descripcion" rows="3">' + escHtml(isReminder ? (row.mensaje || row.descripcion || "") : (row.descripcion || "")) + '</textarea></label>' +
+          (isReminder
+            ? '<div class="scm-calendar-create-row scm-calendar-date-row"><label class="scm-seg-field"><span>Fecha</span><input class="input input-bordered input-sm scm-input" type="date" name="fecha" required value="' + escHtml(dateValue) + '"></label><label class="scm-seg-field"><span>Hora del recordatorio</span><input class="input input-bordered input-sm scm-input" type="time" name="hora" required value="' + escHtml(timeValue) + '"></label></div>' +
+              '<label class="scm-seg-field scm-calendar-field-full"><span>Aviso por WhatsApp y Google (minutos antes)</span><input class="input input-bordered input-sm scm-input" type="number" name="aviso_minutos_antes" min="0" max="1440" step="1" required value="' + escHtml(noticeMinutes) + '"></label>'
+            : '<label class="scm-seg-field scm-calendar-field-full"><span>Ubicaci&oacute;n</span><input class="input input-bordered input-sm scm-input" name="ubicacion" value="' + escHtml(row.ubicacion || "") + '"></label>' +
+              '<label class="scm-seg-field scm-calendar-field-full"><span>Categor&iacute;a</span><select class="select select-bordered select-sm scm-select" name="id_categoria" required>' + categoryOptions + '</select></label>') +
+          '</div></form></div>';
+        window.Swal.fire({
+          title: "",
+          html: html,
+          width: 720,
+          customClass: { popup: "scm-calendar-swal-popup scm-calendar-native-swal scm-calendar-edit-swal" },
+          showCancelButton: true,
+          confirmButtonText: "Guardar cambios",
+          cancelButtonText: "Cerrar",
+          preConfirm: function () {
+            var popup = window.Swal.getPopup();
+            var form = popup && popup.querySelector("[data-scm-calendar-edit-form]");
+            if (!form || !form.reportValidity()) return false;
+            var fd = new FormData(form);
+            var payload = { titulo: String(fd.get("titulo") || "").trim(), descripcion: String(fd.get("descripcion") || "") };
+            if (isReminder) {
+              payload.id_recordatorio = itemId;
+              payload.recordatorio_at = String(fd.get("fecha") || "") + " " + String(fd.get("hora") || "") + ":00";
+              payload.aviso_minutos_antes = Number(fd.get("aviso_minutos_antes"));
+            } else {
+              payload.id = itemId;
+              payload.ubicacion = String(fd.get("ubicacion") || "").trim();
+              payload.id_categoria = String(fd.get("id_categoria") || "");
+            }
+            window.Swal.showLoading();
+            return calendarApi(isReminder ? "actualizar_recordatorio" : "actualizar_evento", payload).then(function (json) {
+              if (!json || !json.success) throw new Error((json && json.message) || "No se pudieron guardar los cambios.");
+              return json;
+            }).catch(function (err) {
+              window.Swal.showValidationMessage(err.message || "No se pudieron guardar los cambios.");
+              return false;
+            });
+          },
+        }).then(function (result) {
+          if (!result.isConfirmed || !result.value) {
+            if (typeof options.returnTo === "function") window.setTimeout(options.returnTo, 80);
+            return;
+          }
+          showToast("success", result.value.message || "Cambios guardados.");
+          var data = result.value.data || {};
+          if (data.google_pendiente) showToast("error", "El cambio se guardo aqui, pero no se pudo actualizar en Google Calendar. " + ((data.item && data.item.google_error) || "") + (data.item && data.item.google_error_detail ? " Detalle: " + data.item.google_error_detail : ""), "Google Calendar pendiente");
+          if (isReminder && data.aviso_programado === false) showToast("error", "El recordatorio se guardo, pero no se pudo programar el aviso por WhatsApp.", "Aviso pendiente");
+          loadEvents();
+        });
+      }
+
+      function openCalendarItemDetailPopup(itemId, kind) {
+        if (!window.Swal || typeof window.Swal.fire !== "function") {
+          showToast("error", "No esta disponible el detalle del calendario.");
+          return;
+        }
+        if (kind !== "tarea" && kind !== "recordatorio") return;
+        var row = calendarItemById(itemId, kind);
+        if (!row) {
+          showToast("error", "No encontre el elemento seleccionado.");
+          return;
+        }
+        var label = calendarItemKindLabel(row);
+        var description = calendarDetailValue(row, ["descripcion", "detalle", "mensaje"]);
+        var dateLabel = kind === "recordatorio" ? "Aviso programado" : "Inicio";
+        var dateValue = kind === "recordatorio" ? (row.recordatorio_at || row.fecha_inicio) : row.fecha_inicio;
+        var html = '<div class="scm-calendar-event-detail-modern">' +
+          '<header class="scm-calendar-event-detail-head"><div><span>Detalle de ' + escHtml(label.toLowerCase()) + '</span></div>' +
+          '<h3>' + escHtml(row.titulo || label) + '</h3>' +
+          '<button type="button" class="scm-calendar-modern-close" data-scm-calendar-close aria-label="Cerrar"><span class="material-symbols-outlined" aria-hidden="true">close</span></button></header>' +
+          '<section class="scm-calendar-event-detail-body"><div class="scm-calendar-detail-info-grid">' +
+          calendarDetailCardHtml("schedule", dateLabel, formatDateTime(dateValue), false) +
+          (kind === "tarea" ? calendarDetailCardHtml("event", "Limite", formatDateTime(row.fecha_limite || row.fecha_fin), false) : "") +
+          calendarDetailCardHtml("task_alt", "Estado", calendarItemStatusLabel(row), false) +
+          calendarDetailCardHtml("category", "Categoria", categoryNameForRow(row), false) +
+          calendarDetailCardHtml("person", "Funcionario", employeeNameForRow(row), false) +
+          calendarDetailCardHtml("location_on", "Ubicacion", row.ubicacion || "", true) +
+          (kind === "recordatorio" ? calendarDetailCardHtml("notifications", "Canal", row.recordatorio_canal || row.canal || "", false) : "") +
+          '</div>' + (description ? '<div class="scm-calendar-detail-description"><div><span>Descripci&oacute;n</span></div><p>' + calendarRichTextHtml(description) + '</p></div>' : "") +
+          '</section><footer class="scm-calendar-event-detail-foot"><div>' +
+          (kind === "recordatorio" && !calendarItemIsDone(row) ? '<button type="button" class="scm-calendar-modern-btn scm-calendar-modern-btn--soft" data-scm-calendar-edit-item data-item-id="' + escHtml(itemId) + '" data-item-kind="recordatorio">Editar recordatorio</button>' : "") +
+          '</div><button type="button" class="scm-calendar-modern-btn scm-calendar-modern-btn--dark" data-scm-calendar-close>Cerrar</button></footer></div>';
+        window.Swal.fire({
+          title: "",
+          html: html,
+          width: 720,
+          customClass: { popup: "scm-calendar-swal-popup scm-calendar-native-swal scm-calendar-event-detail-swal" },
+          showConfirmButton: false,
+          didOpen: function () {
+            var popup = window.Swal.getPopup();
+            if (!popup) return;
+            popup.querySelectorAll("[data-scm-calendar-close]").forEach(function (button) {
+              button.addEventListener("click", function () { window.Swal.close(); });
+            });
+            popup.querySelectorAll("[data-scm-calendar-edit-item]").forEach(function (button) {
+              button.addEventListener("click", function () {
+                window.Swal.close();
+                window.setTimeout(function () { openCalendarEditPopup(itemId, kind); }, 50);
+              });
+            });
+          },
         });
       }
 
@@ -3364,6 +3596,7 @@
           showToast("warning", "Este evento no tiene ticket relacionado.");
           return true;
         }
+        if (openCommercialTaskModal(ticketId)) return true;
         if (openLoadedNativeTicket(ticketId)) return true;
         var eventRow = calendarEventById(eventId) || calendarEventByTicket(ticketId) || {};
         var employeeId = getEventEmployeeId(eventRow) || selectedEmployeeFromFilter();
@@ -3558,6 +3791,9 @@
             return;
           }
           showToast("success", result.value.message || "Evento trasladado.");
+          if (result.value.data && result.value.data.google_pendiente) {
+            showToast("error", "El traslado se guardo aqui, pero no se pudo actualizar en Google Calendar.", "Google Calendar pendiente");
+          }
           if (Array.isArray(result.value._scmCitaNotificationAppointments) && result.value._scmCitaNotificationAppointments.length) {
             notifyCalendarAppointment(root, result.value._scmCitaNotificationAppointments)
               .then(showCalendarNotificationResult);
@@ -3640,6 +3876,9 @@
             return;
           }
           showToast("success", result.value.message || "Evento marcado como realizado.");
+          if (result.value.data && result.value.data.google_pendiente) {
+            showToast("error", "El evento quedo realizado aqui, pero no se pudo actualizar en Google Calendar.", "Google Calendar pendiente");
+          }
           loadEvents();
         });
       }
@@ -3834,7 +4073,7 @@
         var defaultStartValue = String(defaults.start || "").slice(0, 5);
         var defaultEndValue = String(defaults.end || "").slice(0, 5);
         var defaultKind = String(defaults.kind || "event").trim();
-        if (["event", "task", "reminder"].indexOf(defaultKind) === -1) defaultKind = "event";
+        if (["event", "reminder"].indexOf(defaultKind) === -1) defaultKind = "event";
         var defaultTitleValue = String(defaults.title || "").trim();
         var defaultKindConfig = defaultKind === "reminder"
           ? {
@@ -3863,15 +4102,22 @@
           } : {
             label: "Operativo",
             title: mode === "multiple" ? "Crear evento m&uacute;ltiple" : "Crear evento en calendario",
-            subtitle: "Programaci&oacute;n de visitas t&eacute;cnicas, inspecciones locativas y reuniones",
+            subtitle: "Programaci&oacute;n de visitas, captaciones, aval&uacute;os y reuniones comerciales",
             icon: "calendar_month",
             titleLabel: "T&iacute;tulo del evento",
-            titlePlaceholder: "Ej: Cita revisi&oacute;n preventiva",
+            titlePlaceholder: "Ej: Visita apartamento en Manga",
             categoryLabel: "Categor&iacute;a",
             descriptionLabel: "Descripci&oacute;n del evento",
             descriptionPlaceholder: "Agrega notas visibles para el equipo.",
             recurrenceLabel: "Evento recurrente / m&uacute;ltiples fechas",
           });
+        // Los textos de configuración traen entidades HTML; se decodifican porque luego pasan por escHtml.
+        var entityDecoder = document.createElement("textarea");
+        Object.keys(defaultKindConfig).forEach(function (key) {
+          if (key === "recurrenceLabel" || typeof defaultKindConfig[key] !== "string") return;
+          entityDecoder.innerHTML = defaultKindConfig[key];
+          defaultKindConfig[key] = entityDecoder.value;
+        });
         var defaultDate = escHtml(defaultDateValue);
         var defaultStart = escHtml(defaultStartValue);
         var defaultEnd = escHtml(defaultEndValue);
@@ -3882,7 +4128,7 @@
           '<label class="scm-seg-field scm-calendar-location-address"><span>Direcci&oacute;n de la visita</span><input class="input input-bordered input-sm scm-input" name="ubicacion" data-calendar-location-input placeholder="Selecciona una ubicaci&oacute;n para completar este campo"></label>' +
           "</div></section>" : "";
         var googleCalendarHtml = defaultKind !== "task"
-          ? '<label class="scm-calendar-google-toggle scm-calendar-field-full"><input type="checkbox" name="sincronizar_google" value="1"><span><strong>Agregar a Google Calendar</strong><em>Si el funcionario no ha autorizado su cuenta, se pedir&aacute; permiso antes de guardar.</em></span></label>'
+          ? '<label class="scm-calendar-google-toggle scm-calendar-field-full"><input type="checkbox" name="sincronizar_google" value="1" checked><span><strong>Agregar a Google Calendar</strong><em>Se usa la cuenta conectada del funcionario. Cada funcionario autoriza su propia cuenta.</em></span></label>'
           : "";
         var html = '<div class="scm-calendar-create-shell scm-calendar-create-shell--' + escHtml(defaultKind) + '">' +
           '<div class="scm-calendar-create-head">' +
@@ -3904,6 +4150,7 @@
           '<label class="scm-seg-field"><span>Hora fin</span><input class="input input-bordered input-sm scm-input" type="time" name="hora_fin" required value="' + defaultEnd + '"></label>' +
           '</div>' +
           googleCalendarHtml +
+          (defaultKind === "reminder" ? '<label class="scm-seg-field scm-calendar-field-full"><span>Aviso por WhatsApp y Google Calendar</span><select class="select select-bordered select-sm scm-select" name="aviso_minutos_antes"><option value="0">A la hora del recordatorio</option><option value="5">5 minutos antes</option><option value="15">15 minutos antes</option><option value="30" selected>30 minutos antes</option><option value="60">1 hora antes</option></select></label>' : "") +
           '<label class="scm-seg-field scm-calendar-field-full"><span>' + escHtml(defaultKindConfig.descriptionLabel) + '</span><textarea class="textarea textarea-bordered textarea-sm scm-textarea" name="descripcion" rows="3" placeholder="' + escHtml(defaultKindConfig.descriptionPlaceholder) + '"></textarea></label>' +
           '<div class="scm-calendar-recurrence scm-calendar-field-full" data-calendar-recurrence>' +
           '<label class="scm-calendar-recurrence-toggle"><input type="checkbox" name="es_recurrente" value="1" data-calendar-recurrence-toggle><span>' + defaultKindConfig.recurrenceLabel + '</span><em data-calendar-recurrence-badge>Inactivo</em></label>' +
@@ -3996,7 +4243,7 @@
               $ticket.select2({
                 width: "100%",
                 dropdownParent: window.jQuery(popup),
-                placeholder: "Buscar ticket por número, contrato, inmueble o solicitante",
+                placeholder: "Buscar tarea por número, inmueble o solicitante",
                 allowClear: true,
               });
             }
@@ -4207,7 +4454,7 @@
               if (mode !== "single") return;
               var selected = selectedEmployees();
               destroyTicketSelect2();
-              if (ticketSelect) ticketSelect.innerHTML = '<option value="">Cargando tickets...</option>';
+              if (ticketSelect) ticketSelect.innerHTML = '<option value="">Cargando tareas...</option>';
               loadTicketsForEmployees(selected).then(function (rows) {
                 currentTicketRows = rows || [];
                 renderTicketSelector(ticketSelect, currentTicketRows, "");
@@ -4614,9 +4861,12 @@
               descripcion: fd.get("descripcion") || "",
               ubicacion: rawLocation || (defaultKind === "reminder" ? "Recordatorio interno" : (defaultKind === "task" ? "Tarea interna" : "")),
               id_categoria: fd.get("id_categoria") || "",
+              creado_por: currentCalendarEmployeeId || "",
+              sincronizar_google: googleRequested ? "1" : "0",
             };
             if (tipoItem === "recordatorio") {
               basePayload.recordatorio_canal = "whatsapp";
+              basePayload.aviso_minutos_antes = Number(fd.get("aviso_minutos_antes") || 0);
             }
             if (googleRequested) {
               basePayload.sincronizar_google = "1";
@@ -4712,7 +4962,7 @@
               window.Swal.showLoading();
               var citaNotificationAppointments = [];
               if (tipoItem === "evento" && mode === "single" && relatedTicket && isCita === "si") {
-                var notificationCategoryName = categoryNameFromSelect(categorySelect) || fd.get("id_categoria") || "cita";
+                var notificationCategoryName = categoryNameFromSelect(form.querySelector('[name="id_categoria"]')) || fd.get("id_categoria") || "cita";
                 eventsToCreate.forEach(function (eventPayload) {
                   selected.forEach(function (employeeId) {
                     citaNotificationAppointments.push(Object.assign({}, eventPayload, {
@@ -4728,9 +4978,17 @@
               }
               var request;
               if (tipoItem === "evento") {
-                request = selected.length > 1 || eventsToCreate.length > 1
-                  ? calendarApi("crear_eventos", { eventos: eventsToCreate, empleados: selected, sincronizar_google: googleRequested ? "1" : "" })
-                  : calendarApi("crear_evento", Object.assign({}, eventsToCreate[0], { id_empleado: selected[0] }));
+                var sendEvents = function (extra) {
+                  return selected.length > 1 || eventsToCreate.length > 1
+                    ? calendarApi("crear_eventos", Object.assign({ eventos: eventsToCreate, empleados: selected, sincronizar_google: googleRequested ? "1" : "" }, extra))
+                    : calendarApi("crear_evento", Object.assign({}, eventsToCreate[0], { id_empleado: selected[0] }, extra));
+                };
+                request = sendEvents({}).then(function (json) {
+                  var blocked = json && !json.success && ((json.data && json.data.bloqueado_vencidos) || /vencidos sin realizar/i.test(String(json.message || "")));
+                  if (!blocked) return json;
+                  var ok = window.confirm(String(json.message || "El funcionario tiene eventos vencidos sin realizar.") + "\n\n¿Deseas crear el evento de todas formas? Quedará registrado el bloqueo.");
+                  return ok ? sendEvents({ permitir_vencidos: "1" }) : json;
+                });
               } else {
                 var itemPayloads = [];
                 eventsToCreate.forEach(function (eventPayload) {
@@ -4753,6 +5011,7 @@
               return request.then(function (json) {
                 if (!json || !json.success) throw new Error((json && json.message) || "No se pudo crear el item.");
                 json._scmCitaNotificationAppointments = citaNotificationAppointments;
+                json._scmGoogleRequested = googleRequested;
                 return json;
               });
             }).catch(function (err) {
@@ -4763,6 +5022,9 @@
         }).then(function (result) {
           if (!result.isConfirmed || !result.value) return;
           showToast("success", result.value.message || "Evento creado.");
+          if (result.value._scmGoogleRequested && result.value.data && (result.value.data.google_pendiente || result.value.data.google_pendientes > 0 || (Array.isArray(result.value.data) && result.value.data.some(function (item) { return item && !item.google_event_id; })))) {
+            showToast("error", "Se guardó en el panel, pero uno o más elementos quedaron pendientes en Google Calendar. " + (result.value.data.google_error || "") + (result.value.data.google_error_detail ? " Detalle: " + result.value.data.google_error_detail : ""), "Google Calendar pendiente");
+          }
           if (Array.isArray(result.value._scmCitaNotificationAppointments) && result.value._scmCitaNotificationAppointments.length) {
             notifyCalendarAppointment(root, result.value._scmCitaNotificationAppointments)
               .then(showCalendarNotificationResult);
@@ -4792,17 +5054,113 @@
       } else {
         calendarBootstrapPromise = Promise.all([loadFuncionariosFallback(), calendarApi("listar_categorias")]).then(function (results) {
           var funcionarios = Array.isArray(results[0]) ? results[0] : [];
-          categories = results[1] && results[1].success && Array.isArray(results[1].data) ? results[1].data : [];
+          allCalendarCategories = results[1] && results[1].success && Array.isArray(results[1].data) ? results[1].data : [];
           categoriesById = {};
-          categories.forEach(function (row) {
+          allCalendarCategories.forEach(function (row) {
             var id = String(row.id || row._ID || row.id_categoria || "").trim();
             if (id) categoriesById[id] = row;
           });
           applyCalendarEmployeeOptions(funcionarios, currentCalendarEmployeeId);
-          fillCategoryOptions(panel.querySelector("[data-scm-calendar-filter-categories]"), calendarAdminCategories(), "Todas las categorías");
+          applyCalendarCategoryWhitelist();
         }).catch(function (err) {
           showToast("error", (err && err.message) || "No se pudieron cargar los funcionarios del calendario.");
         }).finally(loadEvents);
+      }
+
+      // Como opciones solo salen las categorías habilitadas para comercial (vacío = todas);
+      // los eventos existentes conservan el nombre de su categoría.
+      function applyCalendarCategoryWhitelist() {
+        var allowedCategoryIds = Array.isArray(runtime.calendarCategoryIds) ? runtime.calendarCategoryIds.map(String) : [];
+        categories = allowedCategoryIds.length
+          ? allCalendarCategories.filter(function (row) {
+            return allowedCategoryIds.indexOf(String(row.id || row._ID || row.id_categoria || "").trim()) !== -1;
+          })
+          : allCalendarCategories.slice();
+        fillCategoryOptions(panel.querySelector("[data-scm-calendar-filter-categories]"), calendarAdminCategories(), "Todas las categorías");
+      }
+
+      function openCalendarCategorySettings() {
+        if (!window.Swal || !actions.calendar_categories_save) {
+          showToast("error", "La configuración de categorías no está disponible.");
+          return;
+        }
+        var promise = allCalendarCategories.length ? Promise.resolve(allCalendarCategories) : calendarApi("listar_categorias").then(function (json) {
+          allCalendarCategories = json && json.success && Array.isArray(json.data) ? json.data : [];
+          return allCalendarCategories;
+        });
+        promise.then(function (rows) {
+          if (!rows.length) throw new Error("No se encontraron categorías en el calendario.");
+          var allowed = Array.isArray(runtime.calendarCategoryIds) ? runtime.calendarCategoryIds.map(String) : [];
+          var sorted = rows.slice().sort(function (left, right) {
+            return String(calendarCategoryLabel(left) || "").localeCompare(String(calendarCategoryLabel(right) || ""), "es");
+          });
+          var items = sorted.map(function (row) {
+            var id = String(row.id || row._ID || row.id_categoria || "").trim();
+            if (!id) return "";
+            var checked = !allowed.length || allowed.indexOf(id) !== -1;
+            return '<label class="flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white cursor-pointer hover:bg-slate-50 text-left">' +
+              '<input type="checkbox" name="calendar_categories" value="' + escHtml(id) + '"' + (checked ? " checked" : "") + '>' +
+              '<i class="inline-block w-3 h-3 rounded-full shrink-0" style="background:' + escHtml(row.color || "#94a3b8") + '"></i>' +
+              '<span class="text-sm text-slate-800">' + escHtml(calendarCategoryLabel(row) || "Categoría") + '</span></label>';
+          }).join("");
+          return window.Swal.fire({
+            title: "Categorías del calendario comercial",
+            html: '<p class="text-sm text-slate-600 mb-3 text-left">Elige qué categorías se usan en el calendario comercial para crear, filtrar y agendar. Los eventos ya creados conservan su categoría.</p>' +
+              '<div class="flex gap-2 mb-3"><button type="button" class="px-3 py-1 rounded-lg bg-slate-100 text-sm font-semibold" data-scm-category-toggle="1">Marcar todas</button><button type="button" class="px-3 py-1 rounded-lg bg-slate-100 text-sm font-semibold" data-scm-category-toggle="0">Quitar todas</button></div>' +
+              '<form class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[52vh] overflow-y-auto" data-scm-calendar-category-form>' + items + '</form>',
+            width: 760,
+            showCancelButton: true,
+            confirmButtonText: "Guardar categorías",
+            cancelButtonText: "Cerrar",
+            customClass: { popup: "scm-calendar-swal-popup" },
+            didOpen: function () {
+              var popup = window.Swal.getPopup();
+              popup.querySelectorAll("[data-scm-category-toggle]").forEach(function (button) {
+                button.addEventListener("click", function () {
+                  var value = button.getAttribute("data-scm-category-toggle") === "1";
+                  popup.querySelectorAll('[name="calendar_categories"]').forEach(function (input) { input.checked = value; });
+                });
+              });
+            },
+            preConfirm: function () {
+              var popup = window.Swal.getPopup();
+              var selected = Array.prototype.slice.call(popup.querySelectorAll('[name="calendar_categories"]:checked')).map(function (input) { return input.value; });
+              if (!selected.length) {
+                window.Swal.showValidationMessage("Selecciona al menos una categoría.");
+                return false;
+              }
+              var available = Array.prototype.slice.call(popup.querySelectorAll('[name="calendar_categories"]')).map(function (input) { return input.value; });
+              return dashboardAjax(actions.calendar_categories_save, {
+                categories: JSON.stringify(selected),
+                available: JSON.stringify(available),
+              }).catch(function (err) {
+                window.Swal.showValidationMessage(err.message || "No se pudieron guardar las categorías.");
+                return false;
+              });
+            },
+          });
+        }).then(function (result) {
+          if (!result || !result.isConfirmed || !result.value) return;
+          runtime.calendarCategoryIds = Array.isArray(result.value.category_ids) ? result.value.category_ids : [];
+          applyCalendarCategoryWhitelist();
+          showToast("success", result.value.message || "Categorías guardadas.");
+          loadEvents();
+        }).catch(function (err) {
+          showToast("error", (err && err.message) || "No se pudieron cargar las categorías.");
+        });
+      }
+
+      var categorySettingsBtn = panel.querySelector("[data-scm-calendar-configure-categories]");
+      if (categorySettingsBtn) categorySettingsBtn.addEventListener("click", openCalendarCategorySettings);
+
+      if (!isDueCalendar) {
+        var reminderRefreshTimer = window.setInterval(function () {
+          if (!panel.isConnected) {
+            window.clearInterval(reminderRefreshTimer);
+            return;
+          }
+          if (!document.hidden && panel.offsetParent !== null) loadEvents();
+        }, 60000);
       }
 
       if (filterForm) {
@@ -4914,6 +5272,24 @@
             ticketViewBtn.getAttribute("data-ticket-id") || "",
             ticketViewBtn.getAttribute("data-event-id") || "",
           );
+          return;
+        }
+        var itemViewBtn = e.target && e.target.closest ? e.target.closest("[data-scm-calendar-view-item]") : null;
+        if (itemViewBtn && panel.contains(itemViewBtn)) {
+          e.preventDefault();
+          openCalendarItemDetailPopup(itemViewBtn.getAttribute("data-item-id") || "", itemViewBtn.getAttribute("data-item-kind") || "");
+          return;
+        }
+        var eventEditBtn = e.target && e.target.closest ? e.target.closest("[data-scm-calendar-edit-event]") : null;
+        if (eventEditBtn && panel.contains(eventEditBtn)) {
+          e.preventDefault();
+          openCalendarEditPopup(eventEditBtn.getAttribute("data-event-id") || "", "evento");
+          return;
+        }
+        var itemEditBtn = e.target && e.target.closest ? e.target.closest("[data-scm-calendar-edit-item]") : null;
+        if (itemEditBtn && panel.contains(itemEditBtn)) {
+          e.preventDefault();
+          openCalendarEditPopup(itemEditBtn.getAttribute("data-item-id") || "", itemEditBtn.getAttribute("data-item-kind") || "");
           return;
         }
         var completeBtn = e.target && e.target.closest ? e.target.closest("[data-scm-calendar-complete-event]") : null;
@@ -5069,8 +5445,16 @@
       cardsEl.setAttribute("aria-busy", isLoading ? "true" : "false");
     }
 
-    function showToast(type, message) {
-      scmNotify(type, message);
+    function showToast(type, message, title) {
+      scmNotify(type, message, title);
+    }
+
+    function withPanelLoader(work) {
+      try {
+        return Promise.resolve(typeof work === "function" ? work() : work);
+      } catch (error) {
+        return Promise.reject(error);
+      }
     }
 
     function initAdminNotificationsPanel(forceReload) {

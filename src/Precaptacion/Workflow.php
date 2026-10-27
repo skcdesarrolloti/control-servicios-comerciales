@@ -155,6 +155,23 @@ final class Workflow
 
     public function summary(string $employee = ''): array
     {
+        $s = $this->scan($employee);
+        if (empty($s['available'])) return $s;
+        usort($s['items'], static fn(array $a, array $b): int => [$b['overdue'], $a['next'] ?: '9999'] <=> [$a['overdue'], $b['next'] ?: '9999']);
+        $s['items'] = array_slice($s['items'], 0, 10);
+        return $s;
+    }
+
+    /** Llamadas de precaptación con próxima fecha de contacto programada (para el calendario comercial). */
+    public function contactAgenda(string $employee = ''): array
+    {
+        $s = $this->scan($employee);
+        if (empty($s['available'])) return [];
+        return array_values(array_filter($s['items'], static fn(array $item): bool => $item['next'] !== ''));
+    }
+
+    private function scan(string $employee): array
+    {
         $table = $this->db->table('jet_cct_precaptaciones');
         $adapter = new DatabaseAdapter($this->db);
         if (!$adapter->get_var($adapter->prepare('SHOW TABLES LIKE %s', $table))) return ['available'=>false];
@@ -191,11 +208,9 @@ final class Workflow
                 $name = $names[$owner] ?? $owner;
                 $s['advisors'][$owner] ??= ['name'=>$name,'pending'=>0,'overdue'=>0];
                 $s['advisors'][$owner]['pending']++; $s['advisors'][$owner]['overdue'] += $due === 'vencidas' ? 1 : 0;
-                $s['items'][] = ['id'=>(int) $row['_ID'],'contact'=>(string) ($row['contacto'] ?? ''),'phone'=>(string) ($row['celular'] ?? ''),'status'=>self::LABELS[$status] ?? $status,'next'=>$next,'owner'=>$name,'overdue'=>$due === 'vencidas'];
+                $s['items'][] = ['id'=>(int) $row['_ID'],'contact'=>(string) ($row['contacto'] ?? ''),'phone'=>(string) ($row['celular'] ?? ''),'status'=>self::LABELS[$status] ?? $status,'next'=>$next,'owner'=>$name,'owner_id'=>$owner,'overdue'=>$due === 'vencidas'];
             }
         }
-        usort($s['items'], static fn(array $a, array $b): int => [$b['overdue'], $a['next'] ?: '9999'] <=> [$a['overdue'], $b['next'] ?: '9999']);
-        $s['items'] = array_slice($s['items'], 0, 10);
         return $s;
     }
 

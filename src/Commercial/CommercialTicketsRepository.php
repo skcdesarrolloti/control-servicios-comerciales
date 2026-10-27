@@ -135,6 +135,35 @@ final class CommercialTicketsRepository
   }
 
   /**
+   * Tareas comerciales abiertas con SLA calculado, sin paginar, para el calendario de vencimientos.
+   *
+   * @param array<string,mixed> $filters
+   * @return array<int,array<string,mixed>>
+   */
+  public function calendarOpenTickets(array $filters = []): array
+  {
+    $table = $this->db->table('jet_cct_tickets');
+    [$where, $args] = $this->bucketWhere('abiertos');
+    [$filterWhere, $filterArgs] = $this->ticketFilterClauses($filters);
+    $where = array_merge($where, $filterWhere);
+    $args = array_merge($args, $filterArgs);
+
+    $rows = $this->db->getResults(
+      "SELECT t.`_ID`, t.`id_ticket`, t.`estado_comercial`, t.`asunto`, t.`descripcion`,
+              t.`solicitante`, t.`celular_solicitante`, t.`id_empleado`, t.`nombre_empleado`,
+              t.`inmueble`, t.`id_inmueble`, t.`direccion`, t.`barrio`, t.`medio`, t.`prioridad`, t.`tema_ayuda`,
+              t.`tuvo_seguimiento`, t.`fecha_seguimiento`, t.`fecha`, t.`fecha_actualizacion`, t.`cct_created`, t.`cct_modified`
+         FROM `{$table}` t
+        WHERE " . implode(' AND ', $where) . "
+        ORDER BY t.`_ID` DESC
+        LIMIT 2000",
+      $args
+    );
+
+    return $this->decorateCommercialSla($rows);
+  }
+
+  /**
    * @return array{ticket:array<string,mixed>,timeline:array<int,array<string,mixed>>}
    */
   public function detail(int $ticketPk): array
@@ -1399,12 +1428,12 @@ final class CommercialTicketsRepository
     $days = $reference > 0 ? (int) floor((time() - $reference) / 86400) : 0;
     $max = $this->signRetouchLimit((string) ($row['tipo_negocio'] ?? ''));
     if ($days >= $max) {
-      return ['status' => 'retoque_vencido', 'label' => 'Retoque vencido', 'days' => max(0, $days)];
+      return ['status' => 'retoque_vencido', 'label' => 'Retoque vencido', 'days' => max(0, $days), 'max' => $max];
     }
     if ($days >= max(0, $max - 10)) {
-      return ['status' => 'retoque_alerta', 'label' => 'Retoque por vencer', 'days' => max(0, $days)];
+      return ['status' => 'retoque_alerta', 'label' => 'Retoque por vencer', 'days' => max(0, $days), 'max' => $max];
     }
-    return ['status' => 'ok', 'label' => 'Aviso al día', 'days' => max(0, $days)];
+    return ['status' => 'ok', 'label' => 'Aviso al día', 'days' => max(0, $days), 'max' => $max];
   }
 
   /** @param array<string,mixed> $row @return array{estado:string,dias:int,max:int,fecha_captacion:string,label:string} */

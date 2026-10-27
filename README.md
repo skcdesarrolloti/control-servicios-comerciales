@@ -148,6 +148,23 @@ Para revisar historial, informe y permisos de eliminación usa `php tools/previe
 
 La misma vista de administrador incluye datos ficticios de los cuatro tipos de actor y sus relaciones. `tools/check-commercial-actor-editor-ui.cjs` verifica edición, comparación por titular y sin editar, selección individual, confirmación explícita, guardado, permisos/CSRF y móvil. Agrega `--shell` a la generación de la vista y al verificador para probar también con el dashboard completo, sus scripts y la URL versionada del JavaScript. `CommercialActorEditorTest` prueba persistencia, exclusiones, comparación sin cambios, auditoría, personas jurídicas, alcance, tokens, referencias ambiguas y rollback completo con SQLite en memoria. La API local conserva los tokens en una sesión de pruebas; reconstruye los datos por petición y nunca edita actores reales.
 
+## Calendario comercial
+
+Usa el mismo motor y la misma API de `calendario-actividades` que el panel administrativo (`CALENDAR_API_URL`), con contenido comercial:
+
+- **Mi calendario / Calendario equipo**: eventos y recordatorios con vista mes/semana/día, creación simple, múltiple y recurrente, edición, traslado, cierre, pendientes vencidos, informe del día y sincronización con Google Calendar (cada funcionario autoriza su propia cuenta). Las tareas del calendario ya no existen en la API, por eso no hay capa ni botón de "Tarea".
+- **Categorías**: los cargos administradores eligen en el botón **Categorías** cuáles se usan en comercial (setting `commercial_calendar_categories`; vacío = todas). Los eventos existentes conservan su categoría.
+- **Funcionarios**: cargos del setting `commercial_calendar_cargos` o, si no existe, `CALENDAR_ALLOWED_CARGOS`.
+- **Vencimientos**: `commercial_calendar_due` (`CommercialCalendarService`) arma tareas atrasadas y por vencer según el SLA por tema (días hábiles de Colombia), seguimientos programados (`fecha_seguimiento`), actualizaciones de inmuebles, retoques y avisos nuevos, y llamadas de precaptación. Cada tipo exige la vista correspondiente; lo vencido antes del mes visible se acumula en el día de hoy.
+- **Desde la tarea**: la tarjeta **Agenda comercial** del popup permite agendar una cita vinculada (`id_ticket`), ver la agenda del responsable con cruces de horario y sus pendientes vencidos. La API del calendario reescribe `estado_comercial` y `estado_administrativo` de la tarea, así que se envían el estado comercial elegido y el administrativo actual. Las citas encolan WhatsApp al funcionario y al solicitante (`commercial_calendar_cita_notify`).
+
+Prueba de navegador con SQLite aislado y la API del calendario simulada:
+
+```powershell
+php -S 127.0.0.1:8769 -t .
+node tools/check-commercial-calendar.cjs RUTA_A_NODE_MODULES
+```
+
 ## Autologin firmado
 
 El autologin está desactivado por defecto. Para habilitarlo configura:
