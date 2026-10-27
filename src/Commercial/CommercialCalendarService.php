@@ -115,6 +115,7 @@ final class CommercialCalendarService
         'calendar_initial_subtab' => in_array($subtab, ['mine', 'team', 'due'], true) ? $subtab : 'mine',
         'calendar_can_configure' => $this->policy->canManage(),
         'calendar_due_types' => $this->visibleDueTypes(),
+        'calendar_due_employee_filter' => $this->policy->canSeeAllCommercialTickets(),
         'is_admin' => $this->policy->canManage(),
       ],
     ];

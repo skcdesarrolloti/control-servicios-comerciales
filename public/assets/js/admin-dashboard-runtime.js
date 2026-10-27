@@ -2461,7 +2461,10 @@
         }
         if (spinner) spinner.classList.add("active");
         var range = activeCalendarRange();
-        return dashboardAjax(actionAdminDueCalendar, { fecha_inicio: range.from, fecha_fin: range.to, include_summary: "1" })
+        var dueFilters = { fecha_inicio: range.from, fecha_fin: range.to, include_summary: "1" };
+        var dueEmployeeField = dueTypeFilterForm ? dueTypeFilterForm.querySelector("[data-scm-calendar-due-employee]") : null;
+        if (dueEmployeeField && dueEmployeeField.value) dueFilters.id_empleado = dueEmployeeField.value;
+        return dashboardAjax(actionAdminDueCalendar, dueFilters)
           .then(function (data) {
             renderDueCalendar(data || {});
             if (data && Array.isArray(data.failed_sources) && data.failed_sources.length) {
@@ -5338,7 +5341,12 @@
       }
 
       if (dueTypeFilterForm) {
-        dueTypeFilterForm.addEventListener("change", function () {
+        dueTypeFilterForm.addEventListener("change", function (event) {
+          // El funcionario se filtra en el servidor; los tipos, sobre lo ya cargado.
+          if (event.target && event.target.hasAttribute("data-scm-calendar-due-employee")) {
+            loadDueCalendar();
+            return;
+          }
           applyDueFilters();
         });
       }

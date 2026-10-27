@@ -96,6 +96,17 @@ async function closeSwal(page) {
   assert(dueText.includes('Tarea #1') && dueText.includes('Seguimiento tarea #1'), 'Faltan los vencimientos de tareas y seguimientos');
   assert(await page.locator('[data-scm-calendar-due-type-filter] [name="due_type"]').count() === 7, 'Faltan tipos de vencimiento comercial');
 
+  // Filtro por funcionario: el administrador ve todo el equipo y puede acotar a un funcionario.
+  const dueEmployee = page.locator('[data-scm-calendar-due-employee]');
+  assert(await dueEmployee.count() === 1, 'Vencimientos no ofrece el filtro por funcionario');
+  const dueEmployeeId = await dueEmployee.locator('option').nth(1).getAttribute('value');
+  const dueRequest = page.waitForRequest(request => request.method() === 'POST' && (request.postData() || '').includes('commercial_calendar_due') && (request.postData() || '').includes(`name="id_empleado"\r\n\r\n${dueEmployeeId}`));
+  await dueEmployee.selectOption(dueEmployeeId);
+  await dueRequest;
+  await page.locator('[data-scm-calendar-spinner].active').waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
+  await dueEmployee.selectOption('');
+  await page.waitForFunction(() => Number(document.querySelector('[data-scm-calendar-total]').textContent) > 0);
+
   // Semana y día estilo Google Calendar: los vencimientos sin hora van en "Todo el día" y abren su propio detalle.
   await page.locator('[data-scm-calendar-view-mode="week"]').click();
   await page.locator('[data-scm-calendar-week-grid] .scm-calendar-allday-cell').first().waitFor();

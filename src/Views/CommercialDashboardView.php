@@ -2937,6 +2937,7 @@ final class CommercialDashboardView
     $allowedCargos = is_array($config['calendar_allowed_cargos'] ?? null) ? $config['calendar_allowed_cargos'] : ['9', '10', '17'];
     $currentEmployeeId = trim((string) ($config['calendar_current_employee_id'] ?? ''));
     $canConfigure = !empty($config['calendar_can_configure']);
+    $canFilterDueEmployee = !empty($config['calendar_due_employee_filter']);
     $dueTypes = is_array($config['calendar_due_types'] ?? null) ? $config['calendar_due_types'] : \SCM\Commercial\CommercialCalendarService::DUE_TYPES;
     $dueTypeIcons = [
       'tarea_atrasada' => ['assignment_late', 'text-error'],
@@ -3111,6 +3112,19 @@ final class CommercialDashboardView
           <?php else: ?>
             <!-- Tipos de vencimiento comercial -->
             <form class="flex flex-wrap items-center gap-1 px-4 py-2.5 border-b border-slate-100" data-scm-calendar-due-type-filter autocomplete="off" aria-label="Tipos de vencimiento">
+              <?php if ($canFilterDueEmployee): ?>
+                <select name="id_empleado" data-scm-calendar-due-employee aria-label="Funcionario" class="h-8 pl-2.5 pr-8 mr-1 rounded-lg border border-slate-200 bg-white text-[13px] text-slate-700 outline-none focus:border-[#1E3C76] focus:ring-2 focus:ring-[#1E3C76]/10 max-w-[220px]">
+                  <option value="">Todo el equipo</option>
+                  <?php foreach ($employees as $emp): ?>
+                    <?php
+                      $empId = (string) ($emp['id_empleado'] ?? $emp['id'] ?? '');
+                      $empName = trim((string) ($emp['nombre'] ?? $emp['display_name'] ?? ''));
+                      if ($empId === '') continue;
+                    ?>
+                    <option value="<?php echo esc_attr($empId); ?>"><?php echo esc_html($empName ?: "Funcionario #$empId"); ?></option>
+                  <?php endforeach; ?>
+                </select>
+              <?php endif; ?>
               <?php foreach ($dueTypes as $dueKey => $dueType): ?>
                 <label class="cursor-pointer">
                   <input type="checkbox" name="due_type" value="<?php echo esc_attr((string) $dueKey); ?>" checked class="peer sr-only">
