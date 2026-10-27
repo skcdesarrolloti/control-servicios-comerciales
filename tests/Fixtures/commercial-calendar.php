@@ -44,6 +44,8 @@ $recent = date('Y-m-d H:i:s', strtotime('-1 day'));
 $followUp = strtotime(date('Y-m-d 15:00:00', strtotime('+2 days')));
 $db->insert($tickets, ['_ID' => 1, 'id_ticket' => '1', 'estado' => 'En proceso', 'estado_comercial' => 'Contactado', 'estado_administrativo' => 'Sin novedad', 'asunto' => 'Captar apartamento en Manga', 'solicitante' => 'Laura Gómez', 'celular_solicitante' => '3001112233', 'id_empleado' => '999', 'nombre_empleado' => 'Administrador', 'direccion' => 'Calle 25 #20-10', 'barrio' => 'Manga', 'tema_ayuda' => 'Captacion', 'fecha_seguimiento' => $followUp, 'fecha' => strtotime($old), 'cct_created' => $old, 'cct_modified' => $old]);
 $db->insert($tickets, ['_ID' => 2, 'id_ticket' => '2', 'estado' => 'Nuevo', 'estado_comercial' => 'Nuevo', 'asunto' => 'Avalúo casa Crespo', 'solicitante' => 'Pedro Ruiz', 'id_empleado' => '900', 'nombre_empleado' => 'Ana Pérez', 'tema_ayuda' => 'Avaluo', 'fecha' => strtotime($recent), 'cct_created' => $recent, 'cct_modified' => $recent]);
+$older = date('Y-m-d H:i:s', strtotime('-60 days'));
+$db->insert($tickets, ['_ID' => 3, 'id_ticket' => '3', 'estado' => 'En proceso', 'estado_comercial' => 'Mostrando', 'asunto' => 'Arriendo local Bocagrande', 'solicitante' => 'María Díaz', 'id_empleado' => '999', 'nombre_empleado' => 'Administrador', 'tema_ayuda' => 'Arriendo', 'fecha' => strtotime($older), 'cct_created' => $older, 'cct_modified' => $older]);
 
 $settings = new SCM\Core\Settings($db, false, 'control_servicios_comerciales_config');
 $csrf = new SCM\Core\Csrf(str_repeat('x', 40));

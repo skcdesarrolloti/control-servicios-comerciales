@@ -1203,40 +1203,7 @@
       }
 
       function dueEventCardHtml(row) {
-        var caseData = row && row.case ? row.case : {};
-        var ticketPk = String(caseData.ticket_pk || "").trim();
-        var linkUrl = String(caseData.link_url || "").trim();
-        var propertyUrl = String(caseData.property_url || "").trim();
-        var overdue = String(row.estado || "").toLowerCase() === "vencido";
-        var theme = dueTypeTheme(row);
-        var color = String(theme.color || row.color || (overdue ? "#dc2626" : "#f59e0b")).trim();
-        var actionClass = "px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer";
-        var actions = "";
-        if (ticketPk) {
-          actions += '<button type="button" class="' + actionClass + ' bg-primary hover:bg-primary/90 text-white" data-commercial-open-case="' + escHtml(ticketPk) + '">Ver tarea</button>';
-        }
-        if (linkUrl) {
-          actions += '<a class="' + actionClass + ' bg-surface-container hover:bg-surface-container-high text-on-surface" href="' + escHtml(linkUrl) + '" target="_blank" rel="noopener">' + escHtml(caseData.link_label || "Abrir") + '</a>';
-        }
-        if (propertyUrl) {
-          actions += '<a class="' + actionClass + ' bg-surface-container hover:bg-surface-container-high text-on-surface" href="' + escHtml(propertyUrl) + '" target="_blank" rel="noopener">Ver inmueble</a>';
-        }
-        return '<article class="p-3 bg-surface-container-low rounded-xl border border-surface-container relative overflow-hidden transition-all space-y-2" style="border-left-width:4px;border-left-color:' + escHtml(color) + '">' +
-          '<div class="flex items-start justify-between gap-2">' +
-          '<h5 class="font-title-sm font-semibold text-on-surface leading-snug">' + escHtml(row.titulo || "Vencimiento") + '</h5>' +
-          '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 uppercase tracking-wide ' + (overdue ? "bg-red-100 text-red-800" : "bg-amber-100 text-amber-800") + '">' + escHtml(row.estado || "Pendiente") + '</span>' +
-          '</div>' +
-          '<div class="text-xs text-secondary/90 leading-relaxed font-body-sm">' + escHtml(row.descripcion || "Control de vencimiento comercial.") + '</div>' +
-          '<div class="flex flex-wrap items-center gap-1.5 text-[11px] text-secondary">' +
-          '<span class="font-medium" style="color:' + escHtml(theme.text || color) + '">' + escHtml(dueTypeLabel(row.tipo_vencimiento) || row.grupo || "Vencimiento") + '</span>' +
-          (row.fecha_base ? '<span class="text-secondary/40">·</span><span>Base: ' + escHtml(row.fecha_base) + '</span>' : '') +
-          '<span class="text-secondary/40">·</span>' +
-          '<span class="font-semibold text-error">Vence: ' + escHtml(row.fecha_vencimiento || "-") + '</span>' +
-          (Number(row.dias_vencido || 0) > 0 ? '<span class="text-secondary/40">·</span><span class="text-red-600 font-bold">' + escHtml(String(row.dias_vencido)) + ' d vencido</span>' : '') +
-          (Number(row.acumulado_vencido || 0) > 0 ? '<span class="text-secondary/40">·</span><span>Acumulado en hoy</span>' : '') +
-          '</div>' +
-          (actions ? '<div class="pt-1 flex flex-wrap items-center gap-1.5 border-t border-surface-container/60">' + actions + '</div>' : '') +
-          '</article>';
+        return dueRowHtml(row);
       }
 
       function eventCardHtml(row) {
@@ -1248,86 +1215,74 @@
         var kind = calendarItemKind(row);
         var isEventKind = kind === "evento";
         var isDone = calendarItemIsDone(row);
-        var color = String(row.color || "#f59e0b").trim() || "#f59e0b";
+        var color = String(row.color || "#64748b").trim() || "#64748b";
         var kindLabel = calendarItemKindLabel(row);
-        var category = categoryNameForRow(row);
         var start = timePartFromDateTime(row.fecha_inicio);
         var end = isEventKind ? timePartFromDateTime(row.fecha_fin) : "";
         var detailAttr = isEventKind
           ? ' data-scm-calendar-view-event data-event-id="' + escHtml(id) + '"'
           : ' data-scm-calendar-view-item data-item-id="' + escHtml(id) + '" data-item-kind="' + escHtml(kind) + '"';
         function iconButton(attrs, icon, label, tone) {
-          return '<button type="button" class="w-8 h-8 rounded-lg flex items-center justify-center transition-colors cursor-pointer ' + (tone || "text-slate-500 hover:text-[#061D49] hover:bg-slate-100") + '"' + attrs + ' title="' + escHtml(label) + '" aria-label="' + escHtml(label) + '"><span class="material-symbols-outlined text-[18px]">' + icon + '</span></button>';
+          return '<button type="button" class="w-7 h-7 rounded-md flex items-center justify-center transition-colors cursor-pointer ' + (tone || "text-slate-400 hover:text-slate-800 hover:bg-slate-200/60") + '"' + attrs + ' title="' + escHtml(label) + '" aria-label="' + escHtml(label) + '"><span class="material-symbols-outlined text-[17px]">' + icon + '</span></button>';
         }
         var actions = "";
         if (isEventKind && id) {
-          if (!isDone) actions += iconButton(' data-scm-calendar-complete-event data-event-id="' + escHtml(id) + '"', "check_circle", "Marcar realizado", "text-emerald-600 hover:bg-emerald-50");
-          actions += iconButton(' data-scm-calendar-reschedule-event data-event-id="' + escHtml(id) + '"', "event_repeat", "Trasladar");
+          if (!isDone) actions += iconButton(' data-scm-calendar-complete-event data-event-id="' + escHtml(id) + '"', "check", "Marcar realizado", "text-slate-400 hover:text-emerald-700 hover:bg-emerald-50");
+          actions += iconButton(' data-scm-calendar-reschedule-event data-event-id="' + escHtml(id) + '"', "schedule", "Trasladar");
           actions += iconButton(' data-scm-calendar-edit-event data-event-id="' + escHtml(id) + '"', "edit", "Editar");
           if (ticket) actions += iconButton(' data-scm-calendar-view-ticket data-event-id="' + escHtml(id) + '" data-ticket-id="' + escHtml(ticket) + '"', "assignment", "Ver tarea #" + ticket);
         }
         if (kind === "recordatorio" && id && !isDone) {
-          actions += iconButton(' data-scm-calendar-send-reminder data-reminder-id="' + escHtml(id) + '"', "mark_email_read", "Marcar enviado", "text-emerald-600 hover:bg-emerald-50");
+          actions += iconButton(' data-scm-calendar-send-reminder data-reminder-id="' + escHtml(id) + '"', "check", "Marcar enviado", "text-slate-400 hover:text-emerald-700 hover:bg-emerald-50");
           actions += iconButton(' data-scm-calendar-edit-item data-item-id="' + escHtml(id) + '" data-item-kind="recordatorio"', "edit", "Editar");
-          actions += iconButton(' data-scm-calendar-cancel-reminder data-reminder-id="' + escHtml(id) + '"', "cancel", "Cancelar recordatorio", "text-rose-600 hover:bg-rose-50");
+          actions += iconButton(' data-scm-calendar-cancel-reminder data-reminder-id="' + escHtml(id) + '"', "close", "Cancelar recordatorio", "text-slate-400 hover:text-rose-600 hover:bg-rose-50");
         }
+        var meta = [isEventKind ? "" : kindLabel, categoryNameForRow(row), row.funcionario || row.nombre || "", row.ubicacion || ""].filter(Boolean).join(" · ");
 
-        return '<article class="flex gap-3 p-2.5 rounded-xl border bg-white hover:shadow-sm transition-shadow ' + (isDone ? "border-slate-100 opacity-75" : "border-slate-200") + '">' +
-          '<div class="w-14 shrink-0 text-center pt-0.5">' +
-          '<strong class="block text-sm font-bold text-[#061D49]">' + escHtml(start || "—") + '</strong>' +
-          (end ? '<span class="block text-[11px] text-slate-400">' + escHtml(end) + '</span>' : '') +
+        return '<article class="group flex gap-3 px-2.5 py-2 rounded-lg hover:bg-slate-50">' +
+          '<div class="w-10 shrink-0 pt-px text-[12px] leading-4 tabular-nums">' +
+          '<span class="block font-medium ' + (isDone ? "text-slate-400" : "text-slate-700") + '">' + escHtml(start || "—") + '</span>' +
+          (end ? '<span class="block text-slate-400">' + escHtml(end) + '</span>' : '') +
           '</div>' +
-          '<div class="w-1 rounded-full shrink-0" style="background:' + escHtml(color) + '"></div>' +
-          '<div class="min-w-0 flex-1">' +
-          '<button type="button" class="block w-full text-left cursor-pointer group"' + (id ? detailAttr : ' disabled') + '>' +
-          '<strong class="block text-sm font-semibold leading-snug group-hover:text-[#1E3C76] ' + (isDone ? "text-slate-500 line-through" : "text-slate-800") + '">' + escHtml(row.titulo || kindLabel) + '</strong>' +
-          '<span class="block text-[11px] text-slate-500 truncate mt-0.5">' + escHtml([kindLabel, category, row.funcionario || row.nombre || "", row.ubicacion || ""].filter(Boolean).join(" · ")) + '</span>' +
+          '<div class="min-w-0 flex-1 border-l-2 pl-3" style="border-color:' + escHtml(color) + '">' +
+          '<button type="button" class="block w-full text-left cursor-pointer"' + (id ? detailAttr : ' disabled') + '>' +
+          '<span class="block text-[13px] font-medium leading-snug ' + (isDone ? "text-slate-400 line-through" : "text-slate-800 hover:text-[#1E3C76]") + '">' + escHtml(row.titulo || kindLabel) + '</span>' +
+          '<span class="block text-xs text-slate-500 truncate">' + escHtml(meta) + (isDone ? " · " + escHtml(calendarItemStatusLabel(row)) : "") + '</span>' +
           '</button>' +
-          '<div class="flex items-center justify-between gap-2 mt-1.5">' +
-          '<span class="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ' + (isDone ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700") + '">' + escHtml(calendarItemStatusLabel(row)) + '</span>' +
-          '<div class="flex items-center">' + actions + '</div>' +
-          '</div>' +
+          (actions ? '<div class="flex items-center gap-0.5 mt-1 -ml-1.5 opacity-70 group-hover:opacity-100 transition-opacity">' + actions + '</div>' : '') +
           '</div>' +
           '</article>';
       }
 
       function upcomingItemHtml(row) {
         var dateKey = eventDateKey(row);
-        var dueTheme = isDueCalendar ? dueTypeTheme(row) : null;
-        var color = String((dueTheme && dueTheme.color) || row.color || (isDueCalendar ? "#f59e0b" : "#f43f5e")).trim() || "#f59e0b";
-        var category = isDueCalendar ? (row.grupo || "Vencimiento") : (row.categoria || (categoriesById[getCategoryId(row)] && categoriesById[getCategoryId(row)].nombre) || "Sin categoria");
-        var kindLabel = isDueCalendar ? category : calendarItemKindLabel(row);
-        var time = isDueCalendar
-          ? ("Vence: " + (row.fecha_vencimiento || dateKey || "-"))
-          : [timePartFromDateTime(row.fecha_inicio), timePartFromDateTime(row.fecha_fin)].filter(function (value, index, list) { return value && list.indexOf(value) === index; }).join(" - ");
-        var monthName = shortMonthLabel(dateKey) || "MES";
-        var dayNum = String(Number(String(dateKey).slice(8, 10)) || "");
-
-        return '<button type="button" class="w-full text-left p-2 bg-white hover:bg-[#F6F8FC] rounded-xl border border-slate-200 transition-colors flex items-center gap-3 cursor-pointer group" data-scm-calendar-upcoming-day="' + escHtml(dateKey) + '">' +
-          '<div class="w-11 h-11 rounded-xl bg-[#EBF1FB] text-[#1E3C76] flex flex-col items-center justify-center shrink-0 text-center">' +
-          '<strong class="text-[9px] text-secondary uppercase font-bold tracking-wider leading-none">' + escHtml(monthName) + '</strong>' +
-          '<span class="text-xs font-bold text-on-surface leading-tight mt-0.5">' + escHtml(dayNum) + '</span>' +
+        var color = isDueCalendar ? dueTypeTheme(row).color : (row.color || "#64748b");
+        var detail = isDueCalendar
+          ? dueTypeLabel(row.tipo_vencimiento)
+          : [[timePartFromDateTime(row.fecha_inicio), timePartFromDateTime(row.fecha_fin)].filter(function (value, index, list) { return value && list.indexOf(value) === index; }).join(" – "), categoryNameForRow(row)].filter(Boolean).join(" · ");
+        return '<button type="button" class="w-full text-left flex items-center gap-3 px-2.5 py-2 rounded-lg hover:bg-slate-50 cursor-pointer" data-scm-calendar-upcoming-day="' + escHtml(dateKey) + '">' +
+          '<div class="w-9 shrink-0 text-center leading-none">' +
+          '<span class="block text-[10px] font-medium uppercase text-slate-400">' + escHtml(shortMonthLabel(dateKey) || "") + '</span>' +
+          '<span class="block text-base font-semibold text-slate-900 mt-0.5">' + escHtml(String(Number(String(dateKey).slice(8, 10)) || "")) + '</span>' +
           '</div>' +
           '<div class="min-w-0 flex-1">' +
-          '<strong class="block text-xs font-semibold text-on-surface truncate group-hover:text-primary transition-colors">' + escHtml(row.titulo || (isDueCalendar ? "Vencimiento" : kindLabel)) + '</strong>' +
-          '<span class="block text-[11px] text-secondary truncate mt-0.5">' + escHtml(time) + '</span>' +
-          '<span class="inline-block text-[10px] font-medium px-1.5 py-0.2 rounded mt-1 text-on-surface bg-surface-container-lowest border-l-2" style="border-left-color:' + escHtml(color) + '">' + escHtml(kindLabel + (isDueCalendar ? "" : " · " + category)) + '</span>' +
-          '</div>' +
-          '</button>';
+          '<span class="block text-[13px] font-medium text-slate-800 truncate">' + escHtml(row.titulo || (isDueCalendar ? "Vencimiento" : calendarItemKindLabel(row))) + '</span>' +
+          '<span class="flex items-center gap-1.5 text-xs text-slate-500 truncate"><i class="w-1.5 h-1.5 rounded-full shrink-0" style="background:' + escHtml(color) + '"></i>' + escHtml(detail) + '</span>' +
+          '</div></button>';
       }
 
       function renderUpcoming() {
         if (!upcomingWrap) return;
         var todayKey = toDateKey(new Date());
         var range = monthRange(currentMonth);
-        var rows = calendarEvents.filter(function (row) {
+        var rows = gridRows().filter(function (row) {
           var key = eventDateKey(row);
           return key >= todayKey && key >= range.from && key <= range.to;
         }).sort(function (a, b) {
           return String(eventDateKey(a)).localeCompare(String(eventDateKey(b))) || String(a.fecha_inicio || "").localeCompare(String(b.fecha_inicio || ""));
         });
         var visibleRows = showAllUpcoming ? rows : rows.slice(0, 2);
-        upcomingWrap.innerHTML = visibleRows.length ? visibleRows.map(upcomingItemHtml).join("") : '<p class="py-6 text-center text-xs text-slate-400">' + (isDueCalendar ? "No hay vencimientos próximos en este mes." : "No hay eventos próximos en este mes.") + "</p>";
+        upcomingWrap.innerHTML = visibleRows.length ? visibleRows.map(upcomingItemHtml).join("") : '<p class="py-6 text-center text-xs text-slate-400">' + (isDueCalendar ? "Nada más por vencer este mes." : "Nada más programado este mes.") + "</p>";
         if (upcomingAllBtn) {
           upcomingAllBtn.hidden = rows.length <= 2;
           upcomingAllBtn.textContent = showAllUpcoming ? "Ver menos" : "Ver todos";
@@ -1342,14 +1297,14 @@
       }
 
       function renderSelectedDay() {
-        var dayRows = calendarEvents.filter(function (row) { return eventDateKey(row) === selectedDay; }).sort(function (a, b) {
+        var dayRows = gridRows().filter(function (row) { return eventDateKey(row) === selectedDay; }).sort(function (a, b) {
           return String(a.fecha_inicio || "").localeCompare(String(b.fecha_inicio || ""));
         });
         var holiday = holidayForDateKey(selectedDay);
         if (dayTitleEl) dayTitleEl.textContent = calendarDayTitle(selectedDay);
         if (daySubtitleEl) daySubtitleEl.textContent = (holiday ? "Festivo: " + holiday + " · " : "") + (dayRows.length ? dayRows.length + (isDueCalendar ? " vencimiento(s)" : visibleCalendarItemWord(dayRows.length)) : (isDueCalendar ? "Sin vencimientos" : "Sin eventos"));
         if (!eventsWrap) return;
-        eventsWrap.innerHTML = dayRows.length ? dayRows.map(eventCardHtml).join("") : '<div class="py-10 px-4 text-center"><span class="material-symbols-outlined text-[36px] text-slate-300">' + (isDueCalendar ? "task_alt" : "event_available") + '</span><strong class="block text-sm font-semibold text-slate-600 mt-1">' + (isDueCalendar ? "Sin vencimientos este día" : "Día libre") + '</strong><p class="text-xs text-slate-400 mt-0.5">' + (isDueCalendar ? "No hay controles vencidos o pendientes en esta fecha." : "No hay eventos con los filtros activos.") + "</p></div>";
+        eventsWrap.innerHTML = dayRows.length ? dayRows.map(eventCardHtml).join("") : '<p class="py-10 text-center text-sm text-slate-400">' + (isDueCalendar ? "Nada vence este día." : "No hay nada programado.") + "</p>";
       }
 
       function openCreateEventWithDefaults(defaults) {
@@ -1387,7 +1342,7 @@
           var active = mode === calendarDisplayMode;
           btn.classList.toggle("active", active);
           btn.setAttribute("aria-pressed", active ? "true" : "false");
-          ["bg-white", "text-[#061D49]", "shadow-sm"].forEach(function (cls) { btn.classList.toggle(cls, active); });
+          ["bg-white", "text-slate-900", "shadow-sm"].forEach(function (cls) { btn.classList.toggle(cls, active); });
           ["text-slate-500", "hover:text-slate-800"].forEach(function (cls) { btn.classList.toggle(cls, !active); });
         });
         panel.classList.toggle("scm-calendar-panel--week", calendarDisplayMode === "week");
@@ -1398,6 +1353,72 @@
         if (weekdaysHeader) {
           weekdaysHeader.style.display = calendarDisplayMode === "month" ? "" : "none";
         }
+      }
+
+      // En vencimientos, lo que venció antes del mes visible va en "Atrasados" y no en el día de hoy.
+      function isBacklogRow(row) {
+        return isDueCalendar && Number((row && row.acumulado_vencido) || 0) > 0;
+      }
+
+      function gridRows() {
+        return calendarEvents.filter(function (row) { return !isBacklogRow(row); });
+      }
+
+      function dueActionsHtml(row) {
+        var caseData = row && row.case ? row.case : {};
+        var linkClass = "text-[12px] font-medium text-slate-500 hover:text-[#1E3C76] cursor-pointer";
+        var links = [];
+        if (caseData.ticket_pk) links.push('<button type="button" class="' + linkClass + '" data-commercial-open-case="' + escHtml(caseData.ticket_pk) + '">Ver tarea</button>');
+        if (caseData.link_url) links.push('<a class="' + linkClass + '" href="' + escHtml(caseData.link_url) + '" target="_blank" rel="noopener">' + escHtml(caseData.link_label || "Abrir") + '</a>');
+        if (caseData.property_url) links.push('<a class="' + linkClass + '" href="' + escHtml(caseData.property_url) + '" target="_blank" rel="noopener">Ver inmueble</a>');
+        return links.join('<span class="text-slate-300" aria-hidden="true">·</span>');
+      }
+
+      function dueRowHtml(row) {
+        var theme = dueTypeTheme(row);
+        var overdueDays = Number(row.dias_vencido || 0);
+        var status = overdueDays > 0
+          ? '<span class="text-rose-600">' + escHtml(String(overdueDays)) + (overdueDays === 1 ? " día vencido" : " días vencido") + '</span>'
+          : '<span>Vence ' + escHtml(row.fecha_vencimiento || "") + '</span>';
+        var actions = dueActionsHtml(row);
+        return '<article class="flex gap-2.5 px-2.5 py-2 rounded-lg hover:bg-slate-50">' +
+          '<i class="mt-[7px] w-2 h-2 rounded-full shrink-0" style="background:' + escHtml(theme.color) + '" aria-hidden="true"></i>' +
+          '<div class="min-w-0 flex-1">' +
+          '<p class="text-[13px] font-medium text-slate-800 truncate" title="' + escHtml(row.titulo || "") + '">' + escHtml(row.titulo || "Vencimiento") + '</p>' +
+          '<p class="text-xs text-slate-500 truncate" title="' + escHtml(row.descripcion || "") + '">' + escHtml(row.descripcion || dueTypeLabel(row.tipo_vencimiento)) + '</p>' +
+          '<div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1 text-xs text-slate-500">' + status + (actions ? '<span class="text-slate-300" aria-hidden="true">·</span>' + actions : '') + '</div>' +
+          '</div></article>';
+      }
+
+      function renderDueBacklog() {
+        var wrap = panel.querySelector("[data-scm-calendar-backlog-wrap]");
+        var list = panel.querySelector("[data-scm-calendar-backlog]");
+        if (!wrap || !list) return;
+        var rows = calendarEvents.filter(isBacklogRow);
+        wrap.hidden = !rows.length;
+        if (!rows.length) {
+          list.innerHTML = "";
+          return;
+        }
+        var groups = {};
+        rows.forEach(function (row) {
+          var type = String(row.tipo_vencimiento || "otros");
+          (groups[type] = groups[type] || []).push(row);
+        });
+        list.innerHTML = Object.keys(groups).sort(function (a, b) { return groups[b].length - groups[a].length; }).map(function (type) {
+          var groupRows = groups[type].sort(function (a, b) { return Number(b.dias_vencido || 0) - Number(a.dias_vencido || 0); });
+          var shown = groupRows.slice(0, 40);
+          return '<details class="group/backlog">' +
+            '<summary class="flex items-center gap-2.5 px-4 py-2.5 cursor-pointer list-none hover:bg-slate-50 [&::-webkit-details-marker]:hidden">' +
+            '<i class="w-2 h-2 rounded-full shrink-0" style="background:' + escHtml(dueTypeTheme(type).color) + '" aria-hidden="true"></i>' +
+            '<span class="flex-1 text-[13px] text-slate-700">' + escHtml(dueTypeLabel(type)) + '</span>' +
+            '<span class="text-[13px] font-semibold text-slate-900 tabular-nums">' + groupRows.length + '</span>' +
+            '<span class="material-symbols-outlined text-[18px] text-slate-400 transition-transform group-open/backlog:rotate-180">expand_more</span>' +
+            '</summary>' +
+            '<div class="px-1.5 pb-2 max-h-80 overflow-y-auto">' + shown.map(dueRowHtml).join("") +
+            (groupRows.length > shown.length ? '<p class="px-2.5 py-1.5 text-xs text-slate-400">y ' + (groupRows.length - shown.length) + ' más. Revísalos desde su módulo.</p>' : '') +
+            '</div></details>';
+        }).join("");
       }
 
       function eventMinutes(row, key) {
@@ -1418,7 +1439,7 @@
       }
 
       function timeGridEvents(dateKey) {
-        return calendarEvents.filter(function (row) {
+        return gridRows().filter(function (row) {
           if (eventDateKey(row) !== dateKey) return false;
           var start = eventMinutes(row, "fecha_inicio");
           if (start === null) return false;
@@ -2035,61 +2056,50 @@
         var weekday = first.getDay();
         start.setDate(first.getDate() + (weekday === 0 ? -6 : 1 - weekday));
         var todayKey = toDateKey(new Date());
+        var rows = gridRows();
         var canCreate = !isDueCalendar && !!panel.querySelector('[data-scm-calendar-open-create][data-calendar-mode="single"]');
-        var html = '<div class="grid grid-cols-7 gap-px rounded-2xl overflow-hidden border border-slate-200 bg-slate-200">';
+        var html = '<div class="grid grid-cols-7 border-t border-l border-slate-100 rounded-lg overflow-hidden">';
         for (var i = 0; i < 42; i += 1) {
           var cellDate = new Date(start);
           cellDate.setDate(start.getDate() + i);
           var key = toDateKey(cellDate);
           var holiday = holidayForDateKey(key);
-          var dayEvents = calendarEvents.filter(function (row) { return eventDateKey(row) === key; }).sort(function (a, b) {
+          var dayEvents = rows.filter(function (row) { return eventDateKey(row) === key; }).sort(function (a, b) {
             return String(a.fecha_inicio || "").localeCompare(String(b.fecha_inicio || ""));
           });
           var isCurrentMonth = cellDate.getMonth() === currentMonth.getMonth();
           var isToday = key === todayKey;
           var isSelected = key === selectedDay;
-          var isWeekend = cellDate.getDay() === 0;
 
-          var cellClasses = "group relative min-h-[112px] p-1.5 sm:p-2 text-left flex flex-col gap-1 transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#1E3C76] ";
-          if (isSelected) cellClasses += "bg-[#EBF1FB] ";
-          else if (!isCurrentMonth) cellClasses += "bg-slate-50 text-slate-400 hover:bg-slate-100 ";
-          else if (isWeekend || holiday) cellClasses += "bg-slate-50/70 hover:bg-[#F6F8FC] ";
-          else cellClasses += "bg-white hover:bg-[#F6F8FC] ";
+          var cellClasses = "group min-h-[118px] p-1 flex flex-col gap-0.5 border-r border-b border-slate-100 cursor-pointer outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#1E3C76]/40 ";
+          cellClasses += isSelected ? "bg-[#1E3C76]/[0.04] " : (isCurrentMonth ? "bg-white hover:bg-slate-50/70 " : "bg-slate-50/50 ");
 
           html += '<div role="button" tabindex="0" class="' + cellClasses + '" data-scm-calendar-day="' + escHtml(key) + '" aria-label="' + escHtml(calendarDayTitle(key) + (dayEvents.length ? ", " + dayEvents.length + (isDueCalendar ? " vencimientos" : " elementos") : "")) + '"' + (isSelected ? ' aria-current="date"' : '') + '>';
-          html += '<div class="flex items-center justify-between gap-1">';
-          var dayNumberClass = isToday
-            ? "w-7 h-7 rounded-full bg-[#F8CF4A] text-[#061D49] shadow-sm"
-            : (isSelected ? "w-7 h-7 rounded-full bg-[#1E3C76] text-white" : "w-7 h-7 rounded-full " + (isCurrentMonth ? "text-slate-700" : "text-slate-400"));
-          html += '<span class="flex items-center justify-center text-xs font-bold ' + dayNumberClass + '">' + String(cellDate.getDate()) + '</span>';
+          html += '<div class="flex items-center justify-between h-6 px-0.5">';
+          var numberClass = isToday
+            ? "bg-[#1E3C76] text-white"
+            : (isSelected ? "bg-slate-200 text-slate-900" : (isCurrentMonth ? "text-slate-700" : "text-slate-300"));
+          html += '<span class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium tabular-nums ' + numberClass + '">' + String(cellDate.getDate()) + '</span>';
           if (canCreate) {
-            html += '<button type="button" class="w-6 h-6 rounded-lg flex items-center justify-center text-[#1E3C76] bg-white border border-slate-200 opacity-0 group-hover:opacity-100 focus:opacity-100 hover:bg-[#F8CF4A] hover:border-[#F8CF4A] transition-opacity cursor-pointer" data-scm-calendar-add-day="' + escHtml(key) + '" title="Crear evento este día" aria-label="Crear evento el ' + escHtml(calendarDayTitle(key)) + '"><span class="material-symbols-outlined text-[16px]">add</span></button>';
-          } else if (dayEvents.length) {
-            html += '<span class="text-[10px] px-1.5 rounded-full font-bold ' + (isDueCalendar ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500') + '">' + dayEvents.length + '</span>';
+            html += '<button type="button" class="w-6 h-6 rounded-md flex items-center justify-center text-slate-400 hover:text-slate-800 hover:bg-slate-200/70 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity cursor-pointer" data-scm-calendar-add-day="' + escHtml(key) + '" title="Nuevo evento este día" aria-label="Nuevo evento el ' + escHtml(calendarDayTitle(key)) + '"><span class="material-symbols-outlined text-[16px]">add</span></button>';
           }
           html += '</div>';
           if (holiday) {
-            html += '<span class="text-[10px] text-rose-600 font-medium truncate" title="' + escHtml(holiday) + '">' + escHtml(holiday) + '</span>';
+            html += '<span class="px-1 text-[10px] text-rose-500 truncate" title="' + escHtml(holiday) + '">' + escHtml(holiday) + '</span>';
           }
-          html += '<div class="space-y-1 min-w-0">';
           dayEvents.slice(0, 3).forEach(function (row) {
-            if (isDueCalendar) {
-              var dueTheme = dueTypeTheme(row);
-              html += '<span class="block text-[11px] px-1.5 py-0.5 rounded-md font-medium truncate leading-snug" style="background:' + escHtml(dueTheme.bg) + ';color:' + escHtml(dueTheme.text) + '" title="' + escHtml(row.titulo || "") + '">' + escHtml(row.titulo || dueTypeLabel(row.tipo_vencimiento || "")) + '</span>';
-            } else {
-              var eventColor = row.color || "#3b82f6";
-              var done = calendarItemIsDone(row);
-              var time = timePartFromDateTime(row.fecha_inicio);
-              html += '<span class="flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded-md truncate leading-snug ' + (done ? 'text-slate-400 line-through bg-slate-100' : 'text-slate-700 bg-slate-100/80') + '" title="' + escHtml((time ? time + " · " : "") + (row.titulo || "")) + '">' +
-                '<i class="w-1.5 h-1.5 rounded-full shrink-0" style="background:' + escHtml(eventColor) + '"></i>' +
-                (time ? '<b class="font-semibold text-slate-500">' + escHtml(time) + '</b>' : '') +
-                '<span class="truncate">' + escHtml(row.titulo || calendarItemKindLabel(row)) + '</span></span>';
-            }
+            var color = isDueCalendar ? dueTypeTheme(row).color : (row.color || "#64748b");
+            var done = !isDueCalendar && calendarItemIsDone(row);
+            var time = isDueCalendar ? "" : timePartFromDateTime(row.fecha_inicio);
+            html += '<span class="flex items-center gap-1.5 px-1 py-[2px] rounded text-[12px] leading-4 min-w-0 ' + (done ? "text-slate-400 line-through" : "text-slate-700") + '" title="' + escHtml((time ? time + " · " : "") + (row.titulo || "")) + '">' +
+              '<i class="w-1.5 h-1.5 rounded-full shrink-0" style="background:' + escHtml(color) + '"></i>' +
+              (time ? '<span class="hidden lg:inline text-slate-400 tabular-nums shrink-0">' + escHtml(time) + '</span>' : '') +
+              '<span class="truncate">' + escHtml(row.titulo || (isDueCalendar ? dueTypeLabel(row.tipo_vencimiento) : calendarItemKindLabel(row))) + '</span></span>';
           });
           if (dayEvents.length > 3) {
-            html += '<span class="block text-[11px] text-[#1E3C76] font-semibold pl-1">+' + (dayEvents.length - 3) + ' más</span>';
+            html += '<span class="px-1 text-[11px] font-medium text-slate-500">' + (dayEvents.length - 3) + ' más</span>';
           }
-          html += '</div></div>';
+          html += '</div>';
         }
         html += '</div>';
         monthGrid.innerHTML = html;
@@ -2227,6 +2237,7 @@
         renderSelectedDay();
         renderUpcoming();
         renderDueBreakdown(calendarEvents);
+        renderDueBacklog();
       }
 
       function dueSettingValue(settings, key, fallback) {
