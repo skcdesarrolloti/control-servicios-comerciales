@@ -95,7 +95,7 @@ final class CommercialOwnerPreapprovalPdf
       $installmentsNote = $sim !== null && $sim['cuotas'] > 0 ? ($sim['cuotas'] === 1 ? 'Se paga en 1 pago' : 'Se paga en ' . $sim['cuotas'] . ' cuotas de ' . self::money((float) $sim['cuota'])) . '. ' : '';
       // Solo los descuentos que tiene el inmueble: las filas en $0 alargan el documento sin informar nada.
       $rows = self::row('Canon mensual', 'Mensual (mes)', (float) $item['canon']);
-      if ($sim !== null && $sim['administracion'] > 0) $rows .= self::row('Administración (la paga el arrendatario)', 'Mensual (mes)', (float) $sim['administracion'], 'Informativa: no se descuenta del canon, pero hace parte de la base de la comisión y de la garantía.', 'is-info');
+      if ($sim !== null && $sim['administracion'] > 0) $rows .= self::row('Administración', 'Mensual (mes)', (float) $sim['administracion'], 'Informativa: la inmobiliaria la paga a la copropiedad; no se descuenta del canon, pero hace parte de la base de la comisión y de la garantía.', 'is-info');
       if ($item['comision'] > 0) $rows .= self::row('(−) Comisión de administración (IVA incluido)', 'Mensual (mes)', (float) $item['comision'], $sim !== null ? (string) ($sim['detail']['Comisión de administración'] ?? '') : '');
       if ($item['garantia'] > 0) $rows .= self::row('(−) Garantía inmobiliaria', 'Mensual (mes)', (float) $item['garantia'], $sim !== null ? (string) ($sim['detail']['Garantía inmobiliaria'] ?? $sim['detail']['Póliza Berkley'] ?? $sim['detail']['Póliza Seguros Mundial'] ?? '') : '');
       // La póliza de servicios públicos siempre sale: en $0 si ya se pagó o si el inmueble no la tiene (con el aviso).

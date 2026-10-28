@@ -243,7 +243,8 @@ final class CommercialOwnerPreapprovalTest extends TestCase
     self::assertStringContainsString(CommercialOwnerPreapprovalPdf::TITLE, $html);
     self::assertStringContainsString('Simulación con El Libertador', $html);
     self::assertStringContainsString('Se paga en 2 cuotas de $30.000', $html);
-    self::assertStringContainsString('Administración (la paga el arrendatario)', $html);
+    self::assertStringContainsString('la inmobiliaria la paga a la copropiedad', $html);
+    self::assertStringNotContainsString('arrendatario', $html);
     self::assertStringContainsString('$4.991.400', $html);
     self::assertStringContainsString('<h2>4. Lo que puede resolver con su crédito</h2>', $html);
     self::assertStringContainsString('<h2>5. Condiciones para la aprobación del crédito</h2>', $html);
