@@ -274,7 +274,21 @@
       var rate = commission / (canon * (1 + (Number(rates(root).iva) || 0) / 100)) * 100;
       simField(card, "tasa").value = String(Math.round(rate * 10000) / 10000).replace(".", ",");
       simField(card, "garantia").checked = Number(data.garantia) > 0;
-      simField(card, "servicios").checked = Number(data.seguro) > 0;
+    }
+    // Póliza de servicios del mandato: se paga una sola vez en N cuotas desde el inicio del contrato. Si ya pasaron
+    // esos meses está pagada y no se descuenta; si no, se simula con su valor asegurado y sus cuotas.
+    var policy = data.contrato ? data.servicios : null;
+    simField(card, "servicios").checked = !!policy && policy.estado !== "pagada";
+    if (policy) {
+      if (Number(policy.valor) > 0) simField(card, "valor").value = money(policy.valor);
+      simField(card, "cuotas").value = String(policy.cuotas);
+      var start = policy.inicio ? policy.inicio.split("-").reverse().join("/") : "";
+      var count = policy.cuotas === 1 ? "1 pago" : policy.cuotas + " cuotas";
+      var info = card.querySelector("[data-pre-source-policy]");
+      info.textContent = policy.estado === "pagada" ? "Póliza de servicios públicos ya pagada: " + count + " desde el inicio del contrato (" + start + "). No se descuenta."
+        : policy.estado === "pendiente" ? "Póliza de servicios públicos en " + count + " desde el inicio del contrato (" + start + "): lleva " + policy.pagadas + " y le faltan " + (policy.cuotas - policy.pagadas) + "."
+        : "El contrato no tiene fecha de inicio: no se puede saber si ya pagó la póliza de servicios públicos (" + count + "). Si ya la pagó, desactívala.";
+      info.hidden = false;
     }
     card.querySelector("[data-pre-source-meta]").textContent = data.contrato ? ["Contrato " + data.contrato, data.inmueble ? "SIMI " + data.inmueble : "", data.direccion, data.estado].filter(Boolean).join(" · ") : "Simulación con las tarifas de SuCasa";
     list.append(card);

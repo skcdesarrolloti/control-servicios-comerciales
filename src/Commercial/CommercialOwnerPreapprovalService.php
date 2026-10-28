@@ -88,8 +88,8 @@ final class CommercialOwnerPreapprovalService
   /**
    * Contratos Entregado o Por entregar donde el documento (cédula o NIT) es de un propietario, con el ingreso que
    * toma el liquidador: canon (o el de la última carta de aumento) y descuentos del mandato. La póliza de servicios
-   * públicos del mandato es mensual; se entrega como seguro de 12 meses para que el consultor la vea como el
-   * propietario la paga.
+   * públicos cubre todo el contrato y se paga una sola vez en `pago_servicios` cuotas desde el inicio del contrato
+   * (`precio_mes_servicios` es el valor de cada cuota): `servicios` dice si ya se pagó.
    * @return array{owner:array{name:string,document:string,email:string,phone:string}|null,contracts:list<array<string,mixed>>,active_credits:int}
    */
   public function lookup(string $document): array
@@ -133,7 +133,7 @@ final class CommercialOwnerPreapprovalService
       if ($owner['document'] === '') $owner['document'] = $document;
       $result['owner'] ??= $owner;
       $end = self::timestamp($contract['fin_contrato'] ?? '');
-      $income = $this->income($contract, $noMandate);
+      $income = $this->income($contract, $noMandate, time());
       $result['contracts'][] = [
         'id' => (int) ($contract['_ID'] ?? 0), 'contrato' => (string) ($contract['contrato'] ?? ''), 'inmueble' => (string) ($contract['inmueble'] ?? ''),
         'direccion' => (string) ($contract['direccion'] ?? ''), 'estado' => (string) ($contract['estado'] ?? ''),
@@ -218,24 +218,47 @@ final class CommercialOwnerPreapprovalService
 
   /**
    * Canon y descuentos mensuales del contrato; sin mandato con comisión, el porcentaje configurado del canon.
-   * @return array{canon:float,comision:float,garantia:float,seguro:float,intereses:float,otros:float}
+   * `seguro` es la prima de la póliza de servicios aún por pagar (0 si ya se pagó).
+   * @return array{canon:float,comision:float,garantia:float,seguro:float,intereses:float,otros:float,servicios:array{estado:string,cuotas:int,pagadas:int,valor:float,prima:float,inicio:string}|null}
    */
-  private function income(array $contract, float $noMandate): array
+  private function income(array $contract, float $noMandate, int $today): array
   {
     $canon = self::money($contract['valor_canon'] ?? '');
     $letterId = (int) ($contract['id_carta_aumento_canon'] ?? 0);
     $letters = $this->db->table('jet_cct_cartas_aumento');
     if ($letterId > 0 && $this->hasColumn($letters, 'canon')) $canon = max($canon, self::money($this->db->getVar("SELECT `canon` FROM `{$letters}` WHERE `_ID` = ? LIMIT 1", [$letterId]) ?? ''));
-    $income = ['canon' => $canon, 'comision' => 0.0, 'garantia' => 0.0, 'seguro' => 0.0, 'intereses' => 0.0, 'otros' => 0.0];
+    $income = ['canon' => $canon, 'comision' => 0.0, 'garantia' => 0.0, 'seguro' => 0.0, 'intereses' => 0.0, 'otros' => 0.0, 'servicios' => null];
     $mandate = $this->mandate($contract);
     if (is_array($mandate) && self::money($mandate['total_comision'] ?? '') > 0) {
       $income['comision'] = self::money($mandate['total_comision'] ?? '');
       $income['garantia'] = self::isYes($mandate['incluye_garantia'] ?? '') ? self::money($mandate['precio_mes_garantia'] ?? '') : 0.0;
-      $income['seguro'] = self::isYes($mandate['incluye_garantia_servicios'] ?? '') ? self::money($mandate['precio_mes_servicios'] ?? '') * 12 : 0.0;
+      if (self::isYes($mandate['incluye_garantia_servicios'] ?? '')) {
+        $income['servicios'] = self::servicesPolicy($mandate, self::timestamp($contract['inicio_contrato'] ?? ''), $today);
+        $income['seguro'] = $income['servicios']['estado'] === 'pagada' ? 0.0 : $income['servicios']['prima'];
+      }
       return $income;
     }
     $income['otros'] = round($canon * $noMandate);
     return $income;
+  }
+
+  /**
+   * Póliza de servicios públicos del mandato: se paga una sola vez para todo el contrato, en `pago_servicios` cuotas
+   * mensuales desde el inicio del contrato. Si ya pasaron esos meses, está pagada; sin fecha de inicio no se puede saber.
+   * @param array<string,mixed> $mandate
+   * @return array{estado:string,cuotas:int,pagadas:int,valor:float,prima:float,inicio:string}
+   */
+  private static function servicesPolicy(array $mandate, int $start, int $today): array
+  {
+    $installments = max(1, min(12, (int) self::money($mandate['pago_servicios'] ?? '')));
+    $premium = self::money($mandate['precio_anual_servicios'] ?? '');
+    if ($premium <= 0) $premium = self::money($mandate['precio_mes_servicios'] ?? '') * $installments;
+    $paid = $start > 0 ? min($installments, self::monthsUntil($start, $today)) : 0;
+    return [
+      'estado' => $start <= 0 ? 'sin_inicio' : ($paid >= $installments ? 'pagada' : 'pendiente'),
+      'cuotas' => $installments, 'pagadas' => $paid, 'valor' => self::money($mandate['precio_garantia_sevicios'] ?? ''),
+      'prima' => round($premium, 2), 'inicio' => $start > 0 ? date('Y-m-d', $start) : '',
+    ];
   }
 
   /** Créditos aprobados (vigentes) de la persona en el liquidador: el analista descuenta su saldo del cupo. */

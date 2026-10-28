@@ -185,6 +185,7 @@ final class CommercialToolsView
               <?php echo self::moneyField('otros', 'Otros descuentos', '/ mes'); ?>
             </div>
             <dl class="ctl-breakdown" data-pre-breakdown></dl>
+            <p class="ctl-note ctl-rates" data-pre-source-policy hidden></p>
             <p class="ctl-alert" data-pre-source-warning hidden></p>
           </div>
           <footer class="ctl-source__foot">

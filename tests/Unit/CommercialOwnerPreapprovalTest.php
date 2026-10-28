@@ -48,8 +48,17 @@ final class CommercialOwnerPreapprovalTest extends TestCase
     self::assertSame(['name'=>'Ana Propietaria', 'document'=>'1.143.415.938', 'email'=>'ana@example.test', 'phone'=>'573145106244'], $result['owner']);
     self::assertSame([1, 2], array_column($result['contracts'], 'id'));
     $mandate = $result['contracts'][0];
-    // La póliza de servicios del mandato es mensual: se entrega como seguro de 12 meses.
-    self::assertEquals([2000000, 250000, 40000, 180000, 0, 0], [$mandate['canon'], $mandate['comision'], $mandate['garantia'], $mandate['seguro'], $mandate['intereses'], $mandate['otros']]);
+    // Póliza de servicios: 4 cuotas de $15.000 desde el inicio (hace 65 días): lleva 2 y aún se descuenta la prima.
+    self::assertEquals([2000000, 250000, 40000, 60000, 0, 0], [$mandate['canon'], $mandate['comision'], $mandate['garantia'], $mandate['seguro'], $mandate['intereses'], $mandate['otros']]);
+    self::assertEquals(['estado'=>'pendiente', 'cuotas'=>4, 'pagadas'=>2, 'valor'=>3000000, 'prima'=>60000, 'inicio'=>date('Y-m-d', strtotime('-65 days'))], $mandate['servicios']);
+    self::assertNull($result['contracts'][1]['servicios']);
+    // Pasadas las 4 cuotas desde el inicio, la póliza está pagada y no se descuenta.
+    $this->db->update('wp_jet_cct_contratos_arrendamiento', ['inicio_contrato'=>(string) strtotime('-5 months')], ['_ID'=>1]);
+    $paid = $this->service()->lookup('1143415938')['contracts'][0];
+    self::assertSame(['pagada', 4, 0.0], [$paid['servicios']['estado'], $paid['servicios']['pagadas'], $paid['seguro']]);
+    // Sin fecha de inicio no se puede saber: se deja la prima y se avisa.
+    $this->db->update('wp_jet_cct_contratos_arrendamiento', ['inicio_contrato'=>''], ['_ID'=>1]);
+    self::assertSame('sin_inicio', $this->service()->lookup('1143415938')['contracts'][0]['servicios']['estado']);
     self::assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2}$/', $mandate['fin']);
     self::assertGreaterThanOrEqual(13, $mandate['max_months']);
     // Sin mandato se descuenta el 15 % del canon por defecto.
