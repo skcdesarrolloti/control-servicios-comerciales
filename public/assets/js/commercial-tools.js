@@ -1,7 +1,7 @@
 (function () {
   "use strict";
-  // Herramientas comerciales: cupo preaprobado del propietario (con PDF para el propietario) y calculadora de
-  // ganancia ocasional. Los paneles llegan por AJAX, por eso todos los eventos se delegan en el documento.
+  // Herramientas comerciales: simulador de ingreso neto del propietario con su crédito preaprobado (mensaje y PDF
+  // para el propietario) y calculadora de ganancia ocasional. Los paneles llegan por AJAX, por eso todos los eventos se delegan en el documento.
   var runtime = {};
   var app = document.getElementById("scm-app");
   if (!app) return;
@@ -12,6 +12,7 @@
   function money(value) { return "$" + moneyFormat.format(Math.round(Number(value) || 0)); }
   function digits(value) { return Number(String(value || "").replace(/[^\d]/g, "")) || 0; }
   function todayIso() { var d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
+  function escapeHtml(value) { return String(value == null ? "" : value).replace(/[&<>"']/g, function (char) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[char]; }); }
   function isoDate(text) { return /^\d{4}-\d{2}-\d{2}$/.test(text || "") ? new Date(text + "T00:00:00") : null; }
 
   async function request(action, data) {
@@ -42,49 +43,216 @@
     input.setSelectionRange(position, position);
   }
 
-  /* ------------------------------------------------------------------ Cupo preaprobado del propietario */
+  /* ------------------------------------------------------------ Simulador de ingreso neto del propietario */
+
+  var MODALITIES = { defecto: "Por defecto", berkley: "Berkley", mundial: "Seguros Mundial" };
+  var USE_LABELS = { servicios: "servicios públicos", administracion: "cuotas de administración", reparaciones: "reparaciones y mantenimiento", otros: "otros imprevistos" };
+
+  function round2(value) { return Math.round((Number(value) || 0) * 100) / 100; }
+  function percent(value) { return String(Math.round((Number(value) || 0) * 10000) / 10000).replace(".", ",") + " %"; }
+  // Porcentaje escrito como 10, "10 %", "2,5" o "0.8" (CommercialNetIncomeSimulator::rate).
+  function parseRate(value) {
+    var text = String(value || "").replace(/[%\s ]/g, "");
+    text = text.indexOf(",") >= 0 && text.indexOf(".") >= 0 ? text.replace(/\./g, "").replace(",", ".") : text.replace(",", ".");
+    var number = Number(text);
+    return text !== "" && isFinite(number) ? Math.max(0, number) : 0;
+  }
+  function rates(root) {
+    if (!root._rates) { try { root._rates = JSON.parse(root.dataset.rates || "{}"); } catch (_error) { root._rates = {}; } }
+    return root._rates;
+  }
+
+  // Cuota fija (sistema francés) y sus intereses; sin tasa, la prima se divide en partes iguales.
+  function loan(amount, installments, monthlyRate) {
+    installments = Math.max(1, installments);
+    var rate = monthlyRate / 100;
+    var factor = rate > 0 ? rate * Math.pow(1 + rate, installments) / (Math.pow(1 + rate, installments) - 1) : 1 / installments;
+    var installment = round2(amount * factor);
+    return { cuota: installment, intereses: round2(installment * installments - amount) };
+  }
+
+  function simField(card, name) { return card.querySelector('[data-pre-sim="' + name + '"]'); }
+
+  // Mismo cálculo que CommercialNetIncomeSimulator::simulate() (plugin de la calculadora de comisión).
+  function simulate(root, card, canon) {
+    var r = rates(root);
+    var iva = Number(r.iva) || 0;
+    var modality = MODALITIES[simField(card, "modalidad").value] ? simField(card, "modalidad").value : "defecto";
+    var admin = digits(simField(card, "administracion").value);
+    var rateInput = simField(card, "tasa").value.trim();
+    var commissionRate = rateInput === "" ? Number(r.comision) || 0 : Math.min(100, parseRate(rateInput));
+    var ivaCanon = simField(card, "iva").checked ? round2(canon * iva / 100) : 0;
+    var canonTotal = round2(canon + admin);
+    var commission = round2(canonTotal * commissionRate / 100);
+    commission = round2(commission + round2(commission * iva / 100));
+    var installments = Math.max(1, Math.min(modality === "berkley" ? 4 : 12, Number(simField(card, "cuotas").value) || 1));
+    var insured = digits(simField(card, "valor").value);
+    var services = simField(card, "servicios").checked;
+    var out = { comision: commission, garantia: 0, seguro: 0, intereses: 0, cuota: 0, cuotas: 0, modalidad: MODALITIES[modality], aseguradora: MODALITIES[modality], tasa: commissionRate, warnings: [] };
+    if (modality === "defecto") {
+      var insurers = r.aseguradoras || {};
+      var name = insurers[simField(card, "aseguradora").value] ? simField(card, "aseguradora").value : Object.keys(insurers)[0] || "";
+      var insurer = insurers[name] || { seguro: 0, servicios: 0 };
+      out.aseguradora = name;
+      if (simField(card, "garantia").checked) out.garantia = round2((canonTotal + ivaCanon) * insurer.seguro / 100);
+      if (services) {
+        if (insured <= 0) out.warnings.push("Indica el valor asegurado de servicios públicos.");
+        else if (!(insurer.servicios > 0)) out.warnings.push(name + " no tiene tasa de servicios públicos configurada.");
+        else {
+          var premium = round2(insured * insurer.servicios / 100);
+          // Hasta 4 cuotas se dividen sin intereses; desde 5 se financian con la tasa de préstamo de garantías.
+          var financed = installments <= 4 ? { cuota: round2(premium / installments), intereses: 0 } : loan(premium, installments, Number(r.prestamo) || 0);
+          out.seguro = premium; out.intereses = financed.intereses; out.cuota = financed.cuota; out.cuotas = installments;
+        }
+      }
+    } else if (modality === "berkley") {
+      var berkley = r.berkley || { tasa: 0, expedicion: 0 };
+      var premiumCanon = round2(round2(canonTotal * 12) * berkley.tasa / 100);
+      var premiumServices = 0;
+      if (services) {
+        if (insured <= 0) out.warnings.push("Indica el valor asegurado de servicios para Berkley.");
+        else premiumServices = round2(insured * berkley.tasa / 100);
+      }
+      var policy = round2(premiumCanon + premiumServices + (Number(berkley.expedicion) || 0));
+      out.garantia = round2(premiumCanon / 12); out.seguro = policy; out.cuota = round2(policy / installments); out.cuotas = installments;
+    } else {
+      var mundial = r.mundial || { tasa: 0, expedicion: 0 };
+      var canonPremium = round2(round2((canonTotal + ivaCanon) * 12) * mundial.tasa / 100);
+      var withoutIva = round2(canonPremium + (Number(mundial.expedicion) || 0));
+      var total = round2(withoutIva + round2(withoutIva * iva / 100));
+      out.garantia = round2(canonPremium / 12);
+      if (services) {
+        var credit = loan(total, installments, Number(r.prestamo) || 0);
+        out.seguro = total; out.intereses = credit.intereses; out.cuota = credit.cuota; out.cuotas = installments;
+      }
+    }
+    return out;
+  }
+
+  // Muestra solo los campos de la modalidad elegida y deja las cuotas que permite (Berkley hasta 4).
+  function syncSimFields(root, card) {
+    var modality = simField(card, "modalidad").value;
+    var services = simField(card, "servicios").checked;
+    card.querySelectorAll('[data-pre-sim-row="defecto"]').forEach(function (node) { node.hidden = modality !== "defecto"; });
+    card.querySelector('[data-pre-sim-row="valor"]').hidden = !services || modality === "mundial";
+    card.querySelector('[data-pre-sim-row="cuotas"]').hidden = !(services || modality === "berkley");
+    var select = simField(card, "cuotas");
+    var max = modality === "berkley" ? 4 : 12;
+    Array.from(select.options).forEach(function (option) { option.hidden = option.disabled = Number(option.value) > max; });
+    if (Number(select.value) > max) select.value = String(max);
+    var r = rates(root);
+    var text = "";
+    if (modality === "defecto") {
+      var insurer = (r.aseguradoras || {})[simField(card, "aseguradora").value] || { seguro: 0, servicios: 0 };
+      text = "Tarifas de " + simField(card, "aseguradora").value + ": garantía " + percent(insurer.seguro) + " · servicios públicos " + (insurer.servicios > 0 ? percent(insurer.servicios) : "sin tasa") + ". Desde 5 cuotas el seguro se financia al " + percent(r.prestamo) + " mensual.";
+    } else if (modality === "berkley") {
+      text = "Berkley: " + percent((r.berkley || {}).tasa) + " sobre el canon anual (y los servicios asegurados) + expedición " + money((r.berkley || {}).expedicion) + ". La póliza se paga en 1 a 4 cuotas.";
+    } else {
+      text = "Seguros Mundial: " + percent((r.mundial || {}).tasa) + " sobre el canon anual + expedición " + money((r.mundial || {}).expedicion) + " + IVA. Con servicios, la póliza se financia al " + percent(r.prestamo) + " mensual.";
+    }
+    card.querySelector("[data-pre-sim-rates]").textContent = text;
+  }
 
   // Ingreso neto mensual de un inmueble: canon − comisión − garantía − (seguro + intereses) / 12 − otros.
-  function sourceValues(card) {
+  function sourceValues(root, card) {
     var value = function (name) { var input = card.querySelector('[data-pre-field="' + name + '"]'); return input ? digits(input.value) : 0; };
     var item = {
-      canon: value("canon"), comision: value("comision"), garantia: value("garantia"), seguro: value("seguro"), intereses: value("intereses"), otros: value("otros"),
+      calc: card.dataset.calc === "fijo" ? "fijo" : "sim",
+      canon: value("canon"), comision: value("comision"), garantia: value("garantia"), seguro: value("seguro"), intereses: value("intereses"), otros: value("otros"), cuota: 0, cuotas: 0, sim: null, warnings: [],
       fin: (card.querySelector('[data-pre-field="fin"]') || {}).value || "",
       meta: card.querySelector("[data-pre-source-meta]").textContent, fromContract: card.dataset.contract === "1",
     };
+    if (item.calc === "sim") {
+      var sim = simulate(root, card, item.canon);
+      item.sim = sim;
+      ["comision", "garantia", "seguro", "intereses", "cuota", "cuotas", "warnings"].forEach(function (key) { item[key] = sim[key]; });
+    }
     item.seguroMes = (item.seguro + item.intereses) / 12;
     item.net = Math.max(0, item.canon - item.comision - item.garantia - item.seguroMes - item.otros);
     return item;
   }
 
+  function breakdownRow(label, value, note) {
+    return "<div><dt>" + escapeHtml(label) + (note ? "<small>" + escapeHtml(note) + "</small>" : "") + "</dt><dd>" + escapeHtml(value) + "</dd></div>";
+  }
+
+  function renderSource(root, card) {
+    if (card.dataset.calc !== "fijo") syncSimFields(root, card);
+    var item = sourceValues(root, card);
+    var rows = breakdownRow("Canon mensual", money(item.canon));
+    if (item.comision > 0) rows += breakdownRow("(−) Comisión de administración", money(item.comision), item.sim ? percent(item.sim.tasa) + " + IVA" + (digits(simField(card, "administracion").value) > 0 ? ", sobre canon + administración" : "") : "IVA incluido");
+    if (item.garantia > 0) rows += breakdownRow("(−) Garantía inmobiliaria", money(item.garantia), item.sim ? item.sim.aseguradora : "");
+    if (item.seguro > 0) rows += breakdownRow("(−) Seguro" + (item.intereses > 0 ? " e intereses" : ""), money(item.seguroMes), item.cuotas > 0 ? money(item.seguro + item.intereses) + " en " + (item.cuotas === 1 ? "1 pago" : item.cuotas + " cuotas de " + money(item.cuota)) + ", repartido en 12 meses" : money(item.seguro + item.intereses) + " en 12 meses");
+    if (item.otros > 0) rows += breakdownRow("(−) Otros descuentos", money(item.otros));
+    card.querySelector("[data-pre-breakdown]").innerHTML = item.canon > 0 ? rows : "";
+    var warning = card.querySelector("[data-pre-source-warning]");
+    warning.textContent = item.warnings.join(" ");
+    warning.hidden = !item.warnings.length;
+    card.querySelector("[data-pre-source-net]").textContent = money(item.net);
+    // Con la cuota del seguro en menos de 12 meses, el neto cambia entre los meses con y sin cuota.
+    var base = Math.max(0, item.canon - item.comision - item.garantia - item.otros);
+    card.querySelector("[data-pre-source-detail]").textContent = item.cuota > 0 && item.cuotas < 12
+      ? "Promedio de 12 meses: " + money(Math.max(0, base - item.cuota)) + " en " + (item.cuotas === 1 ? "el mes" : "los " + item.cuotas + " meses") + " con cuota del seguro y " + money(base) + " en los demás"
+      : item.seguroMes > 0 ? "Seguro" + (item.intereses > 0 ? " e intereses" : "") + ": " + money(item.seguroMes) + " / mes" : "";
+    return item;
+  }
+
+  function useValues(root) {
+    var uses = {};
+    root.querySelectorAll("[data-pre-use]").forEach(function (input) { var value = digits(input.value); if (value > 0) uses[input.dataset.preUse] = value; });
+    return uses;
+  }
+
   function preState(root) {
     var months = Number(root.dataset.incomeMonths) || 3;
     var margin = Number(root.dataset.termMargin) || 0;
-    var sources = Array.from(root.querySelectorAll("[data-pre-sources] [data-pre-source]")).map(sourceValues);
+    var sources = Array.from(root.querySelectorAll("[data-pre-sources] [data-pre-source]")).map(function (card) { return renderSource(root, card); });
     var net = sources.reduce(function (sum, item) { return sum + item.net; }, 0);
+    var gross = sources.reduce(function (sum, item) { return sum + item.canon; }, 0);
     // Plazo: meses completos de 30 días hasta el fin del contrato más largo, menos el margen del liquidador.
     var longest = sources.map(function (item) { return item.fin; }).filter(Boolean).sort().pop() || "";
     var end = isoDate(longest);
     var term = end ? Math.floor((end - isoDate(todayIso())) / DAY / 30) - margin : null;
     var owner = {};
     root.querySelectorAll("[data-pre-owner]").forEach(function (input) { owner[input.dataset.preOwner] = input.value.trim(); });
-    return { months: months, margin: margin, sources: sources, net: net, amount: net * months, longest: longest, term: term, owner: owner, registered: root.dataset.mode !== "manual" };
+    return { months: months, margin: margin, sources: sources, gross: gross, net: net, amount: net * months, longest: longest, term: term, owner: owner, registered: root.dataset.mode !== "manual", uses: useValues(root), notes: root.querySelector("[data-pre-notes]").value.trim() };
   }
 
   function recalc(root) {
-    root.querySelectorAll("[data-pre-sources] [data-pre-source]").forEach(function (card) {
-      var item = sourceValues(card);
-      card.querySelector("[data-pre-source-net]").textContent = money(item.net);
-      card.querySelector("[data-pre-source-detail]").textContent = item.seguroMes > 0 ? "Seguro" + (item.intereses > 0 ? " e intereses" : "") + ": " + money(item.seguroMes) + " / mes" : "";
-    });
     var state = preState(root);
     root.querySelector("[data-pre-total]").textContent = money(state.amount);
-    root.querySelector("[data-pre-formula]").textContent = "Ingreso neto " + money(state.net) + " / mes × " + state.months + " meses";
     root.querySelector("[data-pre-net]").textContent = money(state.net);
+    root.querySelector("[data-pre-formula]").textContent = "Canon " + money(state.gross) + " − descuentos " + money(state.gross - state.net) + " / mes";
+    root.querySelector("[data-pre-gross]").textContent = money(state.gross);
+    root.querySelector("[data-pre-deductions]").textContent = money(state.gross - state.net);
     root.querySelector("[data-pre-count]").textContent = String(state.sources.length);
     root.querySelector("[data-pre-term]").textContent = state.term === null ? "Según vigencia" : state.term > 0 ? "Hasta " + state.term + " cuotas" : "Sin plazo disponible";
     root.querySelector("[data-pre-empty]").hidden = state.sources.length > 0;
+    var need = Object.keys(state.uses).reduce(function (sum, key) { return sum + state.uses[key]; }, 0);
+    var summary = root.querySelector("[data-pre-uses-summary]");
+    if (!need) {
+      summary.dataset.state = "empty";
+      summary.textContent = "Escribe cuánto necesita para cada cosa y muéstrale que su crédito preaprobado lo cubre.";
+    } else if (!(state.amount > 0)) {
+      summary.dataset.state = "empty";
+      summary.textContent = "Necesita " + money(need) + ". Completa el canon de sus inmuebles para ver cuánto le cubre el crédito.";
+    } else if (need <= state.amount) {
+      summary.dataset.state = "ok";
+      summary.textContent = "Su crédito preaprobado cubre los " + money(need) + " que necesita y le quedan " + money(state.amount - need) + " disponibles.";
+    } else {
+      summary.dataset.state = "partial";
+      summary.textContent = "Necesita " + money(need) + ": su crédito preaprobado cubre " + money(state.amount) + " (" + Math.floor(state.amount / need * 100) + " %).";
+    }
     return state;
+  }
+
+  function setCalc(root, card, calc) {
+    card.dataset.calc = calc;
+    card.querySelectorAll("[data-pre-calc]").forEach(function (button) { button.setAttribute("aria-pressed", button.dataset.preCalc === calc ? "true" : "false"); });
+    card.querySelector('[data-pre-panel="sim"]').hidden = calc !== "sim";
+    card.querySelector('[data-pre-panel="fijo"]').hidden = calc !== "fijo";
+    // El 15 % sin mandato reemplaza la comisión del liquidador: al simular, la comisión ya se calcula.
+    if (calc === "sim" && card.dataset.ruleOtros === "1") { card.querySelector('[data-pre-field="otros"]').value = ""; card.dataset.ruleOtros = ""; }
   }
 
   function addSource(root, data) {
@@ -98,8 +266,11 @@
     });
     card.querySelector('[data-pre-field="fin"]').value = data.fin || "";
     card.dataset.contract = data.contrato ? "1" : "";
-    card.querySelector("[data-pre-source-meta]").textContent = data.contrato ? ["Contrato " + data.contrato, data.inmueble ? "SIMI " + data.inmueble : "", data.direccion, data.estado].filter(Boolean).join(" · ") : "Valores escritos por el consultor";
+    card.dataset.ruleOtros = data.contrato && !(Number(data.comision) > 0) && Number(data.otros) > 0 ? "1" : "";
+    card.querySelector("[data-pre-source-meta]").textContent = data.contrato ? ["Contrato " + data.contrato, data.inmueble ? "SIMI " + data.inmueble : "", data.direccion, data.estado].filter(Boolean).join(" · ") : "Simulación con las tarifas de SuCasa";
     list.append(card);
+    // Los contratos traen los descuentos de su mandato; los inmuebles nuevos se simulan.
+    setCalc(root, card, data.contrato ? "fijo" : "sim");
     renumber(root);
     return card;
   }
@@ -160,17 +331,17 @@
       clearSources(root);
       var credits = root.querySelector("[data-pre-credits]");
       credits.hidden = !(result.active_credits > 0);
-      credits.textContent = result.active_credits > 0 ? "Tiene " + result.active_credits + (result.active_credits === 1 ? " crédito aprobado vigente" : " créditos aprobados vigentes") + " en el liquidador: el cupo disponible será menor, porque el analista descuenta su saldo." : "";
+      credits.textContent = result.active_credits > 0 ? "Tiene " + result.active_credits + (result.active_credits === 1 ? " crédito aprobado vigente" : " créditos aprobados vigentes") + " en el liquidador: el crédito disponible será menor, porque el analista descuenta su saldo." : "";
       var contracts = result.contracts || [];
       if (!contracts.length || !result.owner) {
         root.querySelector('[data-pre-owner="document"]').value = query;
-        setStatus(root, "No encontramos contratos Entregado o Por entregar de este documento. Si aún no está registrado, usa \"Aún no registrado\" o agrega un inmueble.", true);
+        setStatus(root, "No encontramos contratos Entregado o Por entregar de este documento. Si aún no está registrado, usa \"Aún no registrado\" o agrega un inmueble para simularlo.", true);
         recalc(root);
         return;
       }
       ["name", "document", "phone", "email"].forEach(function (key) { root.querySelector('[data-pre-owner="' + key + '"]').value = result.owner[key] || ""; });
       contracts.forEach(function (contract) { addSource(root, contract); });
-      setStatus(root, result.owner.name + (contracts.length === 1 ? " es propietario en 1 contrato vigente." : " es propietario en " + contracts.length + " contratos vigentes: todos suman al cupo."));
+      setStatus(root, result.owner.name + (contracts.length === 1 ? " es propietario en 1 contrato vigente." : " es propietario en " + contracts.length + " contratos vigentes: todos suman a su ingreso neto."));
       recalc(root);
     } catch (error) {
       setStatus(root, error.message, true);
@@ -179,26 +350,80 @@
     }
   }
 
-  /* --------------------------------------------------------------------------- PDF para el propietario */
+  /* ---------------------------------------------------------- Mensaje y PDF para el propietario */
 
-  // El servidor recalcula el cupo y genera el PDF con el diseño de las actas (Chromium); aquí solo se descarga.
+  function shareMessage(state) {
+    var lines = [state.owner.name ? "Hola " + state.owner.name + "," : "Hola,", "", "Te comparto la simulación de tu ingreso neto con SKC SuCasa Inmobiliaria:"];
+    state.sources.forEach(function (item, index) {
+      lines.push("- Inmueble " + (index + 1) + (item.fromContract && item.meta ? " (" + item.meta + ")" : "") + ": canon " + money(item.canon) + " → neto " + money(item.net) + " / mes" + (item.sim ? " (" + item.sim.modalidad + (item.sim.aseguradora !== item.sim.modalidad ? ", " + item.sim.aseguradora : "") + ")" : ""));
+    });
+    lines.push("", "Ingreso neto mensual: " + money(state.net));
+    lines.push("Con este ingreso cuentas con un crédito preaprobado de hasta " + money(state.amount) + " (" + state.months + " meses de tu ingreso neto) para ponerte al día con servicios públicos, cuotas de administración, reparaciones o cualquier imprevisto del inmueble" + (state.term > 0 ? ", hasta en " + state.term + " cuotas." : "."));
+    var uses = Object.keys(state.uses);
+    if (uses.length) {
+      var need = uses.reduce(function (sum, key) { return sum + state.uses[key]; }, 0);
+      lines.push("Lo que necesitas cubrir (" + uses.map(function (key) { return USE_LABELS[key] + " " + money(state.uses[key]); }).join(", ") + ") suma " + money(need) + (need <= state.amount ? ": tu crédito lo cubre todo." : ": tu crédito cubre " + money(state.amount) + "."));
+    }
+    if (state.notes) lines.push("", state.notes);
+    lines.push("", "Valores de referencia sujetos a estudio y aprobación del crédito.");
+    return lines.join("\n");
+  }
+
+  function validState(root, state) {
+    if (!state.sources.length) { showError(root, "Agrega al menos un inmueble con su canon."); return false; }
+    if (!(state.net > 0)) { showError(root, "El ingreso neto es $0: revisa el canon y los descuentos."); return false; }
+    return true;
+  }
+
+  async function copyMessage(root, button) {
+    var state = recalc(root);
+    showError(root, "");
+    if (!validState(root, state)) return;
+    var text = shareMessage(state);
+    var label = button.querySelector("[data-pre-copy-label]");
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (_error) {
+      var area = document.createElement("textarea");
+      area.value = text;
+      area.setAttribute("readonly", "");
+      area.style.position = "fixed";
+      area.style.opacity = "0";
+      document.body.append(area);
+      area.select();
+      document.execCommand("copy");
+      area.remove();
+    }
+    label.textContent = "Mensaje copiado";
+    setTimeout(function () { label.textContent = "Copiar mensaje para WhatsApp"; }, 1800);
+  }
+
+  // El servidor recalcula la simulación y genera el PDF con el diseño de las actas (Chromium); aquí solo se descarga.
   async function downloadPdf(root, button) {
     var state = recalc(root);
     showError(root, "");
-    if (!state.sources.length) { showError(root, "Agrega al menos un inmueble con su canon."); return; }
-    if (!(state.net > 0)) { showError(root, "El ingreso neto es $0: revisa el canon y los descuentos."); return; }
+    if (!validState(root, state)) return;
     if (!state.owner.name) { showError(root, "Escribe el nombre del propietario: aparece en el PDF."); root.querySelector('[data-pre-owner="name"]').focus(); return; }
     if (button.disabled) return;
     var label = button.innerHTML;
     button.disabled = true;
     button.textContent = "Generando PDF…";
     try {
+      var cards = Array.from(root.querySelectorAll("[data-pre-sources] [data-pre-source]"));
       var data = new FormData();
       data.set("action", "commercial_tools_preapproval_pdf");
       data.set("nonce", runtime.nonce || "");
       data.set("payload", JSON.stringify({
-        owner: state.owner, registered: state.registered,
-        sources: state.sources.map(function (item) { return { canon: item.canon, comision: item.comision, garantia: item.garantia, seguro: item.seguro, intereses: item.intereses, otros: item.otros, fin: item.fin, meta: item.fromContract ? item.meta : "" }; }),
+        owner: state.owner, registered: state.registered, uses: state.uses, notes: state.notes,
+        sources: state.sources.map(function (item, index) {
+          var source = { calc: item.calc, canon: item.canon, otros: item.otros, fin: item.fin, meta: item.fromContract ? item.meta : "" };
+          if (item.calc === "fijo") return Object.assign(source, { comision: item.comision, garantia: item.garantia, seguro: item.seguro, intereses: item.intereses });
+          var card = cards[index];
+          return Object.assign(source, {
+            administracion: digits(simField(card, "administracion").value), tasa_comision: simField(card, "tasa").value, modalidad: simField(card, "modalidad").value, aseguradora: simField(card, "aseguradora").value,
+            iva_canon: simField(card, "iva").checked, garantia: simField(card, "garantia").checked, servicios: simField(card, "servicios").checked, valor_asegurado: digits(simField(card, "valor").value), cuotas: Number(simField(card, "cuotas").value) || 1,
+          });
+        }),
       }));
       var response = await fetch(runtime.ajaxUrl || "api.php", { method: "POST", body: data, credentials: "same-origin" });
       if (!response.ok || (response.headers.get("Content-Type") || "").indexOf("application/pdf") !== 0) {
@@ -210,7 +435,7 @@
       var url = URL.createObjectURL(await response.blob());
       var link = document.createElement("a");
       link.href = url;
-      link.download = match ? match[1] : "cupo-preaprobado.pdf";
+      link.download = match ? match[1] : "simulacion-ingreso-neto.pdf";
       document.body.append(link);
       link.click();
       link.remove();
@@ -310,6 +535,10 @@
       if (mode) { if ((pre.dataset.mode || "registrado") !== mode.dataset.preMode) setMode(pre, mode.dataset.preMode); return; }
       if (target.closest("[data-pre-search-button]")) { search(pre); return; }
       if (target.closest("[data-pre-add]")) { addSource(pre).querySelector('[data-pre-field="canon"]').focus(); recalc(pre); return; }
+      var calc = target.closest("[data-pre-calc]");
+      if (calc) { setCalc(pre, calc.closest("[data-pre-source]"), calc.dataset.preCalc); recalc(pre); return; }
+      var copy = target.closest("[data-pre-copy]");
+      if (copy) { copyMessage(pre, copy); return; }
       var remove = target.closest("[data-pre-remove]");
       if (remove) { remove.closest("[data-pre-source]").remove(); renumber(pre); recalc(pre); return; }
       var pdf = target.closest("[data-pre-pdf]");

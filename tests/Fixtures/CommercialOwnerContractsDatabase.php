@@ -34,6 +34,10 @@ final class CommercialOwnerContractsDatabase
     $db->insert('wp_jet_cct_contratos_arrendamiento', ['_ID'=>2,'contrato'=>'C-200','inmueble'=>'600','direccion'=>'Carrera 5','estado'=>'Por entregar','propietario'=>'Ana Propietaria','correo_propietario'=>'ana@example.test','celular_propietario'=>'3145106244','indicativo_propietario'=>'57','documento_propietario'=>'1143415938','id_propietario'=>'P-1','valor_canon'=>'1000000']);
     // Terminado: no debe aparecer.
     $db->insert('wp_jet_cct_contratos_arrendamiento', ['_ID'=>3,'contrato'=>'C-300','inmueble'=>'700','estado'=>'Terminado','documento_propietario'=>'1143415938','valor_canon'=>'900000']);
+    // Tarifas del simulador de ingreso neto, con los formatos que se guardan en producción.
+    foreach (['iva'=>'19','tasa_administracion_arriendo'=>'10','tasa_libertador_seguro'=>'2,5','tasa_libertador_servicios'=>'2','tasa_suramericana_seguro'=>'2.2','tasa_prestamo_garantias_servicios'=>'1,5','tasa_berkley'=>'2','gasto_expedicion_berkley'=>'15.000','tasa_seguros_mundial'=>'2,2','gasto_expedicion_seguros_mundial'=>'20000'] as $function => $value) {
+      $db->insert('wp_jet_cct_confi_sistema', ['funcion'=>$function,'valor'=>$value]);
+    }
     return $db;
   }
 }

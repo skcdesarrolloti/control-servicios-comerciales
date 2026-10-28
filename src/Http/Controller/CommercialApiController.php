@@ -799,7 +799,7 @@ final class CommercialApiController
     }
   }
 
-  /** PDF del cupo preaprobado para el propietario, con el diseño de las actas (Chromium). */
+  /** PDF de la simulación de ingreso neto y crédito preaprobado para el propietario, con el diseño de las actas (Chromium). */
   public function preapprovalPdf(array $input): never
   {
     $this->verify($input);

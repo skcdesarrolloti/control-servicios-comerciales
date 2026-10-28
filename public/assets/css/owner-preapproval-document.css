@@ -1,17 +1,13 @@
-/* PDF del cupo preaprobado: complementa los estilos de las actas (ticket-completion-document.css y public-services-document.css). */
+/* PDF de la simulación de ingreso neto y crédito preaprobado: complementa los estilos de las actas (ticket-completion-document.css y public-services-document.css). */
 .scm-preapproval-topline{height:6px;margin:0 0 4mm;border-radius:3px;background:linear-gradient(90deg,#061d49,#1e3c76 60%,#3b82f6)}
 .scm-preapproval-document h1{color:#061d49;font-weight:700}
 .scm-preapproval-document .scm-acta-receipt-data th{text-align:left;width:32%}
 .scm-preapproval-document h2{color:#061d49}
 .scm-preapproval-document h3{margin:16px 0 6px;color:#1e3c76}
 .scm-preapproval-document h3 span{color:#5b6b82;font-weight:400;font-size:.85em}
-.scm-preapproval-highlight{display:grid;grid-template-columns:1.1fr 1fr;gap:18px;align-items:center;margin:0 0 18px;padding:16px 20px;border-left:5px solid #f59120;border-radius:8px;background:#eef2f8;break-inside:avoid;page-break-inside:avoid}
+.scm-preapproval-highlight{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:stretch;margin:0 0 18px;padding:0;break-inside:avoid;page-break-inside:avoid}
 .scm-preapproval-highlight span{display:block;color:#5b6b82;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
 .scm-preapproval-highlight strong{display:block;margin-top:4px;color:#061d49;font-size:30px;line-height:1.1}
-.scm-preapproval-highlight dl{margin:0;text-align:right}
-.scm-preapproval-highlight dl div+div{margin-top:8px}
-.scm-preapproval-highlight dt{color:#5b6b82;font-size:10px;font-weight:400}
-.scm-preapproval-highlight dd{margin:2px 0 0;color:#10264a;font-size:13px;font-weight:700}
 .scm-preapproval-lead{margin:0 0 6px;color:#5b6b82}
 .scm-preapproval-income{width:100%;border-collapse:collapse;font-size:12px}
 .scm-preapproval-income th,.scm-preapproval-income td{padding:6px 9px;border-bottom:1px solid #d7dde6;text-align:left;vertical-align:top}
@@ -32,3 +28,15 @@
   .scm-preapproval-income tr{break-inside:avoid;page-break-inside:avoid}
   .scm-preapproval-disclaimer{font-size:9.5px}
 }
+.scm-preapproval-highlight>div{padding:14px 18px;border-left:5px solid #1e3c76;border-radius:8px;background:#eef2f8}
+.scm-preapproval-highlight>div.is-credit{border-left-color:#f59120;background:#fff7e6}
+.scm-preapproval-highlight em{display:block;margin-top:4px;color:#5b6b82;font-size:10.5px;font-style:normal}
+.scm-preapproval-income tr.is-info th,.scm-preapproval-income tr.is-info td{color:#5b6b82}
+.scm-preapproval-uses{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0;padding:0;list-style:none}
+.scm-preapproval-uses li{padding:9px 12px;border:1px solid #d7dde6;border-radius:6px;font-size:11.5px;break-inside:avoid;page-break-inside:avoid}
+.scm-preapproval-uses strong{color:#061d49}
+.scm-preapproval-uses b{float:right;color:#061d49}
+.scm-preapproval-uses span{display:block;margin-top:3px;color:#5b6b82;font-size:.92em}
+.scm-preapproval-coverage{margin:10px 0 0;padding:9px 12px;border-radius:6px;background:#ecfdf3;color:#166534;font-weight:700;font-size:11.5px}
+.scm-preapproval-coverage.is-partial{background:#fff7ed;color:#9a3412}
+.scm-preapproval-notes{margin:0;white-space:normal;color:#202020}

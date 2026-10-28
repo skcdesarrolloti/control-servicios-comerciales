@@ -6,6 +6,7 @@ namespace Tests\Unit;
 
 use PHPUnit\Framework\TestCase;
 use SCM\Commercial\CommercialAccessPolicy;
+use SCM\Commercial\CommercialNetIncomeSimulator;
 use SCM\Commercial\CommercialOwnerPreapprovalPdf;
 use SCM\Commercial\CommercialOwnerPreapprovalService;
 use SCM\Commercial\CommercialSignAccessDenied;
@@ -119,10 +120,72 @@ final class CommercialOwnerPreapprovalTest extends TestCase
     self::assertStringContainsString('$5.202.000', $html);
     self::assertStringContainsString('<td class="is-unit">12 meses</td>', $html);
     self::assertStringContainsString('Permanece mientras la vigencia del contrato continúa.', $html);
-    self::assertStringContainsString('Aplica si el seguro se difiere a 12 meses.', $html);
+    self::assertStringContainsString('Aplica si el seguro se difiere en cuotas.', $html);
     self::assertStringNotContainsString('Garantía inmobiliaria', $html);
     self::assertStringContainsString(CommercialToolsView::DISCLAIMER, $html);
-    self::assertSame('cupo-preaprobado-1-143-415-938-' . date('Y-m-d') . '.pdf', CommercialOwnerPreapprovalPdf::filename($estimate));
+    self::assertStringContainsString('Lo que puede resolver con su crédito', $html);
+    self::assertSame('simulacion-ingreso-neto-1-143-415-938-' . date('Y-m-d') . '.pdf', CommercialOwnerPreapprovalPdf::filename($estimate));
+  }
+
+  public function testRatesComeFromTheSystemConfigurationLikeThePlugin(): void
+  {
+    $rates = $this->service()->rates();
+    self::assertEquals(19, $rates['iva']);
+    self::assertEquals(10, $rates['comision']);
+    self::assertEquals(1.5, $rates['prestamo']);
+    self::assertEquals(['seguro'=>2.5, 'servicios'=>2], $rates['aseguradoras']['El Libertador']);
+    self::assertEquals(['seguro'=>2.2, 'servicios'=>0], $rates['aseguradoras']['Suramericana']);
+    self::assertEquals(['tasa'=>2, 'expedicion'=>15000], $rates['berkley']);
+    self::assertEquals(['tasa'=>2.2, 'expedicion'=>20000], $rates['mundial']);
+    self::assertSame(1234.5, CommercialNetIncomeSimulator::rate('1.234,5'));
+    self::assertSame(0.8, CommercialNetIncomeSimulator::rate('0.8 %'));
+  }
+
+  public function testSimulatorReplicatesTheCommissionCalculatorPlugin(): void
+  {
+    $rates = $this->service()->rates();
+    // Por defecto con El Libertador: comisión 10 % + IVA sobre canon + administración, garantía 2,5 % y servicios en 2 cuotas.
+    $base = ['canon'=>'$2.000.000', 'administracion'=>300000, 'tasa_comision'=>'10', 'modalidad'=>'defecto', 'aseguradora'=>'El Libertador', 'garantia'=>true, 'servicios'=>true, 'valor_asegurado'=>3000000, 'cuotas'=>2];
+    $sim = CommercialNetIncomeSimulator::simulate($base, $rates);
+    self::assertEquals([273700, 57500, 60000, 0, 30000, 2], [$sim['comision'], $sim['garantia'], $sim['seguro'], $sim['intereses'], $sim['cuota'], $sim['cuotas']]);
+    // Desde 5 cuotas la prima se financia con la tasa de préstamo de garantías (1,5 % mensual).
+    $financed = CommercialNetIncomeSimulator::simulate(['cuotas'=>6] + $base, $rates);
+    self::assertEquals(CommercialNetIncomeSimulator::loan(60000, 6, 1.5), ['cuota'=>$financed['cuota'], 'intereses'=>$financed['intereses']]);
+    self::assertEqualsWithDelta(10531.5, $financed['cuota'], 0.02);
+    // Sin tasa de servicios en la aseguradora, se avisa y no se descuenta.
+    $without = CommercialNetIncomeSimulator::simulate(['aseguradora'=>'Suramericana'] + $base, $rates);
+    self::assertEquals([50600, 0], [$without['garantia'], $without['seguro']]);
+    self::assertStringContainsString('no tiene tasa de servicios', $without['warnings'][0]);
+    // Berkley: 2 % del canon anual + expedición, hasta 4 cuotas; la garantía es la prima del canon / 12.
+    $berkley = CommercialNetIncomeSimulator::simulate(['canon'=>2000000, 'modalidad'=>'berkley', 'cuotas'=>9], $rates);
+    self::assertEquals([238000, 40000, 495000, 123750, 4], [$berkley['comision'], $berkley['garantia'], $berkley['seguro'], $berkley['cuota'], $berkley['cuotas']]);
+    // Seguros Mundial con servicios: (2,2 % del canon anual + expedición) + IVA, financiado.
+    $mundial = CommercialNetIncomeSimulator::simulate(['canon'=>1000000, 'modalidad'=>'mundial', 'servicios'=>true, 'cuotas'=>1], $rates);
+    self::assertEquals([119000, 22000, 337960], [$mundial['comision'], $mundial['garantia'], $mundial['seguro']]);
+    self::assertEqualsWithDelta(5069.4, $mundial['intereses'], 0.01);
+  }
+
+  public function testEstimateSimulatesSourcesAndKeepsTheOwnerNeeds(): void
+  {
+    $estimate = $this->service()->estimate(['owner'=>['name'=>'Carlos Nuevo'], 'notes'=>"Primera línea\r\nSegunda", 'uses'=>['servicios'=>'$800.000', 'reparaciones'=>1200000, 'otros'=>0, 'desconocido'=>5], 'sources'=>[
+      // El navegador no puede imponer los descuentos de una simulación: se recalculan con las tarifas.
+      ['calc'=>'sim', 'canon'=>2000000, 'administracion'=>300000, 'comision'=>1, 'garantia'=>true, 'servicios'=>true, 'valor_asegurado'=>3000000, 'cuotas'=>2, 'aseguradora'=>'El Libertador'],
+    ]]);
+    // 2.000.000 − 273.700 − 57.500 − 60.000 / 12 = 1.663.800 × 3
+    self::assertEquals(1663800, $estimate['net']);
+    self::assertEquals(4991400, $estimate['amount']);
+    self::assertEquals(2000000, $estimate['gross']);
+    self::assertSame(['servicios'=>800000.0, 'reparaciones'=>1200000.0], $estimate['uses']);
+    self::assertSame("Primera línea\nSegunda", $estimate['notes']);
+    $html = CommercialOwnerPreapprovalPdf::html($estimate, 'Funcionario de prueba');
+    self::assertStringContainsString(CommercialOwnerPreapprovalPdf::TITLE, $html);
+    self::assertStringContainsString('Simulación Por defecto · El Libertador', $html);
+    self::assertStringContainsString('Se paga en 2 cuotas de $30.000', $html);
+    self::assertStringContainsString('Administración (la paga el arrendatario)', $html);
+    self::assertStringContainsString('$4.991.400', $html);
+    self::assertStringContainsString('cubre los $2.000.000 que necesita y le quedan $2.991.400 disponibles', $html);
+    self::assertStringNotContainsString('Cuotas de administración', $html);
+    self::assertStringContainsString('Primera línea<br />', $html);
   }
 
   public function testCargosWithExplicitPermissionsNeedTheToolSubview(): void
@@ -140,12 +203,18 @@ final class CommercialOwnerPreapprovalTest extends TestCase
     $html = CommercialToolsView::render('preaprobado', $this->service(), 'https://example.test');
     self::assertStringContainsString('data-commercial-tool="preaprobado"', $html);
     self::assertStringContainsString('data-income-months="3"', $html);
-    self::assertStringContainsString('Canon / valor de la prima</span><span class="ctl-input"><input data-pre-field="canon"', $html);
+    self::assertStringContainsString('Canon mensual</span><span class="ctl-input"><input data-pre-field="canon"', $html);
     self::assertStringContainsString('<em>/ mes</em>', $html);
     self::assertStringContainsString('<em>12 meses</em>', $html);
     self::assertStringContainsString('Permanece mientras la vigencia del contrato continúa.', $html);
     self::assertStringContainsString('Aplica si el seguro se difiere a 12 meses.', $html);
     self::assertStringContainsString('membrete-sucasa-header.jpg', $html);
+    self::assertStringContainsString('Simulador de ingreso neto del propietario', $html);
+    self::assertStringContainsString('crédito preaprobado de hasta 3 veces su ingreso neto', $html);
+    self::assertStringContainsString('data-rates="{&quot;iva&quot;:19', $html);
+    self::assertStringContainsString('<option value="El Libertador">', $html);
+    self::assertStringContainsString('data-pre-sim="tasa" inputmode="decimal" maxlength="6" autocomplete="off" value="10"', $html);
+    self::assertStringContainsString('data-pre-use="reparaciones"', $html);
 
     $gain = CommercialToolsView::render('ganancia_ocasional', null, 'https://example.test');
     self::assertStringContainsString('data-commercial-tool="ganancia_ocasional"', $gain);

@@ -1090,7 +1090,7 @@ final class CommercialDashboardView
         </a>
       <?php endif; ?>
 
-      <!-- Dropdown Herramientas (Cupo preaprobado, Ganancia ocasional) -->
+      <!-- Dropdown Herramientas (Simulador de ingreso neto, Ganancia ocasional) -->
       <?php if (in_array('herramientas', $views, true)): ?>
         <div class="relative group/nav" data-commercial-dropdown="herramientas">
           <button type="button" class="flex items-center gap-space-xs px-2 lg:px-3 py-space-xs font-label-md text-label-md <?php echo $bucket === 'herramientas' ? ($activeClasses . ' active') : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-tab="herramientas" data-commercial-dropdown-trigger="herramientas" aria-expanded="false">
@@ -1101,10 +1101,10 @@ final class CommercialDashboardView
           <div class="absolute right-0 top-full hidden group-hover/nav:block bg-surface-container-lowest shadow-[0_12px_32px_rgba(0,0,0,0.14)] rounded-2xl py-space-xs min-w-[260px] z-50 border border-outline-variant/30 text-on-surface" data-commercial-dropdown-menu="herramientas">
             <?php if (!$policy instanceof CommercialAccessPolicy || $policy->canSubview('herramientas', 'preaprobado')): ?>
             <a class="flex items-center gap-2.5 px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="herramientas" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'herramientas', 'subtab' => 'preaprobado'])); ?>">
-              <span class="material-symbols-outlined text-[18px] text-primary" aria-hidden="true">request_quote</span>
+              <span class="material-symbols-outlined text-[18px] text-primary" aria-hidden="true">savings</span>
               <div>
-                <span class="block font-semibold text-on-surface">Cupo preaprobado</span>
-                <span class="block text-[11px] text-secondary">Estimación y PDF para el propietario</span>
+                <span class="block font-semibold text-on-surface">Simulador de ingreso neto</span>
+                <span class="block text-[11px] text-secondary">Neto al propietario y crédito preaprobado</span>
               </div>
             </a>
             <?php endif; ?>

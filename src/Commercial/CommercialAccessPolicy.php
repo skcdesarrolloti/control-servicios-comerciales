@@ -62,7 +62,7 @@ final class CommercialAccessPolicy
       'due' => 'Vencimientos',
     ],
     'herramientas' => [
-      'preaprobado' => 'Cupo preaprobado del propietario',
+      'preaprobado' => 'Simulador de ingreso neto del propietario',
       'ganancia_ocasional' => 'Calculadora de ganancia ocasional',
     ],
   ];

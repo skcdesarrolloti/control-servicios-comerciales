@@ -8,10 +8,11 @@ use SCM\Core\Database;
 use SCM\Core\Settings;
 
 /**
- * Herramientas → "Cupo preaprobado del propietario". Estima el cupo con la misma regla del liquidador de créditos de
- * Control de Servicios Inmobiliarios: (canon − descuentos) de todos los contratos Entregado o Por entregar × meses de
- * política. Aquí solo se consulta: no se registra ninguna solicitud. El cálculo lo hace el navegador para que el
- * consultor ajuste los valores, o los escriba a mano para propietarios que todavía no están registrados.
+ * Herramientas → "Simulador de ingreso neto del propietario". Calcula lo que le queda al propietario cada mes (canon −
+ * comisión − garantía − seguros, con las tarifas de SuCasa: CommercialNetIncomeSimulator) y, con la misma regla del
+ * liquidador de créditos de Control de Servicios Inmobiliarios, el crédito preaprobado al que accede: ingreso neto × meses
+ * de política. Los propietarios registrados cargan sus contratos Entregado o Por entregar; los demás se simulan a mano.
+ * Aquí solo se consulta: no se registra ninguna solicitud.
  *
  * La configuración de créditos (`owner_credit_settings`) se administra en el panel inmobiliario, por eso se lee, sin
  * escribir, de su configuración (`control_servicios_config`).
@@ -31,11 +32,42 @@ final class CommercialOwnerPreapprovalService
     $this->sharedSettings = $sharedSettings ?? new Settings($db, true, Settings::FUNCTION_KEY);
   }
 
+  /** Necesidades que el crédito preaprobado le ayuda a resolver al propietario (argumento comercial del simulador). */
+  public const USES = [
+    'servicios' => ['Servicios públicos', 'Ponerse al día con agua, luz y gas sin afectar su flujo de caja.'],
+    'administracion' => ['Cuotas de administración', 'Pagar la administración pendiente y evitar intereses de mora.'],
+    'reparaciones' => ['Reparaciones y mantenimiento', 'Arreglar el inmueble para arrendarlo más rápido y a mejor precio.'],
+    'otros' => ['Otros imprevistos', 'Impuesto predial, mejoras o cualquier gasto del inmueble.'],
+  ];
+
+  /** @var array<string,mixed>|null */
+  private ?array $rates = null;
+
   public function authorize(): void
   {
     if (!$this->policy->canSubview('herramientas', 'preaprobado')) {
-      throw new CommercialSignAccessDenied('Tu cargo no tiene permiso para consultar el cupo preaprobado de propietarios.');
+      throw new CommercialSignAccessDenied('Tu cargo no tiene permiso para usar el simulador de ingreso neto del propietario.');
     }
+  }
+
+  /**
+   * Tarifas del simulador (IVA, comisión, aseguradoras, Berkley, Seguros Mundial, préstamo) desde sus filas de
+   * `jet_cct_confi_sistema`, las mismas que usa el plugin de la calculadora de comisión.
+   * @return array<string,mixed>
+   */
+  public function rates(): array
+  {
+    if ($this->rates !== null) return $this->rates;
+    $rows = [];
+    try {
+      $keys = CommercialNetIncomeSimulator::RATE_KEYS;
+      foreach ($this->db->getResults('SELECT funcion, valor FROM `' . $this->db->table('jet_cct_confi_sistema') . '` WHERE funcion IN (' . implode(',', array_fill(0, count($keys), '?')) . ')', $keys) as $row) {
+        $rows[(string) $row['funcion']] = (string) $row['valor'];
+      }
+    } catch (\Throwable $error) {
+      error_log('[commercial-net-income-rates] ' . $error->getMessage());
+    }
+    return $this->rates = CommercialNetIncomeSimulator::rates($rows);
   }
 
   /**
@@ -113,10 +145,11 @@ final class CommercialOwnerPreapprovalService
   }
 
   /**
-   * Cupo para el PDF, recalculado aquí con los valores que escribió o ajustó el consultor (no se confía en los
-   * totales del navegador). Ingreso neto de cada inmueble = canon − comisión − garantía − (seguro + intereses) / 12
-   * − otros; cupo = suma × meses de política. Plazo: meses de 30 días hasta el fin más lejano − margen.
-   * @param array<string,mixed> $input owner{name,document,phone,email}, registered, sources[{canon,comision,garantia,seguro,intereses,otros,fin,meta}]
+   * Simulación para el PDF, recalculada aquí con los valores que escribió o ajustó el consultor (no se confía en los
+   * totales del navegador). Cada inmueble se simula con las tarifas de SuCasa (`calc` = "sim") o trae los descuentos del
+   * contrato. Ingreso neto = canon − comisión − garantía − (seguro + intereses) / 12 − otros; crédito preaprobado = suma ×
+   * meses de política. Plazo: meses de 30 días hasta el fin más lejano − margen.
+   * @param array<string,mixed> $input owner{name,document,phone,email}, registered, sources[{calc,canon,…,otros,fin,meta}], uses{servicios,…}, notes
    * @return array<string,mixed>
    */
   public function estimate(array $input, int $today = 0): array
@@ -130,8 +163,13 @@ final class CommercialOwnerPreapprovalService
     $sources = [];
     foreach (array_slice(is_array($input['sources'] ?? null) ? $input['sources'] : [], 0, 30) as $source) {
       if (!is_array($source)) continue;
-      $item = [];
+      $item = ['sim' => null];
       foreach (['canon', 'comision', 'garantia', 'seguro', 'intereses', 'otros'] as $key) $item[$key] = min(9999999999.0, round(self::money($source[$key] ?? 0)));
+      if (($source['calc'] ?? '') === 'sim') {
+        $sim = CommercialNetIncomeSimulator::simulate($source, $this->rates());
+        foreach (['canon', 'comision', 'garantia', 'seguro', 'intereses'] as $key) $item[$key] = $sim[$key];
+        $item['sim'] = $sim;
+      }
       $fin = trim((string) ($source['fin'] ?? ''));
       $item['fin'] = preg_match('/^\d{4}-\d{2}-\d{2}$/', $fin) === 1 && strtotime($fin) !== false ? $fin : '';
       $item['meta'] = $text($source['meta'] ?? '', 160);
@@ -145,11 +183,18 @@ final class CommercialOwnerPreapprovalService
     $ends = array_filter(array_column($sources, 'fin'));
     $longest = $ends === [] ? '' : max($ends);
     $today = $today > 0 ? $today : (int) strtotime('today');
+    $uses = [];
+    $requested = is_array($input['uses'] ?? null) ? $input['uses'] : [];
+    foreach (array_keys(self::USES) as $key) {
+      $value = min(9999999999.0, round(self::money($requested[$key] ?? 0)));
+      if ($value > 0) $uses[$key] = $value;
+    }
     return [
       'owner' => $owner, 'registered' => !empty($input['registered']), 'sources' => $sources,
       'income_months' => $settings['income_months'], 'term_margin_months' => $settings['term_margin_months'],
-      'net' => $net, 'amount' => $net * $settings['income_months'], 'longest_end' => $longest,
+      'gross' => array_sum(array_column($sources, 'canon')), 'net' => $net, 'amount' => $net * $settings['income_months'], 'longest_end' => $longest,
       'term' => $longest === '' ? null : self::monthsUntil($today, (int) strtotime($longest)) - $settings['term_margin_months'],
+      'uses' => $uses, 'notes' => mb_substr(trim(str_replace("\r", '', (string) ($input['notes'] ?? ''))), 0, 600),
     ];
   }
 
