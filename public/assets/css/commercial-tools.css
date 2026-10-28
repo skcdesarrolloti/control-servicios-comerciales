@@ -20,70 +20,27 @@
 .ctl [hidden] { display:none !important }
 .ctl .material-symbols-outlined { font-size:20px; line-height:1 }
 
-/* Encabezado con la franja azul superior y el logo actual */
-.ctl-hero {
-  position:relative;
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:24px;
-  padding:30px 32px 28px;
-  border-radius:24px;
-  overflow:hidden;
-  background:linear-gradient(120deg,#061d49 0%,#0b2e67 55%,#1e3c76 100%);
-  color:#fff;
-  box-shadow:0 18px 40px rgba(6,29,73,.18)
-}
-.ctl-hero::before {
-  content:"";
-  position:absolute;
-  inset:0 0 auto;
-  height:6px;
-  background:linear-gradient(90deg,#3b82f6,#1e3c76 45%,var(--ctl-orange))
-}
-.ctl-hero::after {
-  content:"";
-  position:absolute;
-  right:-80px;
-  bottom:-120px;
-  width:320px;
-  height:320px;
-  border-radius:50%;
-  background:radial-gradient(circle,rgba(248,207,74,.22),transparent 65%);
-  pointer-events:none
-}
-.ctl-hero__text { position:relative; z-index:1; max-width:720px }
+/* Encabezado sin fondo: etiqueta, título y descripción sobre la página */
+.ctl-hero { padding:4px 0 0 }
+.ctl-hero__text { max-width:820px }
 .ctl-eyebrow {
   display:inline-flex;
   align-items:center;
   gap:6px;
   padding:5px 12px;
   border-radius:999px;
-  background:rgba(255,255,255,.12);
-  color:#dbe5f7;
+  background:var(--ctl-sky);
+  color:var(--ctl-blue);
   font-size:11px;
   font-weight:700;
   letter-spacing:.08em;
   text-transform:uppercase
 }
-.ctl-eyebrow .material-symbols-outlined { font-size:16px; color:var(--ctl-gold) }
-.ctl-hero h1 { margin:14px 0 8px; font-size:clamp(24px,3vw,32px); line-height:1.15; font-weight:700; color:#fff }
-.ctl-hero p { margin:0; font-size:14px; line-height:1.6; color:#d6e0f2 }
-.ctl-hero p strong { color:#fff }
+.ctl-eyebrow .material-symbols-outlined { font-size:16px; color:var(--ctl-orange) }
+.ctl-hero h1 { margin:12px 0 8px; font-size:clamp(24px,3vw,32px); line-height:1.15; font-weight:700; color:var(--ctl-navy) }
+.ctl-hero p { margin:0; font-size:14px; line-height:1.6; color:var(--ctl-muted) }
+.ctl-hero p strong { color:var(--ctl-navy) }
 .ctl-hero .ctl-ghost { margin-top:16px }
-.ctl-hero__brand { position:relative; z-index:1; flex:none }
-.ctl-logo {
-  display:block;
-  position:relative;
-  width:266px;
-  height:72px;
-  overflow:hidden;
-  border-radius:16px;
-  background:#fff;
-  box-shadow:0 10px 24px rgba(0,0,0,.18)
-}
-/* Recorte del membrete: solo el logo SK&C + SuCasa, sin la esquina naranja. */
-.ctl-logo img { position:absolute; height:94px; width:auto; max-width:none; left:-72px; top:-20px }
 
 /* Distribución */
 .ctl-layout { display:grid; grid-template-columns:minmax(0,1fr) 340px; gap:24px; align-items:start; margin-top:24px }
@@ -301,8 +258,8 @@
 .ctl-secondary { border:1px solid #cbd5e1; background:#fff; color:var(--ctl-navy) }
 .ctl-secondary:hover { background:var(--ctl-sky) }
 .ctl-wide { width:100% }
-.ctl-ghost { border:1px solid rgba(255,255,255,.35); background:rgba(255,255,255,.08); color:#fff }
-.ctl-ghost:hover { background:rgba(255,255,255,.16) }
+.ctl-ghost { border:1px solid #cbd5e1; background:#fff; color:var(--ctl-navy) }
+.ctl-ghost:hover { background:var(--ctl-sky) }
 .ctl-icon {
   display:grid;
   place-items:center;
@@ -409,8 +366,6 @@
 }
 @media (max-width:720px) {
   .ctl { padding:16px 16px 48px }
-  .ctl-hero { flex-direction:column; align-items:flex-start; padding:24px 20px }
-  .ctl-hero__brand { display:none }
   .ctl-card { padding:18px }
   .ctl-grid,
   .ctl-uses { grid-template-columns:1fr }

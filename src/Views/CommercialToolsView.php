@@ -22,8 +22,8 @@ final class CommercialToolsView
 
   public static function render(string $tool, ?CommercialOwnerPreapprovalService $service, string $baseUrl): string
   {
-    if ($tool === 'ganancia_ocasional') return self::occasionalGain($baseUrl);
-    return $service instanceof CommercialOwnerPreapprovalService ? self::netIncome($service, $baseUrl) : '';
+    if ($tool === 'ganancia_ocasional') return self::occasionalGain();
+    return $service instanceof CommercialOwnerPreapprovalService ? self::netIncome($service) : '';
   }
 
   private static function e($value): string
@@ -31,11 +31,10 @@ final class CommercialToolsView
     return htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
   }
 
-  /** Encabezado común: franja azul superior, título y logo actual de SuCasa. */
-  private static function hero(string $baseUrl, string $icon, string $title, string $text, string $aside = ''): string
+  /** Encabezado común sin fondo: etiqueta, título y descripción. */
+  private static function hero(string $icon, string $title, string $text, string $aside = ''): string
   {
-    return '<header class="ctl-hero"><div class="ctl-hero__text"><span class="ctl-eyebrow"><span class="material-symbols-outlined" aria-hidden="true">' . self::e($icon) . '</span>Herramientas</span><h1>' . self::e($title) . '</h1><p>' . $text . '</p>' . $aside . '</div>'
-      . '<div class="ctl-hero__brand" aria-hidden="true"><span class="ctl-logo"><img src="' . self::e($baseUrl . '/assets/img/membrete-sucasa-header.jpg') . '" alt=""></span></div></header>';
+    return '<header class="ctl-hero"><div class="ctl-hero__text"><span class="ctl-eyebrow"><span class="material-symbols-outlined" aria-hidden="true">' . self::e($icon) . '</span>Herramientas</span><h1>' . self::e($title) . '</h1><p>' . $text . '</p>' . $aside . '</div></header>';
   }
 
   /** Campo de dinero con su unidad visible (/ mes, 12 meses) y, si aplica, la aclaración debajo. */
@@ -55,7 +54,7 @@ final class CommercialToolsView
     return '<label class="ctl-switch"' . ($row !== '' ? ' data-pre-sim-row="' . self::e($row) . '"' : '') . '><input type="checkbox" data-pre-sim="' . self::e($field) . '"' . ($checked ? ' checked' : '') . '><span aria-hidden="true"></span>' . self::e($label) . '</label>';
   }
 
-  private static function netIncome(CommercialOwnerPreapprovalService $service, string $baseUrl): string
+  private static function netIncome(CommercialOwnerPreapprovalService $service): string
   {
     $settings = $service->settings();
     $rates = $service->rates();
@@ -70,7 +69,7 @@ final class CommercialToolsView
     for ($i = 1; $i <= 12; $i++) $installments .= '<option value="' . $i . '">' . ($i === 1 ? '1 pago (contado)' : $i . ' cuotas') . '</option>';
     ob_start(); ?>
     <section class="ctl" data-commercial-tool="preaprobado" data-income-months="<?php echo $months; ?>" data-term-margin="<?php echo (int) $settings['term_margin_months']; ?>" data-rates="<?php echo $e(json_encode($rates, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)); ?>">
-      <?php echo self::hero($baseUrl, 'savings', 'Simulador de ingreso neto del propietario', 'Calcula cuánto le queda al propietario cada mes después de la comisión, la garantía y los seguros, con las tarifas vigentes de SuCasa. Con ese ingreso accede a un <strong>crédito preaprobado de hasta ' . $months . ' veces su ingreso neto</strong> para ponerse al día con servicios públicos, administración o reparaciones.'); ?>
+      <?php echo self::hero('savings', 'Simulador de ingreso neto del propietario', 'Calcula cuánto le queda al propietario cada mes después de la comisión, la garantía y los seguros, con las tarifas vigentes de SuCasa. Con ese ingreso accede a un <strong>crédito preaprobado de hasta ' . $months . ' veces su ingreso neto</strong> para ponerse al día con servicios públicos, administración o reparaciones.'); ?>
       <div class="ctl-layout">
         <div class="ctl-main">
           <section class="ctl-card">
@@ -192,7 +191,7 @@ final class CommercialToolsView
     <?php return (string) ob_get_clean();
   }
 
-  private static function occasionalGain(string $baseUrl): string
+  private static function occasionalGain(): string
   {
     $uvt = self::UVT;
     $money = static fn(float $value): string => '$' . number_format($value, 0, ',', '.');
@@ -201,7 +200,7 @@ final class CommercialToolsView
     $switch = static fn(string $id, string $label): string => '<label class="ctl-switch"><input type="checkbox" data-go-field="' . $id . '"><span aria-hidden="true"></span>' . self::e($label) . '</label>';
     ob_start(); ?>
     <section class="ctl" data-commercial-tool="ganancia_ocasional">
-      <?php echo self::hero($baseUrl, 'calculate', 'Calculadora de ganancia ocasional', 'Estima el impuesto por la venta de un inmueble en Colombia: ganancia ocasional (15 %) si fue activo fijo por 2 años o más, o renta ordinaria si no. <strong>Herramienta informativa: debe validarla el contador del vendedor.</strong>', '<button type="button" class="ctl-ghost" data-go-guide><span class="material-symbols-outlined" aria-hidden="true">menu_book</span>Ver definiciones y guía</button>'); ?>
+      <?php echo self::hero('calculate', 'Calculadora de ganancia ocasional', 'Estima el impuesto por la venta de un inmueble en Colombia: ganancia ocasional (15 %) si fue activo fijo por 2 años o más, o renta ordinaria si no. <strong>Herramienta informativa: debe validarla el contador del vendedor.</strong>', '<button type="button" class="ctl-ghost" data-go-guide><span class="material-symbols-outlined" aria-hidden="true">menu_book</span>Ver definiciones y guía</button>'); ?>
       <div class="ctl-layout">
         <div class="ctl-main">
           <section class="ctl-card">

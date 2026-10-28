@@ -222,7 +222,7 @@ final class CommercialOwnerPreapprovalTest extends TestCase
     self::assertStringContainsString('<em>12 meses</em>', $html);
     self::assertStringContainsString('Permanece mientras la vigencia del contrato continúa.', $html);
     self::assertStringContainsString('Aplica si el seguro se difiere a 12 meses.', $html);
-    self::assertStringContainsString('membrete-sucasa-header.jpg', $html);
+    self::assertStringNotContainsString('ctl-logo', $html);
     self::assertStringContainsString('Simulador de ingreso neto del propietario', $html);
     self::assertStringContainsString('crédito preaprobado de hasta 3 veces su ingreso neto', $html);
     self::assertStringContainsString('data-rates="{&quot;iva&quot;:19', $html);
