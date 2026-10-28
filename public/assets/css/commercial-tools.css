@@ -174,9 +174,6 @@
 .ctl-source__head strong { display:block; font-size:14px; color:var(--ctl-navy) }
 .ctl-source__head span { display:block; margin-top:2px; font-size:12px; color:var(--ctl-muted) }
 .ctl-source__body { display:grid; gap:16px; padding:18px }
-.ctl-segment--sm { margin:0; justify-self:start }
-.ctl-segment--sm button { min-height:36px; padding:0 12px; font-size:12.5px }
-.ctl-segment--sm .material-symbols-outlined { font-size:18px }
 .ctl-rates { margin:0; padding:10px 12px; border-radius:10px; background:#f8fafc }
 .ctl-source .ctl-switches { margin:0 }
 .ctl-source .ctl-alert { margin:0 }

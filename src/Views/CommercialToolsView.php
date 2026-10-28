@@ -68,7 +68,7 @@ final class CommercialToolsView
     $installments = '';
     for ($i = 1; $i <= 12; $i++) $installments .= '<option value="' . $i . '">' . ($i === 1 ? '1 pago (contado)' : $i . ' cuotas') . '</option>';
     ob_start(); ?>
-    <section class="ctl" data-commercial-tool="preaprobado" data-income-months="<?php echo $months; ?>" data-term-margin="<?php echo (int) $settings['term_margin_months']; ?>" data-rates="<?php echo $e(json_encode($rates, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)); ?>">
+    <section class="ctl" data-commercial-tool="simulador_ingreso_neto" data-income-months="<?php echo $months; ?>" data-term-margin="<?php echo (int) $settings['term_margin_months']; ?>" data-rates="<?php echo $e(json_encode($rates, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)); ?>">
       <?php echo self::hero('savings', 'Simulador de ingreso neto del propietario', 'Calcula cuánto le queda al propietario cada mes después de la comisión, la garantía y los seguros, con las tarifas vigentes de SuCasa. Con ese ingreso accede a un <strong>crédito preaprobado de hasta ' . $months . ' veces su ingreso neto</strong> para ponerse al día con servicios públicos, administración o reparaciones.'); ?>
       <div class="ctl-layout">
         <div class="ctl-main">
@@ -93,7 +93,7 @@ final class CommercialToolsView
           </section>
 
           <section class="ctl-card">
-            <div class="ctl-card__head"><span class="ctl-step">2</span><div><h2>Ingreso neto por inmueble</h2><p>Simula cada inmueble con las tarifas de SuCasa (comisión con IVA, garantía según la aseguradora, Berkley o Seguros Mundial y seguro de servicios públicos) o usa los valores de su contrato. El seguro se reparte en los 12 meses.</p></div></div>
+            <div class="ctl-card__head"><span class="ctl-step">2</span><div><h2>Ingreso neto por inmueble</h2><p>Simula cada inmueble con las tarifas de SuCasa (comisión con IVA, garantía según la aseguradora, Berkley o Seguros Mundial y seguro de servicios públicos). Los contratos de un propietario registrado llegan con su canon, la comisión de su mandato y sus coberturas. El seguro se reparte en los 12 meses.</p></div></div>
             <div class="ctl-sources" data-pre-sources>
               <div class="ctl-empty" data-pre-empty><span class="material-symbols-outlined" aria-hidden="true">home_work</span><p>Busca al propietario para cargar sus contratos vigentes, o agrega un inmueble para simularlo.</p></div>
             </div>
@@ -141,23 +141,19 @@ final class CommercialToolsView
       </div>
 
       <template data-pre-source-template>
-        <article class="ctl-source" data-pre-source data-calc="sim">
+        <article class="ctl-source" data-pre-source>
           <header class="ctl-source__head">
             <div><strong data-pre-source-title>Inmueble</strong><span data-pre-source-meta></span></div>
             <button type="button" class="ctl-icon" data-pre-remove aria-label="Quitar inmueble" title="Quitar inmueble"><span class="material-symbols-outlined" aria-hidden="true">close</span></button>
           </header>
           <div class="ctl-source__body">
-            <div class="ctl-segment ctl-segment--sm" role="group" aria-label="Cómo calcular los descuentos">
-              <button type="button" data-pre-calc="sim" aria-pressed="true"><span class="material-symbols-outlined" aria-hidden="true">calculate</span>Simular con tarifas SuCasa</button>
-              <button type="button" data-pre-calc="fijo" aria-pressed="false"><span class="material-symbols-outlined" aria-hidden="true">receipt_long</span>Valores del contrato</button>
-            </div>
             <div class="ctl-grid">
               <?php echo self::moneyField('canon', 'Canon mensual', '/ mes'); ?>
               <label class="ctl-field"><span class="ctl-label">Fin del contrato</span><span class="ctl-input"><input type="date" data-pre-field="fin"></span><small class="ctl-note">Opcional: con la fecha se estima el plazo máximo.</small></label>
             </div>
-            <div class="ctl-grid" data-pre-panel="sim">
+            <div class="ctl-grid">
               <?php echo self::moneyField('administracion', 'Administración', '/ mes', 'La comisión se calcula sobre canon + administración.', 'data-pre-sim'); ?>
-              <label class="ctl-field"><span class="ctl-label">Tasa de comisión</span><span class="ctl-input"><input data-pre-sim="tasa" inputmode="decimal" maxlength="6" autocomplete="off" value="<?php echo $e($rateText); ?>"><em>% + IVA</em></span></label>
+              <label class="ctl-field"><span class="ctl-label">Tasa de comisión</span><span class="ctl-input"><input data-pre-sim="tasa" inputmode="decimal" maxlength="8" autocomplete="off" value="<?php echo $e($rateText); ?>"><em>% + IVA</em></span></label>
               <?php echo self::selectField('modalidad', 'Modalidad / aseguradora principal', $modalities); ?>
               <?php echo self::selectField('aseguradora', 'Aseguradora', $insurers, 'defecto'); ?>
               <div class="ctl-switches ctl-full">
@@ -168,12 +164,6 @@ final class CommercialToolsView
               <?php echo str_replace('<label class="ctl-field"', '<label class="ctl-field" data-pre-sim-row="valor"', self::moneyField('valor', 'Valor asegurado de servicios', '', '', 'data-pre-sim')); ?>
               <?php echo self::selectField('cuotas', 'Forma de pago del seguro', $installments, 'cuotas'); ?>
               <p class="ctl-note ctl-full ctl-rates" data-pre-sim-rates></p>
-            </div>
-            <div class="ctl-grid" data-pre-panel="fijo" hidden>
-              <?php echo self::moneyField('comision', 'Comisión de administración (IVA incluido)', '/ mes'); ?>
-              <?php echo self::moneyField('garantia', 'Garantía inmobiliaria', '/ mes'); ?>
-              <?php echo self::moneyField('seguro', 'Seguro', '12 meses', 'Valor de los 12 meses. Permanece mientras la vigencia del contrato continúa.'); ?>
-              <?php echo self::moneyField('intereses', 'Intereses', '12 meses', 'Aplica si el seguro se difiere a 12 meses.'); ?>
             </div>
             <div class="ctl-grid">
               <?php echo self::moneyField('otros', 'Otros descuentos', '/ mes'); ?>

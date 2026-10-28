@@ -215,19 +215,19 @@ final class CommercialOwnerPreapprovalTest extends TestCase
   public function testViewsShowTheBossRequestedUnitsAndNotes(): void
   {
     $html = CommercialToolsView::render('simulador_ingreso_neto', $this->service(), 'https://example.test');
-    self::assertStringContainsString('data-commercial-tool="preaprobado"', $html);
+    self::assertStringContainsString('data-commercial-tool="simulador_ingreso_neto"', $html);
     self::assertStringContainsString('data-income-months="3"', $html);
     self::assertStringContainsString('Canon mensual</span><span class="ctl-input"><input data-pre-field="canon"', $html);
     self::assertStringContainsString('<em>/ mes</em>', $html);
-    self::assertStringContainsString('<em>12 meses</em>', $html);
-    self::assertStringContainsString('Permanece mientras la vigencia del contrato continúa.', $html);
-    self::assertStringContainsString('Aplica si el seguro se difiere a 12 meses.', $html);
+    // Un solo cálculo: la simulación con las tarifas de SuCasa (sin la opción "Valores del contrato").
+    self::assertStringNotContainsString('data-pre-calc', $html);
+    self::assertStringNotContainsString('Valores del contrato', $html);
     self::assertStringNotContainsString('ctl-logo', $html);
     self::assertStringContainsString('Simulador de ingreso neto del propietario', $html);
     self::assertStringContainsString('crédito preaprobado de hasta 3 veces su ingreso neto', $html);
     self::assertStringContainsString('data-rates="{&quot;iva&quot;:19', $html);
     self::assertStringContainsString('<option value="El Libertador">', $html);
-    self::assertStringContainsString('data-pre-sim="tasa" inputmode="decimal" maxlength="6" autocomplete="off" value="10"', $html);
+    self::assertStringContainsString('data-pre-sim="tasa" inputmode="decimal" maxlength="8" autocomplete="off" value="10"', $html);
     self::assertStringContainsString('data-pre-use="reparaciones"', $html);
 
     $gain = CommercialToolsView::render('ganancia_ocasional', null, 'https://example.test');

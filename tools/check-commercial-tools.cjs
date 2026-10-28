@@ -11,7 +11,7 @@ const { chromium } = require(process.env.SCM_PLAYWRIGHT_MODULE || 'playwright');
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
     await page.goto('http://127.0.0.1:8771/tests/Fixtures/commercial-tools.php');
-    const tool = page.locator('[data-commercial-tool="preaprobado"]');
+    const tool = page.locator('[data-commercial-tool="simulador_ingreso_neto"]');
     await tool.waitFor();
     assert.equal(await page.locator('[data-commercial-dropdown-menu="herramientas"] a').count(), 2);
     assert.match(await page.locator('[data-commercial-dropdown-menu="herramientas"]').textContent(), /Simulador de ingreso neto/);
@@ -19,7 +19,7 @@ const { chromium } = require(process.env.SCM_PLAYWRIGHT_MODULE || 'playwright');
     assert.match(await page.locator('[data-commercial-dropdown-menu="herramientas"] a').first().getAttribute('href'), /[?&]tab=simulador_ingreso_neto$/);
     assert.equal(await tool.locator('[data-pre-total]').innerText(), '$0');
 
-    // Propietario registrado: se cargan sus dos contratos vigentes con los valores del contrato (regla del liquidador).
+    // Propietario registrado: sus dos contratos vigentes llenan el simulador (canon, comisión del mandato y coberturas).
     await tool.locator('[data-pre-document]').fill('12');
     await tool.locator('[data-pre-search-button]').click();
     await page.waitForFunction(() => document.querySelector('[data-pre-status]').textContent.includes('mínimo 4'));
@@ -27,19 +27,23 @@ const { chromium } = require(process.env.SCM_PLAYWRIGHT_MODULE || 'playwright');
     await tool.locator('[data-pre-document]').press('Enter');
     await page.waitForFunction(() => document.querySelectorAll('[data-pre-sources] [data-pre-source]').length === 2);
     assert.equal(await tool.locator('[data-pre-owner="name"]').inputValue(), 'Ana Propietaria');
-    // (2.000.000 − 250.000 − 40.000 − 180.000 / 12) + (1.000.000 − 150.000) = 2.545.000 × 3
-    assert.equal(await tool.locator('[data-pre-net]').innerText(), '$2.545.000');
-    assert.equal(await tool.locator('[data-pre-total]').innerText(), '$7.635.000');
+    assert.equal(await tool.locator('[data-pre-calc]').count(), 0);
+    const contract = tool.locator('[data-pre-source]').first();
+    // Mandato: comisión $250.000 con IVA sobre $2.000.000 → tasa 10,5042 %; tiene garantía y seguro de servicios.
+    assert.equal(await contract.locator('[data-pre-sim="tasa"]').inputValue(), '10,5042');
+    assert.equal(await contract.locator('[data-pre-sim="garantia"]').isChecked(), true);
+    assert.equal(await contract.locator('[data-pre-sim="servicios"]').isChecked(), true);
+    assert.match(await contract.locator('[data-pre-source-warning]').innerText(), /valor asegurado/);
+    // (2.000.000 − 250.000 − garantía 50.000) + sin mandato (1.000.000 − 119.000 − 25.000) = 2.556.000 × 3
+    assert.equal(await tool.locator('[data-pre-net]').innerText(), '$2.556.000');
+    assert.equal(await tool.locator('[data-pre-total]').innerText(), '$7.668.000');
     assert.match(await tool.locator('[data-pre-term]').innerText(), /^Hasta 1[12] cuotas$/);
-    assert.equal(await tool.locator('[data-pre-source]').first().locator('[data-pre-field="seguro"]').inputValue(), '$180.000');
-    assert.equal(await tool.locator('[data-pre-source]').first().getAttribute('data-calc'), 'fijo');
     assert.equal(await tool.locator('[data-pre-gross]').innerText(), '$3.000.000');
+    // El consultor completa el valor asegurado: prima 2 % de $3.000.000 = $60.000 al año ($5.000 / mes).
+    await contract.locator('[data-pre-sim="valor"]').fill('3000000');
+    assert.equal(await contract.locator('[data-pre-source-warning]').isVisible(), false);
+    assert.equal(await tool.locator('[data-pre-net]').innerText(), '$2.551.000');
     await page.screenshot({ path: 'output/commercial-tools-preapproval.png', fullPage: true });
-
-    // El consultor ajusta un valor: el seguro diferido con intereses baja el neto.
-    await tool.locator('[data-pre-source]').first().locator('[data-pre-field="intereses"]').fill('12000');
-    assert.equal(await tool.locator('[data-pre-source]').first().locator('[data-pre-field="intereses"]').inputValue(), '$12.000');
-    assert.equal(await tool.locator('[data-pre-net]').innerText(), '$2.544.000');
 
     const [download] = await Promise.all([page.waitForEvent('download', { timeout: 30000 }), tool.locator('[data-pre-pdf]').click()]);
     assert.match(download.suggestedFilename(), /^simulacion-ingreso-neto-1-143-415-938-\d{4}-\d{2}-\d{2}\.pdf$/);
@@ -51,7 +55,6 @@ const { chromium } = require(process.env.SCM_PLAYWRIGHT_MODULE || 'playwright');
     assert.equal(await tool.locator('[data-pre-search]').isVisible(), false);
     assert.equal(await tool.locator('[data-pre-source]').count(), 1);
     const first = tool.locator('[data-pre-source]').first();
-    assert.equal(await first.getAttribute('data-calc'), 'sim');
     await tool.locator('[data-pre-owner="name"]').fill('Carlos Nuevo');
     await first.locator('[data-pre-field="canon"]').fill('1500000');
     // Comisión 10 % + IVA = 178.500 y garantía El Libertador 2,5 % = 37.500.
@@ -73,17 +76,12 @@ const { chromium } = require(process.env.SCM_PLAYWRIGHT_MODULE || 'playwright');
     assert.equal(await first.locator('[data-pre-source-net]').innerText(), '$1.260.250');
     await first.locator('[data-pre-sim="modalidad"]').selectOption('defecto');
     await page.screenshot({ path: 'output/commercial-tools-simulation.png', fullPage: true });
-    // Valores conocidos del contrato en lugar de la simulación.
-    await first.locator('[data-pre-calc="fijo"]').click();
-    await first.locator('[data-pre-field="comision"]').fill('150000');
-    assert.equal(await tool.locator('[data-pre-total]').innerText(), '$4.050.000');
     assert.equal(await tool.locator('[data-pre-term]').innerText(), 'Según vigencia');
+    // Otro inmueble: $500.000 − 59.500 − 12.500 = 428.000 / mes.
     await tool.locator('[data-pre-add]').click();
     await tool.locator('[data-pre-source]').nth(1).locator('[data-pre-field="canon"]').fill('500000');
-    assert.equal(await tool.locator('[data-pre-total]').innerText(), '$5.334.000');
+    assert.equal(await tool.locator('[data-pre-total]').innerText(), '$5.136.000');
     await tool.locator('[data-pre-source]').nth(1).locator('[data-pre-remove]').click();
-    assert.equal(await tool.locator('[data-pre-total]').innerText(), '$4.050.000');
-    await first.locator('[data-pre-calc="sim"]').click();
     assert.equal(await tool.locator('[data-pre-total]').innerText(), '$3.852.000');
     // Lo que necesita el propietario y si su crédito preaprobado lo cubre.
     await tool.locator('[data-pre-use="reparaciones"]').fill('1000000');

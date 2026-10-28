@@ -157,16 +157,13 @@
   function sourceValues(root, card) {
     var value = function (name) { var input = card.querySelector('[data-pre-field="' + name + '"]'); return input ? digits(input.value) : 0; };
     var item = {
-      calc: card.dataset.calc === "fijo" ? "fijo" : "sim",
-      canon: value("canon"), comision: value("comision"), garantia: value("garantia"), seguro: value("seguro"), intereses: value("intereses"), otros: value("otros"), cuota: 0, cuotas: 0, sim: null, warnings: [],
+      canon: value("canon"), otros: value("otros"),
       fin: (card.querySelector('[data-pre-field="fin"]') || {}).value || "",
       meta: card.querySelector("[data-pre-source-meta]").textContent, fromContract: card.dataset.contract === "1",
     };
-    if (item.calc === "sim") {
-      var sim = simulate(root, card, item.canon);
-      item.sim = sim;
-      ["comision", "garantia", "seguro", "intereses", "cuota", "cuotas", "warnings"].forEach(function (key) { item[key] = sim[key]; });
-    }
+    var sim = simulate(root, card, item.canon);
+    item.sim = sim;
+    ["comision", "garantia", "seguro", "intereses", "cuota", "cuotas", "warnings"].forEach(function (key) { item[key] = sim[key]; });
     item.seguroMes = (item.seguro + item.intereses) / 12;
     item.net = Math.max(0, item.canon - item.comision - item.garantia - item.seguroMes - item.otros);
     return item;
@@ -177,11 +174,11 @@
   }
 
   function renderSource(root, card) {
-    if (card.dataset.calc !== "fijo") syncSimFields(root, card);
+    syncSimFields(root, card);
     var item = sourceValues(root, card);
     var rows = breakdownRow("Canon mensual", money(item.canon));
-    if (item.comision > 0) rows += breakdownRow("(−) Comisión de administración", money(item.comision), item.sim ? percent(item.sim.tasa) + " + IVA" + (digits(simField(card, "administracion").value) > 0 ? ", sobre canon + administración" : "") : "IVA incluido");
-    if (item.garantia > 0) rows += breakdownRow("(−) Garantía inmobiliaria", money(item.garantia), item.sim ? item.sim.aseguradora : "");
+    if (item.comision > 0) rows += breakdownRow("(−) Comisión de administración", money(item.comision), percent(item.sim.tasa) + " + IVA" + (digits(simField(card, "administracion").value) > 0 ? ", sobre canon + administración" : ""));
+    if (item.garantia > 0) rows += breakdownRow("(−) Garantía inmobiliaria", money(item.garantia), item.sim.aseguradora);
     if (item.seguro > 0) rows += breakdownRow("(−) Seguro" + (item.intereses > 0 ? " e intereses" : ""), money(item.seguroMes), item.cuotas > 0 ? money(item.seguro + item.intereses) + " en " + (item.cuotas === 1 ? "1 pago" : item.cuotas + " cuotas de " + money(item.cuota)) + ", repartido en 12 meses" : money(item.seguro + item.intereses) + " en 12 meses");
     if (item.otros > 0) rows += breakdownRow("(−) Otros descuentos", money(item.otros));
     card.querySelector("[data-pre-breakdown]").innerHTML = item.canon > 0 ? rows : "";
@@ -246,31 +243,26 @@
     return state;
   }
 
-  function setCalc(root, card, calc) {
-    card.dataset.calc = calc;
-    card.querySelectorAll("[data-pre-calc]").forEach(function (button) { button.setAttribute("aria-pressed", button.dataset.preCalc === calc ? "true" : "false"); });
-    card.querySelector('[data-pre-panel="sim"]').hidden = calc !== "sim";
-    card.querySelector('[data-pre-panel="fijo"]').hidden = calc !== "fijo";
-    // El 15 % sin mandato reemplaza la comisión del liquidador: al simular, la comisión ya se calcula.
-    if (calc === "sim" && card.dataset.ruleOtros === "1") { card.querySelector('[data-pre-field="otros"]').value = ""; card.dataset.ruleOtros = ""; }
-  }
-
   function addSource(root, data) {
     var template = root.querySelector("[data-pre-source-template]");
     var card = template.content.firstElementChild.cloneNode(true);
     var list = root.querySelector("[data-pre-sources]");
     data = data || {};
-    ["canon", "comision", "garantia", "seguro", "intereses", "otros"].forEach(function (name) {
-      var input = card.querySelector('[data-pre-field="' + name + '"]');
-      input.value = Number(data[name]) > 0 ? money(data[name]) : "";
-    });
+    var canon = Number(data.canon) || 0;
+    card.querySelector('[data-pre-field="canon"]').value = canon > 0 ? money(canon) : "";
     card.querySelector('[data-pre-field="fin"]').value = data.fin || "";
     card.dataset.contract = data.contrato ? "1" : "";
-    card.dataset.ruleOtros = data.contrato && !(Number(data.comision) > 0) && Number(data.otros) > 0 ? "1" : "";
+    // Un contrato con mandato llena el simulador con su comisión (tasa sobre el canon, sin IVA) y sus coberturas;
+    // sin mandato se simula con la tasa y las coberturas por defecto.
+    var commission = Number(data.comision) || 0;
+    if (data.contrato && commission > 0 && canon > 0) {
+      var rate = commission / (canon * (1 + (Number(rates(root).iva) || 0) / 100)) * 100;
+      simField(card, "tasa").value = String(Math.round(rate * 10000) / 10000).replace(".", ",");
+      simField(card, "garantia").checked = Number(data.garantia) > 0;
+      simField(card, "servicios").checked = Number(data.seguro) > 0;
+    }
     card.querySelector("[data-pre-source-meta]").textContent = data.contrato ? ["Contrato " + data.contrato, data.inmueble ? "SIMI " + data.inmueble : "", data.direccion, data.estado].filter(Boolean).join(" · ") : "Simulación con las tarifas de SuCasa";
     list.append(card);
-    // Los contratos traen los descuentos de su mandato; los inmuebles nuevos se simulan.
-    setCalc(root, card, data.contrato ? "fijo" : "sim");
     renumber(root);
     return card;
   }
@@ -355,7 +347,7 @@
   function shareMessage(state) {
     var lines = [state.owner.name ? "Hola " + state.owner.name + "," : "Hola,", "", "Te comparto la simulación de tu ingreso neto con SKC SuCasa Inmobiliaria:"];
     state.sources.forEach(function (item, index) {
-      lines.push("- Inmueble " + (index + 1) + (item.fromContract && item.meta ? " (" + item.meta + ")" : "") + ": canon " + money(item.canon) + " → neto " + money(item.net) + " / mes" + (item.sim ? " (" + item.sim.modalidad + (item.sim.aseguradora !== item.sim.modalidad ? ", " + item.sim.aseguradora : "") + ")" : ""));
+      lines.push("- Inmueble " + (index + 1) + (item.fromContract && item.meta ? " (" + item.meta + ")" : "") + ": canon " + money(item.canon) + " → neto " + money(item.net) + " / mes (" + item.sim.modalidad + (item.sim.aseguradora !== item.sim.modalidad ? ", " + item.sim.aseguradora : "") + ")");
     });
     lines.push("", "Ingreso neto mensual: " + money(state.net));
     lines.push("Con este ingreso cuentas con un crédito preaprobado de hasta " + money(state.amount) + " (" + state.months + " meses de tu ingreso neto) para ponerte al día con servicios públicos, cuotas de administración, reparaciones o cualquier imprevisto del inmueble" + (state.term > 0 ? ", hasta en " + state.term + " cuotas." : "."));
@@ -416,13 +408,12 @@
       data.set("payload", JSON.stringify({
         owner: state.owner, registered: state.registered, uses: state.uses, notes: state.notes,
         sources: state.sources.map(function (item, index) {
-          var source = { calc: item.calc, canon: item.canon, otros: item.otros, fin: item.fin, meta: item.fromContract ? item.meta : "" };
-          if (item.calc === "fijo") return Object.assign(source, { comision: item.comision, garantia: item.garantia, seguro: item.seguro, intereses: item.intereses });
           var card = cards[index];
-          return Object.assign(source, {
+          return {
+            calc: "sim", canon: item.canon, otros: item.otros, fin: item.fin, meta: item.fromContract ? item.meta : "",
             administracion: digits(simField(card, "administracion").value), tasa_comision: simField(card, "tasa").value, modalidad: simField(card, "modalidad").value, aseguradora: simField(card, "aseguradora").value,
             iva_canon: simField(card, "iva").checked, garantia: simField(card, "garantia").checked, servicios: simField(card, "servicios").checked, valor_asegurado: digits(simField(card, "valor").value), cuotas: Number(simField(card, "cuotas").value) || 1,
-          });
+          };
         }),
       }));
       var response = await fetch(runtime.ajaxUrl || "api.php", { method: "POST", body: data, credentials: "same-origin" });
@@ -529,14 +520,12 @@
   document.addEventListener("click", function (event) {
     var target = event.target instanceof Element ? event.target : null;
     if (!target) return;
-    var pre = target.closest('[data-commercial-tool="preaprobado"]');
+    var pre = target.closest('[data-commercial-tool="simulador_ingreso_neto"]');
     if (pre) {
       var mode = target.closest("[data-pre-mode]");
       if (mode) { if ((pre.dataset.mode || "registrado") !== mode.dataset.preMode) setMode(pre, mode.dataset.preMode); return; }
       if (target.closest("[data-pre-search-button]")) { search(pre); return; }
       if (target.closest("[data-pre-add]")) { addSource(pre).querySelector('[data-pre-field="canon"]').focus(); recalc(pre); return; }
-      var calc = target.closest("[data-pre-calc]");
-      if (calc) { setCalc(pre, calc.closest("[data-pre-source]"), calc.dataset.preCalc); recalc(pre); return; }
       var copy = target.closest("[data-pre-copy]");
       if (copy) { copyMessage(pre, copy); return; }
       var remove = target.closest("[data-pre-remove]");
@@ -556,7 +545,7 @@
   document.addEventListener("keydown", function (event) {
     if (event.key !== "Enter" || !(event.target instanceof Element) || !event.target.matches("[data-pre-document]")) return;
     event.preventDefault();
-    search(event.target.closest('[data-commercial-tool="preaprobado"]'));
+    search(event.target.closest('[data-commercial-tool="simulador_ingreso_neto"]'));
   });
 
   document.addEventListener("input", function (event) {
@@ -564,7 +553,7 @@
     var root = target && target.closest("[data-commercial-tool]");
     if (!root) return;
     if (target.matches("[data-tool-money]")) formatMoney(target, true);
-    if (root.dataset.commercialTool === "preaprobado") { showError(root, ""); recalc(root); }
+    if (root.dataset.commercialTool === "simulador_ingreso_neto") { showError(root, ""); recalc(root); }
     else calculateGain(root);
   });
 
