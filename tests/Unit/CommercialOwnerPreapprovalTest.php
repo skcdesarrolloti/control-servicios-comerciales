@@ -46,27 +46,31 @@ final class CommercialOwnerPreapprovalTest extends TestCase
   {
     $result = $this->service()->lookup('1.143.415.938');
     self::assertSame(['name'=>'Ana Propietaria', 'document'=>'1.143.415.938', 'email'=>'ana@example.test', 'phone'=>'573145106244'], $result['owner']);
-    self::assertSame([1, 2], array_column($result['contracts'], 'id'));
-    $mandate = $result['contracts'][0];
+    // Primero los Entregado; el Por entregar llega sin canon ni datos del mandato para escribirlos como inmueble nuevo.
+    self::assertSame([4, 1, 2], array_column($result['contracts'], 'id'));
+    $byId = array_column($result['contracts'], null, 'id');
+    $mandate = $byId[1];
+    self::assertSame([false, false, true], array_column($result['contracts'], 'por_entregar'));
+    self::assertEquals([0, 0, 0, null], [$byId[2]['canon'], $byId[2]['administracion'], $byId[2]['otros'], $byId[2]['servicios']]);
     // Póliza de servicios: 4 cuotas de $15.000 desde el inicio (hace 65 días): lleva 2 y aún se descuenta la prima.
     self::assertEquals([2000000, 250000, 40000, 60000, 0, 0], [$mandate['canon'], $mandate['comision'], $mandate['garantia'], $mandate['seguro'], $mandate['intereses'], $mandate['otros']]);
     self::assertEquals(['estado'=>'pendiente', 'cuotas'=>4, 'pagadas'=>2, 'valor'=>3000000, 'prima'=>60000, 'inicio'=>date('Y-m-d', strtotime('-65 days'))], $mandate['servicios']);
-    self::assertNull($result['contracts'][1]['servicios']);
+    self::assertNull($byId[4]['servicios']);
     // Pasadas las 4 cuotas desde el inicio, la póliza está pagada y no se descuenta.
     $this->db->update('wp_jet_cct_contratos_arrendamiento', ['inicio_contrato'=>(string) strtotime('-5 months')], ['_ID'=>1]);
-    $paid = $this->service()->lookup('1143415938')['contracts'][0];
+    $paid = $this->service()->lookup('1143415938')['contracts'][1];
     self::assertSame(['pagada', 4, 0.0], [$paid['servicios']['estado'], $paid['servicios']['pagadas'], $paid['seguro']]);
     // Sin fecha de inicio no se puede saber: se deja la prima y se avisa.
     $this->db->update('wp_jet_cct_contratos_arrendamiento', ['inicio_contrato'=>''], ['_ID'=>1]);
-    self::assertSame('sin_inicio', $this->service()->lookup('1143415938')['contracts'][0]['servicios']['estado']);
+    self::assertSame('sin_inicio', $this->service()->lookup('1143415938')['contracts'][1]['servicios']['estado']);
     self::assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2}$/', $mandate['fin']);
     self::assertGreaterThanOrEqual(13, $mandate['max_months']);
     // Por entregar: los meses del contrato se cuentan desde su inicio, no desde hoy (12, no 14; el plazo será 12 − 2).
     $this->db->update('wp_jet_cct_contratos_arrendamiento', ['inicio_contrato'=>(string) strtotime('+60 days 00:00:00'), 'fin_contrato'=>(string) strtotime('+425 days 00:00:00')], ['_ID'=>2]);
-    self::assertSame(12, $this->service()->lookup('1143415938')['contracts'][1]['max_months']);
+    self::assertSame(12, $this->service()->lookup('1143415938')['contracts'][2]['max_months']);
     $this->db->update('wp_jet_cct_contratos_arrendamiento', ['inicio_contrato'=>'', 'fin_contrato'=>''], ['_ID'=>2]);
     // Sin mandato se descuenta el 15 % del canon por defecto.
-    self::assertEquals([1000000, 0, 150000], [$result['contracts'][1]['canon'], $result['contracts'][1]['comision'], $result['contracts'][1]['otros']]);
+    self::assertEquals([800000, 0, 120000], [$byId[4]['canon'], $byId[4]['comision'], $byId[4]['otros']]);
     self::assertSame(0, $result['active_credits']);
   }
 
@@ -93,7 +97,7 @@ final class CommercialOwnerPreapprovalTest extends TestCase
     $this->db->update('wp_jet_cct_confi_sistema', ['valor'=>json_encode(['owner_credit_settings'=>['income_months'=>4, 'term_margin_months'=>1, 'no_mandate_deduction'=>'20']], JSON_THROW_ON_ERROR)], ['funcion'=>'control_servicios_config']);
     $service = $this->service();
     self::assertSame(['income_months'=>4, 'term_margin_months'=>1, 'no_mandate_deduction'=>0.2], $service->settings());
-    self::assertEquals(200000, $service->lookup('1143415938')['contracts'][1]['otros']);
+    self::assertEquals(160000, $service->lookup('1143415938')['contracts'][0]['otros']);
   }
 
   public function testEstimateRecalculatesTheCupoOnTheServer(): void

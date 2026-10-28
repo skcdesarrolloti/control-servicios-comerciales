@@ -266,7 +266,9 @@
       if (options.indexOf(months) < 0) { duration.append(new Option(months + (months === 1 ? " mes" : " meses") + " (restantes)", String(months))); }
       duration.value = String(months);
     }
-    card.dataset.contract = data.contrato ? "1" : "";
+    // Los contratos Por entregar se simulan como un inmueble nuevo: el consultor escribe canon y administración.
+    var pending = !!data.por_entregar;
+    card.dataset.contract = data.contrato && !pending ? "1" : "";
     // Un contrato con mandato llena el simulador con su administración, su comisión (tasa sobre canon + administración,
     // sin IVA) y sus coberturas; sin mandato se simula con la tasa y las coberturas por defecto.
     var commission = Number(data.comision) || 0;
@@ -279,7 +281,7 @@
     }
     // Póliza de servicios del mandato: se paga una sola vez en N cuotas desde el inicio del contrato. Si ya pasaron
     // esos meses está pagada y no se descuenta; si no, se simula con su valor asegurado y sus cuotas.
-    var policy = data.contrato ? data.servicios : null;
+    var policy = data.contrato && !pending ? data.servicios : null;
     simField(card, "servicios").checked = !!policy && policy.estado !== "pagada";
     if (policy) {
       if (Number(policy.valor) > 0) simField(card, "valor").value = money(policy.valor);
@@ -291,6 +293,11 @@
         : policy.estado === "pendiente" ? "Póliza de servicios públicos en " + count + " desde el inicio del contrato (" + start + "): lleva " + policy.pagadas + " y le faltan " + (policy.cuotas - policy.pagadas) + "."
         : "El contrato no tiene fecha de inicio: no se puede saber si ya pagó la póliza de servicios públicos (" + count + "). Si ya la pagó, desactívala.";
       info.hidden = false;
+    }
+    if (pending) {
+      var note = card.querySelector("[data-pre-source-policy]");
+      note.textContent = "Contrato por entregar: escribe el canon y la administración para simularlo como un inmueble nuevo, con las tarifas de SuCasa.";
+      note.hidden = false;
     }
     card.querySelector("[data-pre-source-meta]").textContent = data.contrato ? ["Contrato " + data.contrato, data.inmueble ? "SIMI " + data.inmueble : "", data.direccion, data.estado].filter(Boolean).join(" · ") : "Simulación con las tarifas de SuCasa";
     list.append(card);
@@ -372,7 +379,14 @@
       }
       ["name", "document", "phone", "email"].forEach(function (key) { root.querySelector('[data-pre-owner="' + key + '"]').value = result.owner[key] || ""; });
       contracts.forEach(function (contract) { addSource(root, contract); });
-      setStatus(root, result.owner.name + (contracts.length === 1 ? " es propietario en 1 contrato vigente." : " es propietario en " + contracts.length + " contratos vigentes: todos suman a su ingreso neto."));
+      var pendingCount = contracts.filter(function (contract) { return contract.por_entregar; }).length;
+      var active = contracts.length - pendingCount;
+      var parts = [];
+      if (active) parts.push(active === 1 ? "1 contrato entregado" : active + " contratos entregados");
+      if (pendingCount) parts.push(pendingCount === 1 ? "1 por entregar" : pendingCount + " por entregar");
+      setStatus(root, result.owner.name + " es propietario en " + parts.join(" y ") + (pendingCount ? ". Escribe el canon y la administración de los contratos por entregar." : "."));
+      var firstPending = root.querySelector('[data-pre-source]:not([data-contract="1"]) [data-pre-field="canon"]');
+      if (pendingCount && firstPending && !active) firstPending.focus();
       recalc(root);
     } catch (error) {
       setStatus(root, error.message, true);
@@ -402,6 +416,8 @@
 
   function validState(root, state) {
     if (!state.sources.length) { showError(root, "Agrega al menos un inmueble con su canon."); return false; }
+    var empty = state.sources.findIndex(function (item) { return !(item.canon > 0); });
+    if (empty >= 0) { showError(root, "Escribe el canon del inmueble " + (empty + 1) + " o quítalo."); return false; }
     if (!(state.net > 0)) { showError(root, "El ingreso neto es $0: revisa el canon y los descuentos."); return false; }
     return true;
   }

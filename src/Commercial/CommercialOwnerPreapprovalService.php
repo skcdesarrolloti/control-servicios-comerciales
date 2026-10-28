@@ -120,25 +120,40 @@ final class CommercialOwnerPreapprovalService
       array_push($args, ...array_map('strval', array_keys($ids)));
     }
     $result = ['owner' => null, 'contracts' => [], 'active_credits' => 0];
+    $ownerMatched = false;
     if ($where === []) return $result;
     $noMandate = $this->settings()['no_mandate_deduction'];
-    // Solo contratos vigentes o por iniciar: de los demás no hay canon del cual descontar.
+    // Solo contratos vigentes (Entregado) o por iniciar. Los Por entregar aún no tienen ingreso real: llegan sin canon
+    // ni datos del mandato (`por_entregar`) para que el consultor escriba canon y administración y los simule como un
+    // inmueble nuevo.
     foreach ($this->db->getResults("SELECT * FROM `{$contracts}` WHERE (" . implode(' OR ', $where) . ") AND LOWER(TRIM(`estado`)) IN ('entregado', 'por entregar') ORDER BY (LOWER(TRIM(`estado`)) = 'entregado') DESC, `_ID` DESC LIMIT 30", $args) as $contract) {
       $candidates = $this->contractOwners($contract);
       $owner = null;
       foreach ($candidates as $candidate) if (self::document($candidate['document']) === $document) $owner = $candidate;
+      $matched = $owner !== null;
       // El documento estaba en el contrato o en la ficha del propietario: es el propietario principal.
       if ($owner === null) $owner = $candidates[0] ?? null;
       if ($owner === null) continue;
       if ($owner['document'] === '') $owner['document'] = $document;
-      $result['owner'] ??= $owner;
+      // Se prefieren los datos donde el documento coincide (mandato); los demás contratos completan lo que falte.
+      if ($result['owner'] === null || ($matched && !$ownerMatched)) {
+        $previous = $result['owner'] ?? [];
+        $result['owner'] = $owner;
+        $ownerMatched = $matched;
+        $owner = $previous;
+      }
+      foreach (['email', 'phone'] as $key) if ($result['owner'][$key] === '' && ($owner[$key] ?? '') !== '') $result['owner'][$key] = $owner[$key];
       $end = self::timestamp($contract['fin_contrato'] ?? '');
-      $income = $this->income($contract, $noMandate, time());
+      $pending = mb_strtolower(trim((string) ($contract['estado'] ?? '')), 'UTF-8') === 'por entregar';
+      $income = $pending
+        ? ['canon' => 0.0, 'administracion' => 0.0, 'comision' => 0.0, 'garantia' => 0.0, 'seguro' => 0.0, 'intereses' => 0.0, 'otros' => 0.0, 'servicios' => null]
+        : $this->income($contract, $noMandate, time());
       $result['contracts'][] = [
         'id' => (int) ($contract['_ID'] ?? 0), 'contrato' => (string) ($contract['contrato'] ?? ''), 'inmueble' => (string) ($contract['inmueble'] ?? ''),
         'direccion' => (string) ($contract['direccion'] ?? ''), 'estado' => (string) ($contract['estado'] ?? ''),
         // Meses de contrato que quedan: desde hoy o, si aún no empieza (Por entregar), desde su inicio.
         'fin' => $end > 0 ? date('Y-m-d', $end) : '', 'max_months' => self::monthsUntil(max(time(), self::timestamp($contract['inicio_contrato'] ?? '')), $end),
+        'por_entregar' => $pending,
       ] + $income;
     }
     $result['active_credits'] = $this->activeCredits($document);

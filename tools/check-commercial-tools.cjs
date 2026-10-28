@@ -25,10 +25,11 @@ const { chromium } = require(process.env.SCM_PLAYWRIGHT_MODULE || 'playwright');
     await page.waitForFunction(() => document.querySelector('[data-pre-status]').textContent.includes('mínimo 4'));
     await tool.locator('[data-pre-document]').fill('1.143.415.938');
     await tool.locator('[data-pre-document]').press('Enter');
-    await page.waitForFunction(() => document.querySelectorAll('[data-pre-sources] [data-pre-source]').length === 2);
+    await page.waitForFunction(() => document.querySelectorAll('[data-pre-sources] [data-pre-source]').length === 3);
     assert.equal(await tool.locator('[data-pre-owner="name"]').inputValue(), 'Ana Propietaria');
     assert.equal(await tool.locator('[data-pre-calc]').count(), 0);
-    const contract = tool.locator('[data-pre-source]').first();
+    const contract = tool.locator('[data-pre-source]', { hasText: 'Contrato C-100' });
+    assert.match(await tool.locator('[data-pre-status]').innerText(), /2 contratos entregados y 1 por entregar/);
     // Mandato: comisión $250.000 con IVA sobre $2.000.000 → tasa 10,5042 %; tiene garantía y seguro de servicios.
     assert.equal(await contract.locator('[data-pre-sim="tasa"]').inputValue(), '10,5042');
     assert.equal(await contract.locator('[data-pre-sim="garantia"]').isChecked(), true);
@@ -39,15 +40,26 @@ const { chromium } = require(process.env.SCM_PLAYWRIGHT_MODULE || 'playwright');
     assert.equal(await contract.locator('[data-pre-sim="cuotas"]').inputValue(), '4');
     assert.match(await contract.locator('[data-pre-source-policy]').innerText(), /lleva 2 y le faltan 2/);
     assert.equal(await contract.locator('[data-pre-source-warning]').isVisible(), false);
-    // (2.000.000 − 250.000 − garantía 50.000 − seguro 60.000 / 12) + sin mandato: 119.000 + 25.000 = 144.000 es menos
-    // del 15 %, así que descuenta el mínimo de 150.000 → 1.695.000 + 850.000 = 2.545.000 × 3
-    assert.equal(await tool.locator('[data-pre-net]').innerText(), '$2.545.000');
-    assert.equal(await tool.locator('[data-pre-total]').innerText(), '$7.635.000');
-    const noMandate = tool.locator('[data-pre-source]').nth(1);
-    assert.equal(await noMandate.locator('[data-pre-source-net]').innerText(), '$850.000');
-    assert.match(await noMandate.locator('[data-pre-breakdown]').innerText(), /Ajuste al descuento mínimo\s+Los contratos descuentan como mínimo el 15 % del canon\s+\$6\.000/);
+    // C-100: 2.000.000 − 250.000 − garantía 50.000 − seguro 60.000 / 12 = 1.695.000. C-400 sin mandato: 95.200 + 20.000 =
+    // 115.200 es menos del 15 %, así que descuenta el mínimo de 120.000 → 680.000. El Por entregar aún no suma.
+    assert.equal(await tool.locator('[data-pre-net]').innerText(), '$2.375.000');
+    assert.equal(await tool.locator('[data-pre-total]').innerText(), '$7.125.000');
+    const noMandate = tool.locator('[data-pre-source]', { hasText: 'Contrato C-400' });
+    assert.equal(await noMandate.locator('[data-pre-source-net]').innerText(), '$680.000');
+    assert.match(await noMandate.locator('[data-pre-breakdown]').innerText(), /Ajuste al descuento mínimo\s+Los contratos descuentan como mínimo el 15 % del canon\s+\$4\.800/);
+    // Por entregar: se pide canon + administración y se simula como inmueble nuevo (sin mandato ni mínimo del 15 %).
+    const pending = tool.locator('[data-pre-source]', { hasText: 'Contrato C-200' });
+    assert.equal(await pending.locator('[data-pre-field="canon"]').inputValue(), '');
+    assert.match(await pending.locator('[data-pre-source-policy]').innerText(), /Contrato por entregar: escribe el canon y la administración/);
+    await tool.locator('[data-pre-pdf]').click();
+    assert.match(await tool.locator('[data-pre-error]').innerText(), /Escribe el canon del inmueble 3/);
+    // 1.200.000 × 10 % + IVA = 142.800 y garantía 2,5 % = 30.000 → 1.000.000 − 172.800 = 827.200.
+    await pending.locator('[data-pre-field="canon"]').fill('1000000');
+    await pending.locator('[data-pre-sim="administracion"]').fill('200000');
+    assert.equal(await pending.locator('[data-pre-source-net]').innerText(), '$827.200');
+    assert.equal(await tool.locator('[data-pre-net]').innerText(), '$3.202.200');
     assert.match(await tool.locator('[data-pre-term]').innerText(), /^Hasta 1[12] cuotas$/);
-    assert.equal(await tool.locator('[data-pre-gross]').innerText(), '$3.000.000');
+    assert.equal(await tool.locator('[data-pre-gross]').innerText(), '$3.800.000');
     await page.screenshot({ path: 'output/commercial-tools-preapproval.png', fullPage: true });
 
     // Primero la vista previa del PDF (popup interno) y desde ahí la descarga.

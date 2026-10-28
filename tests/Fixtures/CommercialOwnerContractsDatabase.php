@@ -32,6 +32,8 @@ final class CommercialOwnerContractsDatabase
     $db->insert('wp_jet_cct_contratos_arrendamiento', ['_ID'=>1,'contrato'=>'C-100','inmueble'=>'500','id_inmueble'=>'500','direccion'=>'Calle 10 # 20-30','estado'=>'Entregado','arrendatario'=>'Pedro Arrendatario','propietario'=>'Ana Propietaria','id_propietario'=>'P-1','id_contrato_mandato'=>'10','valor_canon'=>'2000000','inicio_contrato'=>(string) strtotime('-65 days 00:00:00'),'fin_contrato'=>$end]);
     // Sin mandato: se descuenta el porcentaje configurado del canon.
     $db->insert('wp_jet_cct_contratos_arrendamiento', ['_ID'=>2,'contrato'=>'C-200','inmueble'=>'600','direccion'=>'Carrera 5','estado'=>'Por entregar','propietario'=>'Ana Propietaria','correo_propietario'=>'ana@example.test','celular_propietario'=>'3145106244','indicativo_propietario'=>'57','documento_propietario'=>'1143415938','id_propietario'=>'P-1','valor_canon'=>'1000000']);
+    // Entregado sin mandato: descuento mínimo del 15 % del canon.
+    $db->insert('wp_jet_cct_contratos_arrendamiento', ['_ID'=>4,'contrato'=>'C-400','inmueble'=>'800','direccion'=>'Avenida 3','estado'=>'Entregado','propietario'=>'Ana Propietaria','documento_propietario'=>'1143415938','id_propietario'=>'P-1','valor_canon'=>'800000']);
     // Terminado: no debe aparecer.
     $db->insert('wp_jet_cct_contratos_arrendamiento', ['_ID'=>3,'contrato'=>'C-300','inmueble'=>'700','estado'=>'Terminado','documento_propietario'=>'1143415938','valor_canon'=>'900000']);
     // Tarifas del simulador de ingreso neto, con los formatos que se guardan en producción.
