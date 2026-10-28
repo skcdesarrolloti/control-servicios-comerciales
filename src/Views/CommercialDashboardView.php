@@ -814,24 +814,178 @@ final class CommercialDashboardView
         </div>
       <?php endif; ?>
 
-      <?php if (array_intersect(['precaptacion', 'anadir_aviso'], $views)): ?>
+      <!-- Actividades comerciales: registrar (precaptación, aviso), gestión de tareas, actualizaciones y avisos en fachada -->
+      <?php $commercialViews = array_merge(['precaptacion', 'anadir_aviso', 'actualizaciones', 'avisos'], $taskViews); ?>
+      <?php if (array_intersect($commercialViews, $views) !== []): ?>
         <div class="relative group/nav" data-commercial-dropdown="comerciales">
-          <button type="button" class="flex items-center gap-space-xs px-2 lg:px-3 py-space-xs font-label-md text-label-md <?php echo in_array($bucket, ['precaptacion', 'anadir_aviso'], true) ? ($activeClasses . ' active') : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-dropdown-trigger="comerciales" aria-expanded="false">
+          <button type="button" class="flex items-center gap-space-xs px-2 lg:px-3 py-space-xs font-label-md text-label-md <?php echo ($isTaskActive || in_array($bucket, ['precaptacion', 'anadir_aviso', 'actualizaciones', 'avisos'], true)) ? ($activeClasses . ' active') : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-tab="comerciales" data-commercial-dropdown-trigger="comerciales" aria-expanded="false">
             <span class="material-symbols-outlined text-[16px]" aria-hidden="true">business_center</span>
             <span>Actividades comerciales</span>
-            <span class="material-symbols-outlined text-[16px]">expand_more</span>
+            <span class="material-symbols-outlined text-[16px] group-hover/nav:rotate-180 transition-transform" aria-hidden="true">expand_more</span>
           </button>
-          <div class="absolute left-0 top-full hidden group-hover/nav:block bg-surface-container-lowest shadow-[0_8px_24px_rgba(0,0,0,0.12)] rounded-xl py-space-xs min-w-[230px] z-50 border border-outline-variant/30 text-on-surface" data-commercial-dropdown-menu="comerciales">
-            <?php if (in_array('precaptacion', $views, true)): ?>
-            <a class="flex items-center gap-2 px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="precaptacion" href="<?php echo esc_url(self::url($baseUrl, ['tab'=>'precaptacion'])); ?>">
-              <span class="material-symbols-outlined text-[18px] text-secondary" aria-hidden="true">add_home_work</span><span>Precaptación</span>
-            </a>
+          <div class="absolute left-0 top-full hidden group-hover/nav:block bg-surface-container-lowest shadow-[0_12px_32px_rgba(0,0,0,0.14)] rounded-2xl p-1 z-50 border border-outline-variant/30 text-on-surface" data-commercial-dropdown-menu="comerciales">
+            <div class="flex flex-col md:flex-row md:items-start gap-1">
+            <?php if (array_intersect(['precaptacion', 'anadir_aviso', 'actualizaciones', 'avisos'], $views)): ?>
+            <div class="min-w-[250px]">
+            <?php if (array_intersect(['precaptacion', 'anadir_aviso'], $views)): ?>
+              <div class="flex items-center gap-1.5 px-3 pt-2 pb-1 font-label-sm text-[11px] uppercase font-semibold text-secondary"><span class="material-symbols-outlined text-[15px]" aria-hidden="true">edit_note</span><span>Registrar</span></div>
+              <?php if (in_array('precaptacion', $views, true)): ?>
+              <a class="flex items-center gap-2 px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="precaptacion" href="<?php echo esc_url(self::url($baseUrl, ['tab'=>'precaptacion'])); ?>">
+                <span class="material-symbols-outlined text-[18px] text-secondary" aria-hidden="true">add_home_work</span><span>Precaptación</span>
+              </a>
+              <?php endif; ?>
+              <?php if (in_array('anadir_aviso', $views, true)): ?>
+              <a class="flex items-center gap-2 px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="anadir_aviso" href="<?php echo esc_url(self::url($baseUrl, ['tab'=>'anadir_aviso'])); ?>">
+                <span class="material-symbols-outlined text-[18px] text-secondary" aria-hidden="true">add_photo_alternate</span><span>Añadir aviso</span>
+              </a>
+              <?php endif; ?>
             <?php endif; ?>
-            <?php if (in_array('anadir_aviso', $views, true)): ?>
-            <a class="flex items-center gap-2 px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="anadir_aviso" href="<?php echo esc_url(self::url($baseUrl, ['tab'=>'anadir_aviso'])); ?>">
-              <span class="material-symbols-outlined text-[18px] text-secondary" aria-hidden="true">add_photo_alternate</span><span>Añadir aviso</span>
-            </a>
+            <?php if (in_array('actualizaciones', $views, true)): ?>
+              <div class="flex items-center gap-1.5 px-3 pt-2 pb-1 font-label-sm text-[11px] uppercase font-semibold text-secondary"><span class="material-symbols-outlined text-[15px]" aria-hidden="true">published_with_changes</span><span>Actualizaciones de inmuebles</span></div>
+              <a class="flex items-center justify-between px-space-md py-space-sm font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="actualizaciones" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'actualizaciones', 'estado_actualizacion' => 'OK'])); ?>">
+                <span>Al Día</span>
+                <span class="font-label-sm text-label-sm bg-surface-container px-space-xs py-0.5 rounded text-on-surface">Activo</span>
+              </a>
+              <a class="flex items-center justify-between px-space-md py-space-sm font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="actualizaciones" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'actualizaciones', 'estado_actualizacion' => 'Alerta'])); ?>">
+                <span>En Alerta</span>
+                <span class="font-label-sm text-label-sm bg-tertiary-fixed text-on-tertiary-fixed px-space-xs py-0.5 rounded font-semibold">Alerta</span>
+              </a>
+              <a class="flex items-center justify-between px-space-md py-space-sm font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="actualizaciones" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'actualizaciones', 'estado_actualizacion' => 'Vencido'])); ?>">
+                <span>Vencidos</span>
+                <span class="font-label-sm text-label-sm bg-error-container text-on-error-container px-space-xs py-0.5 rounded font-semibold">Vencido</span>
+              </a>
             <?php endif; ?>
+            <?php if (in_array('avisos', $views, true)): ?>
+              <div class="flex items-center gap-1.5 px-3 pt-2 pb-1 font-label-sm text-[11px] uppercase font-semibold text-secondary"><span class="material-symbols-outlined text-[15px]" aria-hidden="true">signpost</span><span>Avisos en fachada</span></div>
+              <a class="flex items-center justify-between px-space-md py-space-sm font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="avisos" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'avisos', 'estado_aviso' => 'Vencido'])); ?>">
+                <span>Retoques Vencidos</span>
+                <span class="font-label-sm text-label-sm bg-error-container text-on-error-container px-space-xs py-0.5 rounded font-semibold">Vencidos</span>
+              </a>
+              <a class="flex items-center justify-between px-space-md py-space-sm font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="avisos" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'avisos', 'estado_aviso' => 'Alerta'])); ?>">
+                <span>Avisos por Vencer</span>
+                <span class="font-label-sm text-label-sm bg-tertiary-fixed text-on-tertiary-fixed px-space-xs py-0.5 rounded font-semibold">Alerta</span>
+              </a>
+              <a class="flex items-center justify-between px-space-md py-space-sm font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="avisos" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'avisos', 'estado_aviso' => 'Atrasado'])); ?>">
+                <span>Nuevos sin Colocar</span>
+                <span class="font-label-sm text-label-sm bg-secondary-fixed text-on-secondary-fixed px-space-xs py-0.5 rounded font-semibold">Pendientes</span>
+              </a>
+              <a class="flex items-center justify-between px-space-md py-space-sm font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="avisos" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'avisos'])); ?>">
+                <span>Rutas Operativas</span>
+                <span class="material-symbols-outlined text-secondary text-[16px]">near_me</span>
+              </a>
+            <?php endif; ?>
+            </div>
+            <?php endif; ?>
+            <?php if (array_intersect($taskViews, $views) !== []): ?>
+            <div class="min-w-[280px] max-w-[340px] md:border-l first:md:border-l-0 md:border-surface-container md:pl-1 first:md:pl-0" data-commercial-menu-section="tareas">
+              <div class="flex items-center gap-1.5 px-3 pt-2 pb-1 font-label-sm text-[11px] uppercase font-semibold text-secondary"><span class="material-symbols-outlined text-[15px]" aria-hidden="true">task_alt</span><span>Gestión de tareas</span></div>
+            <!-- Vistas Rápidas -->
+            <div class="p-1 space-y-0.5">
+              <?php if (in_array('abiertos', $views, true)): ?>
+                <a class="flex items-center justify-between px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="abiertos" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'abiertos'])); ?>">
+                  <span class="flex items-center gap-2">
+                    <span class="material-symbols-outlined text-[18px] text-primary">inbox</span>
+                    <span>Tareas Abiertas</span>
+                  </span>
+                  <span class="font-label-sm text-label-sm bg-surface-container px-space-xs py-0.5 rounded text-on-surface font-semibold"><?php echo esc_html(number_format($openCount)); ?></span>
+                </a>
+              <?php endif; ?>
+              <?php if (in_array('mis_tickets', $views, true)): ?>
+                <a class="flex items-center justify-between px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="mis_tickets" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'mis_tickets'])); ?>">
+                  <span class="flex items-center gap-2">
+                    <span class="material-symbols-outlined text-[18px] text-tertiary">assignment_ind</span>
+                    <span>Mis Tareas</span>
+                  </span>
+                  <span class="font-label-sm text-label-sm bg-primary-container px-space-xs py-0.5 rounded text-on-surface font-semibold"><?php echo esc_html(number_format($myCount)); ?></span>
+                </a>
+              <?php endif; ?>
+              <?php if (in_array('postergados', $views, true)): ?>
+                <a class="flex items-center justify-between px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="postergados" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'postergados'])); ?>">
+                  <span class="flex items-center gap-2">
+                    <span class="material-symbols-outlined text-[18px] text-secondary">hourglass_empty</span>
+                    <span>Tareas Postergadas</span>
+                  </span>
+                  <span class="font-label-sm text-label-sm bg-surface-container px-space-xs py-0.5 rounded text-on-surface font-semibold"><?php echo esc_html(number_format($postponedCount)); ?></span>
+                </a>
+              <?php endif; ?>
+              <?php if (in_array('cerrados', $views, true)): ?>
+                <a class="flex items-center justify-between px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="cerrados" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'cerrados'])); ?>">
+                  <span class="flex items-center gap-2">
+                    <span class="material-symbols-outlined text-[18px] text-outline">task_alt</span>
+                    <span>Tareas Cerradas</span>
+                  </span>
+                  <span class="font-label-sm text-label-sm bg-surface-container px-space-xs py-0.5 rounded text-on-surface font-semibold"><?php echo esc_html(number_format($closedCount)); ?></span>
+                </a>
+              <?php endif; ?>
+              <?php if (in_array('calendario', $views, true) && (!$policy instanceof CommercialAccessPolicy || $policy->canSubview('calendario', 'due'))): ?>
+                <a class="flex items-center justify-between px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="calendario" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'calendario', 'subtab' => 'due'])); ?>">
+                  <span class="flex items-center gap-2">
+                    <span class="material-symbols-outlined text-[18px] text-error">event_upcoming</span>
+                    <span>Calendario de vencimientos</span>
+                  </span>
+                </a>
+              <?php endif; ?>
+            </div>
+
+            <!-- Desglose por Tema de Ayuda y Estado Comercial -->
+            <?php if (in_array('abiertos', $views, true) && !empty($topicHierarchy)): ?>
+              <div class="my-1 border-t border-surface-container"></div>
+              <div class="px-3 py-1 font-label-sm uppercase font-semibold text-secondary flex items-center justify-between">
+                <span>Por Tema de Ayuda</span>
+                <span class="text-[10px] text-secondary/70">Estados &rsaquo;</span>
+              </div>
+              <div class="p-1 space-y-0.5 overflow-visible">
+                <?php foreach ($topicHierarchy as $th): ?>
+                  <?php
+                    $topicName = (string) ($th['topic'] ?? '');
+                    $topicTotal = (int) ($th['total'] ?? 0);
+                    $statuses = (array) ($th['statuses'] ?? []);
+                  ?>
+                  <div class="relative group/sub" data-commercial-subgroup>
+                    <div class="flex items-center justify-between px-3 py-1.5 rounded-xl text-body-sm hover:bg-surface-container-low transition-colors">
+                      <a class="flex-1 font-medium text-on-surface hover:text-primary transition-colors flex items-center justify-between" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'abiertos', 'tema' => $topicName])); ?>" data-commercial-tab="abiertos">
+                        <span class="truncate max-w-[170px]" title="<?php echo esc_attr($topicName); ?>"><?php echo esc_html($topicName); ?></span>
+                        <span class="font-label-sm text-[11px] bg-surface-container px-1.5 py-0.5 rounded text-on-surface font-semibold ml-1"><?php echo esc_html((string) $topicTotal); ?></span>
+                      </a>
+                      <?php if (!empty($statuses)): ?>
+                        <button type="button" class="ml-1 p-1 -mr-1 text-secondary hover:text-primary rounded-lg transition-colors cursor-pointer flex items-center justify-center" data-commercial-subflyout-trigger aria-label="Ver estados comerciales de <?php echo esc_attr($topicName); ?>" title="Ver estados">
+                          <span class="material-symbols-outlined text-[16px] transition-transform group-hover/sub:translate-x-0.5" aria-hidden="true">chevron_right</span>
+                        </button>
+                      <?php endif; ?>
+                    </div>
+
+                    <!-- Flyout Submenu a la derecha con Estados Comerciales del Tema -->
+                    <?php if (!empty($statuses)): ?>
+                      <div class="absolute left-full top-0 pl-1.5 hidden group-hover/sub:block z-50 pointer-events-auto" data-commercial-subflyout>
+                        <div class="bg-surface-container-lowest shadow-[0_12px_32px_rgba(0,0,0,0.18)] rounded-2xl py-2 min-w-[220px] max-w-[280px] border border-outline-variant/30 p-1.5 space-y-1">
+                          <div class="px-3 py-1.5 border-b border-surface-container pb-1.5 mb-1 bg-surface-container-low/50 rounded-xl">
+                            <div class="flex items-center justify-between">
+                              <span class="font-label-sm uppercase font-bold text-on-surface text-[11px] block truncate"><?php echo esc_html($topicName); ?></span>
+                              <span class="font-label-sm text-[10px] bg-primary-container text-on-surface px-1.5 py-0.2 rounded font-bold"><?php echo esc_html((string) $topicTotal); ?></span>
+                            </div>
+                            <a href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'abiertos', 'tema' => $topicName])); ?>" class="text-[11px] text-primary hover:underline font-semibold flex items-center gap-1 mt-1" data-commercial-tab="abiertos">
+                              <span>Ver todas las tareas</span>
+                              <span class="material-symbols-outlined text-[12px]">arrow_forward</span>
+                            </a>
+                          </div>
+                          <div class="max-h-[260px] overflow-y-auto space-y-0.5 pr-1">
+                            <?php foreach ($statuses as $st): ?>
+                              <a href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'abiertos', 'tema' => $topicName, 'estado' => $st['status']])); ?>" class="flex items-center justify-between px-2.5 py-1.5 rounded-xl text-[12px] text-on-surface hover:bg-surface-container hover:text-primary transition-colors font-medium" data-commercial-tab="abiertos">
+                                <span class="truncate"><?php echo esc_html($st['status']); ?></span>
+                                <span class="font-label-sm text-secondary bg-surface-container-high px-1.5 py-0.5 rounded text-[10px] ml-1 font-semibold"><?php echo esc_html((string) $st['total']); ?></span>
+                              </a>
+                            <?php endforeach; ?>
+                          </div>
+                        </div>
+                      </div>
+                    <?php endif; ?>
+                  </div>
+                <?php endforeach; ?>
+              </div>
+            <?php endif; ?>
+            </div>
+            <?php endif; ?>
+            </div>
           </div>
         </div>
       <?php endif; ?>
@@ -914,176 +1068,6 @@ final class CommercialDashboardView
         </div>
       <?php endif; ?>
 
-      <!-- Dropdown Gestión de Tareas (Con despliegue por tema y por estado comercial) -->
-      <?php if (array_intersect($taskViews, $views) !== []): ?>
-      <div class="relative group/nav" data-commercial-dropdown="tareas">
-        <button type="button" class="flex items-center gap-space-xs px-2 lg:px-3 py-space-xs font-label-md text-label-md <?php echo $isTaskActive ? ($activeClasses . ' active') : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-tab="tareas" data-commercial-dropdown-trigger="tareas" aria-expanded="false">
-          <span class="material-symbols-outlined text-[16px]" aria-hidden="true">task_alt</span>
-          <span>Gestión de Tareas</span>
-          <span class="material-symbols-outlined text-[16px] group-hover/nav:rotate-180 transition-transform">expand_more</span>
-        </button>
-        <div class="absolute left-0 top-full hidden group-hover/nav:block bg-surface-container-lowest shadow-[0_12px_32px_rgba(0,0,0,0.14)] rounded-2xl py-space-xs min-w-[280px] max-w-[340px] z-50 border border-outline-variant/30 text-on-surface" data-commercial-dropdown-menu="tareas">
-          <!-- Vistas Rápidas -->
-          <div class="p-1 space-y-0.5">
-            <?php if (in_array('abiertos', $views, true)): ?>
-              <a class="flex items-center justify-between px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="abiertos" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'abiertos'])); ?>">
-                <span class="flex items-center gap-2">
-                  <span class="material-symbols-outlined text-[18px] text-primary">inbox</span>
-                  <span>Tareas Abiertas</span>
-                </span>
-                <span class="font-label-sm text-label-sm bg-surface-container px-space-xs py-0.5 rounded text-on-surface font-semibold"><?php echo esc_html(number_format($openCount)); ?></span>
-              </a>
-            <?php endif; ?>
-            <?php if (in_array('mis_tickets', $views, true)): ?>
-              <a class="flex items-center justify-between px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="mis_tickets" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'mis_tickets'])); ?>">
-                <span class="flex items-center gap-2">
-                  <span class="material-symbols-outlined text-[18px] text-tertiary">assignment_ind</span>
-                  <span>Mis Tareas</span>
-                </span>
-                <span class="font-label-sm text-label-sm bg-primary-container px-space-xs py-0.5 rounded text-on-surface font-semibold"><?php echo esc_html(number_format($myCount)); ?></span>
-              </a>
-            <?php endif; ?>
-            <?php if (in_array('postergados', $views, true)): ?>
-              <a class="flex items-center justify-between px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="postergados" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'postergados'])); ?>">
-                <span class="flex items-center gap-2">
-                  <span class="material-symbols-outlined text-[18px] text-secondary">hourglass_empty</span>
-                  <span>Tareas Postergadas</span>
-                </span>
-                <span class="font-label-sm text-label-sm bg-surface-container px-space-xs py-0.5 rounded text-on-surface font-semibold"><?php echo esc_html(number_format($postponedCount)); ?></span>
-              </a>
-            <?php endif; ?>
-            <?php if (in_array('cerrados', $views, true)): ?>
-              <a class="flex items-center justify-between px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="cerrados" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'cerrados'])); ?>">
-                <span class="flex items-center gap-2">
-                  <span class="material-symbols-outlined text-[18px] text-outline">task_alt</span>
-                  <span>Tareas Cerradas</span>
-                </span>
-                <span class="font-label-sm text-label-sm bg-surface-container px-space-xs py-0.5 rounded text-on-surface font-semibold"><?php echo esc_html(number_format($closedCount)); ?></span>
-              </a>
-            <?php endif; ?>
-            <?php if (in_array('calendario', $views, true) && (!$policy instanceof CommercialAccessPolicy || $policy->canSubview('calendario', 'due'))): ?>
-              <a class="flex items-center justify-between px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="calendario" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'calendario', 'subtab' => 'due'])); ?>">
-                <span class="flex items-center gap-2">
-                  <span class="material-symbols-outlined text-[18px] text-error">event_upcoming</span>
-                  <span>Calendario de vencimientos</span>
-                </span>
-              </a>
-            <?php endif; ?>
-          </div>
-
-          <!-- Desglose por Tema de Ayuda y Estado Comercial -->
-          <?php if (in_array('abiertos', $views, true) && !empty($topicHierarchy)): ?>
-            <div class="my-1 border-t border-surface-container"></div>
-            <div class="px-3 py-1 font-label-sm uppercase font-semibold text-secondary flex items-center justify-between">
-              <span>Por Tema de Ayuda</span>
-              <span class="text-[10px] text-secondary/70">Estados &rsaquo;</span>
-            </div>
-            <div class="p-1 space-y-0.5 overflow-visible">
-              <?php foreach ($topicHierarchy as $th): ?>
-                <?php
-                  $topicName = (string) ($th['topic'] ?? '');
-                  $topicTotal = (int) ($th['total'] ?? 0);
-                  $statuses = (array) ($th['statuses'] ?? []);
-                ?>
-                <div class="relative group/sub" data-commercial-subgroup>
-                  <div class="flex items-center justify-between px-3 py-1.5 rounded-xl text-body-sm hover:bg-surface-container-low transition-colors">
-                    <a class="flex-1 font-medium text-on-surface hover:text-primary transition-colors flex items-center justify-between" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'abiertos', 'tema' => $topicName])); ?>" data-commercial-tab="abiertos">
-                      <span class="truncate max-w-[170px]" title="<?php echo esc_attr($topicName); ?>"><?php echo esc_html($topicName); ?></span>
-                      <span class="font-label-sm text-[11px] bg-surface-container px-1.5 py-0.5 rounded text-on-surface font-semibold ml-1"><?php echo esc_html((string) $topicTotal); ?></span>
-                    </a>
-                    <?php if (!empty($statuses)): ?>
-                      <button type="button" class="ml-1 p-1 -mr-1 text-secondary hover:text-primary rounded-lg transition-colors cursor-pointer flex items-center justify-center" data-commercial-subflyout-trigger aria-label="Ver estados comerciales de <?php echo esc_attr($topicName); ?>" title="Ver estados">
-                        <span class="material-symbols-outlined text-[16px] transition-transform group-hover/sub:translate-x-0.5" aria-hidden="true">chevron_right</span>
-                      </button>
-                    <?php endif; ?>
-                  </div>
-
-                  <!-- Flyout Submenu a la derecha con Estados Comerciales del Tema -->
-                  <?php if (!empty($statuses)): ?>
-                    <div class="absolute left-full top-0 pl-1.5 hidden group-hover/sub:block z-50 pointer-events-auto" data-commercial-subflyout>
-                      <div class="bg-surface-container-lowest shadow-[0_12px_32px_rgba(0,0,0,0.18)] rounded-2xl py-2 min-w-[220px] max-w-[280px] border border-outline-variant/30 p-1.5 space-y-1">
-                        <div class="px-3 py-1.5 border-b border-surface-container pb-1.5 mb-1 bg-surface-container-low/50 rounded-xl">
-                          <div class="flex items-center justify-between">
-                            <span class="font-label-sm uppercase font-bold text-on-surface text-[11px] block truncate"><?php echo esc_html($topicName); ?></span>
-                            <span class="font-label-sm text-[10px] bg-primary-container text-on-surface px-1.5 py-0.2 rounded font-bold"><?php echo esc_html((string) $topicTotal); ?></span>
-                          </div>
-                          <a href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'abiertos', 'tema' => $topicName])); ?>" class="text-[11px] text-primary hover:underline font-semibold flex items-center gap-1 mt-1" data-commercial-tab="abiertos">
-                            <span>Ver todas las tareas</span>
-                            <span class="material-symbols-outlined text-[12px]">arrow_forward</span>
-                          </a>
-                        </div>
-                        <div class="max-h-[260px] overflow-y-auto space-y-0.5 pr-1">
-                          <?php foreach ($statuses as $st): ?>
-                            <a href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'abiertos', 'tema' => $topicName, 'estado' => $st['status']])); ?>" class="flex items-center justify-between px-2.5 py-1.5 rounded-xl text-[12px] text-on-surface hover:bg-surface-container hover:text-primary transition-colors font-medium" data-commercial-tab="abiertos">
-                              <span class="truncate"><?php echo esc_html($st['status']); ?></span>
-                              <span class="font-label-sm text-secondary bg-surface-container-high px-1.5 py-0.5 rounded text-[10px] ml-1 font-semibold"><?php echo esc_html((string) $st['total']); ?></span>
-                            </a>
-                          <?php endforeach; ?>
-                        </div>
-                      </div>
-                    </div>
-                  <?php endif; ?>
-                </div>
-              <?php endforeach; ?>
-            </div>
-          <?php endif; ?>
-        </div>
-      </div>
-
-      <!-- Dropdown Actualizaciones de Inmuebles -->
-      <?php endif; ?>
-      <?php if (in_array('actualizaciones', $views, true)): ?>
-        <div class="relative group/nav" data-commercial-dropdown="actualizaciones">
-          <button type="button" class="flex items-center gap-space-xs px-2 lg:px-3 py-space-xs font-label-md text-label-md <?php echo $bucket === 'actualizaciones' ? ($activeClasses . ' active') : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-tab="actualizaciones" data-commercial-dropdown-trigger="actualizaciones" aria-expanded="false">
-            <span class="material-symbols-outlined text-[16px]" aria-hidden="true">published_with_changes</span>
-            <span class="hidden 2xl:inline">Actualizaciones de Inmuebles</span><span class="2xl:hidden">Actualizaciones</span>
-            <span class="material-symbols-outlined text-[16px] group-hover/nav:rotate-180 transition-transform">expand_more</span>
-          </button>
-          <div class="absolute left-0 top-full hidden group-hover/nav:block bg-surface-container-lowest shadow-[0_8px_24px_rgba(0,0,0,0.12)] rounded-xl py-space-xs min-w-[230px] z-50 border border-outline-variant/30 text-on-surface" data-commercial-dropdown-menu="actualizaciones">
-            <a class="flex items-center justify-between px-space-md py-space-sm font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="actualizaciones" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'actualizaciones', 'estado_actualizacion' => 'OK'])); ?>">
-              <span>Al Día</span>
-              <span class="font-label-sm text-label-sm bg-surface-container px-space-xs py-0.5 rounded text-on-surface">Activo</span>
-            </a>
-            <a class="flex items-center justify-between px-space-md py-space-sm font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="actualizaciones" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'actualizaciones', 'estado_actualizacion' => 'Alerta'])); ?>">
-              <span>En Alerta</span>
-              <span class="font-label-sm text-label-sm bg-tertiary-fixed text-on-tertiary-fixed px-space-xs py-0.5 rounded font-semibold">Alerta</span>
-            </a>
-            <a class="flex items-center justify-between px-space-md py-space-sm font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="actualizaciones" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'actualizaciones', 'estado_actualizacion' => 'Vencido'])); ?>">
-              <span>Vencidos</span>
-              <span class="font-label-sm text-label-sm bg-error-container text-on-error-container px-space-xs py-0.5 rounded font-semibold">Vencido</span>
-            </a>
-          </div>
-        </div>
-      <?php endif; ?>
-
-      <!-- Dropdown Avisos en Fachada -->
-      <?php if (in_array('avisos', $views, true)): ?>
-        <div class="relative group/nav" data-commercial-dropdown="avisos">
-          <button type="button" class="flex items-center gap-space-xs px-2 lg:px-3 py-space-xs font-label-md text-label-md <?php echo $bucket === 'avisos' ? ($activeClasses . ' active') : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-tab="avisos" data-commercial-dropdown-trigger="avisos" aria-expanded="false">
-            <span class="material-symbols-outlined text-[16px]" aria-hidden="true">signpost</span>
-            <span class="hidden 2xl:inline">Avisos en Fachada</span><span class="2xl:hidden">Avisos</span>
-            <span class="material-symbols-outlined text-[16px] group-hover/nav:rotate-180 transition-transform">expand_more</span>
-          </button>
-          <div class="absolute left-0 top-full hidden group-hover/nav:block bg-surface-container-lowest shadow-[0_8px_24px_rgba(0,0,0,0.12)] rounded-xl py-space-xs min-w-[240px] z-50 border border-outline-variant/30 text-on-surface" data-commercial-dropdown-menu="avisos">
-            <a class="flex items-center justify-between px-space-md py-space-sm font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="avisos" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'avisos', 'estado_aviso' => 'Vencido'])); ?>">
-              <span>Retoques Vencidos</span>
-              <span class="font-label-sm text-label-sm bg-error-container text-on-error-container px-space-xs py-0.5 rounded font-semibold">Vencidos</span>
-            </a>
-            <a class="flex items-center justify-between px-space-md py-space-sm font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="avisos" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'avisos', 'estado_aviso' => 'Alerta'])); ?>">
-              <span>Avisos por Vencer</span>
-              <span class="font-label-sm text-label-sm bg-tertiary-fixed text-on-tertiary-fixed px-space-xs py-0.5 rounded font-semibold">Alerta</span>
-            </a>
-            <a class="flex items-center justify-between px-space-md py-space-sm font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="avisos" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'avisos', 'estado_aviso' => 'Atrasado'])); ?>">
-              <span>Nuevos sin Colocar</span>
-              <span class="font-label-sm text-label-sm bg-secondary-fixed text-on-secondary-fixed px-space-xs py-0.5 rounded font-semibold">Pendientes</span>
-            </a>
-            <a class="flex items-center justify-between px-space-md py-space-sm font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="avisos" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'avisos'])); ?>">
-              <span>Rutas Operativas</span>
-              <span class="material-symbols-outlined text-secondary text-[16px]">near_me</span>
-            </a>
-          </div>
-        </div>
-      <?php endif; ?>
       <?php if (in_array('notificaciones', $views, true)): ?>
         <a class="flex items-center gap-space-xs px-2 lg:px-3 py-space-xs whitespace-nowrap font-label-md text-label-md <?php echo $bucket === 'notificaciones' ? ($activeClasses . ' active') : $inactiveClasses; ?>" data-commercial-tab="notificaciones" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'notificaciones'])); ?>"<?php echo $bucket === 'notificaciones' ? ' aria-current="page"' : ''; ?>>
           <span class="material-symbols-outlined text-[16px]" aria-hidden="true">campaign</span><span>Notificaciones</span>

@@ -128,6 +128,6 @@ final class CommercialAccessPolicyTest extends TestCase
   {
     $policy = $this->policy(['views' => ['inicio']]);
     $html = CommercialDashboardView::renderTabs(['inicio'], 'inicio', [], [], '', [], $policy);
-    self::assertStringNotContainsString('data-commercial-dropdown="tareas"', $html);
+    self::assertStringNotContainsString('data-commercial-menu-section="tareas"', $html);
   }
 }

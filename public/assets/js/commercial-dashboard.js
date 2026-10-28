@@ -462,7 +462,8 @@
   // Las herramientas son pestañas propias (?tab=simulador_ingreso_neto) dentro del grupo Herramientas del menú.
   function topTabFor(tab) {
     if (["simulador_ingreso_neto", "ganancia_ocasional"].indexOf(tab) >= 0) return "herramientas";
-    return ["abiertos", "postergados", "cerrados", "mis_tickets"].indexOf(tab) >= 0 ? "tareas" : tab;
+    // Tareas, precaptación, avisos y actualizaciones van dentro del menú Actividades comerciales.
+    return ["abiertos", "postergados", "cerrados", "mis_tickets", "precaptacion", "anadir_aviso", "actualizaciones", "avisos"].indexOf(tab) >= 0 ? "comerciales" : tab;
   }
 
   function setActiveTab(tab) {
