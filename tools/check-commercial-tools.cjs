@@ -100,9 +100,9 @@ const { chromium } = require(process.env.SCM_PLAYWRIGHT_MODULE || 'playwright');
     await first.locator('[data-pre-field="duracion"]').selectOption('24');
     assert.equal(await first.locator('[data-pre-source-warning]').isVisible(), false);
     assert.equal(await tool.locator('[data-pre-term]').innerText(), 'Hasta 22 cuotas');
-    // La administración no paga comisión: solo cambia la garantía (2,5 % de 1.800.000 = 45.000).
+    // La administración suma al canon total: comisión 10 % + IVA de 1.800.000 = 214.200 y garantía 2,5 % = 45.000.
     await first.locator('[data-pre-sim="administracion"]').fill('300000');
-    assert.equal(await first.locator('[data-pre-source-net]').innerText(), '$1.276.500');
+    assert.equal(await first.locator('[data-pre-source-net]').innerText(), '$1.240.800');
     await first.locator('[data-pre-sim="administracion"]').fill('');
     // Otro inmueble: $500.000 − 59.500 − 12.500 = 428.000 / mes.
     await tool.locator('[data-pre-add]').click();

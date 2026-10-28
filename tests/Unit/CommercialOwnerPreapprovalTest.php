@@ -184,10 +184,10 @@ final class CommercialOwnerPreapprovalTest extends TestCase
   public function testSimulatorReplicatesTheCommissionCalculatorPlugin(): void
   {
     $rates = $this->service()->rates();
-    // Con aseguradora (El Libertador): comisión 10 % + IVA solo sobre el canon, garantía 2,5 % sobre canon + administración y servicios en 2 cuotas.
+    // Con aseguradora (El Libertador): comisión 10 % + IVA y garantía 2,5 % sobre canon + administración y servicios en 2 cuotas.
     $base = ['canon'=>'$2.000.000', 'administracion'=>300000, 'tasa_comision'=>'10', 'modalidad'=>'defecto', 'aseguradora'=>'El Libertador', 'garantia'=>true, 'servicios'=>true, 'valor_asegurado'=>3000000, 'cuotas'=>2];
     $sim = CommercialNetIncomeSimulator::simulate($base, $rates);
-    self::assertEquals([238000, 57500, 60000, 0, 30000, 2], [$sim['comision'], $sim['garantia'], $sim['seguro'], $sim['intereses'], $sim['cuota'], $sim['cuotas']]);
+    self::assertEquals([273700, 57500, 60000, 0, 30000, 2], [$sim['comision'], $sim['garantia'], $sim['seguro'], $sim['intereses'], $sim['cuota'], $sim['cuotas']]);
     // Desde 5 cuotas la prima se financia con la tasa de préstamo de garantías (1,5 % mensual).
     $financed = CommercialNetIncomeSimulator::simulate(['cuotas'=>6] + $base, $rates);
     self::assertEquals(CommercialNetIncomeSimulator::loan(60000, 6, 1.5), ['cuota'=>$financed['cuota'], 'intereses'=>$financed['intereses']]);
@@ -213,9 +213,9 @@ final class CommercialOwnerPreapprovalTest extends TestCase
       // El navegador no puede imponer los descuentos de una simulación: se recalculan con las tarifas.
       ['calc'=>'sim', 'canon'=>2000000, 'administracion'=>300000, 'comision'=>1, 'garantia'=>true, 'servicios'=>true, 'valor_asegurado'=>3000000, 'cuotas'=>2, 'aseguradora'=>'El Libertador'],
     ]]);
-    // 2.000.000 − 238.000 − 57.500 − 60.000 / 12 = 1.699.500 × 3
-    self::assertEquals(1699500, $estimate['net']);
-    self::assertEquals(5098500, $estimate['amount']);
+    // 2.000.000 − 273.700 − 57.500 − 60.000 / 12 = 1.663.800 × 3
+    self::assertEquals(1663800, $estimate['net']);
+    self::assertEquals(4991400, $estimate['amount']);
     self::assertEquals(2000000, $estimate['gross']);
     self::assertSame(['servicios'=>800000.0, 'reparaciones'=>1200000.0], $estimate['uses']);
     self::assertSame("Primera línea\nSegunda", $estimate['notes']);
@@ -224,11 +224,11 @@ final class CommercialOwnerPreapprovalTest extends TestCase
     self::assertStringContainsString('Simulación con El Libertador', $html);
     self::assertStringContainsString('Se paga en 2 cuotas de $30.000', $html);
     self::assertStringContainsString('Administración (la paga el arrendatario)', $html);
-    self::assertStringContainsString('$5.098.500', $html);
+    self::assertStringContainsString('$4.991.400', $html);
     self::assertStringContainsString('<h2>4. Lo que puede resolver con su crédito</h2>', $html);
     self::assertStringContainsString('<h2>5. Condiciones para la aprobación del crédito</h2>', $html);
     self::assertStringContainsString('<h2>6. Observaciones</h2>', $html);
-    self::assertStringContainsString('cubre los $2.000.000 que necesita y le quedan $3.098.500 disponibles', $html);
+    self::assertStringContainsString('cubre los $2.000.000 que necesita y le quedan $2.991.400 disponibles', $html);
     self::assertStringNotContainsString('Cuotas de administración', $html);
     self::assertStringContainsString('Primera línea<br />', $html);
   }
@@ -284,7 +284,6 @@ final class CommercialOwnerPreapprovalTest extends TestCase
     self::assertStringContainsString('data-pre-viewer-frame', $html);
     self::assertStringContainsString('Tipo de garantía', $html);
     self::assertStringNotContainsString('Por defecto', $html);
-    self::assertStringNotContainsString('canon + administración', $html);
 
     $gain = CommercialToolsView::render('ganancia_ocasional', null, 'https://example.test');
     self::assertStringContainsString('data-commercial-tool="ganancia_ocasional"', $gain);

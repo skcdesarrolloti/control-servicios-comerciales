@@ -96,7 +96,7 @@ final class CommercialToolsView
           </section>
 
           <section class="ctl-card">
-            <div class="ctl-card__head"><span class="ctl-step">2</span><div><h2>Ingreso neto por inmueble</h2><p>Simula cada inmueble con las tarifas de SuCasa (comisión sobre el canon con IVA, garantía con una aseguradora o con póliza Berkley o Seguros Mundial, y seguro de servicios públicos). Los contratos de un propietario registrado llegan con su canon, la comisión de su mandato y sus coberturas. El seguro se reparte en los 12 meses.</p></div></div>
+            <div class="ctl-card__head"><span class="ctl-step">2</span><div><h2>Ingreso neto por inmueble</h2><p>Simula cada inmueble con las tarifas de SuCasa (comisión sobre canon + administración con IVA, garantía con una aseguradora o con póliza Berkley o Seguros Mundial, y seguro de servicios públicos). Los contratos de un propietario registrado llegan con su canon, la comisión de su mandato y sus coberturas. El seguro se reparte en los 12 meses.</p></div></div>
             <div class="ctl-sources" data-pre-sources>
               <div class="ctl-empty" data-pre-empty><span class="material-symbols-outlined" aria-hidden="true">home_work</span><p>Busca al propietario para cargar sus contratos vigentes, o agrega un inmueble para simularlo.</p></div>
             </div>
@@ -168,7 +168,7 @@ final class CommercialToolsView
               <label class="ctl-field"><span class="ctl-label">Duración del contrato</span><span class="ctl-input"><select data-pre-field="duracion"><?php echo $durations; ?></select></span><small class="ctl-note">Define el plazo máximo del crédito. Mínimo <?php echo CommercialOwnerPreapprovalService::MIN_CONTRACT_MONTHS; ?> meses.</small></label>
             </div>
             <div class="ctl-grid">
-              <?php echo self::moneyField('administracion', 'Administración', '/ mes', 'No paga comisión: solo suma a la base de la garantía.', 'data-pre-sim'); ?>
+              <?php echo self::moneyField('administracion', 'Administración', '/ mes', 'La comisión y la garantía se calculan sobre canon + administración.', 'data-pre-sim'); ?>
               <label class="ctl-field"><span class="ctl-label">Tasa de comisión</span><span class="ctl-input"><input data-pre-sim="tasa" inputmode="decimal" maxlength="8" autocomplete="off" value="<?php echo $e($rateText); ?>"><em>% + IVA</em></span></label>
               <?php echo self::selectField('modalidad', 'Tipo de garantía', $modalities); ?>
               <?php echo self::selectField('aseguradora', 'Aseguradora', $insurers, 'defecto'); ?>

@@ -220,7 +220,7 @@ final class CommercialOwnerPreapprovalService
   /**
    * Canon y descuentos mensuales del contrato; sin mandato con comisión, el porcentaje configurado del canon.
    * `seguro` es la prima de la póliza de servicios aún por pagar (0 si ya se pagó).
-   * @return array{canon:float,comision:float,garantia:float,seguro:float,intereses:float,otros:float,servicios:array{estado:string,cuotas:int,pagadas:int,valor:float,prima:float,inicio:string}|null}
+   * @return array{canon:float,administracion:float,comision:float,garantia:float,seguro:float,intereses:float,otros:float,servicios:array{estado:string,cuotas:int,pagadas:int,valor:float,prima:float,inicio:string}|null}
    */
   private function income(array $contract, float $noMandate, int $today): array
   {
@@ -228,10 +228,11 @@ final class CommercialOwnerPreapprovalService
     $letterId = (int) ($contract['id_carta_aumento_canon'] ?? 0);
     $letters = $this->db->table('jet_cct_cartas_aumento');
     if ($letterId > 0 && $this->hasColumn($letters, 'canon')) $canon = max($canon, self::money($this->db->getVar("SELECT `canon` FROM `{$letters}` WHERE `_ID` = ? LIMIT 1", [$letterId]) ?? ''));
-    $income = ['canon' => $canon, 'comision' => 0.0, 'garantia' => 0.0, 'seguro' => 0.0, 'intereses' => 0.0, 'otros' => 0.0, 'servicios' => null];
+    $income = ['canon' => $canon, 'administracion' => 0.0, 'comision' => 0.0, 'garantia' => 0.0, 'seguro' => 0.0, 'intereses' => 0.0, 'otros' => 0.0, 'servicios' => null];
     $mandate = $this->mandate($contract);
     if (is_array($mandate) && self::money($mandate['total_comision'] ?? '') > 0) {
       $income['comision'] = self::money($mandate['total_comision'] ?? '');
+      $income['administracion'] = self::money($mandate['administracion'] ?? '');
       $income['garantia'] = self::isYes($mandate['incluye_garantia'] ?? '') ? self::money($mandate['precio_mes_garantia'] ?? '') : 0.0;
       if (self::isYes($mandate['incluye_garantia_servicios'] ?? '')) {
         $income['servicios'] = self::servicesPolicy($mandate, self::timestamp($contract['inicio_contrato'] ?? ''), $today);

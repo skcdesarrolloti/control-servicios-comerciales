@@ -82,8 +82,8 @@
     var commissionRate = rateInput === "" ? Number(r.comision) || 0 : Math.min(100, parseRate(rateInput));
     var ivaCanon = simField(card, "iva").checked ? round2(canon * iva / 100) : 0;
     var canonTotal = round2(canon + admin);
-    // La comisión se cobra sobre el canon; la administración solo suma a la base de la garantía.
-    var commission = round2(canon * commissionRate / 100);
+    // La comisión y la garantía se cobran sobre el canon total (canon + administración).
+    var commission = round2(canonTotal * commissionRate / 100);
     commission = round2(commission + round2(commission * iva / 100));
     var installments = Math.max(1, Math.min(modality === "berkley" ? 4 : 12, Number(simField(card, "cuotas").value) || 1));
     var insured = digits(simField(card, "valor").value);
@@ -182,7 +182,7 @@
     syncSimFields(root, card);
     var item = sourceValues(root, card);
     var rows = breakdownRow("Canon mensual", money(item.canon));
-    if (item.comision > 0) rows += breakdownRow("(−) Comisión de administración", money(item.comision), percent(item.sim.tasa) + " + IVA sobre el canon");
+    if (item.comision > 0) rows += breakdownRow("(−) Comisión de administración", money(item.comision), percent(item.sim.tasa) + " + IVA sobre " + (digits(simField(card, "administracion").value) > 0 ? "canon + administración" : "el canon"));
     if (item.garantia > 0) rows += breakdownRow("(−) Garantía inmobiliaria", money(item.garantia), item.sim.aseguradora);
     if (item.seguro > 0) rows += breakdownRow("(−) Seguro" + (item.intereses > 0 ? " e intereses" : ""), money(item.seguroMes), item.cuotas > 0 ? money(item.seguro + item.intereses) + " en " + (item.cuotas === 1 ? "1 pago" : item.cuotas + " cuotas de " + money(item.cuota)) + ", repartido en 12 meses" : money(item.seguro + item.intereses) + " en 12 meses");
     if (item.otros > 0) rows += breakdownRow("(−) Otros descuentos", money(item.otros));
@@ -267,11 +267,13 @@
       duration.value = String(months);
     }
     card.dataset.contract = data.contrato ? "1" : "";
-    // Un contrato con mandato llena el simulador con su comisión (tasa sobre el canon, sin IVA) y sus coberturas;
-    // sin mandato se simula con la tasa y las coberturas por defecto.
+    // Un contrato con mandato llena el simulador con su administración, su comisión (tasa sobre canon + administración,
+    // sin IVA) y sus coberturas; sin mandato se simula con la tasa y las coberturas por defecto.
     var commission = Number(data.comision) || 0;
+    var admin = Number(data.administracion) || 0;
+    if (admin > 0) simField(card, "administracion").value = money(admin);
     if (data.contrato && commission > 0 && canon > 0) {
-      var rate = commission / (canon * (1 + (Number(rates(root).iva) || 0) / 100)) * 100;
+      var rate = commission / ((canon + admin) * (1 + (Number(rates(root).iva) || 0) / 100)) * 100;
       simField(card, "tasa").value = String(Math.round(rate * 10000) / 10000).replace(".", ",");
       simField(card, "garantia").checked = Number(data.garantia) > 0;
     }
