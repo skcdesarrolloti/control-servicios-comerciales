@@ -76,7 +76,7 @@ final class CommercialDashboardController
     $tabCounts = $repository->bucketCounts($globalCountFilters);
     $myTabCounts = $repository->bucketCounts(['id_empleado' => $currentEmployeeFilter]);
     $tabCounts['mis_tickets'] = (int) ($myTabCounts['mis_tickets'] ?? 0);
-    $result = in_array($bucket, ['actualizaciones', 'avisos', 'calendario', 'inmuebles', 'notificaciones', 'precaptacion', 'anadir_aviso', 'solicitud_credito'], true) ? ['rows' => [], 'counts' => $repository->statusCounts($filters), 'pagination' => []] : $repository->search($bucket === 'inicio' ? 'abiertos' : $bucket, $filters);
+    $result = in_array($bucket, ['actualizaciones', 'avisos', 'calendario', 'inmuebles', 'notificaciones', 'precaptacion', 'anadir_aviso', 'herramientas'], true) ? ['rows' => [], 'counts' => $repository->statusCounts($filters), 'pagination' => []] : $repository->search($bucket === 'inicio' ? 'abiertos' : $bucket, $filters);
     $homeDashboard = $repository->homeDashboard($globalCountFilters, $policy);
     $canSeeAll = $policy->canSeeAllCommercialTickets();
     $propertiesRepository = new CommercialPropertiesRepository($this->db);
@@ -119,7 +119,8 @@ final class CommercialDashboardController
       'policy' => $policy,
       'notifications_service' => $bucket === 'notificaciones' ? new CommercialNotificationsService($this->db, $policy) : null,
       'sign_service' => $bucket === 'anadir_aviso' ? new \SCM\Commercial\CommercialSignService($this->db, $policy, $this->config) : null,
-      'credit_service' => $bucket === 'solicitud_credito' ? new \SCM\Commercial\CommercialCreditRequestService($this->db, $policy, $this->config) : null,
+      'tools_service' => $bucket === 'herramientas' ? new \SCM\Commercial\CommercialOwnerPreapprovalService($this->db, $policy) : null,
+      'tools_view' => $bucket === 'herramientas' ? (string) ($input['subtab'] ?? '') : '',
       'visible_views' => $visibleViews,
       'ticket_employees' => $ticketEmployees,
       'commercial_employee_cargos' => $commercialEmployeeCargos,

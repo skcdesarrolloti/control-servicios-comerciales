@@ -466,7 +466,7 @@ final class CommercialDashboardView
   <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/tailwind.css?v=' . filemtime(SCM_PUBLIC_PATH . '/assets/css/tailwind.css')); ?>">
   <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/commercial-calendar.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/commercial-calendar.css')); ?>">
   <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/commercial-signs.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/commercial-signs.css')); ?>">
-  <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/commercial-credit-request.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/commercial-credit-request.css')); ?>">
+  <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/commercial-tools.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/commercial-tools.css')); ?>">
   <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/commercial-property-entry.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/commercial-property-entry.css')); ?>">
   <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/commercial-editor-studio.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/commercial-editor-studio.css')); ?>">
   <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/commercial-property-video.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/commercial-property-video.css')); ?>">
@@ -665,8 +665,8 @@ final class CommercialDashboardView
             echo self::renderPrecaptacion($baseUrl, $_GET);
           } elseif ($bucket === 'anadir_aviso') {
             echo CommercialSignView::render($data['sign_service'], $policy);
-          } elseif ($bucket === 'solicitud_credito') {
-            echo CommercialCreditRequestView::render($data['credit_service'], $policy);
+          } elseif ($bucket === 'herramientas') {
+            echo CommercialToolsView::render((string) ($data['tools_view'] ?? ''), $data['tools_service'] ?? null, $baseUrl);
           } elseif ($bucket === 'notificaciones') {
             echo CommercialNotificationsView::render($data['notifications_service'], $policy);
           } else {
@@ -711,7 +711,7 @@ final class CommercialDashboardView
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-calendar-schedule.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-calendar-schedule.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-notifications.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-notifications.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-signs.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-signs.js')); ?>"></script>
-  <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-credit-request.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-credit-request.js')); ?>"></script>
+  <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-tools.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-tools.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-property-entry.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-property-entry.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-property-media.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-property-media.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-property-video.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-property-video.js')); ?>"></script>
@@ -814,9 +814,9 @@ final class CommercialDashboardView
         </div>
       <?php endif; ?>
 
-      <?php if (array_intersect(['precaptacion', 'anadir_aviso', 'solicitud_credito'], $views)): ?>
+      <?php if (array_intersect(['precaptacion', 'anadir_aviso'], $views)): ?>
         <div class="relative group/nav" data-commercial-dropdown="comerciales">
-          <button type="button" class="flex items-center gap-space-xs px-2 lg:px-3 py-space-xs font-label-md text-label-md <?php echo in_array($bucket, ['precaptacion', 'anadir_aviso', 'solicitud_credito'], true) ? ($activeClasses . ' active') : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-dropdown-trigger="comerciales" aria-expanded="false">
+          <button type="button" class="flex items-center gap-space-xs px-2 lg:px-3 py-space-xs font-label-md text-label-md <?php echo in_array($bucket, ['precaptacion', 'anadir_aviso'], true) ? ($activeClasses . ' active') : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-dropdown-trigger="comerciales" aria-expanded="false">
             <span class="material-symbols-outlined text-[16px]" aria-hidden="true">business_center</span>
             <span>Actividades comerciales</span>
             <span class="material-symbols-outlined text-[16px]">expand_more</span>
@@ -830,11 +830,6 @@ final class CommercialDashboardView
             <?php if (in_array('anadir_aviso', $views, true)): ?>
             <a class="flex items-center gap-2 px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="anadir_aviso" href="<?php echo esc_url(self::url($baseUrl, ['tab'=>'anadir_aviso'])); ?>">
               <span class="material-symbols-outlined text-[18px] text-secondary" aria-hidden="true">add_photo_alternate</span><span>Añadir aviso</span>
-            </a>
-            <?php endif; ?>
-            <?php if (in_array('solicitud_credito', $views, true)): ?>
-            <a class="flex items-center gap-2 px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="solicitud_credito" href="<?php echo esc_url(self::url($baseUrl, ['tab'=>'solicitud_credito'])); ?>">
-              <span class="material-symbols-outlined text-[18px] text-secondary" aria-hidden="true">payments</span><span>Solicitud de crédito</span>
             </a>
             <?php endif; ?>
           </div>
@@ -1094,6 +1089,37 @@ final class CommercialDashboardView
           <span class="material-symbols-outlined text-[16px]" aria-hidden="true">campaign</span><span>Notificaciones</span>
         </a>
       <?php endif; ?>
+
+      <!-- Dropdown Herramientas (Cupo preaprobado, Ganancia ocasional) -->
+      <?php if (in_array('herramientas', $views, true)): ?>
+        <div class="relative group/nav" data-commercial-dropdown="herramientas">
+          <button type="button" class="flex items-center gap-space-xs px-2 lg:px-3 py-space-xs font-label-md text-label-md <?php echo $bucket === 'herramientas' ? ($activeClasses . ' active') : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-tab="herramientas" data-commercial-dropdown-trigger="herramientas" aria-expanded="false">
+            <span class="material-symbols-outlined text-[16px]" aria-hidden="true">handyman</span>
+            <span>Herramientas</span>
+            <span class="material-symbols-outlined text-[16px] group-hover/nav:rotate-180 transition-transform" aria-hidden="true">expand_more</span>
+          </button>
+          <div class="absolute right-0 top-full hidden group-hover/nav:block bg-surface-container-lowest shadow-[0_12px_32px_rgba(0,0,0,0.14)] rounded-2xl py-space-xs min-w-[260px] z-50 border border-outline-variant/30 text-on-surface" data-commercial-dropdown-menu="herramientas">
+            <?php if (!$policy instanceof CommercialAccessPolicy || $policy->canSubview('herramientas', 'preaprobado')): ?>
+            <a class="flex items-center gap-2.5 px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="herramientas" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'herramientas', 'subtab' => 'preaprobado'])); ?>">
+              <span class="material-symbols-outlined text-[18px] text-primary" aria-hidden="true">request_quote</span>
+              <div>
+                <span class="block font-semibold text-on-surface">Cupo preaprobado</span>
+                <span class="block text-[11px] text-secondary">Estimación y PDF para el propietario</span>
+              </div>
+            </a>
+            <?php endif; ?>
+            <?php if (!$policy instanceof CommercialAccessPolicy || $policy->canSubview('herramientas', 'ganancia_ocasional')): ?>
+            <a class="flex items-center gap-2.5 px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="herramientas" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'herramientas', 'subtab' => 'ganancia_ocasional'])); ?>">
+              <span class="material-symbols-outlined text-[18px] text-secondary" aria-hidden="true">calculate</span>
+              <div>
+                <span class="block font-semibold text-on-surface">Ganancia ocasional</span>
+                <span class="block text-[11px] text-secondary">Impuesto por la venta de un inmueble</span>
+              </div>
+            </a>
+            <?php endif; ?>
+          </div>
+        </div>
+      <?php endif; ?>
     </nav>
     <div class="relative group/nav lg:hidden" data-commercial-dropdown="mobile">
       <button type="button" class="flex items-center gap-2 min-h-[44px] text-sm font-medium text-on-surface" data-commercial-dropdown-trigger="mobile" aria-expanded="false" aria-label="Abrir navegación comercial">
@@ -1103,6 +1129,14 @@ final class CommercialDashboardView
       </button>
       <nav class="absolute left-0 top-full hidden bg-white border border-slate-200 rounded-2xl shadow-modal p-2 w-72 max-w-[85vw] max-h-[75vh] overflow-y-auto z-50" data-commercial-dropdown-menu="mobile" aria-label="Navegación móvil">
         <?php foreach ($views as $mobileView): ?>
+          <?php if ($mobileView === 'herramientas'): ?>
+            <?php foreach (CommercialAccessPolicy::SUBVIEWS['herramientas'] as $toolKey => $toolLabel): ?>
+              <?php if (!$policy instanceof CommercialAccessPolicy || $policy->canSubview('herramientas', $toolKey)): ?>
+              <a class="block px-3 py-3 text-sm rounded-xl hover:bg-surface-container-low" data-commercial-tab="herramientas" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'herramientas', 'subtab' => $toolKey])); ?>">Herramientas · <?php echo esc_html($toolLabel); ?></a>
+              <?php endif; ?>
+            <?php endforeach; ?>
+            <?php continue; ?>
+          <?php endif; ?>
           <a class="block px-3 py-3 text-sm rounded-xl hover:bg-surface-container-low <?php echo $mobileView === $bucket ? 'bg-primary-container font-semibold' : ''; ?>" data-commercial-tab="<?php echo esc_attr($mobileView); ?>" href="<?php echo esc_url(self::url($baseUrl, ['tab' => $mobileView])); ?>"><?php echo esc_html(CommercialAccessPolicy::VIEWS[$mobileView]); ?></a>
         <?php endforeach; ?>
       </nav>

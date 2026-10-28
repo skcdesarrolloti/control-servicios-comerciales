@@ -95,8 +95,8 @@ final class CommercialApiController
     $html = '';
     if ($bucket === 'anadir_aviso') {
       $html = \SCM\Views\CommercialSignView::render(new \SCM\Commercial\CommercialSignService($this->db, $this->policy, $this->config), $this->policy);
-    } elseif ($bucket === 'solicitud_credito') {
-      $html = \SCM\Views\CommercialCreditRequestView::render($this->creditService(), $this->policy);
+    } elseif ($bucket === 'herramientas') {
+      $html = \SCM\Views\CommercialToolsView::render((string) ($input['subtab'] ?? ''), $this->preapprovalService(), $this->baseUrl);
     } elseif ($bucket === 'precaptacion') {
       $html = CommercialDashboardView::renderPrecaptacion($this->baseUrl, $input);
     } elseif ($bucket === 'inicio') {
@@ -782,16 +782,16 @@ final class CommercialApiController
     }
   }
 
-  private function creditService(): \SCM\Commercial\CommercialCreditRequestService
+  private function preapprovalService(): \SCM\Commercial\CommercialOwnerPreapprovalService
   {
-    return new \SCM\Commercial\CommercialCreditRequestService($this->db, $this->policy, $this->config);
+    return new \SCM\Commercial\CommercialOwnerPreapprovalService($this->db, $this->policy);
   }
 
-  public function creditContracts(array $input): never
+  public function preapprovalLookup(array $input): never
   {
     $this->verify($input);
     try {
-      JsonResponse::success(['contracts' => $this->creditService()->contractsByOwnerDocument(trim((string) ($input['document'] ?? '')))]);
+      JsonResponse::success($this->preapprovalService()->lookup(trim((string) ($input['document'] ?? ''))));
     } catch (\SCM\Commercial\CommercialSignAccessDenied $exception) {
       JsonResponse::error($exception->getMessage(), 403);
     } catch (\InvalidArgumentException $exception) {
@@ -799,16 +799,30 @@ final class CommercialApiController
     }
   }
 
-  public function creditCreate(array $input): never
+  /** PDF del cupo preaprobado para el propietario, con el diseño de las actas (Chromium). */
+  public function preapprovalPdf(array $input): never
   {
     $this->verify($input);
     try {
-      JsonResponse::success($this->creditService()->create($input));
+      $payload = json_decode(is_string($input['payload'] ?? null) ? $input['payload'] : '', true);
+      $estimate = $this->preapprovalService()->estimate(is_array($payload) ? $payload : []);
+      $bytes = \SCM\Commercial\CommercialOwnerPreapprovalPdf::bytes($estimate, trim(\SCM\Core\Auth::user()));
     } catch (\SCM\Commercial\CommercialSignAccessDenied $exception) {
       JsonResponse::error($exception->getMessage(), 403);
     } catch (\InvalidArgumentException $exception) {
       JsonResponse::error($exception->getMessage(), 422);
+    } catch (\RuntimeException $exception) {
+      error_log('[commercial-preapproval-pdf] ' . $exception->getMessage());
+      JsonResponse::error($exception->getMessage(), 503);
     }
+    while (ob_get_level() > 0) ob_end_clean();
+    header('Content-Type: application/pdf');
+    header('Content-Disposition: attachment; filename="' . \SCM\Commercial\CommercialOwnerPreapprovalPdf::filename($estimate) . '"');
+    header('Cache-Control: private, no-store');
+    header('X-Content-Type-Options: nosniff');
+    header('Content-Length: ' . strlen($bytes));
+    echo $bytes;
+    exit;
   }
 
   public function propertyEntryForm(array $input): never

@@ -1,0 +1,326 @@
+<?php
+
+declare(strict_types=1);
+
+namespace SCM\Commercial;
+
+use SCM\Core\Database;
+use SCM\Core\Settings;
+
+/**
+ * Herramientas → "Cupo preaprobado del propietario". Estima el cupo con la misma regla del liquidador de créditos de
+ * Control de Servicios Inmobiliarios: (canon − descuentos) de todos los contratos Entregado o Por entregar × meses de
+ * política. Aquí solo se consulta: no se registra ninguna solicitud. El cálculo lo hace el navegador para que el
+ * consultor ajuste los valores, o los escriba a mano para propietarios que todavía no están registrados.
+ *
+ * La configuración de créditos (`owner_credit_settings`) se administra en el panel inmobiliario, por eso se lee, sin
+ * escribir, de su configuración (`control_servicios_config`).
+ */
+final class CommercialOwnerPreapprovalService
+{
+  private Database $db;
+  private CommercialAccessPolicy $policy;
+  private Settings $sharedSettings;
+  /** @var array<string,array<int,string>> */
+  private array $columns = [];
+
+  public function __construct(Database $db, CommercialAccessPolicy $policy, ?Settings $sharedSettings = null)
+  {
+    $this->db = $db;
+    $this->policy = $policy;
+    $this->sharedSettings = $sharedSettings ?? new Settings($db, true, Settings::FUNCTION_KEY);
+  }
+
+  public function authorize(): void
+  {
+    if (!$this->policy->canSubview('herramientas', 'preaprobado')) {
+      throw new CommercialSignAccessDenied('Tu cargo no tiene permiso para consultar el cupo preaprobado de propietarios.');
+    }
+  }
+
+  /**
+   * Variables de la política que usa la herramienta, con los mismos valores por defecto del liquidador.
+   * @return array{income_months:int,term_margin_months:int,no_mandate_deduction:float}
+   */
+  public function settings(): array
+  {
+    $stored = $this->sharedSetting('owner_credit_settings');
+    $int = static fn($value, int $default, int $min, int $max): int => is_numeric($value) ? max($min, min($max, (int) $value)) : $default;
+    return [
+      'income_months' => $int($stored['income_months'] ?? null, 3, 1, 24),
+      'term_margin_months' => $int($stored['term_margin_months'] ?? null, 2, 0, 12),
+      'no_mandate_deduction' => self::share($stored['no_mandate_deduction'] ?? null, 0.15),
+    ];
+  }
+
+  /**
+   * Contratos Entregado o Por entregar donde el documento (cédula o NIT) es de un propietario, con el ingreso que
+   * toma el liquidador: canon (o el de la última carta de aumento) y descuentos del mandato. La póliza de servicios
+   * públicos del mandato es mensual; se entrega como seguro de 12 meses para que el consultor la vea como el
+   * propietario la paga.
+   * @return array{owner:array{name:string,document:string,email:string,phone:string}|null,contracts:list<array<string,mixed>>,active_credits:int}
+   */
+  public function lookup(string $document): array
+  {
+    $this->authorize();
+    $document = self::document($document);
+    if (preg_match('/^[0-9A-Z-]{4,20}$/', $document) !== 1) throw new \InvalidArgumentException('Escribe el documento o NIT del propietario (mínimo 4 caracteres).');
+    $clean = static fn(string $column): string => "UPPER(REPLACE(REPLACE({$column}, '.', ''), ' ', '')) = ?";
+    $contracts = $this->db->table('jet_cct_contratos_arrendamiento');
+    $where = [];
+    $args = [];
+    if ($this->hasColumn($contracts, 'documento_propietario')) {
+      $where[] = $clean('`documento_propietario`');
+      $args[] = $document;
+    }
+    $mandates = $this->db->table('jet_cct_contrato_mandato');
+    $owners = $this->db->table('jet_cct_propietarios');
+    foreach ([['id_contrato_mandato', $mandates, ['documento_1', 'nit_1', 'documento_2', 'nit_2', 'documento_3', 'nit_3', 'documento_4', 'nit_4', 'documento_5', 'nit_5', 'documento_6', 'nit_6'], ['_ID']], ['id_propietario', $owners, ['documento', 'documento_juridico'], ['_ID', 'id_propietario']]] as [$link, $source, $documentColumns, $idColumns]) {
+      if (!$this->hasColumn($contracts, $link)) continue;
+      $documentColumns = array_values(array_filter($documentColumns, fn(string $column): bool => $this->hasColumn($source, $column)));
+      $idColumns = array_values(array_filter($idColumns, fn(string $column): bool => $this->hasColumn($source, $column)));
+      if ($documentColumns === [] || $idColumns === []) continue;
+      $ids = [];
+      $rows = $this->db->getResults('SELECT `' . implode('`, `', $idColumns) . "` FROM `{$source}` WHERE " . implode(' OR ', array_map(static fn(string $column): string => $clean("`{$column}`"), $documentColumns)) . ' LIMIT 100', array_fill(0, count($documentColumns), $document));
+      foreach ($rows as $row) foreach ($idColumns as $column) if (trim((string) ($row[$column] ?? '')) !== '') $ids[trim((string) $row[$column])] = true;
+      if ($ids === []) continue;
+      $where[] = "`{$link}` IN (" . implode(',', array_fill(0, count($ids), '?')) . ')';
+      array_push($args, ...array_map('strval', array_keys($ids)));
+    }
+    $result = ['owner' => null, 'contracts' => [], 'active_credits' => 0];
+    if ($where === []) return $result;
+    $noMandate = $this->settings()['no_mandate_deduction'];
+    // Solo contratos vigentes o por iniciar: de los demás no hay canon del cual descontar.
+    foreach ($this->db->getResults("SELECT * FROM `{$contracts}` WHERE (" . implode(' OR ', $where) . ") AND LOWER(TRIM(`estado`)) IN ('entregado', 'por entregar') ORDER BY (LOWER(TRIM(`estado`)) = 'entregado') DESC, `_ID` DESC LIMIT 30", $args) as $contract) {
+      $candidates = $this->contractOwners($contract);
+      $owner = null;
+      foreach ($candidates as $candidate) if (self::document($candidate['document']) === $document) $owner = $candidate;
+      // El documento estaba en el contrato o en la ficha del propietario: es el propietario principal.
+      if ($owner === null) $owner = $candidates[0] ?? null;
+      if ($owner === null) continue;
+      if ($owner['document'] === '') $owner['document'] = $document;
+      $result['owner'] ??= $owner;
+      $end = self::timestamp($contract['fin_contrato'] ?? '');
+      $income = $this->income($contract, $noMandate);
+      $result['contracts'][] = [
+        'id' => (int) ($contract['_ID'] ?? 0), 'contrato' => (string) ($contract['contrato'] ?? ''), 'inmueble' => (string) ($contract['inmueble'] ?? ''),
+        'direccion' => (string) ($contract['direccion'] ?? ''), 'estado' => (string) ($contract['estado'] ?? ''),
+        'fin' => $end > 0 ? date('Y-m-d', $end) : '', 'max_months' => self::monthsUntil(time(), $end),
+      ] + $income;
+    }
+    $result['active_credits'] = $this->activeCredits($document);
+    return $result;
+  }
+
+  /**
+   * Cupo para el PDF, recalculado aquí con los valores que escribió o ajustó el consultor (no se confía en los
+   * totales del navegador). Ingreso neto de cada inmueble = canon − comisión − garantía − (seguro + intereses) / 12
+   * − otros; cupo = suma × meses de política. Plazo: meses de 30 días hasta el fin más lejano − margen.
+   * @param array<string,mixed> $input owner{name,document,phone,email}, registered, sources[{canon,comision,garantia,seguro,intereses,otros,fin,meta}]
+   * @return array<string,mixed>
+   */
+  public function estimate(array $input, int $today = 0): array
+  {
+    $this->authorize();
+    $settings = $this->settings();
+    $text = static fn($value, int $limit): string => mb_substr(trim(preg_replace('/\s+/u', ' ', (string) $value) ?? ''), 0, $limit);
+    $owner = is_array($input['owner'] ?? null) ? $input['owner'] : [];
+    $owner = ['name' => $text($owner['name'] ?? '', 120), 'document' => $text($owner['document'] ?? '', 24), 'phone' => $text($owner['phone'] ?? '', 20), 'email' => $text($owner['email'] ?? '', 120)];
+    if ($owner['name'] === '') throw new \InvalidArgumentException('Escribe el nombre del propietario: aparece en el PDF.');
+    $sources = [];
+    foreach (array_slice(is_array($input['sources'] ?? null) ? $input['sources'] : [], 0, 30) as $source) {
+      if (!is_array($source)) continue;
+      $item = [];
+      foreach (['canon', 'comision', 'garantia', 'seguro', 'intereses', 'otros'] as $key) $item[$key] = min(9999999999.0, round(self::money($source[$key] ?? 0)));
+      $fin = trim((string) ($source['fin'] ?? ''));
+      $item['fin'] = preg_match('/^\d{4}-\d{2}-\d{2}$/', $fin) === 1 && strtotime($fin) !== false ? $fin : '';
+      $item['meta'] = $text($source['meta'] ?? '', 160);
+      $item['seguro_mes'] = ($item['seguro'] + $item['intereses']) / 12;
+      $item['net'] = max(0.0, $item['canon'] - $item['comision'] - $item['garantia'] - $item['seguro_mes'] - $item['otros']);
+      $sources[] = $item;
+    }
+    if ($sources === []) throw new \InvalidArgumentException('Agrega al menos un inmueble con su canon.');
+    $net = array_sum(array_column($sources, 'net'));
+    if ($net <= 0) throw new \InvalidArgumentException('El ingreso neto es $0: revisa el canon y los descuentos.');
+    $ends = array_filter(array_column($sources, 'fin'));
+    $longest = $ends === [] ? '' : max($ends);
+    $today = $today > 0 ? $today : (int) strtotime('today');
+    return [
+      'owner' => $owner, 'registered' => !empty($input['registered']), 'sources' => $sources,
+      'income_months' => $settings['income_months'], 'term_margin_months' => $settings['term_margin_months'],
+      'net' => $net, 'amount' => $net * $settings['income_months'], 'longest_end' => $longest,
+      'term' => $longest === '' ? null : self::monthsUntil($today, (int) strtotime($longest)) - $settings['term_margin_months'],
+    ];
+  }
+
+  /**
+   * Canon y descuentos mensuales del contrato; sin mandato con comisión, el porcentaje configurado del canon.
+   * @return array{canon:float,comision:float,garantia:float,seguro:float,intereses:float,otros:float}
+   */
+  private function income(array $contract, float $noMandate): array
+  {
+    $canon = self::money($contract['valor_canon'] ?? '');
+    $letterId = (int) ($contract['id_carta_aumento_canon'] ?? 0);
+    $letters = $this->db->table('jet_cct_cartas_aumento');
+    if ($letterId > 0 && $this->hasColumn($letters, 'canon')) $canon = max($canon, self::money($this->db->getVar("SELECT `canon` FROM `{$letters}` WHERE `_ID` = ? LIMIT 1", [$letterId]) ?? ''));
+    $income = ['canon' => $canon, 'comision' => 0.0, 'garantia' => 0.0, 'seguro' => 0.0, 'intereses' => 0.0, 'otros' => 0.0];
+    $mandate = $this->mandate($contract);
+    if (is_array($mandate) && self::money($mandate['total_comision'] ?? '') > 0) {
+      $income['comision'] = self::money($mandate['total_comision'] ?? '');
+      $income['garantia'] = self::isYes($mandate['incluye_garantia'] ?? '') ? self::money($mandate['precio_mes_garantia'] ?? '') : 0.0;
+      $income['seguro'] = self::isYes($mandate['incluye_garantia_servicios'] ?? '') ? self::money($mandate['precio_mes_servicios'] ?? '') * 12 : 0.0;
+      return $income;
+    }
+    $income['otros'] = round($canon * $noMandate);
+    return $income;
+  }
+
+  /** Créditos aprobados (vigentes) de la persona en el liquidador: el analista descuenta su saldo del cupo. */
+  private function activeCredits(string $document): int
+  {
+    $table = $this->db->table('scm_owner_credits');
+    if (!$this->hasColumn($table, 'owner_document')) return 0;
+    return (int) $this->db->getVar("SELECT COUNT(*) FROM `{$table}` WHERE UPPER(REPLACE(REPLACE(`owner_document`, '.', ''), ' ', '')) = ? AND `status` = 'aprobado'", [$document]);
+  }
+
+  /** @return array<string,mixed>|null */
+  private function mandate(array $contract): ?array
+  {
+    $mandates = $this->db->table('jet_cct_contrato_mandato');
+    $mandateId = (int) ($contract['id_contrato_mandato'] ?? 0);
+    $row = $mandateId > 0 && $this->columnsOf($mandates) !== [] ? $this->db->getRow("SELECT * FROM `{$mandates}` WHERE `_ID` = ? LIMIT 1", [$mandateId]) : null;
+    return is_array($row) ? $row : null;
+  }
+
+  /**
+   * Propietarios del contrato de mandato (1 a 6) o, sin mandato, el propietario del contrato de arrendamiento.
+   * @return list<array{name:string,document:string,email:string,phone:string}>
+   */
+  private function contractOwners(array $contract): array
+  {
+    $owners = [];
+    $mandate = $this->mandate($contract);
+    if (is_array($mandate)) {
+      $count = max(1, min(6, (int) ($mandate['propietarios'] ?? 1)));
+      for ($i = 1; $i <= $count; $i++) {
+        $company = strcasecmp(trim((string) ($mandate['tipo_' . $i] ?? '')), 'Natural') !== 0 && trim((string) ($mandate['empresa_' . $i] ?? '')) !== '';
+        $name = trim((string) ($company ? $mandate['empresa_' . $i] : ($mandate['nombre_' . $i] ?? '')));
+        if ($name === '') continue;
+        $owners[] = [
+          'name' => $name,
+          'document' => trim((string) ($company ? ($mandate['nit_' . $i] ?? '') : ($mandate['documento_' . $i] ?? ''))),
+          'email' => trim((string) ($mandate['correo_' . $i] ?? '')),
+          'phone' => self::phone((string) ($mandate['celular_' . $i] ?? ''), (string) ($mandate['indicativo_' . $i] ?? '')),
+        ];
+      }
+    }
+    if ($owners === []) {
+      $owners[] = [
+        'name' => trim((string) ($contract['propietario'] ?? '')), 'document' => '',
+        'email' => trim((string) ($contract['correo_propietario'] ?? '')),
+        'phone' => self::phone((string) ($contract['celular_propietario'] ?? ''), (string) ($contract['indicativo_propietario'] ?? '')),
+      ];
+    }
+    return $owners;
+  }
+
+  /** @return array<string,mixed> */
+  private function sharedSetting(string $key): array
+  {
+    try {
+      $value = $this->sharedSettings->get($key, []);
+      return is_array($value) ? $value : [];
+    } catch (\Throwable $error) {
+      error_log('[commercial-preapproval-settings] ' . $error->getMessage());
+      return [];
+    }
+  }
+
+  /** Columnas de una tabla (vacío si no existe); funciona en MySQL y en la base SQLite de las pruebas. @return array<int,string> */
+  private function columnsOf(string $table): array
+  {
+    if (isset($this->columns[$table])) return $this->columns[$table];
+    $columns = [];
+    try {
+      $statement = $this->db->pdo()->query("SELECT * FROM `{$table}` LIMIT 0");
+      if ($statement !== false) {
+        for ($i = 0; $i < $statement->columnCount(); $i++) {
+          $meta = $statement->getColumnMeta($i);
+          if ($meta !== false) $columns[] = $meta['name'];
+        }
+      }
+    } catch (\PDOException $error) {
+      $columns = [];
+    }
+    return $this->columns[$table] = $columns;
+  }
+
+  private function hasColumn(string $table, string $column): bool
+  {
+    return in_array($column, $this->columnsOf($table), true);
+  }
+
+  /** Meses (de 30 días) entre hoy y el fin del contrato, con la misma regla del liquidador. */
+  private static function monthsUntil(int $from, int $to): int
+  {
+    if ($from <= 0 || $to <= 0) return 0;
+    $days = (int) floor(((int) strtotime(date('Y-m-d', $to)) - (int) strtotime(date('Y-m-d', $from))) / 86400);
+    return max(0, (int) floor($days / 30));
+  }
+
+  /** Porción de 0 a 1: se acepta 15, "15 %" o 0,15. */
+  private static function share($value, float $default): float
+  {
+    $text = str_replace(',', '.', trim((string) $value));
+    if ($text === '' || !is_numeric(rtrim($text, '%'))) return $default;
+    $number = (float) rtrim($text, '%');
+    if (str_ends_with($text, '%') || $number >= 1) $number /= 100;
+    return max(0.0, min(1.0, $number));
+  }
+
+  private static function document(string $value): string
+  {
+    return strtoupper(preg_replace('/[\s.]+/', '', trim($value)) ?? '');
+  }
+
+  /** Celular con indicativo en dígitos (+57 314 5106244 → 573145106244). */
+  private static function phone(string $phone, string $prefix): string
+  {
+    $digits = preg_replace('/\D/', '', $phone) ?? '';
+    $prefixDigits = preg_replace('/\D/', '', $prefix) ?? '';
+    if ($digits === '') return '';
+    if (str_starts_with(trim($phone), '+') || $prefixDigits === '' || str_starts_with($digits, $prefixDigits)) return $digits;
+    return $prefixDigits . $digits;
+  }
+
+  public static function money($value): float
+  {
+    if (is_int($value) || is_float($value)) return max(0.0, (float) $value);
+    $text = preg_replace('/[^\d,.\-]/', '', trim((string) $value)) ?? '';
+    if ($text === '') return 0.0;
+    if (str_contains($text, ',') && str_contains($text, '.')) {
+      $text = strrpos($text, ',') > strrpos($text, '.') ? str_replace(',', '.', str_replace('.', '', $text)) : str_replace(',', '', $text);
+    } elseif (preg_match('/^\d{1,3}(?:\.\d{3})+$/', $text) === 1) {
+      $text = str_replace('.', '', $text);
+    } elseif (str_contains($text, ',')) {
+      $text = preg_match('/^\d{1,3}(?:,\d{3})+$/', $text) === 1 ? str_replace(',', '', $text) : str_replace(',', '.', $text);
+    }
+    return is_numeric($text) ? max(0.0, (float) $text) : 0.0;
+  }
+
+  private static function timestamp($value): int
+  {
+    $text = trim((string) $value);
+    if ($text === '') return 0;
+    if (ctype_digit($text)) {
+      $number = (int) $text;
+      return $number > 9999999999 ? intdiv($number, 1000) : $number;
+    }
+    return (int) (strtotime($text) ?: 0);
+  }
+
+  private static function isYes($value): bool
+  {
+    return in_array(mb_strtolower(trim((string) $value), 'UTF-8'), ['si', 'sí', '1', 'yes'], true);
+  }
+}

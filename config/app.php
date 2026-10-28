@@ -39,7 +39,6 @@ return [
   'preventiva_url' => $env('PREVENTIVA_URL', ''),
   'correctiva_url' => $env('CORRECTIVA_URL', ''),
   'cotizacion_url' => $env('COTIZACION_URL', ''),
-  'owner_credits_url' => $env('OWNER_CREDITS_URL', ''),
   'group_comercial' => $env('GROUP_COMERCIAL', ''),
   'shared_notifications_path' => $env('SHARED_NOTIFICATIONS_PATH', ''),
   'allow_legacy_passwords' => $envBool('AUTH_ALLOW_LEGACY_PASSWORDS', false),

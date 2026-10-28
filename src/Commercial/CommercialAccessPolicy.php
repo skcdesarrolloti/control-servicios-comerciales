@@ -15,7 +15,6 @@ final class CommercialAccessPolicy
     'calendario' => 'Calendario comercial',
     'precaptacion' => 'Precaptación',
     'anadir_aviso' => 'Añadir aviso',
-    'solicitud_credito' => 'Solicitud de crédito',
     'inmuebles' => 'Inmuebles',
     'abiertos' => 'Tareas abiertas',
     'postergados' => 'Tareas postergadas',
@@ -24,6 +23,7 @@ final class CommercialAccessPolicy
     'actualizaciones' => 'Actualizaciones de inmuebles',
     'avisos' => 'Avisos en fachada',
     'notificaciones' => 'Notificaciones comerciales',
+    'herramientas' => 'Herramientas',
   ];
 
   public const ACTIONS = [
@@ -45,7 +45,6 @@ final class CommercialAccessPolicy
     'precaptacion_catalogos' => 'Crear barrios e inmobiliarias',
     'registrar_aviso' => 'Registrar avisos nuevos y retoques',
     'ingresar_inmueble' => 'Ingresar inmuebles desde una tarea',
-    'solicitar_credito' => 'Registrar solicitudes de crédito de propietarios',
   ];
 
   public const SUBVIEWS = [
@@ -61,6 +60,10 @@ final class CommercialAccessPolicy
       'mine' => 'Mi calendario',
       'team' => 'Calendario del equipo',
       'due' => 'Vencimientos',
+    ],
+    'herramientas' => [
+      'preaprobado' => 'Cupo preaprobado del propietario',
+      'ganancia_ocasional' => 'Calculadora de ganancia ocasional',
     ],
   ];
 

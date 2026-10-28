@@ -1,0 +1,119 @@
+<?php
+
+declare(strict_types=1);
+
+namespace SCM\Commercial;
+
+use SCM\Support\HtmlPdfRenderer;
+use SCM\Views\CommercialToolsView;
+
+/**
+ * PDF del cupo preaprobado que se le entrega al propietario. Usa el diseño de las actas de revisión de servicios
+ * públicos del panel inmobiliario (membrete, hojas de estilo y Chromium vía HtmlPdfRenderer).
+ */
+final class CommercialOwnerPreapprovalPdf
+{
+  public const TITLE = 'Cupo preaprobado estimado';
+
+  /** @param array<string,mixed> $estimate CommercialOwnerPreapprovalService::estimate() */
+  public static function bytes(array $estimate, string $generatedBy): string
+  {
+    $css = dirname(__DIR__, 2) . '/public/assets/css/';
+    $bytes = HtmlPdfRenderer::render(self::html($estimate, $generatedBy, true), self::TITLE, [
+      'stylesheets' => [$css . 'ticket-completion-document.css', $css . 'public-services-document.css', $css . 'owner-preapproval-document.css'],
+      'external_fonts' => false, 'body_class' => 'scm-services-page scm-services-pdf',
+      'wrapper_class' => 'scm-services-pdf-root', 'container_class' => 'scm-services-public-root',
+    ]);
+    if ($bytes === null) throw new \RuntimeException('No se pudo generar el PDF con Chromium. Verifica el servicio de PDF (SCM_GOTENBERG_URL) e intenta nuevamente.');
+    return $bytes;
+  }
+
+  public static function filename(array $estimate): string
+  {
+    $owner = $estimate['owner'];
+    $slug = strtolower(trim((string) preg_replace('/[^a-z0-9]+/i', '-', (string) iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', (string) ($owner['document'] !== '' ? $owner['document'] : $owner['name']))), '-'));
+    return 'cupo-preaprobado-' . ($slug !== '' ? $slug : 'propietario') . '-' . date('Y-m-d') . '.pdf';
+  }
+
+  private static function e($value): string
+  {
+    return htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+  }
+
+  private static function money(float $value): string
+  {
+    return '$' . number_format(round($value), 0, ',', '.');
+  }
+
+  private static function date(string $iso): string
+  {
+    $ts = strtotime($iso);
+    return $ts === false ? '' : date('d/m/Y', $ts);
+  }
+
+  /** @param array<string,string> $rows */
+  private static function table(array $rows): string
+  {
+    $html = '<table class="scm-acta-receipt-data"><tbody>';
+    foreach ($rows as $label => $value) $html .= '<tr><th scope="row">' . self::e($label) . '</th><td>' . self::e($value) . '</td></tr>';
+    return $html . '</tbody></table>';
+  }
+
+  /** Fila concepto | frecuencia | valor; la nota aclara la unidad (seguro de 12 meses, intereses si se difiere). */
+  private static function row(string $label, string $unit, float $value, string $note = '', string $class = ''): string
+  {
+    return '<tr' . ($class !== '' ? ' class="' . $class . '"' : '') . '><th scope="row">' . self::e($label) . ($note !== '' ? '<small>' . self::e($note) . '</small>' : '') . '</th><td class="is-unit">' . self::e($unit) . '</td><td class="is-money">' . self::e(self::money($value)) . '</td></tr>';
+  }
+
+  /** @param array<string,mixed> $estimate */
+  public static function html(array $estimate, string $generatedBy, bool $pdf = false): string
+  {
+    $owner = $estimate['owner'];
+    $months = (int) $estimate['income_months'];
+    $term = $estimate['term'];
+    $termText = $term === null ? 'Según la vigencia del contrato' : ((int) $term > 0 ? (int) $term . ' cuotas mensuales' : 'Sin plazo disponible por vigencia');
+
+    $letterhead = $footerImage = '';
+    if ($pdf) {
+      $assets = dirname(__DIR__, 2) . '/public/assets/img/';
+      $top = 'data:image/jpeg;base64,' . base64_encode((string) file_get_contents($assets . 'membrete-sucasa-header.jpg'));
+      $bottom = 'data:image/jpeg;base64,' . base64_encode((string) file_get_contents($assets . 'membrete-sucasa-footer.jpg'));
+      $letterhead = '<style>@page{size:letter;margin:12mm 18mm 14mm;@bottom-left{content:none}@bottom-center{content:none}}</style><div class="scm-preapproval-topline"></div><div class="scm-services-letterhead-top"><img src="' . $top . '" alt="Membrete institucional"></div>';
+      $footerImage = '<div class="scm-services-letterhead-bottom"><img src="' . $bottom . '" alt=""></div>';
+    }
+
+    $income = '';
+    foreach ($estimate['sources'] as $index => $item) {
+      // Solo los descuentos que tiene el inmueble: las filas en $0 alargan el documento sin informar nada.
+      $rows = self::row('Canon / valor de la prima', 'Mensual (mes)', (float) $item['canon']);
+      if ($item['comision'] > 0) $rows .= self::row('(−) Comisión de administración (IVA incluido)', 'Mensual (mes)', (float) $item['comision']);
+      if ($item['garantia'] > 0) $rows .= self::row('(−) Garantía inmobiliaria', 'Mensual (mes)', (float) $item['garantia']);
+      if ($item['seguro'] > 0) $rows .= self::row('(−) Seguro', '12 meses', (float) $item['seguro'], 'Permanece mientras la vigencia del contrato continúa. Se descuentan ' . self::money($item['seguro'] / 12) . ' por mes.');
+      if ($item['intereses'] > 0) $rows .= self::row('(−) Intereses', '12 meses', (float) $item['intereses'], 'Aplica si el seguro se difiere a 12 meses. Se descuentan ' . self::money($item['intereses'] / 12) . ' por mes.');
+      if ($item['otros'] > 0) $rows .= self::row('(−) Otros descuentos', 'Mensual (mes)', (float) $item['otros']);
+      $rows .= self::row('Ingreso neto mensual', 'Mensual (mes)', (float) $item['net'], $item['fin'] !== '' ? 'Fin del contrato: ' . self::date($item['fin']) : '', 'is-total');
+      $income .= '<div class="scm-preapproval-property"><h3>Inmueble ' . ($index + 1) . ($item['meta'] !== '' ? ' <span>' . self::e($item['meta']) . '</span>' : '') . '</h3>'
+        . '<table class="scm-preapproval-income"><thead><tr><th>Concepto</th><th>Frecuencia</th><th>Valor</th></tr></thead><tbody>' . $rows . '</tbody></table></div>';
+    }
+
+    $calc = self::row('Ingreso neto mensual total (' . count($estimate['sources']) . (count($estimate['sources']) === 1 ? ' inmueble)' : ' inmuebles)'), 'Mensual (mes)', (float) $estimate['net'])
+      . '<tr><th scope="row">Meses de ingreso que respaldan el cupo</th><td class="is-unit">Política</td><td class="is-money">' . $months . ' meses</td></tr>'
+      . ($term !== null ? '<tr><th scope="row">Plazo máximo estimado<small>Meses de vigencia del contrato más largo (fin ' . self::e(self::date((string) $estimate['longest_end'])) . ') menos ' . (int) $estimate['term_margin_months'] . ' de margen.</small></th><td class="is-unit">Cuotas</td><td class="is-money">' . self::e($termText) . '</td></tr>' : '')
+      . self::row('Cupo preaprobado estimado', 'Ingreso neto × ' . $months, (float) $estimate['amount'], '', 'is-total');
+
+    return '<article class="scm-acta-receipt scm-services-document scm-preapproval-document">' . $letterhead
+      . '<header class="scm-acta-receipt-head"><h1>' . self::TITLE . '</h1></header>'
+      . '<p class="scm-acta-receipt-date">Cartagena de Indias, ' . date('d/m/Y') . ' · Documento informativo para el propietario</p>'
+      . '<section class="scm-preapproval-highlight"><div><span>Cupo preaprobado estimado</span><strong>' . self::e(self::money((float) $estimate['amount'])) . '</strong></div>'
+      . '<dl><div><dt>Ingreso neto mensual</dt><dd>' . self::e(self::money((float) $estimate['net'])) . ' × ' . $months . ' meses</dd></div><div><dt>Plazo máximo estimado</dt><dd>' . self::e($termText) . '</dd></div></dl></section>'
+      . '<section class="scm-acta-receipt-section"><h2>1. Propietario</h2>' . self::table(array_filter([
+        'Nombre' => $owner['name'], 'Cédula o NIT' => $owner['document'], 'Celular' => $owner['phone'], 'Correo' => $owner['email'],
+        'Vínculo con SuCasa' => $estimate['registered'] ? 'Propietario registrado (contratos vigentes)' : 'Propietario aún no registrado (valores estimados)',
+      ], static fn(string $value): bool => $value !== '')) . '</section>'
+      . '<section class="scm-acta-receipt-section"><h2>2. Ingresos y descuentos por inmueble</h2><p class="scm-preapproval-lead">Los valores son mensuales, salvo el seguro, que se registra por sus 12 meses y se descuenta mes a mes.</p>' . $income . '</section>'
+      . '<section class="scm-acta-receipt-section scm-preapproval-keep"><h2>3. Cálculo del cupo</h2><table class="scm-preapproval-income"><tbody>' . $calc . '</tbody></table></section>'
+      . '<p class="scm-preapproval-disclaimer"><strong>Importante:</strong> ' . self::e(CommercialToolsView::DISCLAIMER) . '</p>'
+      . '<footer class="scm-acta-receipt-footer scm-services-signatures"><div><span>Realizado por</span><strong>' . self::e($generatedBy !== '' ? $generatedBy : 'Servicios comerciales') . '</strong><p>Servicios comerciales</p></div><p class="scm-services-company">SKC SuCasa Inmobiliaria · NIT 900623242-4</p></footer>'
+      . $footerImage . '</article>';
+  }
+}
