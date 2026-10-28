@@ -45,7 +45,17 @@ const { chromium } = require(process.env.SCM_PLAYWRIGHT_MODULE || 'playwright');
     assert.equal(await tool.locator('[data-pre-net]').innerText(), '$2.551.000');
     await page.screenshot({ path: 'output/commercial-tools-preapproval.png', fullPage: true });
 
-    const [download] = await Promise.all([page.waitForEvent('download', { timeout: 30000 }), tool.locator('[data-pre-pdf]').click()]);
+    // Primero la vista previa del PDF (popup interno) y desde ahí la descarga.
+    await tool.locator('[data-pre-pdf]').click();
+    const viewer = tool.locator('[data-pre-viewer]');
+    await page.waitForFunction(() => document.querySelector('[data-pre-viewer]').open, null, { timeout: 30000 });
+    assert.match(await viewer.locator('[data-pre-viewer-frame]').getAttribute('src'), /^blob:/);
+    await page.waitForTimeout(800);
+    await page.screenshot({ path: 'output/commercial-tools-pdf-preview.png' });
+    const isPdf = item => /^simulacion-ingreso-neto-/.test(item.suggestedFilename());
+    const [download] = await Promise.all([page.waitForEvent('download', { predicate: isPdf, timeout: 30000 }), viewer.locator('[data-pre-download]').click()]);
+    await viewer.locator('footer [data-pre-viewer-close]').click();
+    assert.equal(await viewer.evaluate(node => node.open), false);
     assert.match(download.suggestedFilename(), /^simulacion-ingreso-neto-1-143-415-938-\d{4}-\d{2}-\d{2}\.pdf$/);
     await download.saveAs('output/commercial-tools-preapproval.pdf');
     assert.equal(fs.readFileSync('output/commercial-tools-preapproval.pdf').subarray(0, 5).toString(), '%PDF-');
@@ -56,6 +66,7 @@ const { chromium } = require(process.env.SCM_PLAYWRIGHT_MODULE || 'playwright');
     assert.equal(await tool.locator('[data-pre-source]').count(), 1);
     const first = tool.locator('[data-pre-source]').first();
     await tool.locator('[data-pre-owner="name"]').fill('Carlos Nuevo');
+    await tool.locator('[data-pre-owner="document"]').fill('80123456');
     await first.locator('[data-pre-field="canon"]').fill('1500000');
     // Comisión 10 % + IVA = 178.500 y garantía El Libertador 2,5 % = 37.500.
     assert.equal(await first.locator('[data-pre-source-net]').innerText(), '$1.284.000');
@@ -76,14 +87,28 @@ const { chromium } = require(process.env.SCM_PLAYWRIGHT_MODULE || 'playwright');
     assert.equal(await first.locator('[data-pre-source-net]').innerText(), '$1.260.250');
     await first.locator('[data-pre-sim="modalidad"]').selectOption('defecto');
     await page.screenshot({ path: 'output/commercial-tools-simulation.png', fullPage: true });
-    assert.equal(await tool.locator('[data-pre-term]').innerText(), 'Según vigencia');
+    // Duración del contrato en meses (12 por defecto) menos 2 de margen; con menos de 12 meses se avisa.
+    assert.equal(await tool.locator('[data-pre-term]').innerText(), 'Hasta 10 cuotas');
+    await first.locator('[data-pre-field="duracion"]').selectOption('6');
+    assert.match(await first.locator('[data-pre-source-warning]').innerText(), /mínimo 12 meses/);
+    assert.equal(await tool.locator('[data-pre-term]').innerText(), 'Hasta 4 cuotas');
+    await first.locator('[data-pre-field="duracion"]').selectOption('24');
+    assert.equal(await first.locator('[data-pre-source-warning]').isVisible(), false);
+    assert.equal(await tool.locator('[data-pre-term]').innerText(), 'Hasta 22 cuotas');
+    // La administración no paga comisión: solo cambia la garantía (2,5 % de 1.800.000 = 45.000).
+    await first.locator('[data-pre-sim="administracion"]').fill('300000');
+    assert.equal(await first.locator('[data-pre-source-net]').innerText(), '$1.276.500');
+    await first.locator('[data-pre-sim="administracion"]').fill('');
     // Otro inmueble: $500.000 − 59.500 − 12.500 = 428.000 / mes.
     await tool.locator('[data-pre-add]').click();
     await tool.locator('[data-pre-source]').nth(1).locator('[data-pre-field="canon"]').fill('500000');
     assert.equal(await tool.locator('[data-pre-total]').innerText(), '$5.136.000');
     await tool.locator('[data-pre-source]').nth(1).locator('[data-pre-remove]').click();
     assert.equal(await tool.locator('[data-pre-total]').innerText(), '$3.852.000');
-    // Lo que necesita el propietario y si su crédito preaprobado lo cubre.
+    // Lo que necesita el propietario: primero se pregunta; solo si dice que sí se diligencia.
+    assert.equal(await tool.locator('[data-pre-needs-panel]').isVisible(), false);
+    await tool.locator('[data-pre-needs="si"]').click();
+    assert.equal(await tool.locator('[data-pre-needs-panel]').isVisible(), true);
     await tool.locator('[data-pre-use="reparaciones"]').fill('1000000');
     await tool.locator('[data-pre-use="servicios"]').fill('400000');
     assert.equal(await tool.locator('[data-pre-uses-summary]').getAttribute('data-state'), 'ok');
@@ -91,8 +116,19 @@ const { chromium } = require(process.env.SCM_PLAYWRIGHT_MODULE || 'playwright');
     await tool.locator('[data-pre-notes]').fill('Se descuenta de su canon.');
     await tool.locator('[data-pre-copy]').click();
     await page.waitForFunction(() => document.querySelector('[data-pre-copy-label]').textContent === 'Mensaje copiado');
-    const [manualPdf] = await Promise.all([page.waitForEvent('download', { timeout: 30000 }), tool.locator('[data-pre-pdf]').click()]);
-    assert.match(manualPdf.suggestedFilename(), /^simulacion-ingreso-neto-carlos-nuevo-/);
+    // Celular y correo son obligatorios para el PDF.
+    await tool.locator('[data-pre-pdf]').click();
+    assert.match(await tool.locator('[data-pre-error]').innerText(), /el celular/);
+    await tool.locator('[data-pre-owner="phone"]').fill('3001234567');
+    await tool.locator('[data-pre-owner="email"]').fill('carlos@');
+    await tool.locator('[data-pre-pdf]').click();
+    assert.match(await tool.locator('[data-pre-error]').innerText(), /correo/);
+    await tool.locator('[data-pre-owner="email"]').fill('carlos@example.test');
+    await tool.locator('[data-pre-pdf]').click();
+    await page.waitForFunction(() => document.querySelector('[data-pre-viewer]').open, null, { timeout: 30000 });
+    const [manualPdf] = await Promise.all([page.waitForEvent('download', { predicate: isPdf, timeout: 30000 }), viewer.locator('[data-pre-download]').click()]);
+    await viewer.locator('[data-pre-viewer-close]').first().click();
+    assert.match(manualPdf.suggestedFilename(), /^simulacion-ingreso-neto-80123456-/);
     await manualPdf.saveAs('output/commercial-tools-simulation.pdf');
     await page.screenshot({ path: 'output/commercial-tools-manual.png', fullPage: true });
 

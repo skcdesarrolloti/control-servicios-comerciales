@@ -144,22 +144,37 @@ final class CommercialOwnerPreapprovalService
     return $result;
   }
 
+  /** Condiciones para aprobar el crédito; se enumeran en el PDF. */
+  public const CONDITIONS = [
+    'Queda sujeto a estudio, verificación y aprobación.',
+    'El crédito se otorga solamente si el contrato queda perfeccionado, es decir, con la ocupación del inmueble.',
+    'El contrato debe contar con la póliza de servicios públicos.',
+    'La duración del contrato debe ser mínimo de 12 meses.',
+    'El contrato debe contar con garantía inmobiliaria (asegurado).',
+  ];
+  /** Duración mínima del contrato (meses) que exige el crédito. */
+  public const MIN_CONTRACT_MONTHS = 12;
+
   /**
    * Simulación para el PDF, recalculada aquí con los valores que escribió o ajustó el consultor (no se confía en los
    * totales del navegador). Cada inmueble se simula con las tarifas de SuCasa (`calc` = "sim") o trae los descuentos del
    * contrato. Ingreso neto = canon − comisión − garantía − (seguro + intereses) / 12 − otros; crédito preaprobado = suma ×
-   * meses de política. Plazo: meses de 30 días hasta el fin más lejano − margen.
-   * @param array<string,mixed> $input owner{name,document,phone,email}, registered, sources[{calc,canon,…,otros,fin,meta}], uses{servicios,…}, notes
+   * meses de política. Plazo: duración en meses del contrato más largo − margen. Las necesidades del propietario solo
+   * salen si respondió que tiene algo por resolver (`needs`).
+   * @param array<string,mixed> $input owner{name,document,phone,email}, registered, sources[{calc,canon,…,otros,duracion,meta}], needs, uses{servicios,…}, notes
    * @return array<string,mixed>
    */
-  public function estimate(array $input, int $today = 0): array
+  public function estimate(array $input): array
   {
     $this->authorize();
     $settings = $this->settings();
     $text = static fn($value, int $limit): string => mb_substr(trim(preg_replace('/\s+/u', ' ', (string) $value) ?? ''), 0, $limit);
     $owner = is_array($input['owner'] ?? null) ? $input['owner'] : [];
     $owner = ['name' => $text($owner['name'] ?? '', 120), 'document' => $text($owner['document'] ?? '', 24), 'phone' => $text($owner['phone'] ?? '', 20), 'email' => $text($owner['email'] ?? '', 120)];
-    if ($owner['name'] === '') throw new \InvalidArgumentException('Escribe el nombre del propietario: aparece en el PDF.');
+    foreach (['name' => 'el nombre', 'document' => 'la cédula o NIT', 'phone' => 'el celular', 'email' => 'el correo'] as $key => $label) {
+      if ($owner[$key] === '') throw new \InvalidArgumentException('Escribe ' . $label . ' del propietario: es obligatorio y aparece en el PDF.');
+    }
+    if (filter_var($owner['email'], FILTER_VALIDATE_EMAIL) === false) throw new \InvalidArgumentException('El correo del propietario no es válido.');
     $sources = [];
     foreach (array_slice(is_array($input['sources'] ?? null) ? $input['sources'] : [], 0, 30) as $source) {
       if (!is_array($source)) continue;
@@ -170,8 +185,7 @@ final class CommercialOwnerPreapprovalService
         foreach (['canon', 'comision', 'garantia', 'seguro', 'intereses'] as $key) $item[$key] = $sim[$key];
         $item['sim'] = $sim;
       }
-      $fin = trim((string) ($source['fin'] ?? ''));
-      $item['fin'] = preg_match('/^\d{4}-\d{2}-\d{2}$/', $fin) === 1 && strtotime($fin) !== false ? $fin : '';
+      $item['duracion'] = is_numeric($source['duracion'] ?? null) ? max(0, min(240, (int) $source['duracion'])) : 0;
       $item['meta'] = $text($source['meta'] ?? '', 160);
       $item['seguro_mes'] = ($item['seguro'] + $item['intereses']) / 12;
       $item['net'] = max(0.0, $item['canon'] - $item['comision'] - $item['garantia'] - $item['seguro_mes'] - $item['otros']);
@@ -180,11 +194,10 @@ final class CommercialOwnerPreapprovalService
     if ($sources === []) throw new \InvalidArgumentException('Agrega al menos un inmueble con su canon.');
     $net = array_sum(array_column($sources, 'net'));
     if ($net <= 0) throw new \InvalidArgumentException('El ingreso neto es $0: revisa el canon y los descuentos.');
-    $ends = array_filter(array_column($sources, 'fin'));
-    $longest = $ends === [] ? '' : max($ends);
-    $today = $today > 0 ? $today : (int) strtotime('today');
+    $longest = max(array_column($sources, 'duracion'));
+    $needs = !empty($input['needs']);
     $uses = [];
-    $requested = is_array($input['uses'] ?? null) ? $input['uses'] : [];
+    $requested = $needs && is_array($input['uses'] ?? null) ? $input['uses'] : [];
     foreach (array_keys(self::USES) as $key) {
       $value = min(9999999999.0, round(self::money($requested[$key] ?? 0)));
       if ($value > 0) $uses[$key] = $value;
@@ -192,9 +205,9 @@ final class CommercialOwnerPreapprovalService
     return [
       'owner' => $owner, 'registered' => !empty($input['registered']), 'sources' => $sources,
       'income_months' => $settings['income_months'], 'term_margin_months' => $settings['term_margin_months'],
-      'gross' => array_sum(array_column($sources, 'canon')), 'net' => $net, 'amount' => $net * $settings['income_months'], 'longest_end' => $longest,
-      'term' => $longest === '' ? null : self::monthsUntil($today, (int) strtotime($longest)) - $settings['term_margin_months'],
-      'uses' => $uses, 'notes' => mb_substr(trim(str_replace("\r", '', (string) ($input['notes'] ?? ''))), 0, 600),
+      'gross' => array_sum(array_column($sources, 'canon')), 'net' => $net, 'amount' => $net * $settings['income_months'], 'longest_months' => $longest,
+      'term' => $longest > 0 ? max(0, $longest - $settings['term_margin_months']) : null,
+      'needs' => $needs, 'uses' => $uses, 'notes' => mb_substr(trim(str_replace("\r", '', (string) ($input['notes'] ?? ''))), 0, 600),
     ];
   }
 

@@ -20,6 +20,9 @@ require_once dirname(__DIR__, 2) . '/src/Core/Helpers.php';
 
 final class CommercialOwnerPreapprovalTest extends TestCase
 {
+  /** Datos obligatorios del propietario para el PDF. */
+  private const OWNER = ['document'=>'1143415938', 'phone'=>'3145106244', 'email'=>'ana@example.test'];
+
   private Database $db;
   private CommercialAccessPolicy $policy;
   private array $previousSession;
@@ -82,24 +85,33 @@ final class CommercialOwnerPreapprovalTest extends TestCase
 
   public function testEstimateRecalculatesTheCupoOnTheServer(): void
   {
-    $today = (int) strtotime('2026-01-01');
-    $estimate = $this->service()->estimate(['owner'=>['name'=>' Ana  Propietaria ', 'document'=>'1143415938'], 'registered'=>true, 'amount'=>999, 'sources'=>[
-      ['canon'=>'$2.000.000', 'comision'=>250000, 'garantia'=>40000, 'seguro'=>180000, 'intereses'=>12000, 'otros'=>0, 'fin'=>'2027-03-02', 'meta'=>'Contrato C-100'],
-      ['canon'=>1000000, 'otros'=>150000, 'fin'=>'no-es-fecha'],
-    ]], $today);
+    $estimate = $this->service()->estimate(['owner'=>['name'=>' Ana  Propietaria '] + self::OWNER, 'registered'=>true, 'amount'=>999, 'sources'=>[
+      ['canon'=>'$2.000.000', 'comision'=>250000, 'garantia'=>40000, 'seguro'=>180000, 'intereses'=>12000, 'otros'=>0, 'duracion'=>14, 'meta'=>'Contrato C-100'],
+      ['canon'=>1000000, 'otros'=>150000, 'duracion'=>'doce'],
+    ]]);
     self::assertSame('Ana Propietaria', $estimate['owner']['name']);
     // (2.000.000 − 250.000 − 40.000 − 192.000 / 12) + (1.000.000 − 150.000) = 2.544.000 × 3
     self::assertEquals(2544000, $estimate['net']);
     self::assertEquals(7632000, $estimate['amount']);
-    self::assertSame(['2027-03-02', ''], array_column($estimate['sources'], 'fin'));
-    self::assertSame(12, $estimate['term']); // 425 días = 14 meses de 30 días − 2 de margen
+    self::assertSame([14, 0], array_column($estimate['sources'], 'duracion'));
+    self::assertSame(12, $estimate['term']); // contrato más largo de 14 meses − 2 de margen
 
-    $manual = $this->service()->estimate(['owner'=>['name'=>'Carlos'], 'sources'=>[['canon'=>1500000, 'comision'=>150000]]], $today);
+    $manual = $this->service()->estimate(['owner'=>['name'=>'Carlos'] + self::OWNER, 'sources'=>[['canon'=>1500000, 'comision'=>150000]]]);
     self::assertEquals(4050000, $manual['amount']);
     self::assertNull($manual['term']);
     self::assertFalse($manual['registered']);
 
-    foreach ([[['owner'=>['name'=>''], 'sources'=>[['canon'=>1]]], 'nombre'], [['owner'=>['name'=>'X'], 'sources'=>[]], 'al menos un inmueble'], [['owner'=>['name'=>'X'], 'sources'=>[['canon'=>100, 'comision'=>200]]], '$0']] as [$input, $message]) {
+    // Documento, celular y correo son obligatorios, igual que el nombre.
+    $cases = [
+      [['owner'=>['name'=>''] + self::OWNER, 'sources'=>[['canon'=>1]]], 'el nombre'],
+      [['owner'=>['name'=>'X', 'document'=>''] + self::OWNER, 'sources'=>[['canon'=>1]]], 'la cédula o NIT'],
+      [['owner'=>['name'=>'X', 'phone'=>''] + self::OWNER, 'sources'=>[['canon'=>1]]], 'el celular'],
+      [['owner'=>['name'=>'X', 'email'=>''] + self::OWNER, 'sources'=>[['canon'=>1]]], 'el correo'],
+      [['owner'=>['name'=>'X', 'email'=>'sin-arroba'] + self::OWNER, 'sources'=>[['canon'=>1]]], 'no es válido'],
+      [['owner'=>['name'=>'X'] + self::OWNER, 'sources'=>[]], 'al menos un inmueble'],
+      [['owner'=>['name'=>'X'] + self::OWNER, 'sources'=>[['canon'=>100, 'comision'=>200]]], '$0'],
+    ];
+    foreach ($cases as [$input, $message]) {
       try {
         $this->service()->estimate($input);
         self::fail('Se esperaba un error para ' . json_encode($input));
@@ -111,7 +123,7 @@ final class CommercialOwnerPreapprovalTest extends TestCase
 
   public function testPdfDocumentUsesTheActaDesignWithUnitsAndOnlyNonZeroDeductions(): void
   {
-    $estimate = $this->service()->estimate(['owner'=>['name'=>'Ana <b>Propietaria</b>', 'document'=>'1.143.415.938'], 'registered'=>true, 'sources'=>[
+    $estimate = $this->service()->estimate(['owner'=>['name'=>'Ana <b>Propietaria</b>', 'document'=>'1.143.415.938'] + self::OWNER, 'registered'=>true, 'sources'=>[
       ['canon'=>2000000, 'comision'=>250000, 'seguro'=>180000, 'intereses'=>12000, 'meta'=>'Contrato C-100'],
     ]]);
     $html = CommercialOwnerPreapprovalPdf::html($estimate, 'Funcionario de prueba');
@@ -123,7 +135,10 @@ final class CommercialOwnerPreapprovalTest extends TestCase
     self::assertStringContainsString('Aplica si el seguro se difiere en cuotas.', $html);
     self::assertStringNotContainsString('Garantía inmobiliaria', $html);
     self::assertStringContainsString(CommercialToolsView::DISCLAIMER, $html);
-    self::assertStringContainsString('Lo que puede resolver con su crédito', $html);
+    // Sin necesidades del propietario no sale la sección; las condiciones del crédito siempre salen, enumeradas.
+    self::assertStringNotContainsString('Lo que puede resolver con su crédito', $html);
+    self::assertStringContainsString('<h2>4. Condiciones para la aprobación del crédito</h2>', $html);
+    foreach (CommercialOwnerPreapprovalService::CONDITIONS as $condition) self::assertStringContainsString('<li>' . $condition . '</li>', $html);
     self::assertSame('simulacion-ingreso-neto-1-143-415-938-' . date('Y-m-d') . '.pdf', CommercialOwnerPreapprovalPdf::filename($estimate));
   }
 
@@ -144,10 +159,10 @@ final class CommercialOwnerPreapprovalTest extends TestCase
   public function testSimulatorReplicatesTheCommissionCalculatorPlugin(): void
   {
     $rates = $this->service()->rates();
-    // Por defecto con El Libertador: comisión 10 % + IVA sobre canon + administración, garantía 2,5 % y servicios en 2 cuotas.
+    // Con aseguradora (El Libertador): comisión 10 % + IVA solo sobre el canon, garantía 2,5 % sobre canon + administración y servicios en 2 cuotas.
     $base = ['canon'=>'$2.000.000', 'administracion'=>300000, 'tasa_comision'=>'10', 'modalidad'=>'defecto', 'aseguradora'=>'El Libertador', 'garantia'=>true, 'servicios'=>true, 'valor_asegurado'=>3000000, 'cuotas'=>2];
     $sim = CommercialNetIncomeSimulator::simulate($base, $rates);
-    self::assertEquals([273700, 57500, 60000, 0, 30000, 2], [$sim['comision'], $sim['garantia'], $sim['seguro'], $sim['intereses'], $sim['cuota'], $sim['cuotas']]);
+    self::assertEquals([238000, 57500, 60000, 0, 30000, 2], [$sim['comision'], $sim['garantia'], $sim['seguro'], $sim['intereses'], $sim['cuota'], $sim['cuotas']]);
     // Desde 5 cuotas la prima se financia con la tasa de préstamo de garantías (1,5 % mensual).
     $financed = CommercialNetIncomeSimulator::simulate(['cuotas'=>6] + $base, $rates);
     self::assertEquals(CommercialNetIncomeSimulator::loan(60000, 6, 1.5), ['cuota'=>$financed['cuota'], 'intereses'=>$financed['intereses']]);
@@ -167,23 +182,28 @@ final class CommercialOwnerPreapprovalTest extends TestCase
 
   public function testEstimateSimulatesSourcesAndKeepsTheOwnerNeeds(): void
   {
-    $estimate = $this->service()->estimate(['owner'=>['name'=>'Carlos Nuevo'], 'notes'=>"Primera línea\r\nSegunda", 'uses'=>['servicios'=>'$800.000', 'reparaciones'=>1200000, 'otros'=>0, 'desconocido'=>5], 'sources'=>[
+    $ignored = $this->service()->estimate(['owner'=>['name'=>'Carlos Nuevo'] + self::OWNER, 'uses'=>['servicios'=>800000], 'sources'=>[['canon'=>1000000]]]);
+    self::assertSame([], $ignored['uses']); // sin "needs", lo escrito no se usa
+    $estimate = $this->service()->estimate(['owner'=>['name'=>'Carlos Nuevo'] + self::OWNER, 'needs'=>true, 'notes'=>"Primera línea\r\nSegunda", 'uses'=>['servicios'=>'$800.000', 'reparaciones'=>1200000, 'otros'=>0, 'desconocido'=>5], 'sources'=>[
       // El navegador no puede imponer los descuentos de una simulación: se recalculan con las tarifas.
       ['calc'=>'sim', 'canon'=>2000000, 'administracion'=>300000, 'comision'=>1, 'garantia'=>true, 'servicios'=>true, 'valor_asegurado'=>3000000, 'cuotas'=>2, 'aseguradora'=>'El Libertador'],
     ]]);
-    // 2.000.000 − 273.700 − 57.500 − 60.000 / 12 = 1.663.800 × 3
-    self::assertEquals(1663800, $estimate['net']);
-    self::assertEquals(4991400, $estimate['amount']);
+    // 2.000.000 − 238.000 − 57.500 − 60.000 / 12 = 1.699.500 × 3
+    self::assertEquals(1699500, $estimate['net']);
+    self::assertEquals(5098500, $estimate['amount']);
     self::assertEquals(2000000, $estimate['gross']);
     self::assertSame(['servicios'=>800000.0, 'reparaciones'=>1200000.0], $estimate['uses']);
     self::assertSame("Primera línea\nSegunda", $estimate['notes']);
     $html = CommercialOwnerPreapprovalPdf::html($estimate, 'Funcionario de prueba');
     self::assertStringContainsString(CommercialOwnerPreapprovalPdf::TITLE, $html);
-    self::assertStringContainsString('Simulación Por defecto · El Libertador', $html);
+    self::assertStringContainsString('Simulación con El Libertador', $html);
     self::assertStringContainsString('Se paga en 2 cuotas de $30.000', $html);
     self::assertStringContainsString('Administración (la paga el arrendatario)', $html);
-    self::assertStringContainsString('$4.991.400', $html);
-    self::assertStringContainsString('cubre los $2.000.000 que necesita y le quedan $2.991.400 disponibles', $html);
+    self::assertStringContainsString('$5.098.500', $html);
+    self::assertStringContainsString('<h2>4. Lo que puede resolver con su crédito</h2>', $html);
+    self::assertStringContainsString('<h2>5. Condiciones para la aprobación del crédito</h2>', $html);
+    self::assertStringContainsString('<h2>6. Observaciones</h2>', $html);
+    self::assertStringContainsString('cubre los $2.000.000 que necesita y le quedan $3.098.500 disponibles', $html);
     self::assertStringNotContainsString('Cuotas de administración', $html);
     self::assertStringContainsString('Primera línea<br />', $html);
   }
@@ -229,6 +249,15 @@ final class CommercialOwnerPreapprovalTest extends TestCase
     self::assertStringContainsString('<option value="El Libertador">', $html);
     self::assertStringContainsString('data-pre-sim="tasa" inputmode="decimal" maxlength="8" autocomplete="off" value="10"', $html);
     self::assertStringContainsString('data-pre-use="reparaciones"', $html);
+    // Datos del propietario obligatorios, duración del contrato en meses, pregunta antes de las necesidades y vista previa del PDF.
+    self::assertSame(4, substr_count($html, 'class="ctl-required"'));
+    self::assertStringContainsString('<select data-pre-field="duracion"><option value="6">6 meses</option><option value="12" selected>', $html);
+    self::assertStringNotContainsString('data-pre-field="fin"', $html);
+    self::assertStringContainsString('<div data-pre-needs-panel hidden>', $html);
+    self::assertStringContainsString('data-pre-viewer-frame', $html);
+    self::assertStringContainsString('Tipo de garantía', $html);
+    self::assertStringNotContainsString('Por defecto', $html);
+    self::assertStringNotContainsString('canon + administración', $html);
 
     $gain = CommercialToolsView::render('ganancia_ocasional', null, 'https://example.test');
     self::assertStringContainsString('data-commercial-tool="ganancia_ocasional"', $gain);

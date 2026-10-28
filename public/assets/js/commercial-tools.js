@@ -11,7 +11,6 @@
 
   function money(value) { return "$" + moneyFormat.format(Math.round(Number(value) || 0)); }
   function digits(value) { return Number(String(value || "").replace(/[^\d]/g, "")) || 0; }
-  function todayIso() { var d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
   function escapeHtml(value) { return String(value == null ? "" : value).replace(/[&<>"']/g, function (char) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[char]; }); }
   function isoDate(text) { return /^\d{4}-\d{2}-\d{2}$/.test(text || "") ? new Date(text + "T00:00:00") : null; }
 
@@ -45,7 +44,7 @@
 
   /* ------------------------------------------------------------ Simulador de ingreso neto del propietario */
 
-  var MODALITIES = { defecto: "Por defecto", berkley: "Berkley", mundial: "Seguros Mundial" };
+  var MODALITIES = { defecto: "Aseguradora", berkley: "Berkley", mundial: "Seguros Mundial" };
   var USE_LABELS = { servicios: "servicios públicos", administracion: "cuotas de administración", reparaciones: "reparaciones y mantenimiento", otros: "otros imprevistos" };
 
   function round2(value) { return Math.round((Number(value) || 0) * 100) / 100; }
@@ -83,7 +82,8 @@
     var commissionRate = rateInput === "" ? Number(r.comision) || 0 : Math.min(100, parseRate(rateInput));
     var ivaCanon = simField(card, "iva").checked ? round2(canon * iva / 100) : 0;
     var canonTotal = round2(canon + admin);
-    var commission = round2(canonTotal * commissionRate / 100);
+    // La comisión se cobra sobre el canon; la administración solo suma a la base de la garantía.
+    var commission = round2(canon * commissionRate / 100);
     commission = round2(commission + round2(commission * iva / 100));
     var installments = Math.max(1, Math.min(modality === "berkley" ? 4 : 12, Number(simField(card, "cuotas").value) || 1));
     var insured = digits(simField(card, "valor").value);
@@ -158,7 +158,7 @@
     var value = function (name) { var input = card.querySelector('[data-pre-field="' + name + '"]'); return input ? digits(input.value) : 0; };
     var item = {
       canon: value("canon"), otros: value("otros"),
-      fin: (card.querySelector('[data-pre-field="fin"]') || {}).value || "",
+      duracion: Number(card.querySelector('[data-pre-field="duracion"]').value) || 0,
       meta: card.querySelector("[data-pre-source-meta]").textContent, fromContract: card.dataset.contract === "1",
     };
     var sim = simulate(root, card, item.canon);
@@ -177,14 +177,16 @@
     syncSimFields(root, card);
     var item = sourceValues(root, card);
     var rows = breakdownRow("Canon mensual", money(item.canon));
-    if (item.comision > 0) rows += breakdownRow("(−) Comisión de administración", money(item.comision), percent(item.sim.tasa) + " + IVA" + (digits(simField(card, "administracion").value) > 0 ? ", sobre canon + administración" : ""));
+    if (item.comision > 0) rows += breakdownRow("(−) Comisión de administración", money(item.comision), percent(item.sim.tasa) + " + IVA sobre el canon");
     if (item.garantia > 0) rows += breakdownRow("(−) Garantía inmobiliaria", money(item.garantia), item.sim.aseguradora);
     if (item.seguro > 0) rows += breakdownRow("(−) Seguro" + (item.intereses > 0 ? " e intereses" : ""), money(item.seguroMes), item.cuotas > 0 ? money(item.seguro + item.intereses) + " en " + (item.cuotas === 1 ? "1 pago" : item.cuotas + " cuotas de " + money(item.cuota)) + ", repartido en 12 meses" : money(item.seguro + item.intereses) + " en 12 meses");
     if (item.otros > 0) rows += breakdownRow("(−) Otros descuentos", money(item.otros));
     card.querySelector("[data-pre-breakdown]").innerHTML = item.canon > 0 ? rows : "";
     var warning = card.querySelector("[data-pre-source-warning]");
-    warning.textContent = item.warnings.join(" ");
-    warning.hidden = !item.warnings.length;
+    var minMonths = Number(root.dataset.minMonths) || 12;
+    var warnings = item.warnings.concat(item.duracion > 0 && item.duracion < minMonths ? ["El crédito exige un contrato de mínimo " + minMonths + " meses."] : []);
+    warning.textContent = warnings.join(" ");
+    warning.hidden = !warnings.length;
     card.querySelector("[data-pre-source-net]").textContent = money(item.net);
     // Con la cuota del seguro en menos de 12 meses, el neto cambia entre los meses con y sin cuota.
     var base = Math.max(0, item.canon - item.comision - item.garantia - item.otros);
@@ -196,6 +198,7 @@
 
   function useValues(root) {
     var uses = {};
+    if (root.dataset.needs !== "si") return uses;
     root.querySelectorAll("[data-pre-use]").forEach(function (input) { var value = digits(input.value); if (value > 0) uses[input.dataset.preUse] = value; });
     return uses;
   }
@@ -206,13 +209,12 @@
     var sources = Array.from(root.querySelectorAll("[data-pre-sources] [data-pre-source]")).map(function (card) { return renderSource(root, card); });
     var net = sources.reduce(function (sum, item) { return sum + item.net; }, 0);
     var gross = sources.reduce(function (sum, item) { return sum + item.canon; }, 0);
-    // Plazo: meses completos de 30 días hasta el fin del contrato más largo, menos el margen del liquidador.
-    var longest = sources.map(function (item) { return item.fin; }).filter(Boolean).sort().pop() || "";
-    var end = isoDate(longest);
-    var term = end ? Math.floor((end - isoDate(todayIso())) / DAY / 30) - margin : null;
+    // Plazo: duración en meses del contrato más largo, menos el margen del liquidador.
+    var longest = sources.reduce(function (max, item) { return Math.max(max, item.duracion); }, 0);
+    var term = longest > 0 ? Math.max(0, longest - margin) : null;
     var owner = {};
     root.querySelectorAll("[data-pre-owner]").forEach(function (input) { owner[input.dataset.preOwner] = input.value.trim(); });
-    return { months: months, margin: margin, sources: sources, gross: gross, net: net, amount: net * months, longest: longest, term: term, owner: owner, registered: root.dataset.mode !== "manual", uses: useValues(root), notes: root.querySelector("[data-pre-notes]").value.trim() };
+    return { months: months, margin: margin, sources: sources, gross: gross, net: net, amount: net * months, longest: longest, term: term, owner: owner, registered: root.dataset.mode !== "manual", needs: root.dataset.needs === "si", uses: useValues(root), notes: root.querySelector("[data-pre-notes]").value.trim() };
   }
 
   function recalc(root) {
@@ -250,7 +252,14 @@
     data = data || {};
     var canon = Number(data.canon) || 0;
     card.querySelector('[data-pre-field="canon"]').value = canon > 0 ? money(canon) : "";
-    card.querySelector('[data-pre-field="fin"]').value = data.fin || "";
+    // Contratos vigentes: los meses que le quedan, en la opción más cercana de la lista.
+    if (Number(data.max_months) > 0) {
+      var duration = card.querySelector('[data-pre-field="duracion"]');
+      var options = Array.from(duration.options).map(function (option) { return Number(option.value); });
+      var months = Number(data.max_months);
+      if (options.indexOf(months) < 0) { duration.append(new Option(months + (months === 1 ? " mes" : " meses") + " (restantes)", String(months))); }
+      duration.value = String(months);
+    }
     card.dataset.contract = data.contrato ? "1" : "";
     // Un contrato con mandato llena el simulador con su comisión (tasa sobre el canon, sin IVA) y sus coberturas;
     // sin mandato se simula con la tasa y las coberturas por defecto.
@@ -287,6 +296,14 @@
     var node = root.querySelector("[data-pre-error]");
     node.textContent = text || "";
     node.hidden = !text;
+  }
+
+  function setNeeds(root, needs) {
+    root.dataset.needs = needs;
+    root.querySelectorAll("[data-pre-needs]").forEach(function (button) { button.setAttribute("aria-pressed", button.dataset.preNeeds === needs ? "true" : "false"); });
+    root.querySelector("[data-pre-needs-panel]").hidden = needs !== "si";
+    recalc(root);
+    if (needs === "si") root.querySelector("[data-pre-use]").focus();
   }
 
   function setMode(root, mode) {
@@ -347,7 +364,7 @@
   function shareMessage(state) {
     var lines = [state.owner.name ? "Hola " + state.owner.name + "," : "Hola,", "", "Te comparto la simulación de tu ingreso neto con SKC SuCasa Inmobiliaria:"];
     state.sources.forEach(function (item, index) {
-      lines.push("- Inmueble " + (index + 1) + (item.fromContract && item.meta ? " (" + item.meta + ")" : "") + ": canon " + money(item.canon) + " → neto " + money(item.net) + " / mes (" + item.sim.modalidad + (item.sim.aseguradora !== item.sim.modalidad ? ", " + item.sim.aseguradora : "") + ")");
+      lines.push("- Inmueble " + (index + 1) + (item.fromContract && item.meta ? " (" + item.meta + ")" : "") + ": canon " + money(item.canon) + " → neto " + money(item.net) + " / mes (" + (item.sim.modalidad === MODALITIES.defecto ? item.sim.aseguradora : "póliza " + item.sim.modalidad) + ")");
     });
     lines.push("", "Ingreso neto mensual: " + money(state.net));
     lines.push("Con este ingreso cuentas con un crédito preaprobado de hasta " + money(state.amount) + " (" + state.months + " meses de tu ingreso neto) para ponerte al día con servicios públicos, cuotas de administración, reparaciones o cualquier imprevisto del inmueble" + (state.term > 0 ? ", hasta en " + state.term + " cuotas." : "."));
@@ -390,27 +407,37 @@
     setTimeout(function () { label.textContent = "Copiar mensaje para WhatsApp"; }, 1800);
   }
 
-  // El servidor recalcula la simulación y genera el PDF con el diseño de las actas (Chromium); aquí solo se descarga.
-  async function downloadPdf(root, button) {
+  // Documento, celular y correo del propietario son obligatorios: aparecen en el PDF y sirven para contactarlo.
+  function validOwner(root, state) {
+    var labels = { name: "el nombre", document: "la cédula o NIT", phone: "el celular", email: "el correo" };
+    var missing = Object.keys(labels).filter(function (key) { return !state.owner[key]; })[0];
+    var input = missing ? root.querySelector('[data-pre-owner="' + missing + '"]') : root.querySelector('[data-pre-owner="email"]');
+    if (missing) { showError(root, "Escribe " + labels[missing] + " del propietario: es obligatorio y aparece en el PDF."); input.focus(); return false; }
+    if (!input.checkValidity()) { showError(root, "El correo del propietario no es válido."); input.focus(); return false; }
+    return true;
+  }
+
+  // El servidor recalcula la simulación y genera el PDF con el diseño de las actas (Chromium); primero se muestra en
+  // la vista previa y desde ahí se descarga.
+  async function previewPdf(root, button) {
     var state = recalc(root);
     showError(root, "");
-    if (!validState(root, state)) return;
-    if (!state.owner.name) { showError(root, "Escribe el nombre del propietario: aparece en el PDF."); root.querySelector('[data-pre-owner="name"]').focus(); return; }
+    if (!validState(root, state) || !validOwner(root, state)) return;
     if (button.disabled) return;
     var label = button.innerHTML;
     button.disabled = true;
-    button.textContent = "Generando PDF…";
+    button.textContent = "Preparando vista previa…";
     try {
       var cards = Array.from(root.querySelectorAll("[data-pre-sources] [data-pre-source]"));
       var data = new FormData();
       data.set("action", "commercial_tools_preapproval_pdf");
       data.set("nonce", runtime.nonce || "");
       data.set("payload", JSON.stringify({
-        owner: state.owner, registered: state.registered, uses: state.uses, notes: state.notes,
+        owner: state.owner, registered: state.registered, needs: state.needs, uses: state.uses, notes: state.notes,
         sources: state.sources.map(function (item, index) {
           var card = cards[index];
           return {
-            calc: "sim", canon: item.canon, otros: item.otros, fin: item.fin, meta: item.fromContract ? item.meta : "",
+            calc: "sim", canon: item.canon, otros: item.otros, duracion: item.duracion, meta: item.fromContract ? item.meta : "",
             administracion: digits(simField(card, "administracion").value), tasa_comision: simField(card, "tasa").value, modalidad: simField(card, "modalidad").value, aseguradora: simField(card, "aseguradora").value,
             iva_canon: simField(card, "iva").checked, garantia: simField(card, "garantia").checked, servicios: simField(card, "servicios").checked, valor_asegurado: digits(simField(card, "valor").value), cuotas: Number(simField(card, "cuotas").value) || 1,
           };
@@ -423,20 +450,26 @@
         throw new Error((payload && payload.data && payload.data.message) || "No se pudo generar el PDF.");
       }
       var match = /filename="([^"]+)"/.exec(response.headers.get("Content-Disposition") || "");
-      var url = URL.createObjectURL(await response.blob());
-      var link = document.createElement("a");
-      link.href = url;
-      link.download = match ? match[1] : "simulacion-ingreso-neto.pdf";
-      document.body.append(link);
-      link.click();
-      link.remove();
-      setTimeout(function () { URL.revokeObjectURL(url); }, 30000);
+      if (root._pdf) URL.revokeObjectURL(root._pdf.url);
+      root._pdf = { url: URL.createObjectURL(await response.blob()), name: match ? match[1] : "simulacion-ingreso-neto.pdf" };
+      root.querySelector("[data-pre-viewer-frame]").src = root._pdf.url;
+      root.querySelector("[data-pre-viewer]").showModal();
     } catch (error) {
       showError(root, error.message || "No se pudo generar el PDF.");
     } finally {
       button.disabled = false;
       button.innerHTML = label;
     }
+  }
+
+  function downloadPdf(root) {
+    if (!root._pdf) return;
+    var link = document.createElement("a");
+    link.href = root._pdf.url;
+    link.download = root._pdf.name;
+    document.body.append(link);
+    link.click();
+    link.remove();
   }
 
   /* ------------------------------------------------------------------ Calculadora de ganancia ocasional */
@@ -530,8 +563,13 @@
       if (copy) { copyMessage(pre, copy); return; }
       var remove = target.closest("[data-pre-remove]");
       if (remove) { remove.closest("[data-pre-source]").remove(); renumber(pre); recalc(pre); return; }
+      var needs = target.closest("[data-pre-needs]");
+      if (needs) { setNeeds(pre, needs.dataset.preNeeds); return; }
+      var viewer = pre.querySelector("[data-pre-viewer]");
+      if (target.closest("[data-pre-viewer-close]") || target === viewer) { viewer.close(); return; }
+      if (target.closest("[data-pre-download]")) { downloadPdf(pre); return; }
       var pdf = target.closest("[data-pre-pdf]");
-      if (pdf) downloadPdf(pre, pdf);
+      if (pdf) previewPdf(pre, pdf);
       return;
     }
     var gain = target.closest('[data-commercial-tool="ganancia_ocasional"]');
@@ -559,6 +597,8 @@
 
   document.addEventListener("change", function (event) {
     var target = event.target instanceof Element ? event.target : null;
+    var pre = target && target.closest('[data-commercial-tool="simulador_ingreso_neto"]');
+    if (pre) { recalc(pre); return; }
     var root = target && target.closest('[data-commercial-tool="ganancia_ocasional"]');
     if (!root) return;
     if (target.matches('[data-go-field="tipo"]')) prepareRent(root);

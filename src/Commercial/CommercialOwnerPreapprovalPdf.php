@@ -45,12 +45,6 @@ final class CommercialOwnerPreapprovalPdf
     return '$' . number_format(round($value), 0, ',', '.');
   }
 
-  private static function date(string $iso): string
-  {
-    $ts = strtotime($iso);
-    return $ts === false ? '' : date('d/m/Y', $ts);
-  }
-
   /** @param array<string,string> $rows */
   private static function table(array $rows): string
   {
@@ -89,24 +83,26 @@ final class CommercialOwnerPreapprovalPdf
       $installmentsNote = $sim !== null && $sim['cuotas'] > 0 ? ($sim['cuotas'] === 1 ? 'Se paga en 1 pago' : 'Se paga en ' . $sim['cuotas'] . ' cuotas de ' . self::money((float) $sim['cuota'])) . '. ' : '';
       // Solo los descuentos que tiene el inmueble: las filas en $0 alargan el documento sin informar nada.
       $rows = self::row('Canon mensual', 'Mensual (mes)', (float) $item['canon']);
-      if ($sim !== null && $sim['administracion'] > 0) $rows .= self::row('Administración (la paga el arrendatario)', 'Mensual (mes)', (float) $sim['administracion'], 'Informativa: no se descuenta del canon, pero hace parte de la base de la comisión.', 'is-info');
+      if ($sim !== null && $sim['administracion'] > 0) $rows .= self::row('Administración (la paga el arrendatario)', 'Mensual (mes)', (float) $sim['administracion'], 'Informativa: no se descuenta del canon ni paga comisión; hace parte de la base de la garantía.', 'is-info');
       if ($item['comision'] > 0) $rows .= self::row('(−) Comisión de administración (IVA incluido)', 'Mensual (mes)', (float) $item['comision'], $sim !== null ? (string) ($sim['detail']['Comisión de administración'] ?? '') : '');
       if ($item['garantia'] > 0) $rows .= self::row('(−) Garantía inmobiliaria', 'Mensual (mes)', (float) $item['garantia'], $sim !== null ? (string) ($sim['detail']['Garantía inmobiliaria'] ?? $sim['detail']['Póliza Berkley'] ?? $sim['detail']['Póliza Seguros Mundial'] ?? '') : '');
-      if ($item['seguro'] > 0) $rows .= self::row($sim !== null && $sim['modalidad'] !== 'Por defecto' ? '(−) Póliza ' . $sim['modalidad'] : '(−) Seguro', '12 meses', (float) $item['seguro'], $installmentsNote . 'Permanece mientras la vigencia del contrato continúa. Se descuentan ' . self::money($item['seguro'] / 12) . ' por mes en promedio.');
+      if ($item['seguro'] > 0) $rows .= self::row($sim !== null && $sim['modalidad'] !== CommercialNetIncomeSimulator::MODALITIES['defecto'] ? '(−) Póliza ' . $sim['modalidad'] : '(−) Seguro', '12 meses', (float) $item['seguro'], $installmentsNote . 'Permanece mientras la vigencia del contrato continúa. Se descuentan ' . self::money($item['seguro'] / 12) . ' por mes en promedio.');
       if ($item['intereses'] > 0) $rows .= self::row('(−) Intereses', '12 meses', (float) $item['intereses'], 'Aplica si el seguro se difiere en cuotas. Se descuentan ' . self::money($item['intereses'] / 12) . ' por mes.');
       if ($item['otros'] > 0) $rows .= self::row('(−) Otros descuentos', 'Mensual (mes)', (float) $item['otros']);
-      $rows .= self::row('Ingreso neto mensual', 'Mensual (mes)', (float) $item['net'], $item['fin'] !== '' ? 'Fin del contrato: ' . self::date($item['fin']) : '', 'is-total');
-      $title = $item['meta'] !== '' ? $item['meta'] : ($sim !== null ? 'Simulación ' . $sim['modalidad'] . ($sim['aseguradora'] !== $sim['modalidad'] ? ' · ' . $sim['aseguradora'] : '') : '');
+      $rows .= self::row('Ingreso neto mensual', 'Mensual (mes)', (float) $item['net'], $item['duracion'] > 0 ? 'Duración del contrato: ' . $item['duracion'] . ' meses' : '', 'is-total');
+      $title = $item['meta'] !== '' ? $item['meta'] : ($sim === null ? '' : ($sim['modalidad'] === CommercialNetIncomeSimulator::MODALITIES['defecto'] ? 'Simulación con ' . $sim['aseguradora'] : 'Simulación con póliza ' . $sim['modalidad']));
       $income .= '<div class="scm-preapproval-property"><h3>Inmueble ' . ($index + 1) . ($title !== '' ? ' <span>' . self::e($title) . '</span>' : '') . '</h3>'
         . '<table class="scm-preapproval-income"><thead><tr><th>Concepto</th><th>Frecuencia</th><th>Valor</th></tr></thead><tbody>' . $rows . '</tbody></table></div>';
     }
 
     $calc = self::row('Ingreso neto mensual total (' . count($estimate['sources']) . (count($estimate['sources']) === 1 ? ' inmueble)' : ' inmuebles)'), 'Mensual (mes)', (float) $estimate['net'])
       . '<tr><th scope="row">Meses de ingreso que respaldan el crédito</th><td class="is-unit">Política</td><td class="is-money">' . $months . ' meses</td></tr>'
-      . ($term !== null ? '<tr><th scope="row">Plazo máximo estimado<small>Meses de vigencia del contrato más largo (fin ' . self::e(self::date((string) $estimate['longest_end'])) . ') menos ' . (int) $estimate['term_margin_months'] . ' de margen.</small></th><td class="is-unit">Cuotas</td><td class="is-money">' . self::e($termText) . '</td></tr>' : '')
+      . ($term !== null ? '<tr><th scope="row">Plazo máximo estimado<small>Duración del contrato más largo (' . (int) $estimate['longest_months'] . ' meses) menos ' . (int) $estimate['term_margin_months'] . ' de margen.</small></th><td class="is-unit">Cuotas</td><td class="is-money">' . self::e($termText) . '</td></tr>' : '')
       . self::row('Crédito preaprobado estimado', 'Ingreso neto × ' . $months, $amount, '', 'is-total');
 
-    // Lo que el propietario puede resolver con el crédito: las necesidades que escribió el consultor o, sin ellas, los usos.
+    // Lo que el propietario puede resolver con el crédito: solo si respondió que tiene algo pendiente. Muestra lo que
+    // escribió el consultor o, sin valores, los usos posibles.
+    $section = 4;
     $uses = '';
     $need = array_sum($estimate['uses']);
     foreach (CommercialOwnerPreapprovalService::USES as $key => [$label, $text]) {
@@ -117,7 +113,11 @@ final class CommercialOwnerPreapprovalPdf
       : '<p class="scm-preapproval-coverage' . ($need <= $amount ? '' : ' is-partial') . '">' . ($need <= $amount
         ? 'Su crédito preaprobado cubre los ' . self::e(self::money($need)) . ' que necesita y le quedan ' . self::e(self::money($amount - $need)) . ' disponibles.'
         : 'Necesita ' . self::e(self::money($need)) . ': su crédito preaprobado cubre ' . self::e(self::money($amount)) . '.') . '</p>';
-    $notes = $estimate['notes'] !== '' ? '<section class="scm-acta-receipt-section scm-preapproval-keep"><h2>5. Observaciones</h2><p class="scm-preapproval-notes">' . nl2br(self::e($estimate['notes'])) . '</p></section>' : '';
+    $usesSection = !empty($estimate['needs']) ? '<section class="scm-acta-receipt-section scm-preapproval-keep"><h2>' . $section++ . '. Lo que puede resolver con su crédito</h2><p class="scm-preapproval-lead">Sin sacar dinero de su bolsillo, puede ponerse al día y mantener su inmueble en buen estado.</p><ul class="scm-preapproval-uses">' . $uses . '</ul>' . $coverage . '</section>' : '';
+    $conditions = '<section class="scm-acta-receipt-section scm-preapproval-keep"><h2>' . $section++ . '. Condiciones para la aprobación del crédito</h2><ol class="scm-preapproval-conditions">';
+    foreach (CommercialOwnerPreapprovalService::CONDITIONS as $condition) $conditions .= '<li>' . self::e($condition) . '</li>';
+    $conditions .= '</ol></section>';
+    $notes = $estimate['notes'] !== '' ? '<section class="scm-acta-receipt-section scm-preapproval-keep"><h2>' . $section . '. Observaciones</h2><p class="scm-preapproval-notes">' . nl2br(self::e($estimate['notes'])) . '</p></section>' : '';
 
     return '<article class="scm-acta-receipt scm-services-document scm-preapproval-document">' . $letterhead
       . '<header class="scm-acta-receipt-head"><h1>' . self::TITLE . '</h1></header>'
@@ -130,8 +130,7 @@ final class CommercialOwnerPreapprovalPdf
       ], static fn(string $value): bool => $value !== '')) . '</section>'
       . '<section class="scm-acta-receipt-section"><h2>2. Ingreso neto por inmueble</h2><p class="scm-preapproval-lead">Los valores son mensuales, salvo el seguro, que se registra por sus 12 meses y se descuenta mes a mes.</p>' . $income . '</section>'
       . '<section class="scm-acta-receipt-section scm-preapproval-keep"><h2>3. Crédito preaprobado</h2><table class="scm-preapproval-income"><tbody>' . $calc . '</tbody></table></section>'
-      . '<section class="scm-acta-receipt-section scm-preapproval-keep"><h2>4. Lo que puede resolver con su crédito</h2><p class="scm-preapproval-lead">Sin sacar dinero de su bolsillo, puede ponerse al día y mantener su inmueble en buen estado.</p><ul class="scm-preapproval-uses">' . $uses . '</ul>' . $coverage . '</section>'
-      . $notes
+      . $usesSection . $conditions . $notes
       . '<p class="scm-preapproval-disclaimer"><strong>Importante:</strong> ' . self::e(CommercialToolsView::DISCLAIMER) . '</p>'
       . '<footer class="scm-acta-receipt-footer scm-services-signatures"><div><span>Realizado por</span><strong>' . self::e($generatedBy !== '' ? $generatedBy : 'Servicios comerciales') . '</strong><p>Servicios comerciales</p></div><p class="scm-services-company">SKC SuCasa Inmobiliaria · NIT 900623242-4</p></footer>'
       . $footerImage . '</article>';

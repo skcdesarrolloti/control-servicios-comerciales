@@ -355,7 +355,14 @@
 .ctl-dialog__body td { padding:8px 10px; border:1px solid var(--ctl-line); text-align:left; vertical-align:top }
 .ctl-dialog__body th { width:38%; background:#f8fafc; font-weight:600 }
 .ctl-small { font-size:12px; color:var(--ctl-muted) }
-.ctl-dialog > footer { display:flex; justify-content:flex-end; padding:14px 22px; border-top:1px solid var(--ctl-line); background:#f8fafc }
+.ctl-dialog > footer { display:flex; justify-content:flex-end; gap:10px; padding:14px 22px; border-top:1px solid var(--ctl-line); background:#f8fafc }
+.ctl-dialog > footer .ctl-primary { width:auto; margin:0; padding:0 20px }
+/* Vista previa del PDF antes de descargarlo */
+.ctl-dialog--pdf { width:min(980px,calc(100vw - 32px)); height:min(92vh,1100px); max-height:none }
+.ctl-pdf-frame { flex:1; width:100%; min-height:0; border:0; background:#525659 }
+.ctl-required { color:#dc2626; font-weight:700 }
+.ctl-question { margin:0 0 10px; color:var(--ctl-navy); font-size:14px; font-weight:600 }
+[data-pre-needs-panel] { margin-top:4px }
 
 @media (max-width:1080px) {
   .ctl-layout { grid-template-columns:1fr }

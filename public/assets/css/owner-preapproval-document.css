@@ -39,4 +39,6 @@
 .scm-preapproval-uses span{display:block;margin-top:3px;color:#5b6b82;font-size:.92em}
 .scm-preapproval-coverage{margin:10px 0 0;padding:9px 12px;border-radius:6px;background:#ecfdf3;color:#166534;font-weight:700;font-size:11.5px}
 .scm-preapproval-coverage.is-partial{background:#fff7ed;color:#9a3412}
+.scm-preapproval-conditions{margin:0;padding-left:20px;font-size:12px;line-height:1.55;color:#202020}
+.scm-preapproval-conditions li{margin:0 0 4px;padding-left:4px}
 .scm-preapproval-notes{margin:0;white-space:normal;color:#202020}

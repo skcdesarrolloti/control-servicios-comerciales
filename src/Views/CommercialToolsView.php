@@ -62,13 +62,16 @@ final class CommercialToolsView
     $e = static fn($value): string => self::e($value);
     $rateText = rtrim(rtrim(number_format((float) $rates['comision'], 4, ',', ''), '0'), ',');
     $modalities = '';
-    foreach (CommercialNetIncomeSimulator::MODALITIES as $key => $label) $modalities .= '<option value="' . $e($key) . '">' . $e($label) . '</option>';
+    $modalityLabels = ['defecto' => 'Con aseguradora (El Libertador, Sura, Zurich…)', 'berkley' => 'Póliza Berkley', 'mundial' => 'Póliza Seguros Mundial'];
+    foreach (array_keys(CommercialNetIncomeSimulator::MODALITIES) as $key) $modalities .= '<option value="' . $e($key) . '">' . $e($modalityLabels[$key]) . '</option>';
     $insurers = '';
     foreach (array_keys($rates['aseguradoras']) as $name) $insurers .= '<option value="' . $e($name) . '">' . $e($name) . '</option>';
     $installments = '';
     for ($i = 1; $i <= 12; $i++) $installments .= '<option value="' . $i . '">' . ($i === 1 ? '1 pago (contado)' : $i . ' cuotas') . '</option>';
+    $durations = '';
+    foreach ([6, 12, 18, 24, 36, 48, 60] as $value) $durations .= '<option value="' . $value . '"' . ($value === 12 ? ' selected' : '') . '>' . $value . ' meses</option>';
     ob_start(); ?>
-    <section class="ctl" data-commercial-tool="simulador_ingreso_neto" data-income-months="<?php echo $months; ?>" data-term-margin="<?php echo (int) $settings['term_margin_months']; ?>" data-rates="<?php echo $e(json_encode($rates, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)); ?>">
+    <section class="ctl" data-commercial-tool="simulador_ingreso_neto" data-min-months="<?php echo CommercialOwnerPreapprovalService::MIN_CONTRACT_MONTHS; ?>" data-income-months="<?php echo $months; ?>" data-term-margin="<?php echo (int) $settings['term_margin_months']; ?>" data-rates="<?php echo $e(json_encode($rates, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)); ?>">
       <?php echo self::hero('savings', 'Simulador de ingreso neto del propietario', 'Calcula cuánto le queda al propietario cada mes después de la comisión, la garantía y los seguros, con las tarifas vigentes de SuCasa. Con ese ingreso accede a un <strong>crédito preaprobado de hasta ' . $months . ' veces su ingreso neto</strong> para ponerse al día con servicios públicos, administración o reparaciones.'); ?>
       <div class="ctl-layout">
         <div class="ctl-main">
@@ -84,16 +87,16 @@ final class CommercialToolsView
             </div>
             <p class="ctl-status" data-pre-status role="status" aria-live="polite"></p>
             <div class="ctl-grid ctl-owner">
-              <label class="ctl-field"><span class="ctl-label">Nombre completo</span><span class="ctl-input"><input data-pre-owner="name" maxlength="120" autocomplete="off" placeholder="Nombre del propietario"></span></label>
-              <label class="ctl-field"><span class="ctl-label">Cédula o NIT</span><span class="ctl-input"><input data-pre-owner="document" maxlength="24" autocomplete="off" placeholder="Documento"></span></label>
-              <label class="ctl-field"><span class="ctl-label">Celular</span><span class="ctl-input"><input data-pre-owner="phone" maxlength="20" inputmode="tel" autocomplete="off" placeholder="Opcional"></span></label>
-              <label class="ctl-field"><span class="ctl-label">Correo</span><span class="ctl-input"><input data-pre-owner="email" maxlength="120" inputmode="email" autocomplete="off" placeholder="Opcional"></span></label>
+              <label class="ctl-field"><span class="ctl-label">Nombre completo <b class="ctl-required" aria-hidden="true">*</b></span><span class="ctl-input"><input data-pre-owner="name" maxlength="120" autocomplete="off" required placeholder="Nombre del propietario"></span></label>
+              <label class="ctl-field"><span class="ctl-label">Cédula o NIT <b class="ctl-required" aria-hidden="true">*</b></span><span class="ctl-input"><input data-pre-owner="document" maxlength="24" autocomplete="off" required placeholder="Documento"></span></label>
+              <label class="ctl-field"><span class="ctl-label">Celular <b class="ctl-required" aria-hidden="true">*</b></span><span class="ctl-input"><input data-pre-owner="phone" maxlength="20" inputmode="tel" autocomplete="off" required placeholder="Ej. 3145106244"></span></label>
+              <label class="ctl-field"><span class="ctl-label">Correo <b class="ctl-required" aria-hidden="true">*</b></span><span class="ctl-input"><input type="email" data-pre-owner="email" maxlength="120" inputmode="email" autocomplete="off" required placeholder="correo@ejemplo.com"></span></label>
             </div>
             <p class="ctl-alert" data-pre-credits hidden></p>
           </section>
 
           <section class="ctl-card">
-            <div class="ctl-card__head"><span class="ctl-step">2</span><div><h2>Ingreso neto por inmueble</h2><p>Simula cada inmueble con las tarifas de SuCasa (comisión con IVA, garantía según la aseguradora, Berkley o Seguros Mundial y seguro de servicios públicos). Los contratos de un propietario registrado llegan con su canon, la comisión de su mandato y sus coberturas. El seguro se reparte en los 12 meses.</p></div></div>
+            <div class="ctl-card__head"><span class="ctl-step">2</span><div><h2>Ingreso neto por inmueble</h2><p>Simula cada inmueble con las tarifas de SuCasa (comisión sobre el canon con IVA, garantía con una aseguradora o con póliza Berkley o Seguros Mundial, y seguro de servicios públicos). Los contratos de un propietario registrado llegan con su canon, la comisión de su mandato y sus coberturas. El seguro se reparte en los 12 meses.</p></div></div>
             <div class="ctl-sources" data-pre-sources>
               <div class="ctl-empty" data-pre-empty><span class="material-symbols-outlined" aria-hidden="true">home_work</span><p>Busca al propietario para cargar sus contratos vigentes, o agrega un inmueble para simularlo.</p></div>
             </div>
@@ -101,17 +104,24 @@ final class CommercialToolsView
           </section>
 
           <section class="ctl-card">
-            <div class="ctl-card__head"><span class="ctl-step">3</span><div><h2>Lo que puede resolver con su crédito preaprobado</h2><p>Pregúntale al propietario qué tiene pendiente y escribe cuánto necesita: así ve que su crédito lo cubre sin sacar dinero de su bolsillo. Es opcional y aparece en el PDF.</p></div></div>
+            <div class="ctl-card__head"><span class="ctl-step">3</span><div><h2>Lo que puede resolver con su crédito preaprobado</h2><p>Pregúntale al propietario si tiene algo pendiente con su inmueble. Si dice que sí, escribe cuánto necesita: así ve que su crédito lo cubre sin sacar dinero de su bolsillo, y aparece en el PDF.</p></div></div>
+            <p class="ctl-question">¿El propietario necesita ponerse al día con servicios públicos, administración, reparaciones u otro gasto del inmueble?</p>
+            <div class="ctl-segment" role="group" aria-label="El propietario necesita algo">
+              <button type="button" data-pre-needs="si" aria-pressed="false"><span class="material-symbols-outlined" aria-hidden="true">check_circle</span>Sí, necesita</button>
+              <button type="button" data-pre-needs="no" aria-pressed="true"><span class="material-symbols-outlined" aria-hidden="true">block</span>No por ahora</button>
+            </div>
+            <div data-pre-needs-panel hidden>
             <div class="ctl-uses">
               <?php foreach (CommercialOwnerPreapprovalService::USES as $key => [$label, $text]): ?>
               <label class="ctl-use">
-                <span class="ctl-use__icon material-symbols-outlined" aria-hidden="true"><?php echo $e(self::USE_ICONS[$key] ?? 'payments'); ?></span>
+                <span class="ctl-use__icon material-symbols-outlined" aria-hidden="true"><?php echo $e(self::USE_ICONS[$key]); ?></span>
                 <span class="ctl-use__text"><strong><?php echo $e($label); ?></strong><small><?php echo $e($text); ?></small></span>
                 <span class="ctl-input"><input data-pre-use="<?php echo $e($key); ?>" data-tool-money inputmode="numeric" autocomplete="off" placeholder="$0" aria-label="<?php echo $e($label); ?>"></span>
               </label>
               <?php endforeach; ?>
             </div>
             <p class="ctl-uses__summary" data-pre-uses-summary data-state="empty">Escribe cuánto necesita para cada cosa y muéstrale que su crédito preaprobado lo cubre.</p>
+            </div>
             <label class="ctl-field ctl-notes"><span class="ctl-label">Observaciones para el propietario</span><textarea data-pre-notes rows="3" maxlength="600" placeholder="Opcional. Ej.: el crédito se descuenta en cuotas de su canon mensual."></textarea></label>
           </section>
         </div>
@@ -134,11 +144,17 @@ final class CommercialToolsView
             <div><dt>Plazo máximo estimado</dt><dd data-pre-term>Según vigencia</dd></div>
           </dl>
           <p class="ctl-error" data-pre-error role="alert" hidden></p>
-          <button type="button" class="ctl-primary" data-pre-pdf><span class="material-symbols-outlined" aria-hidden="true">picture_as_pdf</span>Descargar PDF para el propietario</button>
+          <button type="button" class="ctl-primary" data-pre-pdf><span class="material-symbols-outlined" aria-hidden="true">preview</span>Ver PDF para el propietario</button>
           <button type="button" class="ctl-secondary ctl-wide" data-pre-copy><span class="material-symbols-outlined" aria-hidden="true">content_copy</span><span data-pre-copy-label>Copiar mensaje para WhatsApp</span></button>
           <p class="ctl-fineprint"><?php echo $e(self::DISCLAIMER); ?></p>
         </aside>
       </div>
+
+      <dialog class="ctl-dialog ctl-dialog--pdf" data-pre-viewer aria-labelledby="pre-viewer-title">
+        <header><h2 id="pre-viewer-title"><span class="material-symbols-outlined" aria-hidden="true">picture_as_pdf</span>Vista previa del PDF</h2><button type="button" class="ctl-icon" data-pre-viewer-close aria-label="Cerrar"><span class="material-symbols-outlined" aria-hidden="true">close</span></button></header>
+        <iframe class="ctl-pdf-frame" data-pre-viewer-frame title="Vista previa del PDF para el propietario"></iframe>
+        <footer><button type="button" class="ctl-secondary" data-pre-viewer-close>Cerrar</button><button type="button" class="ctl-primary" data-pre-download><span class="material-symbols-outlined" aria-hidden="true">download</span>Descargar PDF</button></footer>
+      </dialog>
 
       <template data-pre-source-template>
         <article class="ctl-source" data-pre-source>
@@ -149,12 +165,12 @@ final class CommercialToolsView
           <div class="ctl-source__body">
             <div class="ctl-grid">
               <?php echo self::moneyField('canon', 'Canon mensual', '/ mes'); ?>
-              <label class="ctl-field"><span class="ctl-label">Fin del contrato</span><span class="ctl-input"><input type="date" data-pre-field="fin"></span><small class="ctl-note">Opcional: con la fecha se estima el plazo máximo.</small></label>
+              <label class="ctl-field"><span class="ctl-label">Duración del contrato</span><span class="ctl-input"><select data-pre-field="duracion"><?php echo $durations; ?></select></span><small class="ctl-note">Define el plazo máximo del crédito. Mínimo <?php echo CommercialOwnerPreapprovalService::MIN_CONTRACT_MONTHS; ?> meses.</small></label>
             </div>
             <div class="ctl-grid">
-              <?php echo self::moneyField('administracion', 'Administración', '/ mes', 'La comisión se calcula sobre canon + administración.', 'data-pre-sim'); ?>
+              <?php echo self::moneyField('administracion', 'Administración', '/ mes', 'No paga comisión: solo suma a la base de la garantía.', 'data-pre-sim'); ?>
               <label class="ctl-field"><span class="ctl-label">Tasa de comisión</span><span class="ctl-input"><input data-pre-sim="tasa" inputmode="decimal" maxlength="8" autocomplete="off" value="<?php echo $e($rateText); ?>"><em>% + IVA</em></span></label>
-              <?php echo self::selectField('modalidad', 'Modalidad / aseguradora principal', $modalities); ?>
+              <?php echo self::selectField('modalidad', 'Tipo de garantía', $modalities); ?>
               <?php echo self::selectField('aseguradora', 'Aseguradora', $insurers, 'defecto'); ?>
               <div class="ctl-switches ctl-full">
                 <?php echo self::switchField('garantia', 'Aplicar garantía inmobiliaria', true, 'defecto'); ?>

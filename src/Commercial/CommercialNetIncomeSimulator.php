@@ -7,15 +7,16 @@ namespace SCM\Commercial;
 /**
  * Simulador del ingreso neto de un inmueble con las tarifas de `jet_cct_confi_sistema`. Replica el plugin "Calculadora
  * de comisión, garantía inmobiliaria y seguro de servicios públicos" (herramientas/calculadora-seguros-comisiones):
- * comisión sobre canon + administración con IVA, garantía según la aseguradora y la póliza de Berkley o Seguros Mundial.
+ * comisión sobre el canon con IVA (la administración no paga comisión), garantía según la aseguradora y la póliza de Berkley o Seguros Mundial.
  * commercial-tools.js hace el mismo cálculo en pantalla; aquí se repite para el PDF sin confiar en los totales del navegador.
  *
  * El resultado usa las unidades de la herramienta: comisión y garantía por mes, seguro e intereses por sus 12 meses.
  */
 final class CommercialNetIncomeSimulator
 {
-  public const MODALITIES = ['defecto' => 'Por defecto', 'berkley' => 'Berkley', 'mundial' => 'Seguros Mundial'];
-  /** Aseguradoras de la modalidad "Por defecto": [nombre, clave de la tasa de garantía, clave de la tasa de servicios]. */
+  /** Tipo de garantía: con una de las aseguradoras de SuCasa (clave `defecto` del plugin) o con la póliza de Berkley o Seguros Mundial. */
+  public const MODALITIES = ['defecto' => 'Aseguradora', 'berkley' => 'Berkley', 'mundial' => 'Seguros Mundial'];
+  /** Aseguradoras de la garantía con aseguradora: [nombre, clave de la tasa de garantía, clave de la tasa de servicios]. */
   public const INSURERS = [
     ['El Libertador', 'tasa_libertador_seguro', 'tasa_libertador_servicios'],
     ['Unifianza', 'tasa_unifianza_seguro', 'tasa_unifianza_servicios'],
@@ -66,10 +67,10 @@ final class CommercialNetIncomeSimulator
     $commissionRate = isset($input['tasa_comision']) && trim((string) $input['tasa_comision']) !== '' ? max(0.0, min(100.0, self::rate($input['tasa_comision']))) : (float) $rates['comision'];
     $ivaCanon = $yes('iva_canon') ? self::round($canon * $iva / 100) : 0.0;
     $canonTotal = self::round($canon + $admin);
-    $commission = self::round($canonTotal * $commissionRate / 100);
+    $commission = self::round($canon * $commissionRate / 100);
     $commission = self::round($commission + self::round($commission * $iva / 100));
     $result = ['canon' => $canon, 'administracion' => $admin, 'comision' => $commission, 'garantia' => 0.0, 'seguro' => 0.0, 'intereses' => 0.0, 'cuota' => 0.0, 'cuotas' => 0, 'modalidad' => self::MODALITIES[$modality], 'aseguradora' => self::MODALITIES[$modality], 'tasa_comision' => $commissionRate, 'detail' => [], 'warnings' => []];
-    $result['detail']['Comisión de administración'] = self::percent($commissionRate) . ' sobre canon + administración' . ($iva > 0 ? ', más IVA ' . self::percent($iva) : '');
+    $result['detail']['Comisión de administración'] = self::percent($commissionRate) . ' sobre el canon' . ($iva > 0 ? ', más IVA ' . self::percent($iva) : '');
     if ($ivaCanon > 0) $result['detail']['IVA del canon'] = self::moneyText($ivaCanon);
     $installments = max(1, min($modality === 'berkley' ? 4 : 12, (int) ($input['cuotas'] ?? 1)));
     $insured = $money('valor_asegurado');
