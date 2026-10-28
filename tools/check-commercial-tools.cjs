@@ -34,15 +34,19 @@ const { chromium } = require(process.env.SCM_PLAYWRIGHT_MODULE || 'playwright');
     assert.equal(await contract.locator('[data-pre-sim="garantia"]').isChecked(), true);
     assert.equal(await contract.locator('[data-pre-sim="servicios"]').isChecked(), true);
     assert.match(await contract.locator('[data-pre-source-warning]').innerText(), /valor asegurado/);
-    // (2.000.000 − 250.000 − garantía 50.000) + sin mandato (1.000.000 − 119.000 − 25.000) = 2.556.000 × 3
-    assert.equal(await tool.locator('[data-pre-net]').innerText(), '$2.556.000');
-    assert.equal(await tool.locator('[data-pre-total]').innerText(), '$7.668.000');
+    // (2.000.000 − 250.000 − garantía 50.000) + sin mandato: 119.000 + 25.000 = 144.000 es menos del 15 %, así que
+    // descuenta el mínimo de 150.000 → 1.700.000 + 850.000 = 2.550.000 × 3
+    assert.equal(await tool.locator('[data-pre-net]').innerText(), '$2.550.000');
+    assert.equal(await tool.locator('[data-pre-total]').innerText(), '$7.650.000');
+    const noMandate = tool.locator('[data-pre-source]').nth(1);
+    assert.equal(await noMandate.locator('[data-pre-source-net]').innerText(), '$850.000');
+    assert.match(await noMandate.locator('[data-pre-breakdown]').innerText(), /Ajuste al descuento mínimo\s+Los contratos descuentan como mínimo el 15 % del canon\s+\$6\.000/);
     assert.match(await tool.locator('[data-pre-term]').innerText(), /^Hasta 1[12] cuotas$/);
     assert.equal(await tool.locator('[data-pre-gross]').innerText(), '$3.000.000');
     // El consultor completa el valor asegurado: prima 2 % de $3.000.000 = $60.000 al año ($5.000 / mes).
     await contract.locator('[data-pre-sim="valor"]').fill('3000000');
     assert.equal(await contract.locator('[data-pre-source-warning]').isVisible(), false);
-    assert.equal(await tool.locator('[data-pre-net]').innerText(), '$2.551.000');
+    assert.equal(await tool.locator('[data-pre-net]').innerText(), '$2.545.000');
     await page.screenshot({ path: 'output/commercial-tools-preapproval.png', fullPage: true });
 
     // Primero la vista previa del PDF (popup interno) y desde ahí la descarga.

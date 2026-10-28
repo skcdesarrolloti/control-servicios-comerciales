@@ -94,6 +94,15 @@ final class CommercialOwnerPreapprovalTest extends TestCase
     self::assertEquals(2544000, $estimate['net']);
     self::assertEquals(7632000, $estimate['amount']);
     self::assertSame([14, 0], array_column($estimate['sources'], 'duracion'));
+    // Contratos del propietario registrado: descuento mínimo del 15 % del canon; lo que falte va como ajuste.
+    $contracts = $this->service()->estimate(['owner'=>['name'=>'Ana'] + self::OWNER, 'registered'=>true, 'sources'=>[
+      ['calc'=>'sim', 'contrato'=>true, 'canon'=>1000000, 'garantia'=>true], // 119.000 + 25.000 = 144.000 < 150.000
+      ['calc'=>'sim', 'contrato'=>true, 'canon'=>2000000, 'tasa_comision'=>'12', 'garantia'=>true], // 285.600 + 50.000 ≥ 300.000
+      ['calc'=>'sim', 'canon'=>1000000, 'garantia'=>true], // inmueble agregado a mano: sin mínimo
+    ]]);
+    self::assertEquals([6000, 0, 0], array_column($contracts['sources'], 'ajuste'));
+    self::assertEquals([850000, 1664400, 856000], array_column($contracts['sources'], 'net'));
+    self::assertStringContainsString('Ajuste al descuento mínimo', CommercialOwnerPreapprovalPdf::html($contracts, 'Prueba'));
     self::assertSame(12, $estimate['term']); // contrato más largo de 14 meses − 2 de margen
 
     $manual = $this->service()->estimate(['owner'=>['name'=>'Carlos'] + self::OWNER, 'sources'=>[['canon'=>1500000, 'comision'=>150000]]]);

@@ -165,7 +165,12 @@
     item.sim = sim;
     ["comision", "garantia", "seguro", "intereses", "cuota", "cuotas", "warnings"].forEach(function (key) { item[key] = sim[key]; });
     item.seguroMes = (item.seguro + item.intereses) / 12;
-    item.net = Math.max(0, item.canon - item.comision - item.garantia - item.seguroMes - item.otros);
+    // Los contratos traídos del propietario registrado descuentan como mínimo el 15 % del canon (no_mandate_deduction):
+    // sin mandato no hay con qué calcular sus descuentos reales, así que la diferencia va como ajuste.
+    var deductions = item.comision + item.garantia + item.seguroMes + item.otros;
+    var minimum = item.fromContract ? round2(item.canon * (Number(root.dataset.minDeduction) || 0)) : 0;
+    item.ajuste = Math.max(0, round2(minimum - deductions));
+    item.net = Math.max(0, item.canon - deductions - item.ajuste);
     return item;
   }
 
@@ -181,6 +186,7 @@
     if (item.garantia > 0) rows += breakdownRow("(−) Garantía inmobiliaria", money(item.garantia), item.sim.aseguradora);
     if (item.seguro > 0) rows += breakdownRow("(−) Seguro" + (item.intereses > 0 ? " e intereses" : ""), money(item.seguroMes), item.cuotas > 0 ? money(item.seguro + item.intereses) + " en " + (item.cuotas === 1 ? "1 pago" : item.cuotas + " cuotas de " + money(item.cuota)) + ", repartido en 12 meses" : money(item.seguro + item.intereses) + " en 12 meses");
     if (item.otros > 0) rows += breakdownRow("(−) Otros descuentos", money(item.otros));
+    if (item.ajuste > 0) rows += breakdownRow("(−) Ajuste al descuento mínimo", money(item.ajuste), "Los contratos descuentan como mínimo el " + percent((Number(root.dataset.minDeduction) || 0) * 100) + " del canon");
     card.querySelector("[data-pre-breakdown]").innerHTML = item.canon > 0 ? rows : "";
     var warning = card.querySelector("[data-pre-source-warning]");
     var minMonths = Number(root.dataset.minMonths) || 12;
@@ -189,7 +195,7 @@
     warning.hidden = !warnings.length;
     card.querySelector("[data-pre-source-net]").textContent = money(item.net);
     // Con la cuota del seguro en menos de 12 meses, el neto cambia entre los meses con y sin cuota.
-    var base = Math.max(0, item.canon - item.comision - item.garantia - item.otros);
+    var base = Math.max(0, item.canon - item.comision - item.garantia - item.otros - item.ajuste);
     card.querySelector("[data-pre-source-detail]").textContent = item.cuota > 0 && item.cuotas < 12
       ? "Promedio de 12 meses: " + money(Math.max(0, base - item.cuota)) + " en " + (item.cuotas === 1 ? "el mes" : "los " + item.cuotas + " meses") + " con cuota del seguro y " + money(base) + " en los demás"
       : item.seguroMes > 0 ? "Seguro" + (item.intereses > 0 ? " e intereses" : "") + ": " + money(item.seguroMes) + " / mes" : "";
@@ -437,7 +443,7 @@
         sources: state.sources.map(function (item, index) {
           var card = cards[index];
           return {
-            calc: "sim", canon: item.canon, otros: item.otros, duracion: item.duracion, meta: item.fromContract ? item.meta : "",
+            calc: "sim", contrato: item.fromContract, canon: item.canon, otros: item.otros, duracion: item.duracion, meta: item.fromContract ? item.meta : "",
             administracion: digits(simField(card, "administracion").value), tasa_comision: simField(card, "tasa").value, modalidad: simField(card, "modalidad").value, aseguradora: simField(card, "aseguradora").value,
             iva_canon: simField(card, "iva").checked, garantia: simField(card, "garantia").checked, servicios: simField(card, "servicios").checked, valor_asegurado: digits(simField(card, "valor").value), cuotas: Number(simField(card, "cuotas").value) || 1,
           };

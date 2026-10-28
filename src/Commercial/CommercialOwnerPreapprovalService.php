@@ -159,7 +159,9 @@ final class CommercialOwnerPreapprovalService
    * Simulación para el PDF, recalculada aquí con los valores que escribió o ajustó el consultor (no se confía en los
    * totales del navegador). Cada inmueble se simula con las tarifas de SuCasa (`calc` = "sim") o trae los descuentos del
    * contrato. Ingreso neto = canon − comisión − garantía − (seguro + intereses) / 12 − otros; crédito preaprobado = suma ×
-   * meses de política. Plazo: duración en meses del contrato más largo − margen. Las necesidades del propietario solo
+   * meses de política. Los contratos de un propietario registrado (`contrato`) descuentan como mínimo `no_mandate_deduction`
+   * (15 %) del canon: si la simulación da menos (p. ej. sin mandato), la diferencia va como ajuste. Plazo: duración en meses
+   * del contrato más largo − margen. Las necesidades del propietario solo
    * salen si respondió que tiene algo por resolver (`needs`).
    * @param array<string,mixed> $input owner{name,document,phone,email}, registered, sources[{calc,canon,…,otros,duracion,meta}], needs, uses{servicios,…}, notes
    * @return array<string,mixed>
@@ -188,7 +190,10 @@ final class CommercialOwnerPreapprovalService
       $item['duracion'] = is_numeric($source['duracion'] ?? null) ? max(0, min(240, (int) $source['duracion'])) : 0;
       $item['meta'] = $text($source['meta'] ?? '', 160);
       $item['seguro_mes'] = ($item['seguro'] + $item['intereses']) / 12;
-      $item['net'] = max(0.0, $item['canon'] - $item['comision'] - $item['garantia'] - $item['seguro_mes'] - $item['otros']);
+      $deductions = $item['comision'] + $item['garantia'] + $item['seguro_mes'] + $item['otros'];
+      $minimum = !empty($source['contrato']) ? round($item['canon'] * $settings['no_mandate_deduction'], 2) : 0.0;
+      $item['ajuste'] = max(0.0, round($minimum - $deductions, 2));
+      $item['net'] = max(0.0, $item['canon'] - $deductions - $item['ajuste']);
       $sources[] = $item;
     }
     if ($sources === []) throw new \InvalidArgumentException('Agrega al menos un inmueble con su canon.');
@@ -205,7 +210,7 @@ final class CommercialOwnerPreapprovalService
     return [
       'owner' => $owner, 'registered' => !empty($input['registered']), 'sources' => $sources,
       'income_months' => $settings['income_months'], 'term_margin_months' => $settings['term_margin_months'],
-      'gross' => array_sum(array_column($sources, 'canon')), 'net' => $net, 'amount' => $net * $settings['income_months'], 'longest_months' => $longest,
+      'gross' => array_sum(array_column($sources, 'canon')), 'net' => $net, 'amount' => $net * $settings['income_months'], 'longest_months' => $longest, 'min_deduction' => $settings['no_mandate_deduction'],
       'term' => $longest > 0 ? max(0, $longest - $settings['term_margin_months']) : null,
       'needs' => $needs, 'uses' => $uses, 'notes' => mb_substr(trim(str_replace("\r", '', (string) ($input['notes'] ?? ''))), 0, 600),
     ];
