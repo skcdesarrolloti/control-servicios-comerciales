@@ -613,6 +613,7 @@ button:disabled { cursor: not-allowed; opacity: .52; }
 .commercial-permission-master span { display: block; }
 .commercial-permission-master strong { margin-bottom: 2px !important; color: #16477f !important; font-size: 11px !important; }
 .commercial-permission-master small { display: block; color: #49627f; font-size: 10px; line-height: 1.35; }
+#commercial-permissions-form [hidden] { display: none !important; }
 .commercial-permission-wide { margin: 0 18px 18px; padding: 18px; border: 1px solid #c7d8ef; border-radius: 16px; background: linear-gradient(180deg,#ffffff 0%,#f7fbff 100%); }
 .commercial-permission-wide-head h3 { margin: 4px 0 4px; color: #172943; font-size: 17px; }
 .commercial-permission-wide-head p { margin: 0 0 14px; color: #52647b; font-size: 11px; line-height: 1.5; }

@@ -1674,20 +1674,48 @@
       if (event.target === permissionModal || event.target.closest("[data-commercial-close-permissions]")) setPermissionModal(false);
     });
   }
+  // Pestañas de la configuración de accesos: muestran una sección y ocultan sus hermanas (todas siguen en el formulario).
+  function showPermissionTab(tab, attribute) {
+    var key = tab.getAttribute(attribute);
+    tab.parentElement.querySelectorAll("[" + attribute + "]").forEach(function (button) {
+      button.setAttribute("aria-selected", button === tab ? "true" : "false");
+    });
+    var panel = attribute === "data-perm-pane-tab" ? "data-perm-pane" : "data-perm-section";
+    var owner = tab.closest("[data-cargo]");
+    permissionForm.querySelectorAll("[" + panel + "]").forEach(function (section) {
+      if (section.parentElement.closest("[data-cargo]") !== owner) return;
+      section.hidden = section.getAttribute(panel) !== key;
+    });
+  }
   if (permissionForm) {
+    var cargoSelect = permissionForm.querySelector("[data-commercial-permissions-cargo]");
+    if (cargoSelect) {
+      cargoSelect.addEventListener("change", function () {
+        permissionForm.querySelectorAll("[data-cargo]").forEach(function (panel) {
+          panel.hidden = panel.getAttribute("data-cargo") !== cargoSelect.value;
+        });
+      });
+    }
     permissionForm.addEventListener("click", function (event) {
+      var paneTab = event.target.closest("[data-perm-pane-tab]");
+      if (paneTab) { showPermissionTab(paneTab, "data-perm-pane-tab"); return; }
+      var sectionTab = event.target.closest("[data-perm-section-tab]");
+      if (sectionTab) { showPermissionTab(sectionTab, "data-perm-section-tab"); return; }
       var toggle = event.target.closest("[data-commercial-permissions-toggle]");
       if (!toggle) return;
-      var scope = toggle.getAttribute("data-commercial-permissions-toggle") === "cargo"
-        ? toggle.closest("[data-cargo]")
-        : permissionForm;
+      var scope = toggle.closest("[data-perm-section]");
       if (!scope) return;
       var checked = toggle.getAttribute("data-checked") === "true";
       scope.querySelectorAll('input[type="checkbox"][name^="permissions["]').forEach(function (checkbox) {
         if (!checkbox.disabled) checkbox.checked = checked;
       });
+      scope.querySelectorAll("[data-perm-subviews]").forEach(function (list) { list.classList.toggle("opacity-50", !checked); });
     });
     permissionForm.addEventListener("change", function (event) {
+      if (event.target.matches("[data-perm-view-input]")) {
+        var subviews = event.target.closest("[data-perm-view]").querySelector("[data-perm-subviews]");
+        if (subviews) subviews.classList.toggle("opacity-50", !event.target.checked);
+      }
       if (event.target.matches('input[name="admin_cargos[]"]')) {
         var cargoPanel = event.target.closest('[data-cargo]');
         var deletePermission = cargoPanel && cargoPanel.querySelector('input[value="eliminar_notificacion"]');

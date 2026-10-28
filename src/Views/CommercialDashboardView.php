@@ -4872,6 +4872,14 @@ final class CommercialDashboardView
     return (string) ob_get_clean();
   }
 
+  /** Acciones de la configuración de accesos, agrupadas por módulo. Toda acción de CommercialAccessPolicy::ACTIONS va en un grupo. */
+  private const PERMISSION_ACTION_GROUPS = [
+    'Tareas' => ['ver_ticket', 'responder', 'agregar_nota', 'seguimiento', 'postergar', 'activar', 'cerrar', 'cambiar_estado', 'reasignar'],
+    'Notificaciones' => ['enviar_notificacion', 'eliminar_notificacion'],
+    'Precaptación' => ['precaptacion_crear', 'precaptacion_editar', 'precaptacion_ticket', 'precaptacion_catalogos'],
+    'Inmuebles y avisos' => ['ingresar_inmueble', 'registrar_aviso', 'editar_actor'],
+  ];
+
   /** @param array<int,string> $employeeCargoIds */
   private static function renderPermissions(CommercialAccessPolicy $policy, array $employeeCargoIds = []): string
   {
@@ -4898,75 +4906,98 @@ final class CommercialDashboardView
         </div>
 
         <form id="commercial-permissions-form" class="overflow-y-auto p-space-lg space-y-space-md flex-1">
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-space-sm bg-surface-container-low p-space-md rounded-xl">
-            <div>
-              <strong class="block font-label-md text-on-surface font-semibold">Acceso total administrativo</strong>
-              <span class="font-body-sm text-secondary">Cargos que pueden ver todo el panel, administrar permisos y operar todas las tareas.</span>
-            </div>
-            <div>
-              <strong class="block font-label-md text-on-surface font-semibold">Funcionarios operativos</strong>
-              <span class="font-body-sm text-secondary">Define qué cargos aparecen en filtros, reasignación y búsquedas de responsables.</span>
-            </div>
+          <div class="flex flex-wrap gap-1 p-1 bg-surface-container-low rounded-xl w-fit" role="tablist" aria-label="Secciones de accesos">
+            <button type="button" role="tab" aria-selected="true" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-secondary hover:text-on-surface aria-selected:bg-inverse-surface aria-selected:text-on-secondary aria-selected:shadow-sm transition-colors cursor-pointer" data-perm-pane-tab="cargos">Permisos por cargo</button>
+            <button type="button" role="tab" aria-selected="false" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-secondary hover:text-on-surface aria-selected:bg-inverse-surface aria-selected:text-on-secondary aria-selected:shadow-sm transition-colors cursor-pointer" data-perm-pane-tab="filtros">Cargos en filtros y reasignación</button>
           </div>
 
-          <div class="flex flex-wrap items-center gap-space-sm">
-            <span class="font-label-sm text-secondary font-semibold">Vistas y acciones de todos los cargos:</span>
-            <button type="button" class="px-3 py-1.5 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface font-label-sm font-semibold transition-colors cursor-pointer" data-commercial-permissions-toggle="all" data-checked="true">Marcar todo</button>
-            <button type="button" class="px-3 py-1.5 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface font-label-sm font-semibold transition-colors cursor-pointer" data-commercial-permissions-toggle="all" data-checked="false">Desmarcar todo</button>
-          </div>
+          <div class="space-y-space-md" data-perm-pane="cargos">
+            <label class="block">
+              <span class="block font-label-sm text-secondary font-semibold pb-1">Cargo a configurar</span>
+              <select class="w-full md:w-96 rounded-lg border border-surface-container bg-surface-container-lowest px-3 py-2 text-body-sm text-on-surface" data-commercial-permissions-cargo>
+                <?php foreach ($cargos as $cargo): ?>
+                  <option value="<?php echo esc_attr($cargo['id']); ?>"><?php echo esc_html($cargo['name'] . ' · ' . $cargo['total'] . ' activos' . (isset($adminCargoIds[$cargo['id']]) ? ' · Acceso total' : '')); ?></option>
+                <?php endforeach; ?>
+              </select>
+            </label>
 
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-space-md">
-            <?php foreach ($cargos as $cargo): ?>
-              <?php $current = $permissions[$cargo['id']] ?? ['views' => array_keys(CommercialAccessPolicy::VIEWS), 'actions' => array_values(array_diff(array_keys(CommercialAccessPolicy::ACTIONS), ['editar_actor']))]; ?>
-              <div class="bg-surface-container-low rounded-xl p-space-md border border-surface-container space-y-space-xs" data-cargo="<?php echo esc_attr($cargo['id']); ?>">
-                <div class="flex items-center justify-between pb-1 border-b border-surface-container">
+            <?php foreach (array_values($cargos) as $index => $cargo): ?>
+              <?php
+              $cargoId = $cargo['id'];
+              $isAdmin = isset($adminCargoIds[$cargoId]);
+              $current = $permissions[$cargoId] ?? ['views' => array_keys(CommercialAccessPolicy::VIEWS), 'actions' => array_values(array_diff(array_keys(CommercialAccessPolicy::ACTIONS), ['editar_actor']))];
+              $field = 'permissions[' . $cargoId . ']';
+              ?>
+              <div class="bg-surface-container-low rounded-xl p-space-md border border-surface-container space-y-space-sm" data-cargo="<?php echo esc_attr($cargoId); ?>"<?php echo $index === 0 ? '' : ' hidden'; ?>>
+                <div class="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-surface-container">
                   <span class="font-label-md font-semibold text-on-surface"><?php echo esc_html($cargo['name']); ?></span>
-                  <span class="font-label-sm text-secondary">ID <?php echo esc_html($cargo['id']); ?> (<?php echo esc_html((string) $cargo['total']); ?> activos)</span>
+                  <span class="font-label-sm text-secondary">ID <?php echo esc_html($cargoId); ?> · <?php echo esc_html((string) $cargo['total']); ?> activos</span>
                 </div>
-                <div class="flex flex-wrap items-center gap-2 py-1">
-                  <button type="button" class="px-3 py-1.5 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface font-label-sm font-semibold transition-colors cursor-pointer" data-commercial-permissions-toggle="cargo" data-checked="true" aria-label="Marcar todas las vistas y acciones de <?php echo esc_attr($cargo['name']); ?>">Marcar todo</button>
-                  <button type="button" class="px-3 py-1.5 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface font-label-sm font-semibold transition-colors cursor-pointer" data-commercial-permissions-toggle="cargo" data-checked="false" aria-label="Desmarcar todas las vistas y acciones de <?php echo esc_attr($cargo['name']); ?>">Desmarcar todo</button>
-                </div>
-                <label class="flex items-center gap-2 py-1 cursor-pointer">
-                  <input type="checkbox" name="admin_cargos[]" value="<?php echo esc_attr($cargo['id']); ?>"<?php checked(isset($adminCargoIds[$cargo['id']])); ?> class="rounded text-primary focus:ring-primary">
-                  <span class="font-label-sm font-semibold text-primary">Acceso Total Administrativo</span>
+                <label class="flex items-start gap-2 p-2 rounded-lg bg-surface-container-lowest cursor-pointer">
+                  <input type="checkbox" name="admin_cargos[]" value="<?php echo esc_attr($cargoId); ?>"<?php checked($isAdmin); ?> class="rounded text-primary focus:ring-primary mt-0.5">
+                  <span>
+                    <span class="block font-label-sm font-semibold text-primary">Acceso total administrativo</span>
+                    <span class="block text-[11px] text-secondary">Ve todo el panel, administra la configuración y opera todas las tareas, sin importar lo que se marque abajo.</span>
+                  </span>
                 </label>
-                <input type="hidden" name="permissions[<?php echo esc_attr($cargo['id']); ?>][configured]" value="1">
-                <div class="pt-1">
-                  <span class="block font-label-sm text-secondary font-semibold">Vistas Permitidas:</span>
-                  <div class="grid grid-cols-2 gap-1 pt-1">
-                    <?php foreach (CommercialAccessPolicy::VIEWS as $k => $label): ?>
-                      <label class="flex items-center gap-1.5 text-[11px] text-on-surface cursor-pointer">
-                        <input type="checkbox" name="permissions[<?php echo esc_attr($cargo['id']); ?>][views][]" value="<?php echo esc_attr($k); ?>"<?php checked(in_array($k, $current['views'], true)); ?> class="rounded text-primary">
-                        <span><?php echo esc_html($label); ?></span>
-                      </label>
+                <input type="hidden" name="<?php echo esc_attr($field); ?>[configured]" value="1">
+
+                <div class="flex flex-wrap gap-1 p-1 bg-surface-container rounded-xl w-fit" role="tablist" aria-label="Permisos de <?php echo esc_attr($cargo['name']); ?>">
+                  <button type="button" role="tab" aria-selected="true" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-secondary hover:text-on-surface aria-selected:bg-inverse-surface aria-selected:text-on-secondary aria-selected:shadow-sm transition-colors cursor-pointer" data-perm-section-tab="vistas">Acceso a pestañas</button>
+                  <button type="button" role="tab" aria-selected="false" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-secondary hover:text-on-surface aria-selected:bg-inverse-surface aria-selected:text-on-secondary aria-selected:shadow-sm transition-colors cursor-pointer" data-perm-section-tab="acciones">Acciones</button>
+                </div>
+
+                <div class="space-y-2" data-perm-section="vistas">
+                  <div class="flex flex-wrap items-center justify-between gap-2">
+                    <span class="text-[11px] text-secondary">Las subpestañas solo se ven si su pestaña principal está habilitada.</span>
+                    <span class="flex gap-2">
+                      <button type="button" class="px-3 py-1 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface text-xs font-semibold cursor-pointer" data-commercial-permissions-toggle="section" data-checked="true">Marcar todas</button>
+                      <button type="button" class="px-3 py-1 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface text-xs font-semibold cursor-pointer" data-commercial-permissions-toggle="section" data-checked="false">Desmarcar todas</button>
+                    </span>
+                  </div>
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-2 items-start">
+                    <?php foreach (CommercialAccessPolicy::VIEWS as $viewKey => $viewLabel): ?>
+                      <?php $subviews = CommercialAccessPolicy::SUBVIEWS[$viewKey] ?? []; $viewOn = in_array($viewKey, $current['views'], true); ?>
+                      <div class="p-2 rounded-lg bg-surface-container-lowest" data-perm-view>
+                        <label class="flex items-center gap-2 text-body-sm font-semibold text-on-surface cursor-pointer">
+                          <input type="checkbox" name="<?php echo esc_attr($field); ?>[views][]" value="<?php echo esc_attr($viewKey); ?>"<?php checked($viewOn); ?> class="rounded text-primary" data-perm-view-input>
+                          <span><?php echo esc_html($viewLabel); ?></span>
+                        </label>
+                        <?php if ($subviews !== []): ?>
+                          <input type="hidden" name="<?php echo esc_attr($field); ?>[subviews][<?php echo esc_attr($viewKey); ?>][]" value="">
+                          <div class="pl-6 pt-1 space-y-1<?php echo $viewOn ? '' : ' opacity-50'; ?>" data-perm-subviews>
+                            <?php foreach ($subviews as $subKey => $subLabel): ?>
+                              <label class="flex items-center gap-2 text-[11px] text-on-surface cursor-pointer">
+                                <input type="checkbox" name="<?php echo esc_attr($field); ?>[subviews][<?php echo esc_attr($viewKey); ?>][]" value="<?php echo esc_attr($subKey); ?>"<?php checked(in_array($subKey, $current['subviews'][$viewKey] ?? array_keys($subviews), true)); ?> class="rounded text-primary">
+                                <span><?php echo esc_html($subLabel); ?></span>
+                              </label>
+                            <?php endforeach; ?>
+                          </div>
+                        <?php endif; ?>
+                      </div>
                     <?php endforeach; ?>
                   </div>
                 </div>
-                <p class="text-[11px] text-secondary pt-1">Las subpestañas requieren habilitar su vista principal.</p>
-                <?php foreach (CommercialAccessPolicy::SUBVIEWS as $parentView => $subviews): ?>
-                  <div class="pt-1">
-                    <span class="block font-label-sm text-secondary font-semibold">Subpestañas de <?php echo esc_html(CommercialAccessPolicy::VIEWS[$parentView]); ?>:</span>
-                    <input type="hidden" name="permissions[<?php echo esc_attr($cargo['id']); ?>][subviews][<?php echo esc_attr($parentView); ?>][]" value="">
-                    <div class="grid grid-cols-2 gap-1 pt-1">
-                      <?php foreach ($subviews as $key => $label): ?>
-                        <label class="flex items-center gap-1.5 text-[11px] text-on-surface cursor-pointer">
-                          <input type="checkbox" name="permissions[<?php echo esc_attr($cargo['id']); ?>][subviews][<?php echo esc_attr($parentView); ?>][]" value="<?php echo esc_attr($key); ?>"<?php checked(in_array($key, $current['subviews'][$parentView] ?? array_keys($subviews), true)); ?> class="rounded text-primary">
-                          <span><?php echo esc_html($label); ?></span>
-                        </label>
-                      <?php endforeach; ?>
-                    </div>
+
+                <div class="space-y-2" data-perm-section="acciones" hidden>
+                  <div class="flex flex-wrap items-center justify-between gap-2">
+                    <span class="text-[11px] text-secondary">Eliminar notificaciones va con el acceso total administrativo; no se delega por separado.</span>
+                    <span class="flex gap-2">
+                      <button type="button" class="px-3 py-1 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface text-xs font-semibold cursor-pointer" data-commercial-permissions-toggle="section" data-checked="true">Marcar todas</button>
+                      <button type="button" class="px-3 py-1 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface text-xs font-semibold cursor-pointer" data-commercial-permissions-toggle="section" data-checked="false">Desmarcar todas</button>
+                    </span>
                   </div>
-                <?php endforeach; ?>
-                <div class="pt-1">
-                  <span class="block font-label-sm text-secondary font-semibold">Acciones Operativas:</span>
-                  <p class="text-[11px] text-secondary">Eliminar notificaciones requiere Acceso Total Administrativo; este permiso no se puede delegar por separado.</p>
-                  <div class="grid grid-cols-2 gap-1 pt-1">
-                    <?php foreach (CommercialAccessPolicy::ACTIONS as $k => $label): ?>
-                      <label class="flex items-center gap-1.5 text-[11px] text-on-surface cursor-pointer">
-                        <input type="checkbox" name="permissions[<?php echo esc_attr($cargo['id']); ?>][actions][]" value="<?php echo esc_attr($k); ?>"<?php checked($k === 'eliminar_notificacion' ? isset($adminCargoIds[$cargo['id']]) : (($k === 'editar_actor' && isset($adminCargoIds[$cargo['id']])) || in_array($k, $current['actions'], true))); ?> <?php echo $k === 'eliminar_notificacion' ? 'disabled' : ''; ?> class="rounded text-primary">
-                        <span><?php echo esc_html($label); ?></span>
-                      </label>
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-2 items-start">
+                    <?php foreach (self::PERMISSION_ACTION_GROUPS as $groupLabel => $groupActions): ?>
+                      <div class="p-2 rounded-lg bg-surface-container-lowest space-y-1">
+                        <span class="block font-label-sm text-secondary font-semibold"><?php echo esc_html($groupLabel); ?></span>
+                        <?php foreach ($groupActions as $actionKey): ?>
+                          <label class="flex items-center gap-2 text-[11px] text-on-surface cursor-pointer">
+                            <input type="checkbox" name="<?php echo esc_attr($field); ?>[actions][]" value="<?php echo esc_attr($actionKey); ?>"<?php checked($actionKey === 'eliminar_notificacion' ? $isAdmin : (($actionKey === 'editar_actor' && $isAdmin) || in_array($actionKey, $current['actions'], true))); ?> <?php echo $actionKey === 'eliminar_notificacion' ? 'disabled' : ''; ?> class="rounded text-primary">
+                            <span><?php echo esc_html(CommercialAccessPolicy::ACTIONS[$actionKey]); ?></span>
+                          </label>
+                        <?php endforeach; ?>
+                      </div>
                     <?php endforeach; ?>
                   </div>
                 </div>
@@ -4974,8 +5005,9 @@ final class CommercialDashboardView
             <?php endforeach; ?>
           </div>
 
-          <div class="bg-surface-container-low rounded-xl p-space-md border border-surface-container space-y-space-xs">
-            <span class="font-label-md font-semibold text-on-surface block">Cargos Visibles en Filtros y Reasignación</span>
+          <div class="bg-surface-container-low rounded-xl p-space-md border border-surface-container space-y-space-xs" data-perm-pane="filtros" hidden>
+            <span class="font-label-md font-semibold text-on-surface block">Cargos visibles en filtros y reasignación</span>
+            <span class="block text-[11px] text-secondary">Los funcionarios de estos cargos aparecen en los filtros, la reasignación y la búsqueda de responsables.</span>
             <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1">
               <?php foreach ($cargos as $cargo): ?>
                 <label class="flex items-center gap-2 p-2 bg-surface-container-lowest rounded-lg text-body-sm cursor-pointer border border-transparent hover:border-surface-container">
