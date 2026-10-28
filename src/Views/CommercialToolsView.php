@@ -18,7 +18,7 @@ final class CommercialToolsView
   /** UVT vigente por defecto en la calculadora de ganancia ocasional; el consultor la puede cambiar. */
   public const UVT = 52374;
   /** Íconos de las necesidades que resuelve el crédito preaprobado (CommercialOwnerPreapprovalService::USES). */
-  private const USE_ICONS = ['servicios' => 'water_drop', 'administracion' => 'apartment', 'reparaciones' => 'construction', 'otros' => 'receipt_long'];
+  private const USE_ICONS = ['servicios' => 'water_drop', 'administracion' => 'apartment', 'reparaciones' => 'construction', 'otros' => 'payments'];
 
   public static function render(string $tool, ?CommercialOwnerPreapprovalService $service, string $baseUrl): string
   {

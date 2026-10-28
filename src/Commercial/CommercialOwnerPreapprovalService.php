@@ -37,7 +37,7 @@ final class CommercialOwnerPreapprovalService
     'servicios' => ['Servicios públicos', 'Ponerse al día con agua, luz y gas sin afectar su flujo de caja.'],
     'administracion' => ['Cuotas de administración', 'Pagar la administración pendiente y evitar intereses de mora.'],
     'reparaciones' => ['Reparaciones y mantenimiento', 'Arreglar el inmueble para arrendarlo más rápido y a mejor precio.'],
-    'otros' => ['Otros imprevistos', 'Impuesto predial, mejoras o cualquier gasto del inmueble.'],
+    'otros' => ['Libre inversión', 'Para lo que el propietario necesite: impuesto predial, mejoras u otros gastos.'],
   ];
 
   /** @var array<string,mixed>|null */

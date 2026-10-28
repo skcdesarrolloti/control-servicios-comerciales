@@ -45,7 +45,7 @@
   /* ------------------------------------------------------------ Simulador de ingreso neto del propietario */
 
   var MODALITIES = { defecto: "Aseguradora", berkley: "Berkley", mundial: "Seguros Mundial" };
-  var USE_LABELS = { servicios: "servicios públicos", administracion: "cuotas de administración", reparaciones: "reparaciones y mantenimiento", otros: "otros imprevistos" };
+  var USE_LABELS = { servicios: "servicios públicos", administracion: "cuotas de administración", reparaciones: "reparaciones y mantenimiento", otros: "libre inversión" };
 
   function round2(value) { return Math.round((Number(value) || 0) * 100) / 100; }
   function percent(value) { return String(Math.round((Number(value) || 0) * 10000) / 10000).replace(".", ",") + " %"; }
@@ -403,7 +403,7 @@
       lines.push("- Inmueble " + (index + 1) + (item.fromContract && item.meta ? " (" + item.meta + ")" : "") + ": canon " + money(item.canon) + " → neto " + money(item.net) + " / mes (" + (item.sim.modalidad === MODALITIES.defecto ? item.sim.aseguradora : "póliza " + item.sim.modalidad) + ")");
     });
     lines.push("", "Ingreso neto mensual: " + money(state.net));
-    lines.push("Con este ingreso cuentas con un crédito preaprobado de hasta " + money(state.amount) + " para ponerte al día con servicios públicos, cuotas de administración, reparaciones o cualquier imprevisto del inmueble" + (state.term > 0 ? ", hasta en " + state.term + " cuotas." : "."));
+    lines.push("Con este ingreso cuentas con un crédito preaprobado de hasta " + money(state.amount) + " para ponerte al día con servicios públicos, cuotas de administración, reparaciones o libre inversión" + (state.term > 0 ? ", hasta en " + state.term + " cuotas." : "."));
     var uses = Object.keys(state.uses);
     if (uses.length) {
       var need = uses.reduce(function (sum, key) { return sum + state.uses[key]; }, 0);
