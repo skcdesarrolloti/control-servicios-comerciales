@@ -110,7 +110,10 @@ const { chromium } = require(process.env.SCM_PLAYWRIGHT_MODULE || 'playwright');
     assert.match(await first.locator('[data-pre-source-warning]').innerText(), /mínimo 12 meses/);
     assert.equal(await tool.locator('[data-pre-term]').innerText(), 'Hasta 4 cuotas');
     await first.locator('[data-pre-field="duracion"]').selectOption('24');
-    assert.equal(await first.locator('[data-pre-source-warning]').isVisible(), false);
+    // Sin el seguro de servicios queda el aviso de la póliza (condición del crédito), ya no el de la duración.
+    assert.doesNotMatch(await first.locator('[data-pre-source-warning]').innerText(), /mínimo 12 meses/);
+    assert.match(await first.locator('[data-pre-source-warning]').innerText(), /Sin póliza de servicios públicos: este contrato no cumple/);
+    assert.match(await first.locator('[data-pre-breakdown]').innerText(), /Póliza de servicios públicos\s+No la tiene\s+\$0/);
     assert.equal(await tool.locator('[data-pre-term]').innerText(), 'Hasta 22 cuotas');
     // La administración suma al canon total: comisión 10 % + IVA de 1.800.000 = 214.200 y garantía 2,5 % = 45.000.
     await first.locator('[data-pre-sim="administracion"]').fill('300000');

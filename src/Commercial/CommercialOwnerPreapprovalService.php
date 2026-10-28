@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SCM\Commercial;
 
+use SCM\Core\Auth;
 use SCM\Core\Database;
 use SCM\Core\Settings;
 
@@ -92,6 +93,23 @@ final class CommercialOwnerPreapprovalService
    * (`precio_mes_servicios` es el valor de cada cuota): `servicios` dice si ya se pagó.
    * @return array{owner:array{name:string,document:string,email:string,phone:string}|null,contracts:list<array<string,mixed>>,active_credits:int}
    */
+  /**
+   * Quien firma el PDF: el funcionario de la sesión con su cargo, celular y correo de `jet_cct_funcionarios`.
+   * @return array{name:string,cargo:string,phone:string,email:string}
+   */
+  public function signer(): array
+  {
+    $people = $this->db->table('jet_cct_funcionarios');
+    $cargos = $this->db->table('jet_cct_cargos');
+    $row = $this->db->getRow(
+      "SELECT f.`nombre`, f.`celular`, f.`correo`, c.`nombre_cargo` FROM `{$people}` f LEFT JOIN `{$cargos}` c ON c.`_ID` = f.`id_cargo` WHERE f.`_ID` = ? LIMIT 1",
+      [Auth::userId()]
+    );
+    $row = is_array($row) ? $row : [];
+    $value = static fn(string $key): string => trim((string) ($row[$key] ?? ''));
+    return ['name' => $value('nombre') !== '' ? $value('nombre') : trim(Auth::user()), 'cargo' => $value('nombre_cargo'), 'phone' => $value('celular'), 'email' => $value('correo')];
+  }
+
   public function lookup(string $document): array
   {
     $this->authorize();
@@ -160,6 +178,8 @@ final class CommercialOwnerPreapprovalService
     return $result;
   }
 
+  /** Aviso del inmueble sin póliza de servicios públicos. */
+  public const NO_SERVICES_POLICY = 'Sin póliza de servicios públicos: este contrato no cumple las condiciones para la aprobación del crédito.';
   /** Condiciones para aprobar el crédito; se enumeran en el PDF. */
   public const CONDITIONS = [
     'Queda sujeto a estudio, verificación y aprobación.',
@@ -203,6 +223,10 @@ final class CommercialOwnerPreapprovalService
         foreach (['canon', 'comision', 'garantia', 'seguro', 'intereses'] as $key) $item[$key] = $sim[$key];
         $item['sim'] = $sim;
       }
+      // Póliza de servicios públicos (condición del crédito): 'si' si se descuenta, 'pagada' si la del mandato ya se pagó,
+      // 'no' si el inmueble no la tiene.
+      $services = !empty($source['servicios']) && $source['servicios'] !== 'No';
+      $item['poliza'] = $services ? 'si' : (!empty($source['poliza_pagada']) ? 'pagada' : 'no');
       $item['duracion'] = is_numeric($source['duracion'] ?? null) ? max(0, min(240, (int) $source['duracion'])) : 0;
       $item['meta'] = $text($source['meta'] ?? '', 160);
       $item['seguro_mes'] = ($item['seguro'] + $item['intereses']) / 12;

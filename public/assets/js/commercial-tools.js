@@ -45,6 +45,7 @@
   /* ------------------------------------------------------------ Simulador de ingreso neto del propietario */
 
   var MODALITIES = { defecto: "Aseguradora", berkley: "Berkley", mundial: "Seguros Mundial" };
+  var NO_SERVICES_POLICY = "Sin póliza de servicios públicos: este contrato no cumple las condiciones para la aprobación del crédito.";
   var USE_LABELS = { servicios: "servicios públicos", administracion: "cuotas de administración", reparaciones: "reparaciones y mantenimiento", otros: "libre inversión" };
 
   function round2(value) { return Math.round((Number(value) || 0) * 100) / 100; }
@@ -161,6 +162,8 @@
       duracion: Number(card.querySelector('[data-pre-field="duracion"]').value) || 0,
       meta: card.querySelector("[data-pre-source-meta]").textContent, fromContract: card.dataset.contract === "1",
     };
+    // Póliza de servicios públicos: se descuenta, ya se pagó (la del mandato) o el inmueble no la tiene.
+    item.poliza = simField(card, "servicios").checked ? "si" : card.dataset.policy === "pagada" ? "pagada" : "no";
     var sim = simulate(root, card, item.canon);
     item.sim = sim;
     ["comision", "garantia", "seguro", "intereses", "cuota", "cuotas", "warnings"].forEach(function (key) { item[key] = sim[key]; });
@@ -184,13 +187,14 @@
     var rows = breakdownRow("Canon mensual", money(item.canon));
     if (item.comision > 0) rows += breakdownRow("(−) Comisión de administración", money(item.comision), percent(item.sim.tasa) + " + IVA sobre " + (digits(simField(card, "administracion").value) > 0 ? "canon + administración" : "el canon"));
     if (item.garantia > 0) rows += breakdownRow("(−) Garantía inmobiliaria", money(item.garantia), item.sim.aseguradora);
-    if (item.seguro > 0) rows += breakdownRow("(−) Seguro" + (item.intereses > 0 ? " e intereses" : ""), money(item.seguroMes), item.cuotas > 0 ? money(item.seguro + item.intereses) + " en " + (item.cuotas === 1 ? "1 pago" : item.cuotas + " cuotas de " + money(item.cuota)) + ", repartido en 12 meses" : money(item.seguro + item.intereses) + " en 12 meses");
+    if (item.seguro <= 0 || item.poliza !== "si") rows += breakdownRow("(−) Póliza de servicios públicos", money(0), item.poliza === "pagada" ? "Ya se pagó: no se descuenta" : item.poliza === "no" ? "No la tiene" : "");
+    if (item.seguro > 0) rows += breakdownRow((item.poliza === "si" && simField(card, "modalidad").value === "defecto" ? "(−) Póliza de servicios públicos" : "(−) Seguro") + (item.intereses > 0 ? " e intereses" : ""), money(item.seguroMes), item.cuotas > 0 ? money(item.seguro + item.intereses) + " en " + (item.cuotas === 1 ? "1 pago" : item.cuotas + " cuotas de " + money(item.cuota)) + ", repartido en 12 meses" : money(item.seguro + item.intereses) + " en 12 meses");
     if (item.otros > 0) rows += breakdownRow("(−) Otros descuentos", money(item.otros));
     if (item.ajuste > 0) rows += breakdownRow("(−) Ajuste al descuento mínimo", money(item.ajuste), "Los contratos descuentan como mínimo el " + percent((Number(root.dataset.minDeduction) || 0) * 100) + " del canon");
     card.querySelector("[data-pre-breakdown]").innerHTML = item.canon > 0 ? rows : "";
     var warning = card.querySelector("[data-pre-source-warning]");
     var minMonths = Number(root.dataset.minMonths) || 12;
-    var warnings = item.warnings.concat(item.duracion > 0 && item.duracion < minMonths ? ["El crédito exige un contrato de mínimo " + minMonths + " meses."] : []);
+    var warnings = item.warnings.concat(item.canon > 0 && item.poliza === "no" ? [NO_SERVICES_POLICY] : [], item.duracion > 0 && item.duracion < minMonths ? ["El crédito exige un contrato de mínimo " + minMonths + " meses."] : []);
     warning.textContent = warnings.join(" ");
     warning.hidden = !warnings.length;
     card.querySelector("[data-pre-source-net]").textContent = money(item.net);
@@ -283,6 +287,7 @@
     // esos meses está pagada y no se descuenta; si no, se simula con su valor asegurado y sus cuotas.
     var policy = data.contrato && !pending ? data.servicios : null;
     simField(card, "servicios").checked = !!policy && policy.estado !== "pagada";
+    card.dataset.policy = policy ? policy.estado : "";
     if (policy) {
       if (Number(policy.valor) > 0) simField(card, "valor").value = money(policy.valor);
       simField(card, "cuotas").value = String(policy.cuotas);
@@ -477,7 +482,7 @@
           return {
             calc: "sim", contrato: item.fromContract, canon: item.canon, otros: item.otros, duracion: item.duracion, meta: item.fromContract ? item.meta : "",
             administracion: digits(simField(card, "administracion").value), tasa_comision: simField(card, "tasa").value, modalidad: simField(card, "modalidad").value, aseguradora: simField(card, "aseguradora").value,
-            iva_canon: simField(card, "iva").checked, garantia: simField(card, "garantia").checked, servicios: simField(card, "servicios").checked, valor_asegurado: digits(simField(card, "valor").value), cuotas: Number(simField(card, "cuotas").value) || 1,
+            iva_canon: simField(card, "iva").checked, garantia: simField(card, "garantia").checked, servicios: simField(card, "servicios").checked, poliza_pagada: item.poliza === "pagada", valor_asegurado: digits(simField(card, "valor").value), cuotas: Number(simField(card, "cuotas").value) || 1,
           };
         }),
       }));

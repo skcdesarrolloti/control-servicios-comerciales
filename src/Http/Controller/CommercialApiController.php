@@ -806,8 +806,9 @@ final class CommercialApiController
     $this->verify($input);
     try {
       $payload = json_decode(is_string($input['payload'] ?? null) ? $input['payload'] : '', true);
-      $estimate = $this->preapprovalService()->estimate(is_array($payload) ? $payload : []);
-      $bytes = \SCM\Commercial\CommercialOwnerPreapprovalPdf::bytes($estimate, trim(\SCM\Core\Auth::user()));
+      $service = $this->preapprovalService();
+      $estimate = $service->estimate(is_array($payload) ? $payload : []);
+      $bytes = \SCM\Commercial\CommercialOwnerPreapprovalPdf::bytes($estimate, $service->signer());
     } catch (\SCM\Commercial\CommercialSignAccessDenied $exception) {
       JsonResponse::error($exception->getMessage(), 403);
     } catch (\InvalidArgumentException $exception) {

@@ -32,6 +32,7 @@
 .scm-preapproval-highlight>div.is-credit{border-left-color:#f59120;background:#fff7e6}
 .scm-preapproval-highlight em{display:block;margin-top:4px;color:#5b6b82;font-size:10.5px;font-style:normal}
 .scm-preapproval-income tr.is-info th,.scm-preapproval-income tr.is-info td{color:#5b6b82}
+.scm-preapproval-income tr.is-warning small{color:#b42318;font-weight:600;font-style:normal}
 .scm-preapproval-uses{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0;padding:0;list-style:none}
 .scm-preapproval-uses li{padding:9px 12px;border:1px solid #d7dde6;border-radius:6px;font-size:11.5px;break-inside:avoid;page-break-inside:avoid}
 .scm-preapproval-uses strong{color:#061d49}

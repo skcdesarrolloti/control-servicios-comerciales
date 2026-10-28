@@ -119,7 +119,20 @@ final class CommercialOwnerPreapprovalTest extends TestCase
     ]]);
     self::assertEquals([6000, 0, 0], array_column($contracts['sources'], 'ajuste'));
     self::assertEquals([850000, 1664400, 856000], array_column($contracts['sources'], 'net'));
-    self::assertStringContainsString('Ajuste al descuento mínimo', CommercialOwnerPreapprovalPdf::html($contracts, 'Prueba'));
+    // Al propietario no se le muestra el ajuste: va dentro de otros descuentos. Sin póliza de servicios sale en $0 con el aviso.
+    $html = CommercialOwnerPreapprovalPdf::html($contracts, ['name' => 'Prueba']);
+    self::assertStringNotContainsString('Ajuste al descuento mínimo', $html);
+    self::assertMatchesRegularExpression('/\(−\) Otros descuentos<\/th><td class="is-unit">Mensual \(mes\)<\/td><td class="is-money">\$6\.000/u', $html);
+    self::assertSame(['no', 'no', 'no'], array_column($contracts['sources'], 'poliza'));
+    self::assertSame(3, substr_count($html, CommercialOwnerPreapprovalService::NO_SERVICES_POLICY));
+    $paid = $this->service()->estimate(['owner'=>['name'=>'Ana'] + self::OWNER, 'sources'=>[
+      ['calc'=>'sim', 'canon'=>1000000, 'poliza_pagada'=>true],
+      ['calc'=>'sim', 'canon'=>1000000, 'servicios'=>true, 'valor_asegurado'=>3000000],
+    ]]);
+    self::assertSame(['pagada', 'si'], array_column($paid['sources'], 'poliza'));
+    $html = CommercialOwnerPreapprovalPdf::html($paid, ['name' => 'Prueba']);
+    self::assertStringContainsString('Ya se pagó: no se descuenta.', $html);
+    self::assertStringNotContainsString(CommercialOwnerPreapprovalService::NO_SERVICES_POLICY, $html);
     self::assertSame(12, $estimate['term']); // contrato más largo de 14 meses − 2 de margen
 
     $manual = $this->service()->estimate(['owner'=>['name'=>'Carlos'] + self::OWNER, 'sources'=>[['canon'=>1500000, 'comision'=>150000]]]);
@@ -152,8 +165,11 @@ final class CommercialOwnerPreapprovalTest extends TestCase
     $estimate = $this->service()->estimate(['owner'=>['name'=>'Ana <b>Propietaria</b>', 'document'=>'1.143.415.938'] + self::OWNER, 'registered'=>true, 'sources'=>[
       ['canon'=>2000000, 'comision'=>250000, 'seguro'=>180000, 'intereses'=>12000, 'meta'=>'Contrato C-100'],
     ]]);
-    $html = CommercialOwnerPreapprovalPdf::html($estimate, 'Funcionario de prueba');
+    $html = CommercialOwnerPreapprovalPdf::html($estimate, $this->service()->signer());
     self::assertStringContainsString('scm-acta-receipt scm-services-document scm-preapproval-document', $html);
+    // Firma: "Atentamente," con el nombre, el cargo y el contacto del funcionario de la sesión.
+    self::assertStringContainsString('<span>Atentamente,</span><strong>Funcionario de prueba</strong><p>Consultor de Arriendo</p><p>test@example.test</p>', $html);
+    self::assertStringNotContainsString('Realizado por', $html);
     self::assertStringNotContainsString('ingreso neto ×', $html);
     self::assertStringNotContainsString('Meses de ingreso', $html);
     self::assertStringNotContainsString('meses de su ingreso neto', $html);
@@ -223,7 +239,7 @@ final class CommercialOwnerPreapprovalTest extends TestCase
     self::assertEquals(2000000, $estimate['gross']);
     self::assertSame(['servicios'=>800000.0, 'reparaciones'=>1200000.0], $estimate['uses']);
     self::assertSame("Primera línea\nSegunda", $estimate['notes']);
-    $html = CommercialOwnerPreapprovalPdf::html($estimate, 'Funcionario de prueba');
+    $html = CommercialOwnerPreapprovalPdf::html($estimate, $this->service()->signer());
     self::assertStringContainsString(CommercialOwnerPreapprovalPdf::TITLE, $html);
     self::assertStringContainsString('Simulación con El Libertador', $html);
     self::assertStringContainsString('Se paga en 2 cuotas de $30.000', $html);
