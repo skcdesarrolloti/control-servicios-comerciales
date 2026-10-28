@@ -387,7 +387,7 @@
       lines.push("- Inmueble " + (index + 1) + (item.fromContract && item.meta ? " (" + item.meta + ")" : "") + ": canon " + money(item.canon) + " → neto " + money(item.net) + " / mes (" + (item.sim.modalidad === MODALITIES.defecto ? item.sim.aseguradora : "póliza " + item.sim.modalidad) + ")");
     });
     lines.push("", "Ingreso neto mensual: " + money(state.net));
-    lines.push("Con este ingreso cuentas con un crédito preaprobado de hasta " + money(state.amount) + " (" + state.months + " meses de tu ingreso neto) para ponerte al día con servicios públicos, cuotas de administración, reparaciones o cualquier imprevisto del inmueble" + (state.term > 0 ? ", hasta en " + state.term + " cuotas." : "."));
+    lines.push("Con este ingreso cuentas con un crédito preaprobado de hasta " + money(state.amount) + " para ponerte al día con servicios públicos, cuotas de administración, reparaciones o cualquier imprevisto del inmueble" + (state.term > 0 ? ", hasta en " + state.term + " cuotas." : "."));
     var uses = Object.keys(state.uses);
     if (uses.length) {
       var need = uses.reduce(function (sum, key) { return sum + state.uses[key]; }, 0);

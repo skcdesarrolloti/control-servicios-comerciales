@@ -72,7 +72,7 @@ final class CommercialToolsView
     foreach ([6, 12, 18, 24, 36, 48, 60] as $value) $durations .= '<option value="' . $value . '"' . ($value === 12 ? ' selected' : '') . '>' . $value . ' meses</option>';
     ob_start(); ?>
     <section class="ctl" data-commercial-tool="simulador_ingreso_neto" data-min-months="<?php echo CommercialOwnerPreapprovalService::MIN_CONTRACT_MONTHS; ?>" data-min-deduction="<?php echo $e((string) $settings['no_mandate_deduction']); ?>" data-income-months="<?php echo $months; ?>" data-term-margin="<?php echo (int) $settings['term_margin_months']; ?>" data-rates="<?php echo $e(json_encode($rates, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)); ?>">
-      <?php echo self::hero('savings', 'Simulador de ingreso neto del propietario', 'Calcula cuánto le queda al propietario cada mes después de la comisión, la garantía y los seguros, con las tarifas vigentes de SuCasa. Con ese ingreso accede a un <strong>crédito preaprobado de hasta ' . $months . ' veces su ingreso neto</strong> para ponerse al día con servicios públicos, administración o reparaciones.'); ?>
+      <?php echo self::hero('savings', 'Simulador de ingreso neto del propietario', 'Calcula cuánto le queda al propietario cada mes después de la comisión, la garantía y los seguros, con las tarifas vigentes de SuCasa. Con ese ingreso accede a un <strong>crédito preaprobado</strong> para ponerse al día con servicios públicos, administración o reparaciones.'); ?>
       <div class="ctl-layout">
         <div class="ctl-main">
           <section class="ctl-card">
@@ -135,7 +135,7 @@ final class CommercialToolsView
           <div class="ctl-credit">
             <span class="ctl-credit__label"><span class="material-symbols-outlined" aria-hidden="true">verified</span>Crédito preaprobado hasta</span>
             <strong class="ctl-credit__amount" data-pre-total>$0</strong>
-            <span class="ctl-credit__formula">Su ingreso neto × <?php echo $months; ?> meses, para servicios, administración y reparaciones.</span>
+            <span class="ctl-credit__formula">Para servicios, administración y reparaciones.</span>
           </div>
           <dl class="ctl-summary__rows">
             <div><dt>Inmuebles</dt><dd data-pre-count>0</dd></div>

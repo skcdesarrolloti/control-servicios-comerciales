@@ -63,7 +63,6 @@ final class CommercialOwnerPreapprovalPdf
   public static function html(array $estimate, string $generatedBy, bool $pdf = false): string
   {
     $owner = $estimate['owner'];
-    $months = (int) $estimate['income_months'];
     $term = $estimate['term'];
     $termText = $term === null ? 'Según la vigencia del contrato' : ((int) $term > 0 ? 'Hasta ' . (int) $term . ' cuotas mensuales' : 'Sin plazo disponible por vigencia');
     $amount = (float) $estimate['amount'];
@@ -97,9 +96,8 @@ final class CommercialOwnerPreapprovalPdf
     }
 
     $calc = self::row('Ingreso neto mensual total (' . count($estimate['sources']) . (count($estimate['sources']) === 1 ? ' inmueble)' : ' inmuebles)'), 'Mensual (mes)', (float) $estimate['net'])
-      . '<tr><th scope="row">Meses de ingreso que respaldan el crédito</th><td class="is-unit">Política</td><td class="is-money">' . $months . ' meses</td></tr>'
       . ($term !== null ? '<tr><th scope="row">Plazo máximo estimado<small>Duración del contrato más largo (' . (int) $estimate['longest_months'] . ' meses) menos ' . (int) $estimate['term_margin_months'] . ' de margen.</small></th><td class="is-unit">Cuotas</td><td class="is-money">' . self::e($termText) . '</td></tr>' : '')
-      . self::row('Crédito preaprobado estimado', 'Ingreso neto × ' . $months, $amount, '', 'is-total');
+      . self::row('Crédito preaprobado estimado', 'Hasta', $amount, '', 'is-total');
 
     // Lo que el propietario puede resolver con el crédito: solo si respondió que tiene algo pendiente. Muestra lo que
     // escribió el consultor o, sin valores, los usos posibles.
@@ -124,7 +122,7 @@ final class CommercialOwnerPreapprovalPdf
       . '<header class="scm-acta-receipt-head"><h1>' . self::TITLE . '</h1></header>'
       . '<p class="scm-acta-receipt-date">Cartagena de Indias, ' . date('d/m/Y') . ' · Documento informativo para el propietario</p>'
       . '<section class="scm-preapproval-highlight"><div><span>Ingreso neto mensual</span><strong>' . self::e(self::money((float) $estimate['net'])) . '</strong><em>Canon ' . self::e(self::money((float) $estimate['gross'])) . ' menos comisión, garantía y seguros</em></div>'
-      . '<div class="is-credit"><span>Crédito preaprobado hasta</span><strong>' . self::e(self::money($amount)) . '</strong><em>' . $months . ' meses de su ingreso neto · ' . self::e($termText) . '</em></div></section>'
+      . '<div class="is-credit"><span>Crédito preaprobado hasta</span><strong>' . self::e(self::money($amount)) . '</strong><em>' . self::e($termText) . '</em></div></section>'
       . '<section class="scm-acta-receipt-section"><h2>1. Propietario</h2>' . self::table(array_filter([
         'Nombre' => $owner['name'], 'Cédula o NIT' => $owner['document'], 'Celular' => $owner['phone'], 'Correo' => $owner['email'],
         'Vínculo con SuCasa' => $estimate['registered'] ? 'Propietario registrado (contratos vigentes)' : 'Propietario aún no registrado (simulación con las tarifas de SuCasa)',

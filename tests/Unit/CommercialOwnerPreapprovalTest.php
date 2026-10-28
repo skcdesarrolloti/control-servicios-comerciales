@@ -146,6 +146,9 @@ final class CommercialOwnerPreapprovalTest extends TestCase
     ]]);
     $html = CommercialOwnerPreapprovalPdf::html($estimate, 'Funcionario de prueba');
     self::assertStringContainsString('scm-acta-receipt scm-services-document scm-preapproval-document', $html);
+    self::assertStringNotContainsString('ingreso neto ×', $html);
+    self::assertStringNotContainsString('Meses de ingreso', $html);
+    self::assertStringNotContainsString('meses de su ingreso neto', $html);
     self::assertStringContainsString('Ana &lt;b&gt;Propietaria&lt;/b&gt;', $html);
     self::assertStringContainsString('$5.202.000', $html);
     self::assertStringContainsString('<td class="is-unit">12 meses</td>', $html);
@@ -262,7 +265,9 @@ final class CommercialOwnerPreapprovalTest extends TestCase
     self::assertStringNotContainsString('Valores del contrato', $html);
     self::assertStringNotContainsString('ctl-logo', $html);
     self::assertStringContainsString('Simulador de ingreso neto del propietario', $html);
-    self::assertStringContainsString('crédito preaprobado de hasta 3 veces su ingreso neto', $html);
+    // Al propietario no se le muestra cuántos meses de ingreso respaldan el crédito.
+    self::assertStringContainsString('accede a un <strong>crédito preaprobado</strong>', $html);
+    self::assertDoesNotMatchRegularExpression('/× ?3|3 veces|3 meses/u', $html);
     self::assertStringContainsString('data-rates="{&quot;iva&quot;:19', $html);
     self::assertStringContainsString('<option value="El Libertador">', $html);
     self::assertStringContainsString('data-pre-sim="tasa" inputmode="decimal" maxlength="8" autocomplete="off" value="10"', $html);
