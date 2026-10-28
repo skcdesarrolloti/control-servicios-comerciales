@@ -137,7 +137,8 @@ final class CommercialOwnerPreapprovalService
       $result['contracts'][] = [
         'id' => (int) ($contract['_ID'] ?? 0), 'contrato' => (string) ($contract['contrato'] ?? ''), 'inmueble' => (string) ($contract['inmueble'] ?? ''),
         'direccion' => (string) ($contract['direccion'] ?? ''), 'estado' => (string) ($contract['estado'] ?? ''),
-        'fin' => $end > 0 ? date('Y-m-d', $end) : '', 'max_months' => self::monthsUntil(time(), $end),
+        // Meses de contrato que quedan: desde hoy o, si aún no empieza (Por entregar), desde su inicio.
+        'fin' => $end > 0 ? date('Y-m-d', $end) : '', 'max_months' => self::monthsUntil(max(time(), self::timestamp($contract['inicio_contrato'] ?? '')), $end),
       ] + $income;
     }
     $result['active_credits'] = $this->activeCredits($document);

@@ -61,6 +61,10 @@ final class CommercialOwnerPreapprovalTest extends TestCase
     self::assertSame('sin_inicio', $this->service()->lookup('1143415938')['contracts'][0]['servicios']['estado']);
     self::assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2}$/', $mandate['fin']);
     self::assertGreaterThanOrEqual(13, $mandate['max_months']);
+    // Por entregar: los meses del contrato se cuentan desde su inicio, no desde hoy (12, no 14; el plazo será 12 − 2).
+    $this->db->update('wp_jet_cct_contratos_arrendamiento', ['inicio_contrato'=>(string) strtotime('+60 days 00:00:00'), 'fin_contrato'=>(string) strtotime('+425 days 00:00:00')], ['_ID'=>2]);
+    self::assertSame(12, $this->service()->lookup('1143415938')['contracts'][1]['max_months']);
+    $this->db->update('wp_jet_cct_contratos_arrendamiento', ['inicio_contrato'=>'', 'fin_contrato'=>''], ['_ID'=>2]);
     // Sin mandato se descuenta el 15 % del canon por defecto.
     self::assertEquals([1000000, 0, 150000], [$result['contracts'][1]['canon'], $result['contracts'][1]['comision'], $result['contracts'][1]['otros']]);
     self::assertSame(0, $result['active_credits']);
