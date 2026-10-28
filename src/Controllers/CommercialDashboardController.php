@@ -42,6 +42,7 @@ final class CommercialDashboardController
     $policy = new CommercialAccessPolicy($this->settings, $this->db, $adminCargos);
 
     $visibleViews = array_values(array_filter(array_keys(CommercialAccessPolicy::VIEWS), static fn(string $view): bool => $policy->canView($view)));
+    $input = CommercialAccessPolicy::normalizeToolTab($input);
     $requested = trim((string) ($input['tab'] ?? 'inicio'));
     $bucket = in_array($requested, $visibleViews, true) ? $requested : ($visibleViews[0] ?? 'sin_acceso');
     $subviewDenied = false;
@@ -120,7 +121,7 @@ final class CommercialDashboardController
       'notifications_service' => $bucket === 'notificaciones' ? new CommercialNotificationsService($this->db, $policy) : null,
       'sign_service' => $bucket === 'anadir_aviso' ? new \SCM\Commercial\CommercialSignService($this->db, $policy, $this->config) : null,
       'tools_service' => $bucket === 'herramientas' ? new \SCM\Commercial\CommercialOwnerPreapprovalService($this->db, $policy) : null,
-      'tools_view' => $bucket === 'herramientas' ? (string) ($input['subtab'] ?? '') : '',
+      'tools_view' => $bucket === 'herramientas' ? (string) ($input['herramienta'] ?? '') : '',
       'visible_views' => $visibleViews,
       'ticket_employees' => $ticketEmployees,
       'commercial_employee_cargos' => $commercialEmployeeCargos,

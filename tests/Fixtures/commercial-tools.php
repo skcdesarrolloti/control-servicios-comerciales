@@ -24,7 +24,7 @@ $service = new SCM\Commercial\CommercialOwnerPreapprovalService($db, $policy);
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   header('Content-Type: application/json');
   if (($_POST['action'] ?? '') === 'commercial_tickets_filter') {
-    SCM\Http\Response\JsonResponse::success(['html'=>SCM\Views\CommercialToolsView::render((string) ($_POST['subtab'] ?? 'preaprobado'), $service, SCM_BASE_URL),'tab'=>'herramientas']);
+    SCM\Http\Response\JsonResponse::success(['html'=>SCM\Views\CommercialToolsView::render((string) (SCM\Commercial\CommercialAccessPolicy::normalizeToolTab($_POST)['herramienta'] ?? ''), $service, SCM_BASE_URL),'tab'=>'herramientas']);
   }
   try {
     $controller = new SCM\Http\Controller\CommercialApiController($db, $settings, $csrf, $config);
@@ -33,6 +33,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   exit;
 }
 echo SCM\Views\CommercialDashboardView::render([
-  'bucket'=>'herramientas','policy'=>$policy,'visible_views'=>['herramientas'],'tools_service'=>$service,'tools_view'=>(string) ($_GET['subtab'] ?? 'preaprobado'),'base_url'=>SCM_BASE_URL,
+  'bucket'=>'herramientas','policy'=>$policy,'visible_views'=>['herramientas'],'tools_service'=>$service,'tools_view'=>(string) (SCM\Commercial\CommercialAccessPolicy::normalizeToolTab($_GET + ['tab'=>'simulador_ingreso_neto'])['herramienta'] ?? ''),'base_url'=>SCM_BASE_URL,
   'runtime'=>['ajaxUrl'=>'http://127.0.0.1:8771/tests/Fixtures/commercial-tools.php','nonce'=>'fixture','initialTab'=>'scm-panel-herramientas'],
 ]);

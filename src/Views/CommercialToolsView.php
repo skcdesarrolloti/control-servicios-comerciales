@@ -23,7 +23,7 @@ final class CommercialToolsView
   public static function render(string $tool, ?CommercialOwnerPreapprovalService $service, string $baseUrl): string
   {
     if ($tool === 'ganancia_ocasional') return self::occasionalGain($baseUrl);
-    return $service instanceof CommercialOwnerPreapprovalService ? self::preapproval($service, $baseUrl) : '';
+    return $service instanceof CommercialOwnerPreapprovalService ? self::netIncome($service, $baseUrl) : '';
   }
 
   private static function e($value): string
@@ -55,7 +55,7 @@ final class CommercialToolsView
     return '<label class="ctl-switch"' . ($row !== '' ? ' data-pre-sim-row="' . self::e($row) . '"' : '') . '><input type="checkbox" data-pre-sim="' . self::e($field) . '"' . ($checked ? ' checked' : '') . '><span aria-hidden="true"></span>' . self::e($label) . '</label>';
   }
 
-  private static function preapproval(CommercialOwnerPreapprovalService $service, string $baseUrl): string
+  private static function netIncome(CommercialOwnerPreapprovalService $service, string $baseUrl): string
   {
     $settings = $service->settings();
     $rates = $service->rates();

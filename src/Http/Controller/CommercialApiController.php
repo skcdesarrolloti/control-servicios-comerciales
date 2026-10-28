@@ -63,6 +63,7 @@ final class CommercialApiController
   public function filterTickets(array $input): never
   {
     $this->verify($input);
+    $input = CommercialAccessPolicy::normalizeToolTab($input);
     $bucket = trim((string) ($input['tab'] ?? 'inicio'));
     try {
       $input = $this->policy->resolveNavigation($bucket, $input);
@@ -96,7 +97,7 @@ final class CommercialApiController
     if ($bucket === 'anadir_aviso') {
       $html = \SCM\Views\CommercialSignView::render(new \SCM\Commercial\CommercialSignService($this->db, $this->policy, $this->config), $this->policy);
     } elseif ($bucket === 'herramientas') {
-      $html = \SCM\Views\CommercialToolsView::render((string) ($input['subtab'] ?? ''), $this->preapprovalService(), $this->baseUrl);
+      $html = \SCM\Views\CommercialToolsView::render((string) ($input['herramienta'] ?? ''), $this->preapprovalService(), $this->baseUrl);
     } elseif ($bucket === 'precaptacion') {
       $html = CommercialDashboardView::renderPrecaptacion($this->baseUrl, $input);
     } elseif ($bucket === 'inicio') {

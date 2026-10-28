@@ -45,7 +45,7 @@ final class CommercialOwnerPreapprovalService
 
   public function authorize(): void
   {
-    if (!$this->policy->canSubview('herramientas', 'preaprobado')) {
+    if (!$this->policy->canSubview('herramientas', 'simulador_ingreso_neto')) {
       throw new CommercialSignAccessDenied('Tu cargo no tiene permiso para usar el simulador de ingreso neto del propietario.');
     }
   }

@@ -15,6 +15,8 @@ const { chromium } = require(process.env.SCM_PLAYWRIGHT_MODULE || 'playwright');
     await tool.waitFor();
     assert.equal(await page.locator('[data-commercial-dropdown-menu="herramientas"] a').count(), 2);
     assert.match(await page.locator('[data-commercial-dropdown-menu="herramientas"]').textContent(), /Simulador de ingreso neto/);
+    // Cada herramienta es su propia pestaña, como en el panel inmobiliario (sin subtab).
+    assert.match(await page.locator('[data-commercial-dropdown-menu="herramientas"] a').first().getAttribute('href'), /[?&]tab=simulador_ingreso_neto$/);
     assert.equal(await tool.locator('[data-pre-total]').innerText(), '$0');
 
     // Propietario registrado: se cargan sus dos contratos vigentes con los valores del contrato (regla del liquidador).
@@ -101,6 +103,8 @@ const { chromium } = require(process.env.SCM_PLAYWRIGHT_MODULE || 'playwright');
     await page.locator('[data-commercial-dropdown-menu="herramientas"] a[href*="ganancia_ocasional"]').click();
     const gain = page.locator('[data-commercial-tool="ganancia_ocasional"]');
     await gain.waitFor();
+    assert.equal(new URL(page.url()).search, '?tab=ganancia_ocasional');
+    assert.equal(await page.locator('[data-commercial-dropdown-trigger="herramientas"]').evaluate(node => node.classList.contains('active')), true);
     await gain.locator('[data-go-field="compra"]').fill('2018-01-15');
     await gain.locator('[data-go-field="venta"]').fill('2025-06-01');
     await gain.locator('[data-go-field="precioVenta"]').fill('500000000');

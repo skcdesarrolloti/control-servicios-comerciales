@@ -193,14 +193,28 @@ final class CommercialOwnerPreapprovalTest extends TestCase
     $this->db->insert('wp_jet_cct_confi_sistema', ['funcion'=>'control_servicios_comerciales_config', 'valor'=>json_encode(['commercial_permissions'=>['9'=>['views'=>['herramientas'], 'actions'=>[], 'subviews'=>['herramientas'=>['ganancia_ocasional']]]]], JSON_THROW_ON_ERROR)]);
     $policy = new CommercialAccessPolicy(new Settings($this->db, false, 'control_servicios_comerciales_config'), $this->db, ['11']);
     self::assertTrue($policy->canSubview('herramientas', 'ganancia_ocasional'));
-    self::assertSame('ganancia_ocasional', $policy->resolveNavigation('herramientas', [])['subtab']);
+    self::assertSame('ganancia_ocasional', $policy->resolveNavigation('herramientas', [])['herramienta']);
     $this->expectException(CommercialSignAccessDenied::class);
     $this->service($policy)->lookup('1143415938');
   }
 
+  public function testEachToolIsItsOwnTabAndOldLinksAndPermissionsStillWork(): void
+  {
+    self::assertSame(['tab'=>'herramientas', 'herramienta'=>'simulador_ingreso_neto'], CommercialAccessPolicy::normalizeToolTab(['tab'=>'simulador_ingreso_neto']));
+    self::assertSame(['tab'=>'herramientas', 'herramienta'=>'ganancia_ocasional'], CommercialAccessPolicy::normalizeToolTab(['tab'=>'ganancia_ocasional']));
+    self::assertSame('simulador_ingreso_neto', CommercialAccessPolicy::normalizeToolTab(['tab'=>'herramientas', 'subtab'=>'preaprobado'])['herramienta']);
+    self::assertSame(['tab'=>'calendario', 'subtab'=>'due'], CommercialAccessPolicy::normalizeToolTab(['tab'=>'calendario', 'subtab'=>'due']));
+    // Un cargo que tenía permiso con la clave anterior "preaprobado" conserva el acceso al simulador.
+    $this->db->insert('wp_jet_cct_confi_sistema', ['funcion'=>'control_servicios_comerciales_config', 'valor'=>json_encode(['commercial_permissions'=>['9'=>['views'=>['herramientas'], 'actions'=>[], 'subviews'=>['herramientas'=>['preaprobado']]]]], JSON_THROW_ON_ERROR)]);
+    $policy = new CommercialAccessPolicy(new Settings($this->db, false, 'control_servicios_comerciales_config'), $this->db, ['11']);
+    self::assertTrue($policy->canSubview('herramientas', 'simulador_ingreso_neto'));
+    self::assertFalse($policy->canSubview('herramientas', 'ganancia_ocasional'));
+    self::assertSame('Ana Propietaria', $this->service($policy)->lookup('1143415938')['owner']['name']);
+  }
+
   public function testViewsShowTheBossRequestedUnitsAndNotes(): void
   {
-    $html = CommercialToolsView::render('preaprobado', $this->service(), 'https://example.test');
+    $html = CommercialToolsView::render('simulador_ingreso_neto', $this->service(), 'https://example.test');
     self::assertStringContainsString('data-commercial-tool="preaprobado"', $html);
     self::assertStringContainsString('data-income-months="3"', $html);
     self::assertStringContainsString('Canon mensual</span><span class="ctl-input"><input data-pre-field="canon"', $html);

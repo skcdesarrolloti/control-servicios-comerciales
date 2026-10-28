@@ -62,10 +62,34 @@ final class CommercialAccessPolicy
       'due' => 'Vencimientos',
     ],
     'herramientas' => [
-      'preaprobado' => 'Simulador de ingreso neto del propietario',
+      'simulador_ingreso_neto' => 'Simulador de ingreso neto del propietario',
       'ganancia_ocasional' => 'Calculadora de ganancia ocasional',
     ],
   ];
+
+  /** Claves anteriores de las herramientas: los permisos guardados y los enlaces viejos siguen funcionando. */
+  private const LEGACY_TOOLS = ['preaprobado' => 'simulador_ingreso_neto'];
+
+  /**
+   * Cada herramienta es su propia pestaña (?tab=simulador_ingreso_neto), igual que las vistas del panel inmobiliario;
+   * "Herramientas" es solo el grupo del menú y el permiso. Devuelve la entrada con tab=herramientas y la herramienta en
+   * `herramienta`. Acepta el formato anterior (?tab=herramientas&subtab=preaprobado).
+   * @param array<string,mixed> $input
+   * @return array<string,mixed>
+   */
+  public static function normalizeToolTab(array $input): array
+  {
+    $tab = trim((string) ($input['tab'] ?? ''));
+    $tools = self::SUBVIEWS['herramientas'];
+    if (isset($tools[$tab]) || isset(self::LEGACY_TOOLS[$tab])) {
+      $input['herramienta'] = self::LEGACY_TOOLS[$tab] ?? $tab;
+      $input['tab'] = 'herramientas';
+    } elseif ($tab === 'herramientas' && trim((string) ($input['herramienta'] ?? '')) === '') {
+      $legacy = trim((string) ($input['subtab'] ?? ''));
+      $input['herramienta'] = self::LEGACY_TOOLS[$legacy] ?? $legacy;
+    }
+    return $input;
+  }
 
   private Settings $settings;
   private Database $db;
@@ -129,7 +153,7 @@ final class CommercialAccessPolicy
     if (!isset(self::SUBVIEWS[$view])) {
       return $input;
     }
-    $key = $view === 'inmuebles' ? 'property_subtab' : 'subtab';
+    $key = $view === 'inmuebles' ? 'property_subtab' : ($view === 'herramientas' ? 'herramienta' : 'subtab');
     $requested = trim((string) ($input[$key] ?? ($view === 'inmuebles' ? ($input['subtab'] ?? '') : '')));
     $allowed = $this->allowedSubviews($view);
     if ($requested === '') {
@@ -254,7 +278,7 @@ final class CommercialAccessPolicy
         // Existing configurations inherit their parent permission until subviews are saved.
         $configured = is_array($definition['subviews'] ?? null) && array_key_exists($view, $definition['subviews']);
         $out[$cargo]['subviews'][$view] = $configured
-          ? array_values(array_intersect(array_keys($subviews), array_map('strval', (array) $definition['subviews'][$view])))
+          ? array_values(array_intersect(array_keys($subviews), array_map(static fn($key): string => self::LEGACY_TOOLS[(string) $key] ?? (string) $key, (array) $definition['subviews'][$view])))
           : array_keys($subviews);
       }
     }

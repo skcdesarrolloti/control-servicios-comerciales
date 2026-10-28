@@ -1099,8 +1099,8 @@ final class CommercialDashboardView
             <span class="material-symbols-outlined text-[16px] group-hover/nav:rotate-180 transition-transform" aria-hidden="true">expand_more</span>
           </button>
           <div class="absolute right-0 top-full hidden group-hover/nav:block bg-surface-container-lowest shadow-[0_12px_32px_rgba(0,0,0,0.14)] rounded-2xl py-space-xs min-w-[260px] z-50 border border-outline-variant/30 text-on-surface" data-commercial-dropdown-menu="herramientas">
-            <?php if (!$policy instanceof CommercialAccessPolicy || $policy->canSubview('herramientas', 'preaprobado')): ?>
-            <a class="flex items-center gap-2.5 px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="herramientas" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'herramientas', 'subtab' => 'preaprobado'])); ?>">
+            <?php if (!$policy instanceof CommercialAccessPolicy || $policy->canSubview('herramientas', 'simulador_ingreso_neto')): ?>
+            <a class="flex items-center gap-2.5 px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="herramientas" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'simulador_ingreso_neto'])); ?>">
               <span class="material-symbols-outlined text-[18px] text-primary" aria-hidden="true">savings</span>
               <div>
                 <span class="block font-semibold text-on-surface">Simulador de ingreso neto</span>
@@ -1109,7 +1109,7 @@ final class CommercialDashboardView
             </a>
             <?php endif; ?>
             <?php if (!$policy instanceof CommercialAccessPolicy || $policy->canSubview('herramientas', 'ganancia_ocasional')): ?>
-            <a class="flex items-center gap-2.5 px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="herramientas" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'herramientas', 'subtab' => 'ganancia_ocasional'])); ?>">
+            <a class="flex items-center gap-2.5 px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="herramientas" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'ganancia_ocasional'])); ?>">
               <span class="material-symbols-outlined text-[18px] text-secondary" aria-hidden="true">calculate</span>
               <div>
                 <span class="block font-semibold text-on-surface">Ganancia ocasional</span>
@@ -1132,7 +1132,7 @@ final class CommercialDashboardView
           <?php if ($mobileView === 'herramientas'): ?>
             <?php foreach (CommercialAccessPolicy::SUBVIEWS['herramientas'] as $toolKey => $toolLabel): ?>
               <?php if (!$policy instanceof CommercialAccessPolicy || $policy->canSubview('herramientas', $toolKey)): ?>
-              <a class="block px-3 py-3 text-sm rounded-xl hover:bg-surface-container-low" data-commercial-tab="herramientas" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'herramientas', 'subtab' => $toolKey])); ?>">Herramientas · <?php echo esc_html($toolLabel); ?></a>
+              <a class="block px-3 py-3 text-sm rounded-xl hover:bg-surface-container-low" data-commercial-tab="herramientas" href="<?php echo esc_url(self::url($baseUrl, ['tab' => $toolKey])); ?>">Herramientas · <?php echo esc_html($toolLabel); ?></a>
               <?php endif; ?>
             <?php endforeach; ?>
             <?php continue; ?>
