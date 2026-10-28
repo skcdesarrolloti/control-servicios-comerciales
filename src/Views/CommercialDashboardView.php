@@ -477,7 +477,7 @@ final class CommercialDashboardView
   <!-- Header Principal -->
   <header class="fixed top-0 left-0 right-0 z-50 bg-inverse-surface shadow-[0_1px_8px_rgba(0,0,0,0.06)] overflow-visible">
     <div class="h-28 w-full overflow-visible">
-      <!-- Top Row: Identidad, Búsqueda y Acciones Rápidas -->
+      <!-- Top Row: Identidad y Acciones Rápidas -->
       <div class="h-16 px-margin flex items-center justify-between">
         <div class="flex items-center gap-space-md">
           <a class="flex items-center gap-space-sm hover:opacity-95 transition-opacity" href="<?php echo esc_url($baseUrl . '/index.php'); ?>">
@@ -485,17 +485,10 @@ final class CommercialDashboardView
               <span class="material-symbols-outlined text-on-surface text-[22px]">domain</span>
             </div>
             <div>
-              <span class="font-headline-sm text-headline-sm text-on-primary tracking-tight">SuCasa Inmobiliaria</span>
-              <span class="hidden xl:inline ml-space-xs font-label-sm text-label-sm text-secondary-fixed opacity-80 uppercase">Servicios Comerciales</span>
+              <span class="font-headline-sm text-headline-sm text-on-primary tracking-tight">Dashboard Comercial</span>
+              <span class="hidden xl:inline ml-space-xs font-label-sm text-label-sm text-secondary-fixed opacity-80 uppercase">SKC SuCasa Inmobiliaria</span>
             </div>
           </a>
-          <div class="hidden md:flex items-center ml-space-lg bg-surface-container-lowest/10 rounded-xl px-space-md py-space-xs focus-within:bg-surface-container-lowest/20 transition-all border border-white/5 focus-within:border-white/20">
-            <button type="button" id="quick-search-btn" class="flex items-center text-secondary-fixed hover:text-white transition-colors mr-space-xs cursor-pointer" title="Buscar">
-              <span class="material-symbols-outlined text-[18px]">search</span>
-            </button>
-            <input type="text" id="quick-search-nav" value="<?php echo esc_attr((string) ($filters['busqueda'] ?? '')); ?>" placeholder="Buscar tarea, cliente, correo o celular..." class="bg-transparent border-none outline-none font-body-sm text-body-sm text-on-primary placeholder:text-secondary-fixed/70 mr-space-xs w-48 sm:w-64 lg:w-72 focus:w-80 transition-all">
-            <kbd class="font-label-sm text-label-sm bg-surface-container-lowest/15 text-secondary-fixed px-space-xs py-0.5 rounded font-mono text-[11px] border border-white/10" id="quick-search-kbd">Ctrl+K</kbd>
-          </div>
         </div>
 
         <div class="flex items-center gap-space-md">
