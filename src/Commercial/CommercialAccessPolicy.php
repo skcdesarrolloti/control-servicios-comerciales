@@ -67,6 +67,43 @@ final class CommercialAccessPolicy
     ],
   ];
 
+  /** Grupos del menú del encabezado, en el mismo orden, para la configuración de accesos. */
+  public const VIEW_GROUPS = [
+    'General' => ['inicio', 'calendario'],
+    'Actividades comerciales' => ['precaptacion', 'anadir_aviso', 'actualizaciones', 'avisos', 'abiertos', 'mis_tickets', 'postergados', 'cerrados'],
+    'Inventario' => ['inmuebles'],
+    'Comunicación y herramientas' => ['notificaciones', 'herramientas'],
+  ];
+
+  /**
+   * Qué datos ve un cargo sin acceso total en cada pestaña o subpestaña. El alcance no se configura por pestaña:
+   * lo decide el acceso total administrativo (canSeeAllCommercialTickets).
+   */
+  public const SCOPES = [
+    'inicio' => 'Solo sus tareas e indicadores',
+    'calendario' => '',
+    'calendario.mine' => 'Su agenda',
+    'calendario.team' => 'Agenda del equipo',
+    'calendario.due' => 'Solo sus vencimientos',
+    'precaptacion' => 'Solo sus precaptaciones',
+    'anadir_aviso' => 'Formulario de registro',
+    'actualizaciones' => 'Solo sus inmuebles',
+    'avisos' => 'Solo sus avisos',
+    'abiertos' => 'Solo sus tareas',
+    'mis_tickets' => 'Sus tareas (igual para administradores)',
+    'postergados' => 'Solo sus tareas',
+    'cerrados' => 'Solo sus tareas',
+    'inmuebles' => '',
+    'inmuebles.publicos' => 'Todo el inventario',
+    'inmuebles.pendientes' => 'Todo el inventario',
+    'inmuebles.no_publicos' => 'Todo el inventario',
+    'inmuebles.destacados' => 'Solo sus inmuebles',
+    'inmuebles.mis_solicitudes' => 'Sus solicitudes',
+    'inmuebles.mis_inmuebles' => 'Solo sus inmuebles',
+    'notificaciones' => 'Solo sus contactos vinculados',
+    'herramientas' => '',
+  ];
+
   /** Claves anteriores de las herramientas: los permisos guardados y los enlaces viejos siguen funcionando. */
   private const LEGACY_TOOLS = ['preaprobado' => 'simulador_ingreso_neto'];
 

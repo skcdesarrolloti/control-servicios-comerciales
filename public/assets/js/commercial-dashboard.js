@@ -1721,6 +1721,11 @@
         var cargoPanel = event.target.closest('[data-cargo]');
         var deletePermission = cargoPanel && cargoPanel.querySelector('input[value="eliminar_notificacion"]');
         if (deletePermission) deletePermission.checked = event.target.checked;
+        // Con acceso total las pestañas marcadas no aplican: se avisa y se atenúa la lista.
+        var adminNote = cargoPanel && cargoPanel.querySelector("[data-perm-admin-note]");
+        if (adminNote) adminNote.hidden = !event.target.checked;
+        var viewGroups = cargoPanel && cargoPanel.querySelector("[data-perm-view-groups]");
+        if (viewGroups) viewGroups.classList.toggle("opacity-60", event.target.checked);
       }
       var master = event.target.closest(".commercial-permission-master");
       if (master && event.target.matches('input[name="admin_cargos[]"]')) {

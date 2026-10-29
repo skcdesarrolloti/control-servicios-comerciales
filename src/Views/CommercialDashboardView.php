@@ -4925,32 +4925,47 @@ final class CommercialDashboardView
                 </div>
 
                 <div class="space-y-2" data-perm-section="vistas">
+                  <div class="flex items-start gap-2 p-2 rounded-lg bg-primary-container/40 text-[11px] text-on-surface" data-perm-admin-note<?php echo $isAdmin ? '' : ' hidden'; ?>>
+                    <span class="material-symbols-outlined text-[16px] text-primary" aria-hidden="true">admin_panel_settings</span>
+                    <span>Este cargo tiene acceso total: ve todas las pestañas con la información de todo el equipo. Lo que se marque abajo solo aplica si se quita el acceso total.</span>
+                  </div>
                   <div class="flex flex-wrap items-center justify-between gap-2">
-                    <span class="text-[11px] text-secondary">Las subpestañas solo se ven si su pestaña principal está habilitada.</span>
+                    <span class="text-[11px] text-secondary">Mismo orden del menú. Debajo de cada pestaña se indica qué información ve un cargo sin acceso total. Las subpestañas solo se ven si su pestaña principal está habilitada.</span>
                     <span class="flex gap-2">
                       <button type="button" class="px-3 py-1 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface text-xs font-semibold cursor-pointer" data-commercial-permissions-toggle="section" data-checked="true">Marcar todas</button>
                       <button type="button" class="px-3 py-1 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface text-xs font-semibold cursor-pointer" data-commercial-permissions-toggle="section" data-checked="false">Desmarcar todas</button>
                     </span>
                   </div>
-                  <div class="grid grid-cols-1 md:grid-cols-2 gap-2 items-start">
-                    <?php foreach (CommercialAccessPolicy::VIEWS as $viewKey => $viewLabel): ?>
-                      <?php $subviews = CommercialAccessPolicy::SUBVIEWS[$viewKey] ?? []; $viewOn = in_array($viewKey, $current['views'], true); ?>
-                      <div class="p-2 rounded-lg bg-surface-container-lowest" data-perm-view>
-                        <label class="flex items-center gap-2 text-body-sm font-semibold text-on-surface cursor-pointer">
-                          <input type="checkbox" name="<?php echo esc_attr($field); ?>[views][]" value="<?php echo esc_attr($viewKey); ?>"<?php checked($viewOn); ?> class="rounded text-primary" data-perm-view-input>
-                          <span><?php echo esc_html($viewLabel); ?></span>
-                        </label>
-                        <?php if ($subviews !== []): ?>
-                          <input type="hidden" name="<?php echo esc_attr($field); ?>[subviews][<?php echo esc_attr($viewKey); ?>][]" value="">
-                          <div class="pl-6 pt-1 space-y-1<?php echo $viewOn ? '' : ' opacity-50'; ?>" data-perm-subviews>
-                            <?php foreach ($subviews as $subKey => $subLabel): ?>
-                              <label class="flex items-center gap-2 text-[11px] text-on-surface cursor-pointer">
-                                <input type="checkbox" name="<?php echo esc_attr($field); ?>[subviews][<?php echo esc_attr($viewKey); ?>][]" value="<?php echo esc_attr($subKey); ?>"<?php checked(in_array($subKey, $current['subviews'][$viewKey] ?? array_keys($subviews), true)); ?> class="rounded text-primary">
-                                <span><?php echo esc_html($subLabel); ?></span>
+                  <div class="space-y-space-sm<?php echo $isAdmin ? ' opacity-60' : ''; ?>" data-perm-view-groups>
+                    <?php foreach (CommercialAccessPolicy::VIEW_GROUPS as $groupLabel => $groupViews): ?>
+                      <div class="space-y-1">
+                        <span class="block font-label-sm text-[11px] uppercase font-semibold text-secondary"><?php echo esc_html($groupLabel); ?></span>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-2 items-start">
+                          <?php foreach ($groupViews as $viewKey): ?>
+                            <?php $viewLabel = CommercialAccessPolicy::VIEWS[$viewKey]; $subviews = CommercialAccessPolicy::SUBVIEWS[$viewKey] ?? []; $viewOn = in_array($viewKey, $current['views'], true); $scope = CommercialAccessPolicy::SCOPES[$viewKey]; ?>
+                            <div class="p-2 rounded-lg bg-surface-container-lowest" data-perm-view>
+                              <label class="flex items-start gap-2 text-body-sm font-semibold text-on-surface cursor-pointer">
+                                <input type="checkbox" name="<?php echo esc_attr($field); ?>[views][]" value="<?php echo esc_attr($viewKey); ?>"<?php checked($viewOn); ?> class="rounded text-primary mt-0.5" data-perm-view-input>
+                                <span>
+                                  <span class="block"><?php echo esc_html($viewLabel); ?></span>
+                                  <?php if ($scope !== ''): ?><span class="block text-[11px] font-normal text-secondary"><?php echo esc_html($scope); ?></span><?php endif; ?>
+                                </span>
                               </label>
-                            <?php endforeach; ?>
-                          </div>
-                        <?php endif; ?>
+                              <?php if ($subviews !== []): ?>
+                                <input type="hidden" name="<?php echo esc_attr($field); ?>[subviews][<?php echo esc_attr($viewKey); ?>][]" value="">
+                                <div class="pl-6 pt-1 space-y-1<?php echo $viewOn ? '' : ' opacity-50'; ?>" data-perm-subviews>
+                                  <?php foreach ($subviews as $subKey => $subLabel): ?>
+                                    <?php $subScope = CommercialAccessPolicy::SCOPES[$viewKey . '.' . $subKey] ?? ''; ?>
+                                    <label class="flex items-center gap-2 text-[11px] text-on-surface cursor-pointer">
+                                      <input type="checkbox" name="<?php echo esc_attr($field); ?>[subviews][<?php echo esc_attr($viewKey); ?>][]" value="<?php echo esc_attr($subKey); ?>"<?php checked(in_array($subKey, $current['subviews'][$viewKey] ?? array_keys($subviews), true)); ?> class="rounded text-primary">
+                                      <span><?php echo esc_html($subLabel); ?><?php if ($subScope !== ''): ?> <span class="text-secondary">· <?php echo esc_html($subScope); ?></span><?php endif; ?></span>
+                                    </label>
+                                  <?php endforeach; ?>
+                                </div>
+                              <?php endif; ?>
+                            </div>
+                          <?php endforeach; ?>
+                        </div>
                       </div>
                     <?php endforeach; ?>
                   </div>

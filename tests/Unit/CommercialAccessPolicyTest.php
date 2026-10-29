@@ -130,4 +130,11 @@ final class CommercialAccessPolicyTest extends TestCase
     $html = CommercialDashboardView::renderTabs(['inicio'], 'inicio', [], [], '', [], $policy);
     self::assertStringNotContainsString('data-commercial-menu-section="tareas"', $html);
   }
+
+  public function testViewGroupsListEveryViewOnceInMenuOrder(): void
+  {
+    $grouped = array_merge(...array_values(CommercialAccessPolicy::VIEW_GROUPS));
+    self::assertSame(count($grouped), count(array_unique($grouped)));
+    self::assertEqualsCanonicalizing(array_keys(CommercialAccessPolicy::VIEWS), $grouped);
+  }
 }
