@@ -137,4 +137,38 @@ final class CommercialAccessPolicyTest extends TestCase
     self::assertSame(count($grouped), count(array_unique($grouped)));
     self::assertEqualsCanonicalizing(array_keys(CommercialAccessPolicy::VIEWS), $grouped);
   }
+
+  public function testScopeIsPersonalUntilTheCargoIsGivenTheWholeTeam(): void
+  {
+    $policy = $this->policy(['views' => ['abiertos', 'cerrados', 'mis_tickets', 'avisos']]);
+    self::assertFalse($policy->canSeeAll('abiertos'));
+    self::assertFalse($policy->canSeeAllTasks());
+
+    $policy = $this->policy([
+      'views' => ['abiertos', 'cerrados', 'mis_tickets', 'avisos'],
+      'scope' => ['abiertos' => 'all', 'cerrados' => 'own', 'mis_tickets' => 'all', 'precaptacion' => 'all'],
+    ]);
+    self::assertTrue($policy->canSeeAll('abiertos'));
+    self::assertFalse($policy->canSeeAll('cerrados'));
+    self::assertFalse($policy->canSeeAll('avisos'));
+    self::assertFalse($policy->canSeeAll('mis_tickets'), 'Mis tareas siempre es personal.');
+    self::assertFalse($policy->canSeeAll('precaptacion'), 'Sin la pestaña no hay alcance de equipo.');
+    self::assertTrue($policy->canSeeAllTasks());
+    self::assertSame(['precaptacion', 'abiertos'], $policy->permissions()['9']['scope_all']);
+  }
+
+  public function testAdministratorsSeeTheWholeTeamEverywhere(): void
+  {
+    $_SESSION = ['scm_user_cargo' => '13'];
+    $policy = $this->policy(['views' => []]);
+    self::assertTrue($policy->canSeeAll('abiertos'));
+    self::assertTrue($policy->canSeeAll('notificaciones'));
+    self::assertTrue($policy->canSeeAllTasks());
+  }
+
+  public function testEveryScopedViewIsAPanelView(): void
+  {
+    self::assertSame([], array_diff(array_keys(CommercialAccessPolicy::SCOPED_VIEWS), array_keys(CommercialAccessPolicy::VIEWS)));
+    self::assertArrayNotHasKey('mis_tickets', CommercialAccessPolicy::SCOPED_VIEWS);
+  }
 }

@@ -115,7 +115,7 @@ final class CommercialCalendarService
         'calendar_initial_subtab' => in_array($subtab, ['mine', 'team', 'due'], true) ? $subtab : 'mine',
         'calendar_can_configure' => $this->policy->canManage(),
         'calendar_due_types' => $this->visibleDueTypes(),
-        'calendar_due_employee_filter' => $this->policy->canSeeAllCommercialTickets(),
+        'calendar_due_employee_filter' => $this->policy->canSeeAll('calendario'),
         'is_admin' => $this->policy->canManage(),
       ],
     ];
@@ -153,7 +153,7 @@ final class CommercialCalendarService
     $fromTs = $fromDate->getTimestamp();
     $toTs = $toDate->setTime(23, 59, 59)->getTimestamp();
 
-    $canSeeAll = $this->policy->canSeeAllCommercialTickets();
+    $canSeeAll = $this->policy->canSeeAll('calendario');
     $employeeFilter = $canSeeAll ? trim($employeeId) : $this->tickets->currentEmployeeTicketFilter($this->commercialCargos());
     $types = $this->visibleDueTypes();
 

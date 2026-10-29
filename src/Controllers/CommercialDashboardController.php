@@ -63,23 +63,16 @@ final class CommercialDashboardController
     $filters = $this->ticketFilters($input);
     $filters['tab'] = $bucket;
     $currentEmployeeFilter = $repository->currentEmployeeTicketFilter($commercialEmployeeCargos);
-    $personalTaskScope = $bucket === 'mis_tickets';
-    $employeeFilterLocked = !$policy->canSeeAllCommercialTickets();
-    if ($personalTaskScope || $employeeFilterLocked) {
+    // Cada pestaña filtra por el funcionario actual salvo que el cargo vea todo el equipo en ella.
+    $employeeFilterLocked = !$policy->canSeeAll($bucket);
+    if ($employeeFilterLocked) {
       $filters['id_empleado'] = $currentEmployeeFilter;
     }
-    $globalCountFilters = $personalTaskScope && $policy->canSeeAllCommercialTickets()
-      ? []
-      : $this->globalTicketFilters($filters);
-    if ($bucket === 'inicio' && $policy->canSeeAllCommercialTickets()) {
-      $globalCountFilters = [];
-    }
-    $tabCounts = $repository->bucketCounts($globalCountFilters);
-    $myTabCounts = $repository->bucketCounts(['id_empleado' => $currentEmployeeFilter]);
-    $tabCounts['mis_tickets'] = (int) ($myTabCounts['mis_tickets'] ?? 0);
+    $navigation = $repository->scopedNavigation($bucket, $filters, $currentEmployeeFilter, $policy);
+    $tabCounts = $navigation['tabs'];
     $result = in_array($bucket, ['actualizaciones', 'avisos', 'calendario', 'inmuebles', 'notificaciones', 'precaptacion', 'anadir_aviso', 'herramientas'], true) ? ['rows' => [], 'counts' => $repository->statusCounts($filters), 'pagination' => []] : $repository->search($bucket === 'inicio' ? 'abiertos' : $bucket, $filters);
-    $homeDashboard = $repository->homeDashboard($globalCountFilters, $policy);
-    $canSeeAll = $policy->canSeeAllCommercialTickets();
+    $homeDashboard = $repository->homeDashboard($navigation['home'], $policy);
+    $canSeeAll = $policy->canSeeAll('inmuebles');
     $propertiesRepository = new CommercialPropertiesRepository($this->db);
     $propertyFilters = $this->propertyFilters($input, !$canSeeAll);
     $propertySummaryCounts = $propertiesRepository->summaryCounts($propertyFilters, $canSeeAll);
@@ -93,10 +86,10 @@ final class CommercialDashboardController
     }
     $calendarService = new CommercialCalendarService($this->db, $this->settings, $policy, $this->config);
     $calendar = $calendarService->panelConfig($subtab);
-    $isNonAdmin = !$policy->canSeeAllCommercialTickets();
+    $isNonAdmin = !$policy->canSeeAll('inicio');
     $recentTickets = $repository->latestCreatedTickets($isNonAdmin, $currentEmployeeFilter, 12);
     $recentCount = count($recentTickets);
-    $topicHierarchy = $repository->topicStatusHierarchy($globalCountFilters);
+    $topicHierarchy = $repository->topicStatusHierarchy($navigation['topics']);
 
     $panelId = $bucket === 'calendario' ? 'scm-panel-actividades-administrativas' : 'scm-panel-' . $bucket;
     $runtime = [
@@ -126,7 +119,7 @@ final class CommercialDashboardController
       'ticket_employees' => $ticketEmployees,
       'commercial_employee_cargos' => $commercialEmployeeCargos,
       'employee_filter_locked' => $employeeFilterLocked,
-      'personal_task_scope' => $personalTaskScope,
+      'personal_task_scope' => $bucket === 'mis_tickets',
       'filter_options' => $repository->filterOptions(),
       'calendar_employees' => $calendar['employees'],
       'topic_hierarchy' => $topicHierarchy,
@@ -205,14 +198,6 @@ final class CommercialDashboardController
       'sla_filter' => $clean('sla_filter'),
       'page' => max(1, (int) ($input['page'] ?? 1)),
       'per_page' => 24,
-    ];
-  }
-
-  /** @param array<string,mixed> $filters @return array<string,mixed> */
-  private function globalTicketFilters(array $filters): array
-  {
-    return [
-      'id_empleado' => trim((string) ($filters['id_empleado'] ?? '')),
     ];
   }
 

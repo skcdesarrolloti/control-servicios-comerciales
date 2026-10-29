@@ -79,7 +79,7 @@ final class CommercialSignService
     if ($id < 1) throw new \InvalidArgumentException('Escribe el número de la tarea asignada.');
     $ticket = $this->db->getRow('SELECT * FROM `' . $this->db->table('jet_cct_tickets') . '` WHERE _ID = ? LIMIT 1' . $this->writeLock(), [$id]);
     if (!$ticket) throw new \InvalidArgumentException('No se encontró la tarea.');
-    if (!$this->policy->canSeeAllCommercialTickets()) {
+    if (!$this->policy->canSeeAllTasks()) {
       $tickets = new CommercialTicketsRepository($this->db);
       if (!$tickets->ticketMatchesEmployeeFilter($id, $tickets->currentEmployeeTicketFilter())) {
         throw new CommercialSignAccessDenied('Esta tarea no está asignada a tu usuario.');

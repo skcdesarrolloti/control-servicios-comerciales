@@ -28,7 +28,7 @@ final class CommercialPropertyEntryService
     $task = $this->db->getRow('SELECT * FROM `' . $this->db->table('jet_cct_tickets') . '` WHERE _ID = ?' . $this->lock(), [$id]);
     if (!$task) throw new \InvalidArgumentException('No se encontró la tarea.');
     $repository = new CommercialTicketsRepository($this->db);
-    if (!$this->policy->canSeeAllCommercialTickets() && !$repository->ticketMatchesEmployeeFilter($id, $repository->currentEmployeeTicketFilter())) throw new CommercialSignAccessDenied('Esta tarea no está asignada a tu usuario.');
+    if (!$this->policy->canSeeAllTasks() && !$repository->ticketMatchesEmployeeFilter($id, $repository->currentEmployeeTicketFilter())) throw new CommercialSignAccessDenied('Esta tarea no está asignada a tu usuario.');
     return $task;
   }
 

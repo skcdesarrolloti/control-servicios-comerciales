@@ -76,33 +76,37 @@ final class CommercialAccessPolicy
   ];
 
   /**
-   * Qué datos ve un cargo sin acceso total en cada pestaña o subpestaña. El alcance no se configura por pestaña:
-   * lo decide el acceso total administrativo (canSeeAllCommercialTickets).
+   * Pestañas con alcance configurable por cargo: [solo lo suyo, todo el equipo]. Por defecto cada cargo ve solo lo
+   * suyo; el acceso total administrativo ve todo el equipo en todas.
    */
+  public const SCOPED_VIEWS = [
+    'inicio' => ['Solo sus tareas e indicadores', 'Indicadores de todo el equipo'],
+    'calendario' => ['Solo sus vencimientos', 'Vencimientos de todo el equipo'],
+    'precaptacion' => ['Solo sus precaptaciones', 'Precaptaciones de todo el equipo'],
+    'actualizaciones' => ['Solo sus inmuebles', 'Inmuebles de todo el equipo'],
+    'avisos' => ['Solo sus avisos', 'Avisos de todo el equipo'],
+    'abiertos' => ['Solo sus tareas', 'Tareas de todo el equipo'],
+    'postergados' => ['Solo sus tareas', 'Tareas de todo el equipo'],
+    'cerrados' => ['Solo sus tareas', 'Tareas de todo el equipo'],
+    'inmuebles' => ['Destacados: solo los suyos', 'Destacados de todo el equipo'],
+    'notificaciones' => ['Solo sus contactos y su informe', 'Todos los destinatarios e informes'],
+  ];
+
+  /** Alcance fijo de las pestañas y subpestañas que no se configura. */
   public const SCOPES = [
-    'inicio' => 'Solo sus tareas e indicadores',
-    'calendario' => '',
     'calendario.mine' => 'Su agenda',
     'calendario.team' => 'Agenda del equipo',
-    'calendario.due' => 'Solo sus vencimientos',
-    'precaptacion' => 'Solo sus precaptaciones',
     'anadir_aviso' => 'Formulario de registro',
-    'actualizaciones' => 'Solo sus inmuebles',
-    'avisos' => 'Solo sus avisos',
-    'abiertos' => 'Solo sus tareas',
-    'mis_tickets' => 'Sus tareas (igual para administradores)',
-    'postergados' => 'Solo sus tareas',
-    'cerrados' => 'Solo sus tareas',
-    'inmuebles' => '',
+    'mis_tickets' => 'Siempre sus tareas, también para administradores',
     'inmuebles.publicos' => 'Todo el inventario',
     'inmuebles.pendientes' => 'Todo el inventario',
     'inmuebles.no_publicos' => 'Todo el inventario',
-    'inmuebles.destacados' => 'Solo sus inmuebles',
     'inmuebles.mis_solicitudes' => 'Sus solicitudes',
     'inmuebles.mis_inmuebles' => 'Solo sus inmuebles',
-    'notificaciones' => 'Solo sus contactos vinculados',
-    'herramientas' => '',
   ];
+
+  /** Pestañas de tareas: ver todo el equipo en alguna permite abrir cualquier tarea comercial. */
+  private const TASK_VIEWS = ['inicio', 'abiertos', 'postergados', 'cerrados'];
 
   /** Claves anteriores de las herramientas: los permisos guardados y los enlaces viejos siguen funcionando. */
   private const LEGACY_TOOLS = ['preaprobado' => 'simulador_ingreso_neto'];
@@ -146,9 +150,28 @@ final class CommercialAccessPolicy
     return in_array(Auth::userCargo(), $this->adminCargoIds(), true);
   }
 
-  public function canSeeAllCommercialTickets(): bool
+  /** Si el cargo ve la información de todo el equipo en esa pestaña o solo la suya. */
+  public function canSeeAll(string $view): bool
   {
-    return $this->canManage();
+    if ($this->canManage()) {
+      return true;
+    }
+    if (!isset(self::SCOPED_VIEWS[$view]) || !$this->canView($view)) {
+      return false;
+    }
+    $cargo = Auth::userCargo();
+    return in_array($view, $this->permissions()[$cargo]['scope_all'] ?? [], true);
+  }
+
+  /** Abrir, editar o vincular una tarea de otro funcionario requiere ver todo el equipo en alguna pestaña de tareas. */
+  public function canSeeAllTasks(): bool
+  {
+    foreach (self::TASK_VIEWS as $view) {
+      if ($this->canSeeAll($view)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   public function canView(string $view): bool
@@ -227,7 +250,7 @@ final class CommercialAccessPolicy
     return in_array($action, $this->allowed('actions', array_values(array_diff(array_keys(self::ACTIONS), ['editar_actor']))), true);
   }
 
-  /** @return array<string,array{views:array<int,string>,actions:array<int,string>,subviews:array<string,array<int,string>>}> */
+  /** @return array<string,array{views:array<int,string>,actions:array<int,string>,subviews:array<string,array<int,string>>,scope_all:array<int,string>}> */
   public function permissions(): array
   {
     $raw = $this->settings->get('commercial_permissions', []);
@@ -297,7 +320,7 @@ final class CommercialAccessPolicy
     return array_values($values);
   }
 
-  /** @param array<string,mixed> $raw @return array<string,array{views:array<int,string>,actions:array<int,string>,subviews:array<string,array<int,string>>}> */
+  /** @param array<string,mixed> $raw @return array<string,array{views:array<int,string>,actions:array<int,string>,subviews:array<string,array<int,string>>,scope_all:array<int,string>}> */
   private function sanitize(array $raw): array
   {
     $out = [];
@@ -310,7 +333,13 @@ final class CommercialAccessPolicy
         'views' => array_values(array_intersect(array_keys(self::VIEWS), array_map('strval', (array) ($definition['views'] ?? [])))),
         'actions' => array_values(array_intersect(array_keys(self::ACTIONS), array_map('strval', (array) ($definition['actions'] ?? [])))),
         'subviews' => [],
+        'scope_all' => [],
       ];
+      // El formulario envía scope[vista] = own|all; lo guardado es la lista scope_all.
+      $scopeAll = is_array($definition['scope'] ?? null)
+        ? array_keys(array_filter($definition['scope'], static fn($value): bool => $value === 'all'))
+        : (array) ($definition['scope_all'] ?? []);
+      $out[$cargo]['scope_all'] = array_values(array_intersect(array_keys(self::SCOPED_VIEWS), array_map('strval', $scopeAll)));
       foreach (self::SUBVIEWS as $view => $subviews) {
         // Existing configurations inherit their parent permission until subviews are saved.
         $configured = is_array($definition['subviews'] ?? null) && array_key_exists($view, $definition['subviews']);

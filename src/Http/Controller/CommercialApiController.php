@@ -80,19 +80,11 @@ final class CommercialApiController
     $filters = $this->ticketFilters($input);
     $filters['tab'] = $bucket;
     $filters = $this->scopeTicketFilters($filters);
-    $personalTaskScope = $bucket === 'mis_tickets';
     $ticketEmployees = $this->tickets->ticketEmployees($this->commercialCargos);
     $visibleViews = array_values(array_filter(array_keys(CommercialAccessPolicy::VIEWS), fn(string $view): bool => $this->policy->canView($view)));
     $currentEmployeeFilter = $this->tickets->currentEmployeeTicketFilter($this->commercialCargos);
-    $globalCountFilters = $personalTaskScope && $this->policy->canSeeAllCommercialTickets()
-      ? []
-      : $this->globalTicketFilters($filters);
-    if ($bucket === 'inicio' && $this->policy->canSeeAllCommercialTickets()) {
-      $globalCountFilters = [];
-    }
-    $tabCounts = $this->tickets->bucketCounts($globalCountFilters);
-    $myTabCounts = $this->tickets->bucketCounts(['id_empleado' => $currentEmployeeFilter]);
-    $tabCounts['mis_tickets'] = (int) ($myTabCounts['mis_tickets'] ?? 0);
+    $navigation = $this->tickets->scopedNavigation($bucket, $filters, $currentEmployeeFilter, $this->policy);
+    $tabCounts = $navigation['tabs'];
     $html = '';
     if ($bucket === 'anadir_aviso') {
       $html = \SCM\Views\CommercialSignView::render(new \SCM\Commercial\CommercialSignService($this->db, $this->policy, $this->config), $this->policy);
@@ -103,7 +95,7 @@ final class CommercialApiController
     } elseif ($bucket === 'inicio') {
       $result = $this->tickets->search('abiertos', $filters);
       $html = CommercialDashboardView::renderHome(
-        $this->tickets->homeDashboard($globalCountFilters, $this->policy),
+        $this->tickets->homeDashboard($navigation['home'], $this->policy),
         $filters,
         $this->policy,
         $this->baseUrl,
@@ -134,7 +126,7 @@ final class CommercialApiController
       $html = CommercialNotificationsView::render(new CommercialNotificationsService($this->db, $this->policy), $this->policy);
     } elseif ($bucket === 'inmuebles') {
       $propertiesRepo = new CommercialPropertiesRepository($this->db);
-      $canSeeAll = $this->policy->canSeeAllCommercialTickets();
+      $canSeeAll = $this->policy->canSeeAll('inmuebles');
       $propFilters = $this->propertyFilters($input, !$canSeeAll);
       $propCounts = $propertiesRepo->summaryCounts($propFilters, $canSeeAll);
       $propResult = $propertiesRepo->search($propFilters, $canSeeAll, (int) ($propFilters['page'] ?? 1), 24);
@@ -160,7 +152,7 @@ final class CommercialApiController
         $this->baseUrl
       );
     }
-    $topicHierarchy = $this->tickets->topicStatusHierarchy($globalCountFilters);
+    $topicHierarchy = $this->tickets->topicStatusHierarchy($navigation['topics']);
     JsonResponse::success([
       'html' => $html,
       'tabs_html' => CommercialDashboardView::renderTabs($visibleViews, $bucket, $filters, $tabCounts, $this->baseUrl, $topicHierarchy, $this->policy),
@@ -431,12 +423,13 @@ final class CommercialApiController
       JsonResponse::error('No tienes permiso para consultar actualizaciones de inmuebles.', 403);
     }
     $filters = $this->propertyControlFilters($input);
-    if (!$this->policy->canSeeAllCommercialTickets()) {
+    $canSeeAll = $this->policy->canSeeAll('actualizaciones');
+    if (!$canSeeAll) {
       $filters['id_empleado'] = $this->tickets->currentEmployeeTicketFilter($this->commercialCargos);
     }
-    $result = $this->tickets->propertyUpdateControl($filters, $this->policy->canSeeAllCommercialTickets());
+    $result = $this->tickets->propertyUpdateControl($filters, $canSeeAll);
     JsonResponse::success([
-      'html' => CommercialDashboardView::renderPropertyUpdateRows($result['rows'], $this->policy->canSeeAllCommercialTickets()),
+      'html' => CommercialDashboardView::renderPropertyUpdateRows($result['rows'], $canSeeAll),
       'total' => (int) ($result['total'] ?? 0),
       'stats' => $result['stats'] ?? [],
     ]);
@@ -450,11 +443,12 @@ final class CommercialApiController
       JsonResponse::error('No tienes permiso para consultar avisos.', 403);
     }
     $filters = $this->propertyControlFilters($input);
-    if (!$this->policy->canSeeAllCommercialTickets()) {
+    $canSeeAll = $this->policy->canSeeAll('avisos');
+    if (!$canSeeAll) {
       $filters['id_empleado'] = $this->tickets->currentEmployeeTicketFilter($this->commercialCargos);
     }
     $mode = sanitize_key((string) ($input['mode'] ?? 'maintenance'));
-    $result = $this->tickets->signControl($mode, $filters, $this->policy->canSeeAllCommercialTickets());
+    $result = $this->tickets->signControl($mode, $filters, $canSeeAll);
     JsonResponse::success([
       'html' => CommercialDashboardView::renderSignControlRows($result['rows'], (string) ($result['mode'] ?? $mode)),
       'total' => (int) ($result['total'] ?? 0),
@@ -983,7 +977,7 @@ final class CommercialApiController
   /** @param array<string,mixed> $filters @return array<string,mixed> */
   private function scopeTicketFilters(array $filters): array
   {
-    if ($this->policy->canSeeAllCommercialTickets() && (string) ($filters['tab'] ?? '') !== 'mis_tickets') {
+    if ($this->policy->canSeeAll((string) ($filters['tab'] ?? ''))) {
       return $filters;
     }
 
@@ -993,7 +987,7 @@ final class CommercialApiController
 
   private function authorizeTicketScope(int $ticketPk): void
   {
-    if ($this->policy->canSeeAllCommercialTickets()) {
+    if ($this->policy->canSeeAllTasks()) {
       return;
     }
 
@@ -1060,14 +1054,6 @@ final class CommercialApiController
       'id_empleado' => $clean('id_empleado'),
       'estado_actualizacion' => $clean('estado_actualizacion'),
       'estado_aviso' => $clean('estado_aviso'),
-    ];
-  }
-
-  /** @param array<string,mixed> $filters @return array<string,mixed> */
-  private function globalTicketFilters(array $filters): array
-  {
-    return [
-      'id_empleado' => trim((string) ($filters['id_empleado'] ?? '')),
     ];
   }
 

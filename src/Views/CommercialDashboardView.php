@@ -548,7 +548,7 @@ final class CommercialDashboardView
                     <span class="font-label-sm text-[10px] bg-primary-container text-on-surface px-1.5 py-0.5 rounded font-bold"><?php echo esc_html((string) count($recentTickets)); ?></span>
                   </div>
                   <p class="font-body-sm text-[11px] text-on-surface-variant mt-0.5">
-                    <?php echo ($policy instanceof CommercialAccessPolicy && $policy->canManage()) ? 'Últimas gestiones del equipo comercial' : 'Tus gestiones comerciales asignadas'; ?>
+                    <?php echo ($policy instanceof CommercialAccessPolicy && $policy->canSeeAll('inicio')) ? 'Últimas gestiones del equipo comercial' : 'Tus gestiones comerciales asignadas'; ?>
                   </p>
                 </div>
                 <button type="button" class="text-secondary hover:text-on-surface p-1 rounded-lg cursor-pointer" data-commercial-close-notifications aria-label="Cerrar">
@@ -589,7 +589,7 @@ final class CommercialDashboardView
                           <span class="text-secondary shrink-0 ml-1"><?php echo esc_html($timeAgo); ?></span>
                         <?php endif; ?>
                       </div>
-                      <?php if ($asesor !== '' && ($policy instanceof CommercialAccessPolicy && $policy->canManage())): ?>
+                      <?php if ($asesor !== '' && ($policy instanceof CommercialAccessPolicy && $policy->canSeeAll('inicio'))): ?>
                         <div class="text-[10px] text-secondary mt-1 flex items-center gap-1">
                           <span class="material-symbols-outlined text-[12px]">person</span>
                           <span class="truncate"><?php echo esc_html($asesor); ?></span>
@@ -601,7 +601,7 @@ final class CommercialDashboardView
               </div>
 
               <div class="p-2.5 bg-surface-container-low border-t border-surface-container text-center">
-                <a href="<?php echo esc_url(self::url($baseUrl, ['tab' => ($policy instanceof CommercialAccessPolicy && $policy->canManage()) ? 'abiertos' : 'mis_tickets'])); ?>" class="font-label-md text-[12px] text-primary hover:underline font-semibold flex items-center justify-center gap-1">
+                <a href="<?php echo esc_url(self::url($baseUrl, ['tab' => ($policy instanceof CommercialAccessPolicy && $policy->canSeeAll('inicio')) ? 'abiertos' : 'mis_tickets'])); ?>" class="font-label-md text-[12px] text-primary hover:underline font-semibold flex items-center justify-center gap-1">
                   <span>Ver todas las tareas</span>
                   <span class="material-symbols-outlined text-[14px]">arrow_forward</span>
                 </a>
@@ -748,7 +748,7 @@ final class CommercialDashboardView
     $inactiveClasses = 'text-on-surface-variant hover:text-on-surface rounded-lg transition-colors whitespace-nowrap';
 
     $canManage = $policy instanceof CommercialAccessPolicy && $policy->canManage();
-    $canSeeAll = $policy instanceof CommercialAccessPolicy && $policy->canSeeAllCommercialTickets();
+    $canSeeAll = $policy instanceof CommercialAccessPolicy && $policy->canSeeAll('inmuebles');
 
     $openCount = (int) ($tabCounts['abiertos'] ?? 0);
     $myCount = (int) ($tabCounts['mis_tickets'] ?? 0);
@@ -1925,7 +1925,7 @@ final class CommercialDashboardView
     string $effectiveBucket = '',
     $policy = null
   ): string {
-    $canFilterEmployees = ($policy instanceof CommercialAccessPolicy && $policy->canSeeAllCommercialTickets() && !$isMyTasks);
+    $canFilterEmployees = ($policy instanceof CommercialAccessPolicy && $policy->canSeeAll($bucket) && !$isMyTasks);
     $activeFilterKeys = array_filter(
       ['busqueda', 'ticket_id', 'id_empleado', 'medio', 'barrio', 'sla_filter', 'solicitante', 'celular', 'correo', 'fecha_desde', 'fecha_hasta'],
       static fn(string $k): bool => trim((string) ($filters[$k] ?? '')) !== ''
@@ -2608,7 +2608,7 @@ final class CommercialDashboardView
   /** @param array<string,mixed> $filters @param array<int,array<string,string>> $ticketEmployees @param array<string,mixed> $filterOptions */
   private static function renderOperationalControls(array $filters, array $ticketEmployees, array $filterOptions, $policy, string $activePanel): string
   {
-    $canSeeAll = $policy instanceof CommercialAccessPolicy && $policy->canSeeAllCommercialTickets();
+    $canSeeAll = $policy instanceof CommercialAccessPolicy && $policy->canSeeAll($activePanel === 'updates' ? 'actualizaciones' : 'avisos');
     $selectedEmployee = trim((string) ($filters['id_empleado'] ?? ''));
     $barrios = is_array($filterOptions['barrios'] ?? null) ? $filterOptions['barrios'] : [];
     $tipos = is_array($filterOptions['tipos_inmueble'] ?? null) ? $filterOptions['tipos_inmueble'] : [];
@@ -3235,7 +3235,7 @@ final class CommercialDashboardView
       $currentSubtab = 'publicos';
     }
 
-    $canSeeAll = $policy instanceof CommercialAccessPolicy && $policy->canSeeAllCommercialTickets();
+    $canSeeAll = $policy instanceof CommercialAccessPolicy && $policy->canSeeAll('inmuebles');
     $canManage = $policy instanceof CommercialAccessPolicy && $policy->canManage();
     $publicCount = (int) ($summaryCounts['publicos'] ?? 0);
     $pendingCount = (int) ($summaryCounts['pendientes'] ?? 0);
@@ -4930,7 +4930,7 @@ final class CommercialDashboardView
                     <span>Este cargo tiene acceso total: ve todas las pestañas con la información de todo el equipo. Lo que se marque abajo solo aplica si se quita el acceso total.</span>
                   </div>
                   <div class="flex flex-wrap items-center justify-between gap-2">
-                    <span class="text-[11px] text-secondary">Mismo orden del menú. Debajo de cada pestaña se indica qué información ve un cargo sin acceso total. Las subpestañas solo se ven si su pestaña principal está habilitada.</span>
+                    <span class="text-[11px] text-secondary">Mismo orden del menú. En cada pestaña elige si el cargo ve solo lo suyo o la información de todo el equipo. Las subpestañas solo se ven si su pestaña principal está habilitada.</span>
                     <span class="flex gap-2">
                       <button type="button" class="px-3 py-1 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface text-xs font-semibold cursor-pointer" data-commercial-permissions-toggle="section" data-checked="true">Marcar todas</button>
                       <button type="button" class="px-3 py-1 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface text-xs font-semibold cursor-pointer" data-commercial-permissions-toggle="section" data-checked="false">Desmarcar todas</button>
@@ -4942,7 +4942,7 @@ final class CommercialDashboardView
                         <span class="block font-label-sm text-[11px] uppercase font-semibold text-secondary"><?php echo esc_html($groupLabel); ?></span>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-2 items-start">
                           <?php foreach ($groupViews as $viewKey): ?>
-                            <?php $viewLabel = CommercialAccessPolicy::VIEWS[$viewKey]; $subviews = CommercialAccessPolicy::SUBVIEWS[$viewKey] ?? []; $viewOn = in_array($viewKey, $current['views'], true); $scope = CommercialAccessPolicy::SCOPES[$viewKey]; ?>
+                            <?php $viewLabel = CommercialAccessPolicy::VIEWS[$viewKey]; $subviews = CommercialAccessPolicy::SUBVIEWS[$viewKey] ?? []; $viewOn = in_array($viewKey, $current['views'], true); $scope = CommercialAccessPolicy::SCOPES[$viewKey] ?? ''; $scopeOptions = CommercialAccessPolicy::SCOPED_VIEWS[$viewKey] ?? null; $seesAll = in_array($viewKey, $current['scope_all'] ?? [], true); ?>
                             <div class="p-2 rounded-lg bg-surface-container-lowest" data-perm-view>
                               <label class="flex items-start gap-2 text-body-sm font-semibold text-on-surface cursor-pointer">
                                 <input type="checkbox" name="<?php echo esc_attr($field); ?>[views][]" value="<?php echo esc_attr($viewKey); ?>"<?php checked($viewOn); ?> class="rounded text-primary mt-0.5" data-perm-view-input>
@@ -4951,6 +4951,16 @@ final class CommercialDashboardView
                                   <?php if ($scope !== ''): ?><span class="block text-[11px] font-normal text-secondary"><?php echo esc_html($scope); ?></span><?php endif; ?>
                                 </span>
                               </label>
+                              <?php if ($scopeOptions !== null): ?>
+                                <div class="ml-6 mt-1 flex flex-wrap gap-1 p-0.5 bg-surface-container rounded-lg w-fit" role="radiogroup" aria-label="Alcance de <?php echo esc_attr($viewLabel); ?>">
+                                  <?php foreach (['own' => $scopeOptions[0], 'all' => $scopeOptions[1]] as $scopeValue => $scopeLabel): ?>
+                                    <label class="cursor-pointer">
+                                      <input type="radio" name="<?php echo esc_attr($field); ?>[scope][<?php echo esc_attr($viewKey); ?>]" value="<?php echo esc_attr($scopeValue); ?>"<?php checked($seesAll === ($scopeValue === 'all')); ?> class="peer sr-only">
+                                      <span class="block px-2 py-1 rounded-md text-[11px] text-secondary peer-checked:bg-surface-container-lowest peer-checked:text-on-surface peer-checked:font-semibold peer-checked:shadow-sm peer-focus-visible:ring-2 peer-focus-visible:ring-primary"><?php echo esc_html($scopeLabel); ?></span>
+                                    </label>
+                                  <?php endforeach; ?>
+                                </div>
+                              <?php endif; ?>
                               <?php if ($subviews !== []): ?>
                                 <input type="hidden" name="<?php echo esc_attr($field); ?>[subviews][<?php echo esc_attr($viewKey); ?>][]" value="">
                                 <div class="pl-6 pt-1 space-y-1<?php echo $viewOn ? '' : ' opacity-50'; ?>" data-perm-subviews>

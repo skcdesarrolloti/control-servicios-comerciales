@@ -294,6 +294,35 @@ final class CommercialTicketsRepository
     return $bucketCounts;
   }
 
+  /**
+   * Conteos de la navegación según el alcance del cargo en cada pestaña: las pestañas con todo el equipo cuentan
+   * todas las tareas (o las del funcionario elegido en el filtro) y las personales solo las del funcionario actual.
+   * @param array<string,mixed> $filters filtros de la pestaña actual
+   * @return array{tabs:array<string,int>,home:array<string,mixed>,topics:array<string,mixed>}
+   */
+  public function scopedNavigation(string $bucket, array $filters, string $employeeFilter, CommercialAccessPolicy $policy): array
+  {
+    $own = ['id_empleado' => $employeeFilter];
+    $selected = ['id_empleado' => trim((string) ($filters['id_empleado'] ?? ''))];
+    $teamFilters = $bucket !== 'inicio' && $policy->canSeeAll($bucket) ? $selected : [];
+    $mine = $this->bucketCounts($own);
+    $team = null;
+    $tabs = [];
+    foreach ($mine as $tab => $count) {
+      if ($tab === 'mis_tickets' || !$policy->canSeeAll($tab)) {
+        $tabs[$tab] = $count;
+        continue;
+      }
+      $team ??= $this->bucketCounts($teamFilters);
+      $tabs[$tab] = (int) ($team[$tab] ?? 0);
+    }
+    return [
+      'tabs' => $tabs,
+      'home' => $policy->canSeeAll('inicio') ? [] : $own,
+      'topics' => $policy->canSeeAll('abiertos') ? ($bucket === 'abiertos' ? $selected : []) : $own,
+    ];
+  }
+
   /** @param array<string,mixed> $filters @return array<string,int> */
   public function topicCounts(string $bucket, array $filters = []): array
   {
@@ -879,10 +908,10 @@ final class CommercialTicketsRepository
   {
     $policy ??= new CommercialAccessPolicy(new \SCM\Core\Settings($this->db), $this->db, ['11','12','13','14']);
     if (!$policy->canView('precaptacion')) return ['available'=>false];
-    if (!$policy->canManage() && Auth::employeeId() === '') return ['available'=>false];
+    if (!$policy->canSeeAll('precaptacion') && Auth::employeeId() === '') return ['available'=>false];
     $history = new \SCM\Precaptacion\ManagementHistory($this->db);
     $workflow = new \SCM\Precaptacion\Workflow($this->db, $history);
-    return $workflow->summary($policy->canManage() ? '' : Auth::employeeId());
+    return $workflow->summary($policy->canSeeAll('precaptacion') ? '' : Auth::employeeId());
   }
 
   /** @param array<string,mixed> $filters @return array<string,mixed> */

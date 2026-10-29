@@ -86,7 +86,7 @@ final class LegacyPanel
 
         $mode = sanitize_key((string) $atts['modo']);
         $is_control = in_array($mode, ['control', 'admin', 'administrador'], true);
-        if ($is_control && !self::current_user_can_bulk_update()) {
+        if ($is_control && !self::current_user_can_view_team()) {
             return '<div class="precaptaciones-alerta">No tienes permisos para ver el panel de control de precaptaciones.</div>';
         }
 
@@ -112,7 +112,7 @@ final class LegacyPanel
                 </div>
                 <div class="precap-heading-actions">
                     <button type="button" class="precap-export" data-precap-export>↓ Exportar CSV</button>
-                    <?php if ($is_control) : ?>
+                    <?php if ($is_control && self::current_user_can_bulk_update()) : ?>
                         <?php self::render_bulk_promocionado_por_button(self::count_promocionado_por_por_normalizar($table)); ?>
                         <?php self::render_bulk_competencia_button(self::count_competencia_por_normalizar($table)); ?>
                     <?php endif; ?>
@@ -424,7 +424,7 @@ final class LegacyPanel
                         Editar
                     </button>
                 <?php endif; ?>
-                <?php if ($is_control && !$actions_locked) : ?>
+                <?php if ($is_control && !$actions_locked && self::current_user_can_bulk_update()) : ?>
                     <button
                         class="precaptaciones__duplicada"
                         type="button"
@@ -2205,7 +2205,7 @@ final class LegacyPanel
     {
         global $wpdb;
         $is_control = ($request['mode'] ?? '') === 'control';
-        if ($is_control && !self::current_user_can_bulk_update()) wp_send_json_error(['message' => 'No tienes permiso para exportar el panel administrativo.'], 403);
+        if ($is_control && !self::current_user_can_view_team()) wp_send_json_error(['message' => 'No tienes permiso para exportar el panel administrativo.'], 403);
         $table = self::table_name('jet_cct_precaptaciones');
         [$where, $values] = self::build_where($table, self::read_filters($request), $is_control);
         $sql = "SELECT * FROM {$table} {$where} ORDER BY _ID DESC";
@@ -2252,7 +2252,7 @@ final class LegacyPanel
         $request = wp_unslash($_POST);
         $mode = sanitize_key((string) ($request['mode'] ?? 'mis'));
         $is_control = in_array($mode, ['control', 'admin', 'administrador'], true);
-        if ($is_control && !self::current_user_can_bulk_update()) {
+        if ($is_control && !self::current_user_can_view_team()) {
             wp_send_json_error(['message' => 'No tienes permisos para ver el panel de control de precaptaciones.'], 403);
         }
 
@@ -2983,6 +2983,12 @@ final class LegacyPanel
                 number_format_i18n((int) $result['remaining'])
             ),
         ]);
+    }
+
+    /** Ver las precaptaciones de todo el equipo; las herramientas de control siguen siendo solo administrativas. */
+    private static function current_user_can_view_team(): bool
+    {
+        return self::current_user_can_bulk_update() || Module::policy()->canSeeAll('precaptacion');
     }
 
     private static function current_user_can_bulk_update(): bool

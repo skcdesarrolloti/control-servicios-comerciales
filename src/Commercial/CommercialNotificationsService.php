@@ -153,7 +153,7 @@ final class CommercialNotificationsService extends AdministrativeNotificationsSe
   protected function baseWhere(array $config): string
   {
     $where = parent::baseWhere($config);
-    if ($this->policy->canManage()) {
+    if ($this->policy->canSeeAll('notificaciones')) {
       return $where;
     }
     $employee = $this->currentEmployeeId();
@@ -343,7 +343,7 @@ final class CommercialNotificationsService extends AdministrativeNotificationsSe
   {
     $where = '`project_code` = ? AND `source_module` = ?';
     $args = [self::PROJECT_CODE, self::SOURCE_MODULE];
-    if (!$this->policy->canManage()) {
+    if (!$this->policy->canSeeAll('notificaciones')) {
       $where .= ' AND ' . $this->metadataField('employee_id') . ' = ?';
       $args[] = $this->currentEmployeeId();
       if ($this->currentEmployeeId() === '') {
