@@ -517,6 +517,7 @@ final class CommercialDashboardView
                       ['avisos', 'signpost', 'Avisos en fachada', 'Plazos de retoque, instalación y valores'],
                       ['actualizaciones', 'update', 'Actualizaciones de inmuebles', 'Plazos por tipo de negocio'],
                       ['destacados', 'star', 'Cupos de destacados', 'Inmuebles destacados por portal'],
+                      ['aseo', 'cleaning_services', 'Calculadora de aseo', 'Salario, márgenes, insumos, transporte y tramos'],
                     ];
                   ?>
                   <?php foreach ($configItems as [$configKey, $configIcon, $configLabel, $configHint]): ?>
@@ -659,7 +660,7 @@ final class CommercialDashboardView
           } elseif ($bucket === 'anadir_aviso') {
             echo CommercialSignView::render($data['sign_service'], $policy);
           } elseif ($bucket === 'herramientas') {
-            echo CommercialToolsView::render((string) ($data['tools_view'] ?? ''), $data['tools_service'] ?? null, $baseUrl);
+            echo CommercialToolsView::render((string) ($data['tools_view'] ?? ''), $data['tools_service'] ?? null, $baseUrl, $data['tools_context'] ?? []);
           } elseif ($bucket === 'notificaciones') {
             echo CommercialNotificationsView::render($data['notifications_service'], $policy);
           } else {
@@ -705,6 +706,7 @@ final class CommercialDashboardView
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-notifications.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-notifications.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-signs.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-signs.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-tools.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-tools.js')); ?>"></script>
+  <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-calculators.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-calculators.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-property-entry.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-property-entry.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-property-media.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-property-media.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-property-video.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-property-video.js')); ?>"></script>
@@ -1067,7 +1069,7 @@ final class CommercialDashboardView
         </a>
       <?php endif; ?>
 
-      <!-- Dropdown Herramientas (Simulador de ingreso neto, Ganancia ocasional) -->
+      <!-- Dropdown Herramientas (Simulador de ingreso neto, Ganancia ocasional, Calculadora de mercado, Calculadora de aseo) -->
       <?php if (in_array('herramientas', $views, true)): ?>
         <div class="relative group/nav" data-commercial-dropdown="herramientas">
           <button type="button" class="flex items-center gap-space-xs px-2 lg:px-3 py-space-xs font-label-md text-label-md <?php echo $bucket === 'herramientas' ? ($activeClasses . ' active') : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-tab="herramientas" data-commercial-dropdown-trigger="herramientas" aria-expanded="false">
@@ -1091,6 +1093,24 @@ final class CommercialDashboardView
               <div>
                 <span class="block font-semibold text-on-surface">Ganancia ocasional</span>
                 <span class="block text-[11px] text-secondary">Impuesto por la venta de un inmueble</span>
+              </div>
+            </a>
+            <?php endif; ?>
+            <?php if (!$policy instanceof CommercialAccessPolicy || $policy->canSubview('herramientas', 'calculadora_mercado')): ?>
+            <a class="flex items-center gap-2.5 px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="herramientas" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'calculadora_mercado'])); ?>">
+              <span class="material-symbols-outlined text-[18px] text-secondary" aria-hidden="true">query_stats</span>
+              <div>
+                <span class="block font-semibold text-on-surface">Calculadora de mercado</span>
+                <span class="block text-[11px] text-secondary">Precio por m² de venta y arriendo</span>
+              </div>
+            </a>
+            <?php endif; ?>
+            <?php if (!$policy instanceof CommercialAccessPolicy || $policy->canSubview('herramientas', 'calculadora_aseo')): ?>
+            <a class="flex items-center gap-2.5 px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="herramientas" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'calculadora_aseo'])); ?>">
+              <span class="material-symbols-outlined text-[18px] text-secondary" aria-hidden="true">cleaning_services</span>
+              <div>
+                <span class="block font-semibold text-on-surface">Calculadora de aseo</span>
+                <span class="block text-[11px] text-secondary">Cotización del servicio de aseo</span>
               </div>
             </a>
             <?php endif; ?>
@@ -4855,6 +4875,7 @@ final class CommercialDashboardView
     'Notificaciones' => ['enviar_notificacion', 'eliminar_notificacion'],
     'Precaptación' => ['precaptacion_crear', 'precaptacion_editar', 'precaptacion_ticket', 'precaptacion_catalogos'],
     'Inmuebles y avisos' => ['ingresar_inmueble', 'registrar_aviso', 'editar_actor'],
+    'Herramientas' => ['mercado_vista_completa', 'aseo_vista_interna'],
   ];
 
   /** @param array<int,string> $employeeCargoIds */
@@ -4902,7 +4923,7 @@ final class CommercialDashboardView
               <?php
               $cargoId = $cargo['id'];
               $isAdmin = isset($adminCargoIds[$cargoId]);
-              $current = $permissions[$cargoId] ?? ['views' => array_keys(CommercialAccessPolicy::VIEWS), 'actions' => array_values(array_diff(array_keys(CommercialAccessPolicy::ACTIONS), ['editar_actor']))];
+              $current = $permissions[$cargoId] ?? ['views' => array_keys(CommercialAccessPolicy::VIEWS), 'actions' => array_values(array_diff(array_keys(CommercialAccessPolicy::ACTIONS), CommercialAccessPolicy::OPT_IN_ACTIONS))];
               $field = 'permissions[' . $cargoId . ']';
               ?>
               <div class="bg-surface-container-low rounded-xl p-space-md border border-surface-container space-y-space-sm" data-cargo="<?php echo esc_attr($cargoId); ?>"<?php echo $index === 0 ? '' : ' hidden'; ?>>
@@ -4995,7 +5016,7 @@ final class CommercialDashboardView
                         <span class="block font-label-sm text-secondary font-semibold"><?php echo esc_html($groupLabel); ?></span>
                         <?php foreach ($groupActions as $actionKey): ?>
                           <label class="flex items-center gap-2 text-[11px] text-on-surface cursor-pointer">
-                            <input type="checkbox" name="<?php echo esc_attr($field); ?>[actions][]" value="<?php echo esc_attr($actionKey); ?>"<?php checked($actionKey === 'eliminar_notificacion' ? $isAdmin : (($actionKey === 'editar_actor' && $isAdmin) || in_array($actionKey, $current['actions'], true))); ?> <?php echo $actionKey === 'eliminar_notificacion' ? 'disabled' : ''; ?> class="rounded text-primary">
+                            <input type="checkbox" name="<?php echo esc_attr($field); ?>[actions][]" value="<?php echo esc_attr($actionKey); ?>"<?php checked($actionKey === 'eliminar_notificacion' ? $isAdmin : ((in_array($actionKey, CommercialAccessPolicy::OPT_IN_ACTIONS, true) && $isAdmin) || in_array($actionKey, $current['actions'], true))); ?> <?php echo $actionKey === 'eliminar_notificacion' ? 'disabled' : ''; ?> class="rounded text-primary">
                             <span><?php echo esc_html(CommercialAccessPolicy::ACTIONS[$actionKey]); ?></span>
                           </label>
                         <?php endforeach; ?>

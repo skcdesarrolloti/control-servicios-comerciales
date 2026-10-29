@@ -45,7 +45,12 @@ final class CommercialAccessPolicy
     'precaptacion_catalogos' => 'Crear barrios e inmobiliarias',
     'registrar_aviso' => 'Registrar avisos nuevos y retoques',
     'ingresar_inmueble' => 'Ingresar inmuebles desde una tarea',
+    'mercado_vista_completa' => 'Calculadora de mercado: estadística completa y tabla de inmuebles',
+    'aseo_vista_interna' => 'Calculadora de aseo: costos, márgenes, utilidades y PDF internos',
   ];
+
+  /** Acciones que un cargo sin configurar no recibe por defecto: hay que marcarlas. */
+  public const OPT_IN_ACTIONS = ['editar_actor', 'mercado_vista_completa', 'aseo_vista_interna'];
 
   public const SUBVIEWS = [
     'inmuebles' => [
@@ -64,6 +69,8 @@ final class CommercialAccessPolicy
     'herramientas' => [
       'simulador_ingreso_neto' => 'Simulador de ingreso neto del propietario',
       'ganancia_ocasional' => 'Calculadora de ganancia ocasional',
+      'calculadora_mercado' => 'Calculadora de mercado',
+      'calculadora_aseo' => 'Calculadora de aseo',
     ],
   ];
 
@@ -247,7 +254,7 @@ final class CommercialAccessPolicy
     if ($this->canManage()) {
       return true;
     }
-    return in_array($action, $this->allowed('actions', array_values(array_diff(array_keys(self::ACTIONS), ['editar_actor']))), true);
+    return in_array($action, $this->allowed('actions', array_values(array_diff(array_keys(self::ACTIONS), self::OPT_IN_ACTIONS))), true);
   }
 
   /** @return array<string,array{views:array<int,string>,actions:array<int,string>,subviews:array<string,array<int,string>>,scope_all:array<int,string>}> */

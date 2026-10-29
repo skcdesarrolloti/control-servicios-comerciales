@@ -635,7 +635,7 @@
     if (!root) return;
     if (target.matches("[data-tool-money]")) formatMoney(target, true);
     if (root.dataset.commercialTool === "simulador_ingreso_neto") { showError(root, ""); recalc(root); }
-    else calculateGain(root);
+    else if (root.dataset.commercialTool === "ganancia_ocasional") calculateGain(root);
   });
 
   document.addEventListener("change", function (event) {

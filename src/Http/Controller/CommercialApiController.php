@@ -89,7 +89,8 @@ final class CommercialApiController
     if ($bucket === 'anadir_aviso') {
       $html = \SCM\Views\CommercialSignView::render(new \SCM\Commercial\CommercialSignService($this->db, $this->policy, $this->config), $this->policy);
     } elseif ($bucket === 'herramientas') {
-      $html = \SCM\Views\CommercialToolsView::render((string) ($input['herramienta'] ?? ''), $this->preapprovalService(), $this->baseUrl);
+      $tool = (string) ($input['herramienta'] ?? '');
+      $html = \SCM\Views\CommercialToolsView::render($tool, $this->preapprovalService(), $this->baseUrl, \SCM\Views\CommercialToolsView::context($tool, $this->policy, $this->db));
     } elseif ($bucket === 'precaptacion') {
       $html = CommercialDashboardView::renderPrecaptacion($this->baseUrl, $input);
     } elseif ($bucket === 'inicio') {
@@ -821,6 +822,119 @@ final class CommercialApiController
     exit;
   }
 
+  private function authorizeTool(string $tool, string $message): void
+  {
+    if (!$this->policy->canSubview('herramientas', $tool)) {
+      JsonResponse::error($message, 403);
+    }
+  }
+
+  /** Calculadora de mercado: rutas, barrios, tipos, destinaciones, estratos y estados reales de la tabla de inmuebles. */
+  public function marketOptions(array $input): never
+  {
+    $this->verify($input);
+    $this->authorizeTool('calculadora_mercado', 'No tienes permiso para usar la calculadora de mercado.');
+    try {
+      JsonResponse::success(['options' => (new \SCM\Commercial\Tools\MarketStatsService($this->db))->options(), 'admin' => $this->policy->canAct('mercado_vista_completa')]);
+    } catch (\Throwable $exception) {
+      error_log('[commercial-tools-market] ' . $exception->getMessage());
+      JsonResponse::error('No se pudieron cargar los filtros de la calculadora de mercado.', 500);
+    }
+  }
+
+  /** Valores por m²; el listado de inmuebles (códigos y barrios) solo viaja con la vista completa. */
+  public function marketAnalyze(array $input): never
+  {
+    $this->verify($input);
+    $this->authorizeTool('calculadora_mercado', 'No tienes permiso para usar la calculadora de mercado.');
+    $filters = ['estados' => array_values(array_filter(array_map(static fn($value): string => trim((string) $value), is_array($input['estados'] ?? null) ? $input['estados'] : []), static fn(string $value): bool => $value !== ''))];
+    foreach (['ruta', 'barrio', 'estrato', 'tipo_inmueble', 'categoria', 'destinacion', 'habitaciones', 'edad', 'parqueadero', 'deposito', 'vigilancia'] as $key) {
+      $filters[$key] = is_scalar($input[$key] ?? null) ? trim((string) $input[$key]) : '';
+    }
+    if ($filters['estados'] === []) {
+      JsonResponse::error('Selecciona al menos un estado del inmueble.', 422);
+    }
+    $result = ['venta' => [], 'arriendo' => [], 'items' => [], 'without_area' => 0];
+    try {
+      $result = (new \SCM\Commercial\Tools\MarketStatsService($this->db))->analyze($filters);
+    } catch (\Throwable $exception) {
+      error_log('[commercial-tools-market] ' . $exception->getMessage());
+      JsonResponse::error('No se pudo calcular la estadística de mercado.', 500);
+    }
+    $admin = $this->policy->canAct('mercado_vista_completa');
+    $round = static fn(array $values): array => array_map(static fn(float $value): float => round($value, 2), $values);
+    JsonResponse::success([
+      'admin' => $admin,
+      'venta' => $round($result['venta']),
+      'arriendo' => $round($result['arriendo']),
+      'without_area' => $result['without_area'],
+      'items' => $admin ? array_map(static fn(array $item): array => ['precio' => round($item['precio'], 2), 'area' => round($item['area'], 2), 'm2' => round($item['m2'], 2)] + $item, $result['items']) : [],
+    ]);
+  }
+
+  /** @return array<string,string> */
+  private function cleaningInput(array $input): array
+  {
+    $clean = [];
+    foreach (['m2', 'jornada', 'distancia', 'dificultad', 'trabajador', 'cliente', 'direccion'] as $key) {
+      $clean[$key] = is_scalar($input[$key] ?? null) ? trim(strip_tags((string) $input[$key])) : '';
+    }
+    return $clean;
+  }
+
+  /** Calculadora de aseo: costos, márgenes y utilidades solo viajan con la vista interna. */
+  public function cleaningCalculate(array $input): never
+  {
+    $this->verify($input);
+    $this->authorizeTool('calculadora_aseo', 'No tienes permiso para usar la calculadora de aseo.');
+    $result = [];
+    try {
+      $result = \SCM\Commercial\Tools\CleaningCalculator::calculate((new \SCM\Commercial\Tools\CleaningSettings($this->db))->read(), $this->cleaningInput($input));
+    } catch (\InvalidArgumentException $exception) {
+      JsonResponse::error($exception->getMessage(), 422);
+    } catch (\Throwable $exception) {
+      error_log('[commercial-tools-cleaning] ' . $exception->getMessage());
+      JsonResponse::error('No se pudo calcular el servicio de aseo.', 500);
+    }
+    $internal = $this->policy->canAct('aseo_vista_interna');
+    $public = ['input', 'horas', 'protocolo', 'base', 'iva', 'total', 'cliente'];
+    JsonResponse::success(['internal' => $internal, 'result' => $internal ? $result : array_intersect_key($result, array_flip($public))]);
+  }
+
+  /** PDF de aseo para el cliente o, con la vista interna, para la inmobiliaria y el funcionario. */
+  public function cleaningPdf(array $input): never
+  {
+    $this->verify($input);
+    $this->authorizeTool('calculadora_aseo', 'No tienes permiso para usar la calculadora de aseo.');
+    $mode = is_scalar($input['mode'] ?? null) ? trim((string) $input['mode']) : 'cliente';
+    if (!isset(\SCM\Commercial\Tools\CleaningQuotePdf::MODES[$mode])) {
+      JsonResponse::error('Tipo de PDF no válido.', 422);
+    }
+    if (in_array($mode, \SCM\Commercial\Tools\CleaningQuotePdf::INTERNAL_MODES, true) && !$this->policy->canAct('aseo_vista_interna')) {
+      JsonResponse::error('Tu cargo no tiene permiso para los reportes internos de aseo.', 403);
+    }
+    $bytes = '';
+    try {
+      $config = (new \SCM\Commercial\Tools\CleaningSettings($this->db))->read();
+      $data = $this->cleaningInput($input);
+      $result = \SCM\Commercial\Tools\CleaningCalculator::calculate($config, $data);
+      $bytes = \SCM\Commercial\Tools\CleaningQuotePdf::bytes($mode, $result, $config, ['cliente' => $data['cliente'], 'direccion' => $data['direccion']], $this->preapprovalService()->signer());
+    } catch (\InvalidArgumentException $exception) {
+      JsonResponse::error($exception->getMessage(), 422);
+    } catch (\RuntimeException $exception) {
+      error_log('[commercial-tools-cleaning-pdf] ' . $exception->getMessage());
+      JsonResponse::error($exception->getMessage(), 503);
+    }
+    while (ob_get_level() > 0) ob_end_clean();
+    header('Content-Type: application/pdf');
+    header('Content-Disposition: attachment; filename="' . \SCM\Commercial\Tools\CleaningQuotePdf::filename($mode) . '"');
+    header('Cache-Control: private, no-store');
+    header('X-Content-Type-Options: nosniff');
+    header('Content-Length: ' . strlen($bytes));
+    echo $bytes;
+    exit;
+  }
+
   public function propertyEntryForm(array $input): never
   {
     $this->verify($input);
@@ -1110,7 +1224,8 @@ final class CommercialApiController
   public function propertyDetail(array $input): never
   {
     $this->verify($input);
-    if (!$this->policy->canView('inmuebles')) {
+    // La tabla de control de la calculadora de mercado también abre la ficha del inmueble.
+    if (!$this->policy->canView('inmuebles') && !($this->policy->canSubview('herramientas', 'calculadora_mercado') && $this->policy->canAct('mercado_vista_completa'))) {
       JsonResponse::error('No tienes permiso para consultar inmuebles.', 403);
     }
     $identifier = trim((string) ($input['codigo'] ?? $input['property_id'] ?? ''));

@@ -4,12 +4,17 @@ declare(strict_types=1);
 
 namespace SCM\Views;
 
+use SCM\Commercial\CommercialAccessPolicy;
 use SCM\Commercial\CommercialNetIncomeSimulator;
 use SCM\Commercial\CommercialOwnerPreapprovalService;
+use SCM\Commercial\Tools\CleaningCalculator;
+use SCM\Commercial\Tools\CleaningSettings;
+use SCM\Core\Database;
 
 /**
  * Herramientas del panel comercial: simulador de ingreso neto del propietario con su crédito preaprobado (y PDF para el
- * propietario) y calculadora de ganancia ocasional. Los cálculos en pantalla se hacen en el navegador
+ * propietario), calculadora de ganancia ocasional y las calculadoras de mercado y de aseo del panel inmobiliario
+ * (commercial-calculators.js; el servidor filtra inmuebles, calcula el aseo y genera sus PDF). Los cálculos en pantalla se hacen en el navegador
  * (commercial-tools.js); el servidor busca contratos, recalcula y genera el PDF (CommercialOwnerPreapprovalPdf).
  */
 final class CommercialToolsView
@@ -20,9 +25,36 @@ final class CommercialToolsView
   /** Íconos de las necesidades que resuelve el crédito preaprobado (CommercialOwnerPreapprovalService::USES). */
   private const USE_ICONS = ['servicios' => 'water_drop', 'administracion' => 'apartment', 'reparaciones' => 'construction', 'otros' => 'payments'];
 
-  public static function render(string $tool, ?CommercialOwnerPreapprovalService $service, string $baseUrl): string
+  /** Grados de dificultad de la calculadora de aseo: nombre y criterio (guía del plugin original). */
+  private const CLEANING_LEVELS = [
+    0 => ['Muy bajo', 'Limpieza de mantenimiento, superficies lisas.'],
+    1 => ['Bajo', 'Polvo y uso normal, poca acumulación.'],
+    2 => ['Medio', 'Suciedad moderada, niños, grasa de cocina.'],
+    3 => ['Medio alto', 'Acumulación visible en cocina y baños.'],
+    4 => ['Alto', 'Suciedad fuerte o post-obra · requiere visita técnica.'],
+    5 => ['Muy alto', 'Abandono prolongado; insumos ×1,5 · requiere visita técnica.'],
+    6 => ['Extremo', 'Riesgo biológico; insumos ×1,5 · requiere visita y acta.'],
+  ];
+
+  /**
+   * Datos que necesitan las calculadoras de mercado y aseo según el permiso del cargo.
+   * @return array{market_admin:bool,cleaning_internal:bool,cleaning_config:array<string,mixed>}
+   */
+  public static function context(string $tool, CommercialAccessPolicy $policy, Database $db): array
+  {
+    return [
+      'market_admin' => $policy->canAct('mercado_vista_completa'),
+      'cleaning_internal' => $policy->canAct('aseo_vista_interna'),
+      'cleaning_config' => $tool === 'calculadora_aseo' ? (new CleaningSettings($db))->read() : [],
+    ];
+  }
+
+  /** @param array{market_admin?:bool,cleaning_internal?:bool,cleaning_config?:array<string,mixed>} $context */
+  public static function render(string $tool, ?CommercialOwnerPreapprovalService $service, string $baseUrl, array $context = []): string
   {
     if ($tool === 'ganancia_ocasional') return self::occasionalGain();
+    if ($tool === 'calculadora_mercado') return self::market(!empty($context['market_admin']));
+    if ($tool === 'calculadora_aseo') return self::cleaning(!empty($context['cleaning_internal']), $context['cleaning_config'] ?? []);
     return $service instanceof CommercialOwnerPreapprovalService ? self::netIncome($service) : '';
   }
 
@@ -290,5 +322,90 @@ final class CommercialToolsView
       </dialog>
     </section>
     <?php return (string) ob_get_clean();
+  }
+
+  /** Calculadora de mercado: los filtros se llenan con los valores reales de la tabla de inmuebles (commercial-calculators.js). */
+  private static function market(bool $admin): string
+  {
+    $select = static fn(string $name, string $first = 'Todos', string $options = ''): string => '<span class="ctl-input"><select name="' . $name . '" data-market-field="' . $name . '"><option value="">' . self::e($first) . '</option>' . $options . '</select></span>';
+    $field = static fn(string $label, string $control): string => '<label class="ctl-field"><span class="ctl-label">' . self::e($label) . '</span>' . $control . '</label>';
+    $rooms = '';
+    for ($i = 1; $i <= 30; $i++) $rooms .= '<option value="' . $i . '">' . $i . '</option>';
+    $yesNo = '<option value="Si">Sí</option><option value="No">No</option>';
+    $badge = $admin ? '<span class="ctl-pill"><span class="material-symbols-outlined" aria-hidden="true">lock_open</span>Vista completa de estadística</span>' : '';
+
+    return '<section class="ctl" data-commercial-tool="calculadora_mercado">'
+      . self::hero('query_stats', 'Calculadora de mercado', 'Precio por m² de venta y de arriendo según los inmuebles registrados. Filtra por zona y características para comparar.', $badge)
+      . '<form class="ctl-card ctl-stack" data-market-form autocomplete="off">'
+      . '<div class="ctl-card__head"><span class="ctl-step"><span class="material-symbols-outlined" aria-hidden="true">filter_alt</span></span><div><h2>Filtros</h2><p data-market-options-status>Cargando opciones…</p></div></div>'
+      . '<div class="ctl-grid ctl-grid--4">'
+      . '<div class="ctl-field">' . $field('Ruta', $select('ruta', 'Todas las rutas')) . '<p class="ctl-route" data-market-route-info hidden></p></div>'
+      . $field('Barrio', $select('barrio'))
+      . $field('Estrato', $select('estrato'))
+      . $field('Tipo de inmueble', $select('tipo_inmueble'))
+      . $field('Categoría', $select('categoria', 'Venta y arriendo', '<option value="Venta">Venta</option><option value="Arriendo">Arriendo</option>'))
+      . $field('Destinación', $select('destinacion'))
+      . $field('Habitaciones', $select('habitaciones', 'Todas', $rooms))
+      . $field('Edad máxima (años)', '<span class="ctl-input"><input type="text" inputmode="numeric" name="edad" placeholder="Ej: 5"></span>')
+      . $field('Parqueadero', $select('parqueadero', '—', $yesNo))
+      . $field('Depósito', $select('deposito', '—', $yesNo))
+      . $field('Vigilancia', $select('vigilancia', '—', $yesNo))
+      . '</div>'
+      . '<fieldset class="ctl-checks"><legend class="ctl-label">Estado del inmueble</legend><div data-market-states></div></fieldset>'
+      . '<div class="ctl-actions"><button class="ctl-primary" type="submit" data-market-submit><span class="material-symbols-outlined" aria-hidden="true">query_stats</span>Generar estadística</button>'
+      . '<button class="ctl-ghost" type="reset" data-market-clear>Limpiar filtros</button>'
+      . '<span class="ctl-status" role="status" data-market-status></span></div>'
+      . '</form>'
+      . '<div class="ctl-results" data-market-results></div>'
+      . '<div data-market-table></div>'
+      . '</section>';
+  }
+
+  /** @param array<string,mixed> $config CleaningSettings::read */
+  private static function cleaning(bool $internal, array $config): string
+  {
+    $percent = static fn(float $value): string => rtrim(rtrim(number_format($value * 100, 2, ',', '.'), '0'), ',') . ' %';
+    $field = static fn(string $label, string $control, string $class = ''): string => '<label class="ctl-field' . ($class !== '' ? ' ' . $class : '') . '"><span class="ctl-label">' . self::e($label) . '</span>' . $control . '</label>';
+    $jornadas = '';
+    foreach (CleaningCalculator::JORNADAS as $name => $rate) $jornadas .= '<option value="' . self::e($name) . '">' . self::e($name) . ($rate > 0 ? ' (+' . $percent($rate) . ')' : '') . '</option>';
+    $distances = '';
+    foreach ((array) ($config['transporte'] ?? []) as $row) $distances .= '<option value="' . self::e((string) $row['rango']) . '">' . self::e((string) $row['rango']) . ' km</option>';
+    $levels = '';
+    $guide = '';
+    foreach (self::CLEANING_LEVELS as $level => [$name, $detail]) {
+      $levels .= '<option value="' . $level . '"' . ($level === 2 ? ' selected' : '') . '>' . $level . ' · ' . self::e($name) . ' (+' . $percent(CleaningCalculator::DIFICULTAD[$level]) . ')</option>';
+      $guide .= '<tr><th scope="row">' . $level . ' · ' . self::e($name) . '</th><td>+' . $percent(CleaningCalculator::DIFICULTAD[$level]) . '</td><td>' . self::e($detail) . '</td></tr>';
+    }
+    $workers = '';
+    foreach (CleaningCalculator::WORKERS as $key => $label) $workers .= '<option value="' . $key . '">' . self::e($label) . '</option>';
+    $pdf = static fn(string $mode, string $icon, string $label): string => '<button type="button" class="ctl-secondary" data-cleaning-pdf="' . $mode . '" disabled><span class="material-symbols-outlined" aria-hidden="true">' . $icon . '</span>' . $label . '</button>';
+    $badge = $internal ? '<span class="ctl-pill"><span class="material-symbols-outlined" aria-hidden="true">lock_open</span>Vista interna: costos y utilidades</span>' : '';
+
+    return '<section class="ctl" data-commercial-tool="calculadora_aseo">'
+      . self::hero('cleaning_services', 'Calculadora de aseo', 'Cotiza el servicio de aseo por m², jornada, distancia y dificultad. Las tarifas y márgenes se ajustan en <strong>Configuración › Calculadora de aseo</strong>.', $badge)
+      . '<div class="ctl-layout ctl-layout--even">'
+      . '<form class="ctl-card ctl-stack" data-cleaning-form autocomplete="off">'
+      . '<div class="ctl-card__head"><span class="ctl-step">1</span><div><h2>Datos del servicio</h2><p>El cliente y la dirección solo salen en el PDF.</p></div></div>'
+      . '<div class="ctl-grid">'
+      . $field('Metros cuadrados', '<span class="ctl-input"><input type="text" inputmode="decimal" name="m2" value="60" required><em>m²</em></span>')
+      . $field('Jornada', '<span class="ctl-input"><select name="jornada">' . $jornadas . '</select></span>')
+      . $field('Distancia', '<span class="ctl-input"><select name="distancia">' . $distances . '</select></span>')
+      . $field('Grado de dificultad', '<span class="ctl-input"><select name="dificultad" data-cleaning-level>' . $levels . '</select></span>')
+      . $field('Tipo de trabajador', '<span class="ctl-input"><select name="trabajador">' . $workers . '</select></span>', 'ctl-full')
+      . $field('Cliente (opcional)', '<span class="ctl-input"><input type="text" name="cliente" maxlength="120" placeholder="Nombre del cliente"></span>')
+      . $field('Inmueble / dirección (opcional)', '<span class="ctl-input"><input type="text" name="direccion" maxlength="160" placeholder="Dirección del servicio"></span>')
+      . '</div>'
+      . '<p class="ctl-alert" data-cleaning-protocol role="alert" hidden><strong>Protocolo de seguridad:</strong> los grados 4, 5 y 6 requieren visita técnica previa o registro fotográfico detallado antes de confirmar el servicio.</p>'
+      . '<details class="ctl-details"><summary>Guía de grados de dificultad</summary><table class="ctl-table"><tbody>' . $guide . '</tbody></table></details>'
+      . '<div class="ctl-actions"><button class="ctl-primary" type="submit" data-cleaning-submit><span class="material-symbols-outlined" aria-hidden="true">calculate</span>Calcular costo</button>'
+      . '<span class="ctl-status" role="status" data-cleaning-status></span></div>'
+      . '</form>'
+      . '<section class="ctl-card ctl-stack">'
+      . '<div class="ctl-card__head ctl-card__head--split"><div><h2>Resultado</h2><p>Calcula para habilitar los PDF.</p></div>'
+      . '<div class="ctl-actions">' . $pdf('cliente', 'picture_as_pdf', 'PDF cliente')
+      . ($internal ? $pdf('inmobiliaria', 'analytics', 'PDF inmobiliaria') . $pdf('funcionario', 'badge', 'PDF funcionario') : '')
+      . '</div></div>'
+      . '<div data-cleaning-result><div class="ctl-empty"><span class="material-symbols-outlined" aria-hidden="true">receipt_long</span><p>Ingresa los datos y calcula para ver el valor del servicio.</p></div></div>'
+      . '</section></div></section>';
   }
 }

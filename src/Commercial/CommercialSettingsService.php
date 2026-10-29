@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SCM\Commercial;
 
+use SCM\Commercial\Tools\CleaningSettings;
 use SCM\Core\Auth;
 use SCM\Core\Database;
 use SCM\Core\Settings;
@@ -12,7 +13,7 @@ use SCM\Support\SchemaInspector;
 /**
  * Menú "Configuración" del panel comercial: lee y guarda cada sección configurable.
  * Los valores que también usan otras aplicaciones (SLA de tareas, plazos y valores de avisos,
- * cupos de destacados) se guardan en su fila de `jet_cct_confi_sistema` para mantener una sola fuente.
+ * cupos de destacados, calculadora de aseo) se guardan en su fila de `jet_cct_confi_sistema` para mantener una sola fuente.
  */
 final class CommercialSettingsService
 {
@@ -36,7 +37,7 @@ final class CommercialSettingsService
     'factor_prestacional' => ['Factor prestacional', 0, 0, 100],
   ];
 
-  public const SECTIONS = ['calendario', 'tiempos', 'avisos', 'actualizaciones', 'destacados'];
+  public const SECTIONS = ['calendario', 'tiempos', 'avisos', 'actualizaciones', 'destacados', 'aseo'];
 
   private Database $db;
   private Settings $settings;
@@ -89,6 +90,7 @@ final class CommercialSettingsService
       'avisos' => ['values' => $signs],
       'actualizaciones' => ['limits' => self::propertyUpdateLimits($this->settings)],
       'destacados' => ['portals' => $highlights],
+      'aseo' => $this->cleaningSettings(),
     ];
   }
 
@@ -110,6 +112,10 @@ final class CommercialSettingsService
         return $this->savePropertyUpdates($data);
       case 'destacados':
         return $this->saveHighlights($data);
+      case 'aseo':
+        // Mismas filas que la calculadora de aseo del panel inmobiliario y el plugin de WordPress.
+        (new CleaningSettings($this->db))->save($data, trim(Auth::employeeId()));
+        return 'Configuración de la calculadora de aseo guardada.';
     }
     throw new \InvalidArgumentException('Sección de configuración no válida.');
   }
@@ -136,6 +142,21 @@ final class CommercialSettingsService
       $limits[$type] = ['alerta' => $warning, 'vencido' => $due];
     }
     return $limits;
+  }
+
+  /**
+   * Variables (los porcentajes en %, como se escriben) y tablas de la calculadora de aseo.
+   * @return array{globals:list<array{key:string,label:string,percent:bool,value:float}>,insumos:array<int,mixed>,transporte:array<int,mixed>,tramos:array<int,mixed>}
+   */
+  private function cleaningSettings(): array
+  {
+    $config = (new CleaningSettings($this->db))->read();
+    $globals = [];
+    foreach (CleaningSettings::GLOBALS as $key => [$label, , $percent]) {
+      $value = (float) ($config[$key] ?? 0);
+      $globals[] = ['key' => $key, 'label' => $label, 'percent' => $percent, 'value' => $percent ? round($value * 100, 4) : $value];
+    }
+    return ['globals' => $globals, 'insumos' => $config['insumos'], 'transporte' => $config['transporte'], 'tramos' => $config['tramos']];
   }
 
   /** @param array<string,mixed> $data */

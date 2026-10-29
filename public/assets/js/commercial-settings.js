@@ -1,6 +1,6 @@
 /*
  * Menú "Configuración" del encabezado comercial. Cada opción abre un popup con su sección:
- * calendario, tiempos de atención, avisos, actualizaciones de inmuebles y cupos de destacados.
+ * calendario, tiempos de atención, avisos, actualizaciones de inmuebles, cupos de destacados y calculadora de aseo.
  * Permisos reutiliza su modal existente.
  */
 (function () {
@@ -210,6 +210,68 @@
         return { portals: portals };
       },
     },
+    aseo: {
+      title: "Calculadora de aseo",
+      html: function (settings) {
+        var hints = {
+          salario: "Valor compartido: también lo usan actas, reportes administrativos y revisiones.",
+          factor_prestacional: "Compartido con Avisos en fachada. Divide la mano de obra para el costo real del funcionario.",
+          valor_pasaje_trans: "El auxilio del trabajador es el 50 % de dos pasajes.",
+        };
+        var globals = (settings.globals || []).map(function (row) {
+          return '<label class="block text-left"><span class="block text-xs font-semibold text-slate-700 mb-1">' + esc(row.label) + (row.percent ? " (%)" : "") + "</span>" +
+            '<input class="w-full px-2 py-1.5 rounded-lg border border-slate-300 text-sm" type="text" inputmode="decimal" name="' + esc(row.key) + '" value="' + esc(String(row.value).replace(".", ",")) + '" data-cleaning-global required>' +
+            (hints[row.key] || row.percent ? '<span class="block text-[11px] text-slate-500 mt-1">' + esc(hints[row.key] || "En porcentaje (19 = 19 %).") + "</span>" : "") + "</label>";
+        }).join("");
+        function table(key, title, note, columns) {
+          function line(row) {
+            return "<tr data-cleaning-row>" + columns.map(function (column) {
+              var value = row[column[1]] == null ? "" : String(row[column[1]]);
+              return '<td class="py-1 px-1"><input class="w-full px-2 py-1 rounded-lg border border-slate-300 text-sm" type="text"' + (column[2] ? ' inputmode="decimal"' : "") + ' data-field="' + column[1] + '" value="' + esc(column[2] ? value.replace(".", ",") : value) + '"></td>';
+            }).join("") + '<td class="py-1 px-1 text-right"><button type="button" class="px-2 py-1 rounded-lg text-rose-700 hover:bg-rose-50 text-xs font-semibold" data-cleaning-remove-row aria-label="Quitar fila">Quitar</button></td></tr>';
+          }
+          var empty = {};
+          return '<section class="text-left" data-cleaning-table="' + key + '"><div class="flex flex-wrap items-center justify-between gap-2 mb-1"><div><h4 class="text-sm font-bold text-slate-800">' + esc(title) + '</h4><p class="text-[11px] text-slate-500">' + esc(note) + "</p></div>" +
+            '<button type="button" class="px-3 py-1 rounded-lg bg-slate-100 text-xs font-semibold" data-cleaning-add-row>Agregar fila</button></div>' +
+            '<div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-200">' +
+            columns.map(function (column) { return '<th class="py-2 px-1 text-left">' + esc(column[0]) + "</th>"; }).join("") + "<th></th></tr></thead><tbody>" +
+            (settings[key] || []).map(line).join("") + "</tbody></table></div><template data-cleaning-row-template>" + line(empty) + "</template></section>";
+        }
+        return '<form data-config-form class="text-left space-y-5">' +
+          intro("Tarifas y márgenes de la calculadora de aseo. Se guardan en la misma configuración que usan el panel inmobiliario y el plugin de WordPress.") +
+          '<section><h4 class="text-sm font-bold text-slate-800 mb-2">Variables globales</h4><div class="grid grid-cols-1 sm:grid-cols-2 gap-3">' + globals + "</div></section>" +
+          table("insumos", "Insumos", "Costo por unidad y consumo por m².", [["Nombre", "nombre", false], ["Unidad", "unidad", false], ["Costo", "costo", true], ["Consumo / m²", "consumo", true]]) +
+          table("transporte", "Tarifas de transporte", "Valor por trayecto: con funcionario se cobra ida y regreso (×2).", [["Rango (km)", "rango", false], ["Valor por trayecto", "valor", true]]) +
+          table("tramos", "Tramos de m² y horas", 'Cada área usa el primer tramo cuyo "hasta" la cubre; por encima del último se suma 1 hora cada 50 m².', [["Desde (m²)", "desde", true], ["Hasta (m²)", "hasta", true], ["Horas", "horas", true]]) +
+          "</form>";
+      },
+      bind: function (popup) {
+        popup.addEventListener("click", function (event) {
+          var add = event.target.closest("[data-cleaning-add-row]");
+          if (add) {
+            var box = add.closest("[data-cleaning-table]");
+            box.querySelector("tbody").insertAdjacentHTML("beforeend", box.querySelector("[data-cleaning-row-template]").innerHTML);
+            return;
+          }
+          var remove = event.target.closest("[data-cleaning-remove-row]");
+          if (remove) remove.closest("tr").remove();
+        });
+      },
+      collect: function (form) {
+        var data = {};
+        form.querySelectorAll("[data-cleaning-global]").forEach(function (input) { data[input.name] = input.value; });
+        form.querySelectorAll("[data-cleaning-table]").forEach(function (box) {
+          var key = box.getAttribute("data-cleaning-table");
+          data[key] = Array.prototype.map.call(box.querySelectorAll("tbody [data-cleaning-row]"), function (row) {
+            var item = {};
+            row.querySelectorAll("[data-field]").forEach(function (input) { item[input.getAttribute("data-field")] = input.value; });
+            return item;
+          });
+          if (!data[key].length) throw new Error("Agrega al menos una fila en " + box.querySelector("h4").textContent + ".");
+        });
+        return data;
+      },
+    },
   };
 
   function openSection(key) {
@@ -236,6 +298,7 @@
               popup.querySelectorAll('[name="' + button.getAttribute("data-toggle-all") + '"]').forEach(function (input) { input.checked = value; });
             });
           });
+          if (section.bind) section.bind(popup);
         },
         preConfirm: function () {
           var form = window.Swal.getPopup().querySelector("[data-config-form]");

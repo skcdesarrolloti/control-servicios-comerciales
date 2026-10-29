@@ -115,6 +115,7 @@ final class CommercialDashboardController
       'sign_service' => $bucket === 'anadir_aviso' ? new \SCM\Commercial\CommercialSignService($this->db, $policy, $this->config) : null,
       'tools_service' => $bucket === 'herramientas' ? new \SCM\Commercial\CommercialOwnerPreapprovalService($this->db, $policy) : null,
       'tools_view' => $bucket === 'herramientas' ? (string) ($input['herramienta'] ?? '') : '',
+      'tools_context' => $bucket === 'herramientas' ? \SCM\Views\CommercialToolsView::context((string) ($input['herramienta'] ?? ''), $policy, $this->db) : [],
       'visible_views' => $visibleViews,
       'ticket_employees' => $ticketEmployees,
       'commercial_employee_cargos' => $commercialEmployeeCargos,

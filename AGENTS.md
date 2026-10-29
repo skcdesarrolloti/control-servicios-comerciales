@@ -5,6 +5,13 @@
 - Los valores que comparten otras aplicaciones (SLA de tareas `control_tickets_sla_config`, plazos y valores de avisos, cupos de destacados) se guardan en su fila de `wp_jet_cct_confi_sistema`; la configuración propia del panel va en `Settings` (`control_servicios_comerciales_config`).
 - No cambiar `estado_administrativo` de las tareas salvo que el usuario lo pida. La API del calendario reescribe `estado_comercial` y `estado_administrativo` al vincular un evento a una tarea, así que siempre se envían los valores actuales.
 - El calendario comercial reutiliza el motor de `admin-dashboard-runtime.js` y la API de `calendario-actividades`; mantener el comportamiento alineado con el panel administrativo (`control-servicios-inmobiliarios`) y adaptar solo el contenido comercial.
+- Al traer una herramienta o vista de `control-servicios-inmobiliarios`, copiar su lógica con una nota del archivo de origen (para mantener ambas iguales), adaptarla al diseño comercial y completar siempre, sin que el usuario lo pida:
+  - permiso de pestaña: subpestaña en `CommercialAccessPolicy::SUBVIEWS` (o vista en `VIEWS` y su grupo en `VIEW_GROUPS`; si muestra datos de funcionarios, su alcance en `SCOPED_VIEWS`);
+  - permisos de acción: lo sensible (costos, márgenes, datos completos) como acción en `ACTIONS` + `OPT_IN_ACTIONS` y en `PERMISSION_ACTION_GROUPS`, y validarlo también en el servidor;
+  - navegación: entrada en el menú de escritorio de `renderTabs` (el móvil sale de `SUBVIEWS`) y `topTabFor` en `commercial-dashboard.js`;
+  - endpoints en `CommercialActionRouter` que validen `canSubview`/`canView`/`canAct` y no envíen al navegador datos que el cargo no puede ver;
+  - su configuración como sección del menú **Configuración**, guardando los valores compartidos en las mismas filas que usa el panel inmobiliario;
+  - pruebas PHPUnit (cálculo, permisos y vista).
 - Las notificaciones nuevas deben ser configurables cuando aplique y encolarse mediante `shared-notifications`; evitar envíos directos o destinatarios quemados en código.
 - En los modales del panel, preferir popups internos y conservar el contexto de la tarea; evitar abrir pestañas nuevas si la acción puede resolverse dentro de la app.
 - En registros CCT creados o modificados por funcionarios, `cct_author_id` debe guardar el `id_empleado` real de `wp_jet_cct_funcionarios`, no el `_ID` interno de la sesión.
