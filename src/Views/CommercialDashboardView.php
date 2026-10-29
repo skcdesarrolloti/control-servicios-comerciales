@@ -56,7 +56,7 @@ final class CommercialDashboardView
   <meta charset="utf-8">
   <meta content="width=device-width, initial-scale=1.0" name="viewport">
   <meta content="web_standard" name="shell-type">
-  <title><?php echo $bucket === 'sin_acceso' ? 'Acceso denegado' : 'Control Operativo de Tareas Comerciales'; ?> · SuCasa Inmobiliaria</title>
+  <title><?php echo $bucket === 'sin_acceso' ? 'Acceso denegado' : 'Dashboard comercial'; ?> · SKC SuCasa Inmobiliaria</title>
   <link rel="icon" href="<?php echo esc_url(system_image('portal_favicon_url', SCM_DEFAULT_PORTAL_FAVICON_URL)); ?>" sizes="32x32">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
