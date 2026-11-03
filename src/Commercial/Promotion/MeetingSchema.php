@@ -16,7 +16,7 @@ use SCM\Core\Settings;
  */
 final class MeetingSchema
 {
-  public const VERSION = 1;
+  public const VERSION = 2;
   public const SETTING = 'promotion_meetings_schema';
 
   /** Columnas agregadas por el panel comercial (borrado lógico con rastro). El legado no las conoce: todas anulables. */
@@ -25,6 +25,15 @@ final class MeetingSchema
     'deleted_by' => 'BIGINT NULL DEFAULT NULL',
     'deleted_by_name' => 'VARCHAR(191) NULL DEFAULT NULL',
     'deleted_status' => 'VARCHAR(24) NULL DEFAULT NULL',
+  ];
+
+  /**
+   * Columnas agregadas a los puntos (versión 2). Al eliminar una reunión sus puntos activos quedan con active = 0 para
+   * que el legado deje de contarlos (su indicador de cumplimiento no cruza con la reunión); deleted_at distingue esos
+   * puntos de los que ya se habían archivado uno a uno.
+   */
+  public const ADDED_ITEM_COLUMNS = [
+    'deleted_at' => 'DATETIME NULL DEFAULT NULL',
   ];
 
   /** @var \WeakMap<Database,bool>|null Conexiones ya revisadas en este proceso. */
@@ -41,17 +50,18 @@ final class MeetingSchema
     foreach ($sqlite ? self::sqliteTables($db) : self::mysqlTables($db) as $query) {
       $db->pdo()->exec($query);
     }
-    $meetings = $db->table('marketing_meetings');
-    foreach (self::ADDED_COLUMNS as $column => $definition) {
-      if (self::hasColumn($db, $meetings, $column)) {
-        continue;
-      }
-      try {
-        $db->pdo()->exec("ALTER TABLE `{$meetings}` ADD COLUMN `{$column}` " . ($sqlite ? self::sqliteType($definition) : $definition));
-      } catch (\PDOException $exception) {
-        // Otra petición pudo agregar la misma columna al mismo tiempo.
-        if (!self::hasColumn($db, $meetings, $column)) {
-          throw $exception;
+    foreach ([[$db->table('marketing_meetings'), self::ADDED_COLUMNS], [$db->table('marketing_meeting_items'), self::ADDED_ITEM_COLUMNS]] as [$table, $columns]) {
+      foreach ($columns as $column => $definition) {
+        if (self::hasColumn($db, $table, $column)) {
+          continue;
+        }
+        try {
+          $db->pdo()->exec("ALTER TABLE `{$table}` ADD COLUMN `{$column}` " . ($sqlite ? self::sqliteType($definition) : $definition));
+        } catch (\PDOException $exception) {
+          // Otra petición pudo agregar la misma columna al mismo tiempo.
+          if (!self::hasColumn($db, $table, $column)) {
+            throw $exception;
+          }
         }
       }
     }

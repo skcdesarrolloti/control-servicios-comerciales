@@ -263,6 +263,10 @@ final class MeetingRepository
    * muestre entre las activas ni la use como reunión anterior; su estado previo queda en deleted_status. Se libera
    * carried_from_meeting_id (único) para que la siguiente reunión pueda volver a traer los pendientes, como hacía el
    * borrado definitivo del original; los puntos copiados conservan su carried_from_item_id.
+   *
+   * Sus puntos activos pasan a active = 0 con deleted_at: dashboard-marketing cuenta las acciones sin cruzar con la
+   * reunión (indicador de cumplimiento, totales de la lista y detalle), y así deja de sumarlas como hacía el borrado
+   * definitivo. Los puntos ya archivados uno a uno quedan sin deleted_at. Debe llamarse dentro de una transacción.
    * @param array{id:int|null,name:string} $user
    */
   public function markDeleted(int $meetingId, array $user, string $now): bool
@@ -271,6 +275,13 @@ final class MeetingRepository
     if ($meeting === [] || !empty($meeting['deleted_at'])) {
       return false;
     }
+    $this->db->update($this->items, [
+      'active' => 0,
+      'deleted_at' => $now,
+      'updated_by' => $user['id'],
+      'updated_by_name' => $user['name'],
+      'updated_at' => $now,
+    ], ['meeting_id' => $meetingId, 'active' => 1]);
     return $this->db->update($this->meetings, [
       'deleted_at' => $now,
       'deleted_by' => $user['id'],

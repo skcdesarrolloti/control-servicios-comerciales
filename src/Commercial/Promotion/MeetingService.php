@@ -323,13 +323,19 @@ final class MeetingService
     $this->transitionMeeting($meetingId, ['status' => 'archived', 'archived_at' => date('Y-m-d H:i:s')]);
   }
 
-  /** Borrado lógico: la reunión deja de verse, pero sus puntos, acciones e historial quedan con quién la eliminó y cuándo. */
+  /**
+   * Borrado lógico: la reunión deja de verse, pero sus puntos, acciones e historial quedan con quién la eliminó y cuándo.
+   * Sus puntos se desactivan en la misma transacción para que dashboard-marketing tampoco los cuente.
+   */
   public function delete(int $meetingId): void
   {
     $this->requireMeeting($meetingId);
-    if (!$this->repo->markDeleted($meetingId, $this->userSnapshot(), date('Y-m-d H:i:s'))) {
-      throw new \RuntimeException('La reunión no pudo eliminarse.');
-    }
+    $user = $this->userSnapshot();
+    $this->transaction(function () use ($meetingId, $user): void {
+      if (!$this->repo->markDeleted($meetingId, $user, date('Y-m-d H:i:s'))) {
+        throw new \RuntimeException('La reunión no pudo eliminarse.');
+      }
+    });
   }
 
   /** @param array<string,mixed> $changes */

@@ -183,6 +183,9 @@ final class CommercialPromotionMeetingsTest extends TestCase
     foreach (array_keys(MeetingSchema::ADDED_COLUMNS) as $column) {
       self::assertTrue(MeetingSchema::hasColumn($db, 'wp_marketing_meetings', $column), $column);
     }
+    foreach (array_keys(MeetingSchema::ADDED_ITEM_COLUMNS) as $column) {
+      self::assertTrue(MeetingSchema::hasColumn($db, 'wp_marketing_meeting_items', $column), $column);
+    }
     self::assertSame(MeetingSchema::VERSION, $settings->get(MeetingSchema::SETTING));
     $legacy = $db->getRow("SELECT * FROM wp_marketing_meetings WHERE title = 'Del legado'");
     self::assertSame('completed', $legacy['status']);
@@ -279,7 +282,17 @@ final class CommercialPromotionMeetingsTest extends TestCase
     }
 
     // Eliminar es lógico y deja el rastro; libera el arrastre para la siguiente reunión.
+    $archivedBefore = (int) $carried[1]['id'];
+    $service->archiveItem($archivedBefore);
+    // Consulta del indicador de cumplimiento de dashboard-marketing (app/MeetingRepository.php), que no cruza con la reunión.
+    $legacyActions = fn(): int => (int) $this->db->getVar("SELECT COUNT(*) FROM wp_marketing_meeting_items WHERE active = 1 AND section = 'action' AND meeting_id = ?", [$second]);
+    self::assertSame(1, $legacyActions());
     $service->delete($second);
+    self::assertSame(0, $legacyActions(), 'El legado deja de contar las acciones de la reunión eliminada.');
+    $deletedItem = $this->row('marketing_meeting_items', (int) $carried[0]['id']);
+    self::assertSame(0, (int) $deletedItem['active']);
+    self::assertNotNull($deletedItem['deleted_at']);
+    self::assertNull($this->row('marketing_meeting_items', $archivedBefore)['deleted_at'], 'El punto archivado antes no se marca como eliminado con la reunión.');
     self::assertSame([], $this->service()->find($second));
     $deleted = $this->row('marketing_meetings', $second);
     self::assertNotNull($deleted['deleted_at']);
