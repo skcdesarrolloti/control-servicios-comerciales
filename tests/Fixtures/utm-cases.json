@@ -9,7 +9,10 @@
     ["WhatsApp", "whatsapp"],
     ["ÑANDÚ Ç", "nandu_c"],
     ["¿?¡!", ""],
-    ["campaña 🚀 lanzamiento", "campana_lanzamiento"]
+    ["campaña 🚀 lanzamiento", "campana_lanzamiento"],
+    ["Medelli\u0301n", "medellin"],
+    ["Ma\u0303n\u0303ana Nin\u0303o", "manana_nino"],
+    ["\u00a0Feria\u3000Vivienda\ufeff", "feria_vivienda"]
   ],
   "build": [
     {
@@ -43,6 +46,34 @@
     { "url": "ftp://sucasa.com", "values": { "source": "a", "medium": "b", "campaign": "c" }, "error": "La URL de destino no es válida: debe ser una página web (https://…)." },
     { "url": "https://sucasa.com", "values": { "source": "a", "medium": "", "campaign": "c" }, "error": "Falta el medio del enlace." },
     { "url": "https://sucasa.com", "values": { "source": "a", "medium": "b", "campaign": "" }, "error": "Falta la campaña del enlace." },
-    { "url": "https://sucasa.com", "values": { "source": "a", "medium": "b", "campaign": "c", "content": "¡¡!!" }, "error": "El valor de utm_content debe tener letras o números." }
+    { "url": "https://sucasa.com", "values": { "source": "a", "medium": "b", "campaign": "c", "content": "¡¡!!" }, "error": "El valor de utm_content debe tener letras o números." },
+    {
+      "url": "\u00a0https://a.com/x",
+      "values": { "source": "fb", "medium": "wa", "campaign": "c1", "content": "\u00a0", "term": "\u3000" },
+      "expected": "https://a.com/x?utm_source=fb&utm_medium=wa&utm_campaign=c1"
+    },
+    {
+      "url": "https://a.com/x\u3000",
+      "values": { "source": "Medelli\u0301n", "medium": "wa", "campaign": "c1" },
+      "expected": "https://a.com/x?utm_source=medellin&utm_medium=wa&utm_campaign=c1"
+    },
+    { "url": "https://sucasa.com", "values": { "source": "fb", "medium": "wa", "campaign": "General" }, "error": "\"general\" lo usa el tracker para las visitas sin campaña: elige otro nombre de campaña." },
+    { "url": "https://sucasa.com", "values": { "source": "fb", "medium": "wa", "campaign": "inmueble view" }, "error": "\"inmueble_view\" lo usa el tracker para las visitas sin campaña: elige otro nombre de campaña." },
+    {
+      "url": "https://sucasainmobiliaria.com.co",
+      "values": { "source": "Revista Impresa", "medium": "whatsapp", "campaign": " Revista Esencia ", "content": "Promo (Junio)!*'~", "term": "año" },
+      "verbatim": ["source", "campaign", "content"],
+      "expected": "https://sucasainmobiliaria.com.co/?utm_source=Revista%20Impresa&utm_medium=whatsapp&utm_campaign=Revista%20Esencia&utm_content=Promo%20%28Junio%29%21%2A%27~&utm_term=ano"
+    },
+    {
+      "url": "https://sucasainmobiliaria.com.co/",
+      "values": { "source": "Cañaveral Ñ", "medium": "whatsapp", "campaign": "feria" },
+      "verbatim": ["source"],
+      "expected": "https://sucasainmobiliaria.com.co/?utm_source=Ca%C3%B1averal%20%C3%91&utm_medium=whatsapp&utm_campaign=feria"
+    },
+    { "url": "https://sucasa.com", "values": { "source": "fb", "medium": "wa", "campaign": "GENERAL" }, "verbatim": ["campaign"], "error": "\"GENERAL\" lo usa el tracker para las visitas sin campaña: elige otro nombre de campaña." },
+    { "url": "https://sucasa.com", "values": { "source": "fb", "medium": "wa", "campaign": "a\tb" }, "verbatim": ["campaign"], "error": "El valor de utm_campaign no puede tener saltos de línea ni caracteres de control." },
+    { "url": "https://sucasa.com", "values": { "source": "fb", "medium": "wa", "campaign": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }, "verbatim": ["campaign"], "error": "El valor de utm_campaign supera 120 caracteres." },
+    { "url": "https://sucasa.com", "values": { "source": "\u00a0", "medium": "wa", "campaign": "c" }, "verbatim": ["source"], "error": "Falta la fuente del enlace." }
   ]
 }

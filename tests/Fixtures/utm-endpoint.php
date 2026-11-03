@@ -19,7 +19,7 @@ $db = Tests\Fixtures\CommercialOwnerContractsDatabase::create();
 if (($argv[2] ?? '') !== 'sin_tracker') {
   $db->pdo()->exec('CREATE TABLE wp_jet_cct_tracker_logs (_ID INTEGER PRIMARY KEY AUTOINCREMENT, camp_slug TEXT, utm_source TEXT, utm_medium TEXT, ip_address TEXT, url TEXT)');
   $db->pdo()->exec('CREATE TABLE wp_jet_cct_tracker_camps (_ID INTEGER PRIMARY KEY AUTOINCREMENT, slug TEXT, nombre TEXT)');
-  foreach ([['feria_vivienda', 'Facebook', 'Redes Sociales'], ['general', 'Directo', 'Navegador'], ['event_click', 'Google', 'cpc'], ['Revista Esencia', 'instagram', 'whatsapp']] as [$camp, $source, $medium]) {
+  foreach ([['feria_vivienda', 'Facebook', 'Redes Sociales'], ['general', 'Directo', 'Navegador'], ['event_click', 'Google', 'cpc'], ['Revista Esencia', 'instagram', 'whatsapp'], ['inmueble_view', 'Inmuebles', 'Pagina Web'], ['General', 'Revista Impresa', 'Volante']] as [$camp, $source, $medium]) {
     $db->insert('wp_jet_cct_tracker_logs', ['camp_slug' => $camp, 'utm_source' => $source, 'utm_medium' => $medium, 'ip_address' => '10.0.0.1', 'url' => 'https://x.test/?secreto=1']);
   }
   $db->insert('wp_jet_cct_tracker_camps', ['slug' => 'feria_vivienda', 'nombre' => 'Feria de vivienda']);

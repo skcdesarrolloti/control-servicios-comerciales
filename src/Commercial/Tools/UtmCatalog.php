@@ -27,7 +27,7 @@ final class UtmCatalog
   public const MAX_LABEL = 60;
 
   /** Slugs que el tracker usa para el tráfico sin campaña: no pueden ser el nombre de una campaña. */
-  public const RESERVED_CAMPAIGNS = ['general', 'inmueble_view', 'event_click'];
+  public const RESERVED_CAMPAIGNS = UtmLinkBuilder::RESERVED_CAMPAIGNS;
 
   /** Opciones por defecto de dashboard-marketing (UTM_DEFAULTS) mientras no se guarde el catálogo. */
   private const DEFAULTS = [
@@ -124,7 +124,7 @@ final class UtmCatalog
           throw new \InvalidArgumentException('En ' . $title . ', "' . $source . '" debe tener letras o números.');
         }
         if ($list === 'campanas' && in_array($value, self::RESERVED_CAMPAIGNS, true)) {
-          throw new \InvalidArgumentException('"' . $value . '" lo usa el tracker para las visitas sin campaña: elige otro nombre de campaña.');
+          throw new \InvalidArgumentException(UtmLinkBuilder::reservedMessage($value));
         }
       } catch (\InvalidArgumentException $exception) {
         if ($strict) {

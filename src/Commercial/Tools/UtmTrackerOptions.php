@@ -16,7 +16,16 @@ final class UtmTrackerOptions
 {
   /** Segundos que se reutiliza el resultado en la sesión (el legado cacheaba 15 minutos). */
   private const CACHE_TTL = 900;
-  private const CACHE_KEY = 'scm_utm_tracker_options';
+  private const CACHE_KEY = 'scm_utm_tracker_options_v2';
+
+  /**
+   * Valores que el tracker (dashboard-marketing app/TrackerRepository.php) escribe en las visitas sin UTM: no se sugieren,
+   * porque un enlace con ellos se mezcla con el tráfico directo o de la página. Se comparan sin distinguir mayúsculas.
+   */
+  public const TRACKER_DEFAULTS = [
+    'sources' => ['directo', 'inmuebles'],
+    'mediums' => ['navegador', 'pagina web'],
+  ];
 
   /** @var array<string,bool> */
   private array $exists = [];
@@ -35,8 +44,8 @@ final class UtmTrackerOptions
     $logs = $this->db->table('jet_cct_tracker_logs');
     $camps = $this->db->table('jet_cct_tracker_camps');
     $data = [
-      'sources' => $this->distinct($logs, 'utm_source', 200),
-      'mediums' => $this->distinct($logs, 'utm_medium', 200),
+      'sources' => self::without($this->distinct($logs, 'utm_source', 200), self::TRACKER_DEFAULTS['sources']),
+      'mediums' => self::without($this->distinct($logs, 'utm_medium', 200), self::TRACKER_DEFAULTS['mediums']),
       'campaigns' => [],
     ];
     $campaigns = [];
@@ -53,14 +62,21 @@ final class UtmTrackerOptions
     foreach ($this->distinct($logs, 'camp_slug', 300) as $slug) {
       $campaigns[$slug] ??= ['value' => $slug, 'label' => $slug];
     }
-    foreach (UtmCatalog::RESERVED_CAMPAIGNS as $reserved) {
-      unset($campaigns[$reserved]);
-    }
-    $data['campaigns'] = array_values($campaigns);
+    $data['campaigns'] = array_values(array_filter($campaigns, static fn(array $item): bool => !in_array(mb_strtolower($item['value'], 'UTF-8'), UtmLinkBuilder::RESERVED_CAMPAIGNS, true)));
     if ($useCache) {
       $_SESSION[self::CACHE_KEY] = ['expires' => time() + self::CACHE_TTL, 'data' => $data];
     }
     return $data;
+  }
+
+  /**
+   * @param list<string> $values
+   * @param list<string> $excluded En minúsculas.
+   * @return list<string>
+   */
+  private static function without(array $values, array $excluded): array
+  {
+    return array_values(array_filter($values, static fn(string $value): bool => !in_array(mb_strtolower($value, 'UTF-8'), $excluded, true)));
   }
 
   /** @return list<string> */

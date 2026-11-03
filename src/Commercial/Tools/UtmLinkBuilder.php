@@ -10,8 +10,9 @@ namespace SCM\Commercial\Tools;
  * escriben, utm_content y utm_term.
  *
  * Diferencias con el original: los valores se normalizan como slug (minúsculas, sin tildes ni espacios) para que el
- * tracker no parta una misma campaña en variantes, y la URL se arma como texto para respetar la consulta y el #fragmento
- * que ya traiga. public/assets/js/commercial-utm.js repite este algoritmo; los dos se prueban con
+ * tracker no parta una misma campaña en variantes (salvo los que ya registró el tracker, que van tal cual como en el
+ * original), las campañas reservadas del tracker se rechazan, y la URL se arma como texto para respetar la consulta y el
+ * #fragmento que ya traiga. public/assets/js/commercial-utm.js repite este algoritmo; los dos se prueban con
  * tests/Fixtures/utm-cases.json (PHPUnit y tools/check-commercial-tools.cjs).
  */
 final class UtmLinkBuilder
@@ -34,6 +35,18 @@ final class UtmLinkBuilder
   /** Bytes (UTF-8) máximos de la URL de destino. */
   public const MAX_URL_LENGTH = 2000;
 
+  /**
+   * Campañas que el tracker de dashboard-marketing (app/TrackerRepository.php, ensureCampaign) usa para el tráfico sin
+   * campaña: un enlace con una de ellas pierde su atribución.
+   */
+  public const RESERVED_CAMPAIGNS = ['general', 'inmueble_view', 'event_click'];
+
+  /** Caracteres que guarda el tracker por valor (TrackerRepository::text): un valor suyo se envía tal cual hasta ese largo. */
+  public const MAX_RAW_LENGTH = 120;
+
+  /** Los mismos espacios que quita String.prototype.trim() en JS, para que PHP y commercial-utm.js recorten igual. */
+  private const SPACES = '\x{0009}-\x{000D}\x{0020}\x{00A0}\x{1680}\x{2000}-\x{200A}\x{2028}\x{2029}\x{202F}\x{205F}\x{3000}\x{FEFF}';
+
   /** Letras con tilde que se cambian por su letra base; el resto de caracteres no alfanuméricos separa palabras. */
   private const ACCENTS = [
     'á' => 'a', 'à' => 'a', 'ä' => 'a', 'â' => 'a', 'ã' => 'a', 'Á' => 'a', 'À' => 'a', 'Ä' => 'a', 'Â' => 'a', 'Ã' => 'a',
@@ -50,6 +63,8 @@ final class UtmLinkBuilder
    */
   public static function slug(string $value): string
   {
+    // Las tildes que llegan separadas de su letra (texto en NFD, copiado de macOS o de un PDF) se quitan antes.
+    $value = preg_replace('/[\x{0300}-\x{036F}]+/u', '', $value) ?? $value;
     $value = strtolower(strtr($value, self::ACCENTS));
     $value = (string) preg_replace('/[^a-z0-9-]+/', '_', $value);
     $value = (string) preg_replace('/[-_]*-[-_]*/', '-', $value);
@@ -57,13 +72,26 @@ final class UtmLinkBuilder
     return trim(substr($value, 0, self::MAX_LENGTH), '-_');
   }
 
+  /** Quita los espacios del inicio y del final, incluidos los Unicode (espacio duro, U+3000, BOM). */
+  public static function trimText(string $value): string
+  {
+    return preg_replace('/^[' . self::SPACES . ']+|[' . self::SPACES . ']+$/u', '', $value) ?? trim($value);
+  }
+
+  public static function reservedMessage(string $value): string
+  {
+    return '"' . $value . '" lo usa el tracker para las visitas sin campaña: elige otro nombre de campaña.';
+  }
+
   /**
    * @param array<string,string> $values Claves de PARAMS; se normalizan con slug().
+   * @param list<string> $verbatim Campos (claves de PARAMS) que se envían tal cual porque ya los registró el tracker:
+   *   así el enlace suma a la misma campaña, fuente o medio en lugar de crear una variante normalizada.
    * @throws \InvalidArgumentException Con el mensaje para el funcionario.
    */
-  public static function build(string $url, array $values): string
+  public static function build(string $url, array $values, array $verbatim = []): string
   {
-    $url = trim($url);
+    $url = self::trimText($url);
     if ($url === '') {
       throw new \InvalidArgumentException('Escribe la URL de destino.');
     }
@@ -82,16 +110,24 @@ final class UtmLinkBuilder
 
     $params = [];
     foreach (self::PARAMS as $field => $param) {
-      $raw = trim((string) ($values[$field] ?? ''));
-      $slug = self::slug($raw);
-      if ($raw !== '' && $slug === '') {
-        throw new \InvalidArgumentException('El valor de ' . $param . ' debe tener letras o números.');
+      $raw = self::trimText((string) ($values[$field] ?? ''));
+      if (in_array($field, $verbatim, true)) {
+        $value = self::verbatim($param, $raw);
+      } else {
+        $value = self::slug($raw);
+        if ($raw !== '' && $value === '') {
+          throw new \InvalidArgumentException('El valor de ' . $param . ' debe tener letras o números.');
+        }
       }
-      if ($slug === '' && isset(self::REQUIRED[$field])) {
+      if ($value === '' && isset(self::REQUIRED[$field])) {
         throw new \InvalidArgumentException('Falta ' . self::REQUIRED[$field] . ' del enlace.');
       }
-      if ($slug !== '') {
-        $params[$param] = $slug;
+      // El tracker compara sin distinguir mayúsculas (collation de MySQL): "General" también es tráfico sin campaña.
+      if ($field === 'campaign' && in_array(strtr($value, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), self::RESERVED_CAMPAIGNS, true)) {
+        throw new \InvalidArgumentException(self::reservedMessage($value));
+      }
+      if ($value !== '') {
+        $params[$param] = $value;
       }
     }
 
@@ -121,5 +157,17 @@ final class UtmLinkBuilder
       $pairs[] = $param . '=' . rawurlencode($value);
     }
     return $path . '?' . implode('&', $pairs) . $fragment;
+  }
+
+  /** Un valor del tracker va sin normalizar; solo se rechaza lo que el tracker tampoco guardaría igual. */
+  private static function verbatim(string $param, string $value): string
+  {
+    if (preg_match('/[\x00-\x1F\x7F]/', $value)) {
+      throw new \InvalidArgumentException('El valor de ' . $param . ' no puede tener saltos de línea ni caracteres de control.');
+    }
+    if (mb_strlen($value, 'UTF-8') > self::MAX_RAW_LENGTH) {
+      throw new \InvalidArgumentException('El valor de ' . $param . ' supera ' . self::MAX_RAW_LENGTH . ' caracteres.');
+    }
+    return $value;
   }
 }

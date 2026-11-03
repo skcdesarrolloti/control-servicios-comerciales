@@ -22,7 +22,7 @@ $settings = new SCM\Core\Settings($db, false, 'control_servicios_comerciales_con
 $db->pdo()->exec('CREATE TABLE IF NOT EXISTS wp_jet_cct_tracker_logs (_ID INTEGER PRIMARY KEY AUTOINCREMENT, camp_slug TEXT, utm_source TEXT, utm_medium TEXT, ip_address TEXT)');
 $db->pdo()->exec('CREATE TABLE IF NOT EXISTS wp_jet_cct_tracker_camps (_ID INTEGER PRIMARY KEY AUTOINCREMENT, slug TEXT, nombre TEXT)');
 if (!$db->getVar('SELECT _ID FROM wp_jet_cct_tracker_logs LIMIT 1')) {
-  foreach ([['feria_vivienda', 'instagram', 'whatsapp'], ['Revista Esencia', 'Directo', 'Navegador'], ['general', 'Google', 'cpc']] as [$camp, $source, $medium]) $db->insert('wp_jet_cct_tracker_logs', ['camp_slug'=>$camp,'utm_source'=>$source,'utm_medium'=>$medium,'ip_address'=>'10.0.0.1']);
+  foreach ([['feria_vivienda', 'instagram', 'whatsapp'], ['Revista Esencia', 'Directo', 'Navegador'], ['Revista Esencia', 'Revista Impresa', 'Volante'], ['general', 'Google', 'cpc']] as [$camp, $source, $medium]) $db->insert('wp_jet_cct_tracker_logs', ['camp_slug'=>$camp,'utm_source'=>$source,'utm_medium'=>$medium,'ip_address'=>'10.0.0.1']);
   $db->insert('wp_jet_cct_tracker_camps', ['slug'=>'feria_vivienda','nombre'=>'Feria de vivienda']);
 }
 if ($settings->get(SCM\Commercial\Tools\UtmCatalog::SETTING, null) === null) {

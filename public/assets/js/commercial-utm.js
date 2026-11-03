@@ -6,6 +6,9 @@
   // no se guarda en el navegador: lo define un administrador en Configuración › Generador UTM.
   var MAX_LENGTH = 100;
   var MAX_URL_LENGTH = 2000;
+  var MAX_RAW_LENGTH = 120;
+  var RESERVED_CAMPAIGNS = ["general", "inmueble_view", "event_click"];
+  var TRIM_RE = /^[\t-\r \u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]+|[\t-\r \u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]+$/g;
   var PARAMS = [["source", "utm_source"], ["medium", "utm_medium"], ["campaign", "utm_campaign"], ["content", "utm_content"], ["term", "utm_term"]];
   var REQUIRED = { source: "la fuente", medium: "el medio", campaign: "la campaña" };
   var ACCENTS = {
@@ -21,10 +24,23 @@
 
   function trimSeparators(value) { return value.replace(/^[-_]+|[-_]+$/g, ""); }
 
+  /** Igual que UtmLinkBuilder::trimText: los mismos espacios Unicode en los dos lados. */
+  function trimText(value) { return String(value == null ? "" : value).replace(TRIM_RE, ""); }
+
+  function asciiLower(value) { return value.replace(/[A-Z]/g, function (char) { return char.toLowerCase(); }); }
+
+  function reservedMessage(value) { return '"' + value + '" lo usa el tracker para las visitas sin campaña: elige otro nombre de campaña.'; }
+
+  /** Igual que rawurlencode de PHP (también codifica ! ' ( ) *). */
+  function encode(value) {
+    return encodeURIComponent(value).replace(/[!'()*]/g, function (char) { return "%" + char.charCodeAt(0).toString(16).toUpperCase(); });
+  }
+
   function slug(value) {
-    var out = String(value == null ? "" : value)
-      .replace(ACCENT_RE, function (char) { return ACCENTS[char]; })
-      .replace(/[A-Z]/g, function (char) { return char.toLowerCase(); })
+    var out = asciiLower(String(value == null ? "" : value)
+      // Las tildes que llegan separadas de su letra (texto en NFD, copiado de macOS o de un PDF) se quitan antes.
+      .replace(/[\u0300-\u036f]+/g, "")
+      .replace(ACCENT_RE, function (char) { return ACCENTS[char]; }))
       .replace(/[^a-z0-9-]+/g, "_")
       .replace(/[-_]*-[-_]*/g, "-");
     return trimSeparators(trimSeparators(out).slice(0, MAX_LENGTH));
@@ -35,9 +51,18 @@
     try { return decodeURIComponent(plain); } catch (_error) { return plain; }
   }
 
-  function build(url, values) {
-    url = String(url == null ? "" : url).trim();
+  /** Un valor del tracker va sin normalizar; solo se rechaza lo que el tracker tampoco guardaría igual. */
+  function verbatimValue(param, value) {
+    if (/[\x00-\x1f\x7f]/.test(value)) throw new Error("El valor de " + param + " no puede tener saltos de línea ni caracteres de control.");
+    if (Array.from(value).length > MAX_RAW_LENGTH) throw new Error("El valor de " + param + " supera " + MAX_RAW_LENGTH + " caracteres.");
+    return value;
+  }
+
+  /** verbatim: campos que se envían tal cual porque ya los registró el tracker (mismo contrato que UtmLinkBuilder::build). */
+  function build(url, values, verbatim) {
+    url = trimText(url);
     values = values || {};
+    verbatim = verbatim || [];
     if (url === "") throw new Error("Escribe la URL de destino.");
     if (new TextEncoder().encode(url).length > MAX_URL_LENGTH) throw new Error("La URL de destino es demasiado larga.");
     if (/[\x00-\x20\x7f]/.test(url)) throw new Error("La URL de destino no puede tener espacios.");
@@ -49,10 +74,16 @@
     var params = [];
     var setting = {};
     PARAMS.forEach(function (pair) {
-      var raw = String(values[pair[0]] == null ? "" : values[pair[0]]).trim();
-      var value = slug(raw);
-      if (raw !== "" && value === "") throw new Error("El valor de " + pair[1] + " debe tener letras o números.");
+      var raw = trimText(values[pair[0]]);
+      var value;
+      if (verbatim.indexOf(pair[0]) >= 0) {
+        value = verbatimValue(pair[1], raw);
+      } else {
+        value = slug(raw);
+        if (raw !== "" && value === "") throw new Error("El valor de " + pair[1] + " debe tener letras o números.");
+      }
       if (value === "" && REQUIRED[pair[0]]) throw new Error("Falta " + REQUIRED[pair[0]] + " del enlace.");
+      if (pair[0] === "campaign" && RESERVED_CAMPAIGNS.indexOf(asciiLower(value)) >= 0) throw new Error(reservedMessage(value));
       if (value !== "") { params.push([pair[1], value]); setting[pair[1]] = true; }
     });
 
@@ -70,11 +101,14 @@
       var equal = pair.indexOf("=");
       return !setting[decodeKey(equal < 0 ? pair : pair.slice(0, equal))];
     });
-    params.forEach(function (pair) { pairs.push(pair[0] + "=" + encodeURIComponent(pair[1])); });
+    params.forEach(function (pair) { pairs.push(pair[0] + "=" + encode(pair[1])); });
     return path + "?" + pairs.join("&") + fragment;
   }
 
   window.SCMCommercialUtm = { slug: slug, build: build };
+
+  /** Campañas que devolvió el tracker para cada generador (valor exacto => true). */
+  var trackerCampaigns = new WeakMap();
 
   var app = document.getElementById("scm-app");
   if (!app) return;
@@ -120,17 +154,42 @@
     return out;
   }
 
+  /**
+   * Campos que van tal cual porque ya los registró el tracker: la fuente o el medio elegidos en "Usados en el tracker"
+   * y la campaña escrita exactamente como una del tracker. Así el enlace suma a esa campaña en vez de crear una variante.
+   */
+  function verbatim(root) {
+    var out = [];
+    ["source", "medium"].forEach(function (name) {
+      var input = field(root, name);
+      var option = input && input.tagName === "SELECT" ? input.options[input.selectedIndex] : null;
+      if (option && option.hasAttribute("data-utm-raw")) out.push(name);
+    });
+    var known = trackerCampaigns.get(root) || {};
+    if (Object.prototype.hasOwnProperty.call(known, trimText(value(root, "campaign")))) out.push("campaign");
+    return out;
+  }
+
+  /** Lo que quedará en la URL para un campo: el valor del tracker tal cual o, si no, su slug. */
+  function paramValue(root, name, kept) {
+    var raw = trimText(value(root, name));
+    return kept.indexOf(name) >= 0 ? raw : slug(raw);
+  }
+
   function refreshPreviews(root) {
+    var kept = verbatim(root);
     PARAMS.forEach(function (pair) {
       var node = root.querySelector('[data-utm-preview="' + pair[0] + '"]');
       if (!node) return;
-      var raw = String(value(root, pair[0]) || "").trim();
-      var normalized = slug(raw);
-      node.innerHTML = raw === "" ? "" : normalized === "" ? "Debe tener letras o números." : "En el enlace: <code>" + escapeHtml(pair[1] + "=" + normalized) + "</code>";
+      var raw = trimText(value(root, pair[0]));
+      var normalized = paramValue(root, pair[0], kept);
+      node.innerHTML = raw === "" ? "" : normalized === "" ? "Debe tener letras o números." : "En el enlace: <code>" + escapeHtml(pair[1] + "=" + normalized) + "</code>" + (kept.indexOf(pair[0]) >= 0 ? " (tal como lo registró el tracker)" : "");
     });
-    var campaign = slug(value(root, "campaign"));
+    var campaign = paramValue(root, "campaign", kept);
     root.querySelectorAll("[data-utm-pick]").forEach(function (chip) {
-      chip.setAttribute("aria-pressed", campaign !== "" && slug(chip.getAttribute("data-utm-pick")) === campaign ? "true" : "false");
+      var pick = chip.getAttribute("data-utm-pick");
+      var target = chip.hasAttribute("data-utm-raw") ? pick : slug(pick);
+      chip.setAttribute("aria-pressed", campaign !== "" && target === campaign ? "true" : "false");
     });
   }
 
@@ -157,8 +216,9 @@
 
   function generate(root) {
     var link;
+    var kept = verbatim(root);
     try {
-      link = build(value(root, "url"), values(root));
+      link = build(value(root, "url"), values(root), kept);
     } catch (error) {
       clearResult(root);
       setStatus(root, error.message, true);
@@ -168,7 +228,7 @@
     root.querySelector("[data-utm-copy]").disabled = false;
     var parts = "";
     PARAMS.forEach(function (pair) {
-      var normalized = slug(value(root, pair[0]));
+      var normalized = paramValue(root, pair[0], kept);
       if (normalized) parts += "<div><dt>" + escapeHtml(pair[1]) + "</dt><dd>" + escapeHtml(normalized) + "</dd></div>";
     });
     root.querySelector("[data-utm-parts]").innerHTML = parts;
@@ -178,11 +238,16 @@
     });
   }
 
+  /** Chip de una campaña del tracker: data-utm-raw indica que su valor se envía tal cual. */
   function chip(valueText, label) {
-    return '<button type="button" class="ctl-chip" data-utm-pick="' + escapeHtml(valueText) + '" title="' + escapeHtml(slug(valueText)) + '" aria-pressed="false">' + escapeHtml(label || valueText) + "</button>";
+    return '<button type="button" class="ctl-chip" data-utm-pick="' + escapeHtml(valueText) + '" data-utm-raw title="' + escapeHtml(valueText) + '" aria-pressed="false">' + escapeHtml(label || valueText) + "</button>";
   }
 
-  /** Fuentes, medios y campañas que ya registró el tracker (solo lectura), como sugerencias además del catálogo. */
+  /**
+   * Fuentes, medios y campañas que ya registró el tracker (solo lectura), como sugerencias además del catálogo. Se
+   * ofrecen con su valor exacto (como el generador original) para sumar a lo ya registrado; se omiten los que el
+   * catálogo ya tiene (el tracker compara sin distinguir mayúsculas).
+   */
   function loadTracker(root) {
     root.setAttribute("data-loaded", "1");
     var status = root.querySelector("[data-utm-tracker-status]");
@@ -191,27 +256,32 @@
         var select = field(root, entry[0]);
         if (!select) return;
         var known = {};
-        Array.prototype.forEach.call(select.options, function (option) { known[option.value] = true; });
+        Array.prototype.forEach.call(select.options, function (option) { known[asciiLower(option.value)] = true; });
         var html = "";
         entry[1].forEach(function (raw) {
-          var normalized = slug(raw);
-          if (!normalized || known[normalized]) return;
-          known[normalized] = true;
-          html += '<option value="' + escapeHtml(normalized) + '">' + escapeHtml(raw) + "</option>";
+          raw = trimText(raw);
+          var key = asciiLower(raw);
+          if (!raw || known[key]) return;
+          known[key] = true;
+          html += '<option value="' + escapeHtml(raw) + '" data-utm-raw>' + escapeHtml(raw) + "</option>";
         });
         if (html) select.querySelector('option[value="' + OTHER + '"]').insertAdjacentHTML("beforebegin", '<optgroup label="Usados en el tracker" data-utm-group="tracker">' + html + "</optgroup>");
       });
-      var campaigns = (data.campaigns || []).filter(function (item) { return item && slug(item.value); });
+      var campaigns = (data.campaigns || []).filter(function (item) { return item && trimText(item.value) !== ""; });
       var list = root.querySelector("[data-utm-campaign-list]");
       var known = {};
-      Array.prototype.forEach.call(list.options, function (option) { known[slug(option.value)] = true; });
+      Array.prototype.forEach.call(list.options, function (option) { known[asciiLower(option.value)] = true; });
+      var exact = {};
       var chips = "";
       var options = "";
       campaigns.forEach(function (item) {
-        chips += chip(item.value, item.label);
-        var normalized = slug(item.value);
-        if (!known[normalized]) { known[normalized] = true; options += '<option value="' + escapeHtml(item.value) + '">' + escapeHtml(item.label || "") + "</option>"; }
+        var raw = trimText(item.value);
+        exact[raw] = true;
+        chips += chip(raw, item.label);
+        var key = asciiLower(raw);
+        if (!known[key]) { known[key] = true; options += '<option value="' + escapeHtml(raw) + '">' + escapeHtml(item.label || "") + "</option>"; }
       });
+      trackerCampaigns.set(root, exact);
       list.insertAdjacentHTML("beforeend", options);
       root.querySelector("[data-utm-tracker-campaigns]").innerHTML = chips;
       status.textContent = campaigns.length ? (campaigns.length === 1 ? "1 campaña registrada." : campaigns.length + " campañas registradas.") : "El tracker aún no tiene campañas registradas.";

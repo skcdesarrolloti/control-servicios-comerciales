@@ -47,17 +47,19 @@ final class CommercialUtmGeneratorTest extends TestCase
       self::assertSame($expected, UtmLinkBuilder::slug($expected), 'slug() debe ser idempotente');
     }
     foreach ($cases['build'] as $case) {
+      $verbatim = $case['verbatim'] ?? [];
       if (isset($case['error'])) {
         try {
-          UtmLinkBuilder::build($case['url'], $case['values']);
-          self::fail('Debía rechazar ' . $case['url']);
+          UtmLinkBuilder::build($case['url'], $case['values'], $verbatim);
+          self::fail('Debía rechazar ' . $case['url'] . ': ' . $case['error']);
         } catch (\InvalidArgumentException $exception) {
           self::assertSame($case['error'], $exception->getMessage());
         }
         continue;
       }
-      self::assertSame($case['expected'], UtmLinkBuilder::build($case['url'], $case['values']));
+      self::assertSame($case['expected'], UtmLinkBuilder::build($case['url'], $case['values'], $verbatim));
     }
+    self::assertSame("Medell\u{00ED}n", UtmLinkBuilder::trimText("\u{FEFF}\u{00A0}Medell\u{00ED}n\u{3000}\u{2029}"));
     self::assertSame(UtmLinkBuilder::MAX_LENGTH, strlen(UtmLinkBuilder::slug(str_repeat('ab ', 80))));
   }
 
@@ -182,6 +184,9 @@ final class CommercialUtmGeneratorTest extends TestCase
     self::assertSame(['sources', 'mediums', 'campaigns'], array_keys($allowed['data']));
     self::assertSame([['value' => 'feria_vivienda', 'label' => 'Feria de vivienda'], ['value' => 'Revista Esencia', 'label' => 'Revista Esencia']], $allowed['data']['campaigns']);
     self::assertContains('Facebook', $allowed['data']['sources']);
+    // Lo que el tracker escribe en las visitas sin UTM (y "General" en cualquier forma) no se ofrece.
+    self::assertSame(['Facebook', 'Google', 'Revista Impresa', 'instagram'], $allowed['data']['sources']);
+    self::assertSame(['Redes Sociales', 'Volante', 'cpc', 'whatsapp'], $allowed['data']['mediums']);
     $json = json_encode($allowed, JSON_THROW_ON_ERROR);
     self::assertStringNotContainsString('10.0.0.1', $json);
     self::assertStringNotContainsString('secreto', $json);

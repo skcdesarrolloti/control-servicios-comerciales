@@ -460,7 +460,7 @@ final class CommercialToolsView
       . self::hero('link', 'Generador UTM', 'Crea enlaces de campaña con fuente, medio y nombre para saber de dónde llegan las visitas. Los medios, fuentes y campañas del equipo se ajustan en <strong>Configuración › Generador UTM</strong>.')
       . '<div class="ctl-layout ctl-layout--even">'
       . '<form class="ctl-card ctl-stack" data-utm-form autocomplete="off" novalidate>'
-      . '<div class="ctl-card__head"><span class="ctl-step">1</span><div><h2>Datos del enlace</h2><p>Los valores se escriben en minúsculas, sin tildes ni espacios, para que el tracker no parta una campaña en variantes.</p></div></div>'
+      . '<div class="ctl-card__head"><span class="ctl-step">1</span><div><h2>Datos del enlace</h2><p>Los valores se escriben en minúsculas, sin tildes ni espacios, para que el tracker no parta una campaña en variantes. Los que ya registró el tracker se envían tal cual, para sumar a lo que ya tiene.</p></div></div>'
       . '<label class="ctl-field"><span class="ctl-label">URL de destino <b class="ctl-required" aria-hidden="true">*</b></span><span class="ctl-input"><input type="text" inputmode="url" name="url" data-utm-field="url" maxlength="' . UtmLinkBuilder::MAX_URL_LENGTH . '" placeholder="https://sucasainmobiliaria.com.co/..." required></span>'
       . '<small class="ctl-note">Si la URL ya trae parámetros o un #ancla, se conservan.</small></label>'
       . '<div class="ctl-grid">'
@@ -483,7 +483,7 @@ final class CommercialToolsView
       . '<dl class="ctl-breakdown" data-utm-parts></dl>'
       . '</section>'
       . '<section class="ctl-card ctl-stack">'
-      . '<div class="ctl-card__head"><span class="ctl-step"><span class="material-symbols-outlined" aria-hidden="true">campaign</span></span><div><h2>Campañas</h2><p>Toca una para usarla. Las del catálogo las define un administrador; las del tracker son las que ya han traído visitas.</p></div></div>'
+      . '<div class="ctl-card__head"><span class="ctl-step"><span class="material-symbols-outlined" aria-hidden="true">campaign</span></span><div><h2>Campañas</h2><p>Toca una para usarla. Las del catálogo las define un administrador; las del tracker son las que ya han traído visitas y se envían con su nombre exacto, para que las nuevas visitas sumen a la misma campaña.</p></div></div>'
       . '<div><p class="ctl-subtitle">Catálogo</p><div class="ctl-chips" data-utm-catalog-campaigns>' . ($chips !== '' ? $chips : '<p class="ctl-note">Aún no hay campañas en el catálogo.</p>') . '</div></div>'
       . '<div><p class="ctl-subtitle">Registradas en el tracker</p><p class="ctl-note" data-utm-tracker-status>Cargando campañas del tracker…</p><div class="ctl-chips" data-utm-tracker-campaigns></div></div>'
       . '</section>'
