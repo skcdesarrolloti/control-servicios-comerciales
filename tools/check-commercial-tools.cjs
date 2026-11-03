@@ -99,6 +99,8 @@ const { chromium } = require(process.env.SCM_PLAYWRIGHT_MODULE || 'playwright');
     await first.locator('[data-pre-sim="cuotas"]').selectOption('2');
     assert.equal(await first.locator('[data-pre-source-net]').innerText(), '$1.279.000');
     assert.match(await first.locator('[data-pre-source-detail]').innerText(), /\$1\.254\.000 en los 2 meses con cuota del seguro y \$1\.284\.000 en los demás/);
+    // La fila de la póliza dice que es un promedio mensual: $60.000 en 2 cuotas de $30.000 / 12.
+    assert.match(await first.locator('[data-pre-breakdown]').innerText(), /Póliza de servicios públicos\s+Promedio mensual: \$60\.000 en 2 cuotas de \$30\.000, repartido en 12 meses\s+\$5\.000 \/ mes/);
     // Berkley: 2 % del canon anual + expedición, sin aseguradora ni valor asegurado de servicios.
     await first.locator('.ctl-switch', { hasText: 'seguro de servicios' }).click();
     await first.locator('[data-pre-sim="modalidad"]').selectOption('berkley');
