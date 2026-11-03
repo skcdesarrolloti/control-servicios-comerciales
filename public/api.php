@@ -32,7 +32,10 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
 
 $action = sanitize_key((string) ($_POST['action'] ?? ''));
 $controller = new \SCM\Http\Controller\CommercialApiController($scmDb, $scmSettings, $scmCsrf, $scmConfig);
-$router = new \SCM\Http\Api\CommercialActionRouter($controller);
+$router = new \SCM\Http\Api\CommercialActionRouter(
+  $controller,
+  static fn(): \SCM\Http\Controller\PromotionApiController => new \SCM\Http\Controller\PromotionApiController($scmDb, $scmSettings, $scmCsrf, $scmConfig)
+);
 
 session_write_close();
 ob_start();
