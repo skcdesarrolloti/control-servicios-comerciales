@@ -311,4 +311,62 @@ final class CommercialOwnerPreapprovalTest extends TestCase
     self::assertStringContainsString('<dialog class="ctl-dialog"', $gain);
     self::assertStringNotContainsString('bootstrap', $gain);
   }
+  public function testCreditRateUsesTheReferenceCappedByTheUsuryAndSyncsItDaily(): void
+  {
+    // Sin configuración: los valores por defecto del liquidador. La referencia (2,42 % N.M.V.) pasa la usura de 28,59 % E.A.
+    // (2,12 % mes vencido), así que se ofrece la usura.
+    $rate = $this->service()->creditRate();
+    self::assertEqualsWithDelta((1.2859 ** (1 / 12)) - 1, $rate['monthly'], 1e-9);
+    self::assertEqualsWithDelta(0.2859, $rate['annual'], 1e-9);
+    self::assertTrue($rate['capped']);
+    self::assertSame('2,12 %', CommercialOwnerPreapprovalService::percent($rate['monthly']));
+
+    // La tasa se actualiza desde datos.gov.co en la misma fila del panel inmobiliario, sin pisar sus demás valores.
+    $this->db->update('wp_jet_cct_confi_sistema', ['valor'=>json_encode(['owner_credit_settings'=>['reference_rate'=>0.018, 'income_months'=>4, 'usury_auto'=>true]], JSON_THROW_ON_ERROR)], ['funcion'=>'control_servicios_config']);
+    $calls = 0;
+    $from = date('Y-m-01');
+    $fetch = static function () use (&$calls, $from): array {
+      $calls++;
+      return [
+        ['modalidad'=>'CONSUMO Y ORDINARIO', 'vigencia_desde'=>$from . 'T00:00:00.000', 'vigencia_hasta'=>date('Y-m-t') . 'T00:00:00.000', 'interes_bancario_corriente'=>'18,5', 'resolucion'=>'1600'],
+        ['modalidad'=>'CONSUMO Y ORDINARIO', 'vigencia_desde'=>date('Y-m-d', strtotime('+40 days')), 'interes_bancario_corriente'=>'30'],
+        ['modalidad'=>'MICROCREDITO', 'vigencia_desde'=>$from, 'interes_bancario_corriente'=>'40'],
+      ];
+    };
+    $service = new CommercialOwnerPreapprovalService($this->db, $this->policy, new Settings($this->db, true), $fetch);
+    $service->syncUsury();
+    $service->syncUsury(); // una vez al día
+    self::assertSame(1, $calls);
+    $stored = (new Settings($this->db, true))->get('owner_credit_settings');
+    self::assertSame([0.018, 4, true], [$stored['reference_rate'], $stored['income_months'], $stored['usury_auto']]);
+    self::assertEqualsWithDelta(0.2775, $stored['usury_annual'], 1e-9);
+    self::assertSame([$from, '1600', ''], [$stored['usury_updated_at'], $stored['usury_resolution'], $stored['usury_sync_error']]);
+    $rate = $service->creditRate();
+    self::assertEqualsWithDelta(0.018, $rate['monthly'], 1e-9);
+    self::assertFalse($rate['capped']);
+    self::assertSame([$from, date('Y-m-t'), '1600'], [$rate['updated_at'], $rate['valid_until'], $rate['resolution']]);
+
+    // Va en la vista y en el PDF del propietario, con la fecha de actualización.
+    $html = CommercialToolsView::render('simulador_ingreso_neto', $service, '');
+    self::assertStringContainsString('data-credit-rate="1,80 % mensual"', $html);
+    self::assertStringContainsString('<dd data-pre-rate>1,80 % mensual</dd>', $html);
+    self::assertStringContainsString('actualizada el ' . date('d/m/Y', strtotime($from)), $html);
+    $pdf = CommercialOwnerPreapprovalPdf::html($service->estimate(['owner'=>['name'=>'Ana'] + self::OWNER, 'sources'=>[['canon'=>1000000]]]), ['name'=>'Prueba']);
+    self::assertStringContainsString('Tasa de interés estimada', $pdf);
+    self::assertStringContainsString('1,80 % mensual', $pdf);
+    self::assertStringContainsString('Resolución 1600', $pdf);
+    self::assertStringContainsString('Tasa actualizada el ' . date('d/m/Y', strtotime($from)) . ', vigente hasta el ' . date('t/m/Y'), $pdf);
+
+    // Si la API falla se conserva la última tasa; con la tasa manual en el panel inmobiliario no se consulta.
+    $failing = new CommercialOwnerPreapprovalService($this->db, $this->policy, new Settings($this->db, true), static function (): array { throw new \RuntimeException('caída'); });
+    $settings = new Settings($this->db, false);
+    $settings->set('owner_credit_settings', ['usury_synced_at'=>0] + $settings->get('owner_credit_settings'));
+    $failing->syncUsury();
+    self::assertEqualsWithDelta(0.2775, $failing->creditRate()['usury_annual'], 1e-9);
+    self::assertSame('caída', (new Settings($this->db, true))->get('owner_credit_settings')['usury_sync_error']);
+    $settings->set('owner_credit_settings', ['usury_auto'=>false, 'usury_synced_at'=>0] + $settings->get('owner_credit_settings'));
+    $calls = 0;
+    (new CommercialOwnerPreapprovalService($this->db, $this->policy, new Settings($this->db, true), $fetch))->syncUsury();
+    self::assertSame(0, $calls);
+  }
 }

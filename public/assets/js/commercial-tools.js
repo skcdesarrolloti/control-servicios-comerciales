@@ -224,7 +224,7 @@
     var term = longest > 0 ? Math.max(0, longest - margin) : null;
     var owner = {};
     root.querySelectorAll("[data-pre-owner]").forEach(function (input) { owner[input.dataset.preOwner] = input.value.trim(); });
-    return { months: months, margin: margin, sources: sources, gross: gross, net: net, amount: net * months, longest: longest, term: term, owner: owner, registered: root.dataset.mode !== "manual", needs: root.dataset.needs === "si", uses: useValues(root), notes: root.querySelector("[data-pre-notes]").value.trim() };
+    return { months: months, margin: margin, sources: sources, gross: gross, net: net, amount: net * months, longest: longest, term: term, owner: owner, registered: root.dataset.mode !== "manual", needs: root.dataset.needs === "si", uses: useValues(root), notes: root.querySelector("[data-pre-notes]").value.trim(), rate: root.dataset.creditRate || "" };
   }
 
   function recalc(root) {
@@ -408,7 +408,7 @@
       lines.push("- Inmueble " + (index + 1) + (item.fromContract && item.meta ? " (" + item.meta + ")" : "") + ": canon " + money(item.canon) + " → neto " + money(item.net) + " / mes (" + (item.sim.modalidad === MODALITIES.defecto ? item.sim.aseguradora : "póliza " + item.sim.modalidad) + ")");
     });
     lines.push("", "Ingreso neto mensual: " + money(state.net));
-    lines.push("Con este ingreso cuentas con un crédito preaprobado de hasta " + money(state.amount) + " para ponerte al día con servicios públicos, cuotas de administración, reparaciones o libre inversión" + (state.term > 0 ? ", hasta en " + state.term + " cuotas." : "."));
+    lines.push("Con este ingreso cuentas con un crédito preaprobado de hasta " + money(state.amount) + " para ponerte al día con servicios públicos, cuotas de administración, reparaciones o libre inversión" + (state.term > 0 ? ", hasta en " + state.term + " cuotas" : "") + (state.rate ? ", con una tasa estimada de " + state.rate + "." : "."));
     var uses = Object.keys(state.uses);
     if (uses.length) {
       var need = uses.reduce(function (sum, key) { return sum + state.uses[key]; }, 0);

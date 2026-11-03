@@ -15,7 +15,7 @@ final class PrecaptacionDatabase
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     $pdo->sqliteCreateFunction('regexp', static fn(string $pattern, $value): int => preg_match('/' . $pattern . '/', (string) $value) === 1 ? 1 : 0);
     $tables = [
-      'jet_cct_confi_sistema'=>['funcion','valor'],
+      'jet_cct_confi_sistema'=>['funcion','valor','departamento'],
       'jet_cct_cargos'=>['nombre_cargo'],
       'jet_cct_funcionarios'=>['id_empleado','nombre','correo','celular','activo','id_cargo','sucursal','pais','ciudad','user_others_apss'],
       'jet_cct_precaptaciones'=>['id_precaptacion','fecha','creador','id_empleado','sucursal','origen','id_pph','tipo_inmueble','categoria','fotos','tipo_contacto','contacto','barrio','direccion','punto_referencia','telefono','indicativo','celular','promocionado_por','competencia','observaciones','contactado','tiene_ticket','tuvo_seguimiento','bandera','tarjeta_pph','ruta','razones','resultado','merece_ticket','correo','id_ticket_asignado'],

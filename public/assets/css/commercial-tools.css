@@ -306,6 +306,8 @@
 .ctl-summary__rows > div { display:flex; justify-content:space-between; gap:12px; padding:10px 0; border-bottom:1px solid #f1f5f9; font-size:13px }
 .ctl-summary__rows dt { color:var(--ctl-muted) }
 .ctl-summary__rows dd { margin:0; font-weight:700; color:var(--ctl-navy); text-align:right }
+.ctl-summary__rows dt small { display:block; margin-top:2px; font-size:11px; line-height:1.4; color:#94a3b8 }
+.ctl-summary__rate dd { white-space:nowrap }
 .ctl-error { margin:0; padding:10px 12px; border-radius:10px; background:#fef2f2; color:#b91c1c; font-size:12.5px }
 .ctl-fineprint { margin:0; font-size:11px; line-height:1.5; color:#94a3b8 }
 .ctl-badge {

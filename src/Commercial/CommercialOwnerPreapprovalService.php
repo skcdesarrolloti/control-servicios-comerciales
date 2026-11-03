@@ -15,22 +15,25 @@ use SCM\Core\Settings;
  * de política. Los propietarios registrados cargan sus contratos Entregado o Por entregar; los demás se simulan a mano.
  * Aquí solo se consulta: no se registra ninguna solicitud.
  *
- * La configuración de créditos (`owner_credit_settings`) se administra en el panel inmobiliario, por eso se lee, sin
- * escribir, de su configuración (`control_servicios_config`).
+ * La configuración de créditos (`owner_credit_settings`) se administra en el panel inmobiliario, por eso se lee de su
+ * configuración (`control_servicios_config`); aquí solo se actualiza la tasa de usura (CommercialCreditUsuryRate).
  */
 final class CommercialOwnerPreapprovalService
 {
   private Database $db;
   private CommercialAccessPolicy $policy;
   private Settings $sharedSettings;
+  /** @var (callable(): list<array<string,mixed>>)|null */
+  private $usuryFetch;
   /** @var array<string,array<int,string>> */
   private array $columns = [];
 
-  public function __construct(Database $db, CommercialAccessPolicy $policy, ?Settings $sharedSettings = null)
+  public function __construct(Database $db, CommercialAccessPolicy $policy, ?Settings $sharedSettings = null, ?callable $usuryFetch = null)
   {
     $this->db = $db;
     $this->policy = $policy;
     $this->sharedSettings = $sharedSettings ?? new Settings($db, true, Settings::FUNCTION_KEY);
+    $this->usuryFetch = $usuryFetch;
   }
 
   /** Necesidades que el crédito preaprobado le ayuda a resolver al propietario (argumento comercial del simulador). */
@@ -84,6 +87,46 @@ final class CommercialOwnerPreapprovalService
       'term_margin_months' => $int($stored['term_margin_months'] ?? null, 2, 0, 12),
       'no_mandate_deduction' => self::share($stored['no_mandate_deduction'] ?? null, 0.15),
     ];
+  }
+
+  /** Actualiza la tasa de usura desde la Superfinanciera (como máximo una vez al día) antes de mostrar o generar el PDF. */
+  public function syncUsury(): void
+  {
+    try {
+      CommercialCreditUsuryRate::sync(new Settings($this->db, false, Settings::FUNCTION_KEY), false, $this->usuryFetch);
+    } catch (\Throwable $error) {
+      error_log('[commercial-credit-usury] ' . $error->getMessage());
+    }
+    $this->sharedSettings->refresh();
+  }
+
+  /**
+   * Tasa estimada del crédito, con la regla del liquidador (OwnerCreditCalculator::evaluate del panel inmobiliario): la
+   * tasa de referencia N.M.V., sin pasar de la usura llevada a mes vencido ((1 + E.A.)^(1/12) − 1). Los valores por
+   * defecto son los de OwnerCreditSettings::defaults().
+   * @return array{monthly:float,annual:float,capped:bool,reference:float,usury_annual:float,updated_at:string,valid_until:string,resolution:string}
+   */
+  public function creditRate(): array
+  {
+    $stored = $this->sharedSetting('owner_credit_settings');
+    $date = static fn($value): string => preg_match('/^\d{4}-\d{2}-\d{2}$/', trim((string) $value)) === 1 ? trim((string) $value) : '';
+    $reference = self::share($stored['reference_rate'] ?? null, 0.0242);
+    $usury = self::share($stored['usury_annual'] ?? null, 0.2859);
+    $legal = (1 + $usury) ** (1 / 12) - 1;
+    $monthly = $usury > 0 ? min($reference, $legal) : $reference;
+    return [
+      'monthly' => $monthly, 'annual' => (1 + $monthly) ** 12 - 1, 'capped' => $usury > 0 && $reference > $legal,
+      'reference' => $reference, 'usury_annual' => $usury,
+      'updated_at' => $date($stored['usury_updated_at'] ?? '') ?: '2026-10-01',
+      'valid_until' => $date($stored['usury_valid_until'] ?? ''),
+      'resolution' => mb_substr(trim((string) ($stored['usury_resolution'] ?? '')), 0, 20),
+    ];
+  }
+
+  /** Porcentaje con dos decimales al estilo colombiano (0,021215 → "2,12 %"). */
+  public static function percent(float $rate): string
+  {
+    return number_format($rate * 100, 2, ',', '.') . ' %';
   }
 
   /**
@@ -252,6 +295,7 @@ final class CommercialOwnerPreapprovalService
       'income_months' => $settings['income_months'], 'term_margin_months' => $settings['term_margin_months'],
       'gross' => array_sum(array_column($sources, 'canon')), 'net' => $net, 'amount' => $net * $settings['income_months'], 'longest_months' => $longest, 'min_deduction' => $settings['no_mandate_deduction'],
       'term' => $longest > 0 ? max(0, $longest - $settings['term_margin_months']) : null,
+      'rate' => $this->creditRate(),
       'needs' => $needs, 'uses' => $uses, 'notes' => mb_substr(trim(str_replace("\r", '', (string) ($input['notes'] ?? ''))), 0, 600),
     ];
   }

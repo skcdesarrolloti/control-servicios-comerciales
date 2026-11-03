@@ -116,8 +116,18 @@ final class CommercialOwnerPreapprovalPdf
         . '<table class="scm-preapproval-income"><thead><tr><th>Concepto</th><th>Frecuencia</th><th>Valor</th></tr></thead><tbody>' . $rows . '</tbody></table></div>';
     }
 
+    // Tasa del liquidador (referencia con tope en la usura) y la fecha en que se actualizó la usura de la Superfinanciera.
+    $rate = $estimate['rate'];
+    $rateText = CommercialOwnerPreapprovalService::percent((float) $rate['monthly']) . ' mensual';
+    $updated = date('d/m/Y', (int) strtotime((string) $rate['updated_at']));
+    $validity = 'Tasa actualizada el ' . $updated . ($rate['valid_until'] !== '' ? ', vigente hasta el ' . date('d/m/Y', (int) strtotime((string) $rate['valid_until'])) : '') . '.';
+    $rateRow = '<tr><th scope="row">Tasa de interés estimada<small>Mes vencido; equivale a ' . self::e(CommercialOwnerPreapprovalService::percent((float) $rate['annual'])) . ' efectivo anual. '
+      . 'No supera la tasa de usura certificada por la Superintendencia Financiera (' . self::e(CommercialOwnerPreapprovalService::percent((float) $rate['usury_annual'])) . ' E.A.' . ($rate['resolution'] !== '' ? ', Resolución ' . self::e($rate['resolution']) : '') . '). ' . self::e($validity) . '</small></th>'
+      . '<td class="is-unit">Mensual (mes)</td><td class="is-money">' . self::e($rateText) . '</td></tr>';
+
     $calc = self::row('Ingreso neto mensual total (' . count($estimate['sources']) . (count($estimate['sources']) === 1 ? ' inmueble)' : ' inmuebles)'), 'Mensual (mes)', (float) $estimate['net'])
       . ($term !== null ? '<tr><th scope="row">Plazo máximo estimado<small>Duración del contrato más largo (' . (int) $estimate['longest_months'] . ' meses) menos ' . (int) $estimate['term_margin_months'] . ' de margen.</small></th><td class="is-unit">Cuotas</td><td class="is-money">' . self::e($termText) . '</td></tr>' : '')
+      . $rateRow
       . self::row('Crédito preaprobado estimado', 'Hasta', $amount, '', 'is-total');
 
     // Lo que el propietario puede resolver con el crédito: solo si respondió que tiene algo pendiente. Muestra lo que
@@ -143,7 +153,7 @@ final class CommercialOwnerPreapprovalPdf
       . '<header class="scm-acta-receipt-head"><h1>' . self::TITLE . '</h1></header>'
       . '<p class="scm-acta-receipt-date">Cartagena de Indias, ' . date('d/m/Y') . ' · Documento informativo para el propietario</p>'
       . '<section class="scm-preapproval-highlight"><div><span>Ingreso neto mensual</span><strong>' . self::e(self::money((float) $estimate['net'])) . '</strong><em>Canon ' . self::e(self::money((float) $estimate['gross'])) . ' menos comisión, garantía y seguros</em></div>'
-      . '<div class="is-credit"><span>Crédito preaprobado hasta</span><strong>' . self::e(self::money($amount)) . '</strong><em>' . self::e($termText) . '</em></div></section>'
+      . '<div class="is-credit"><span>Crédito preaprobado hasta</span><strong>' . self::e(self::money($amount)) . '</strong><em>' . self::e($termText) . ' · tasa ' . self::e($rateText) . ' (actualizada el ' . self::e($updated) . ')</em></div></section>'
       . '<section class="scm-acta-receipt-section"><h2>1. Propietario</h2>' . self::table(array_filter([
         'Nombre' => $owner['name'], 'Cédula o NIT' => $owner['document'], 'Celular' => $owner['phone'], 'Correo' => $owner['email'],
         'Vínculo con SuCasa' => $estimate['registered'] ? 'Propietario registrado (contratos vigentes)' : 'Propietario aún no registrado (simulación con las tarifas de SuCasa)',

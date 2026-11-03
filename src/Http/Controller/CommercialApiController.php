@@ -90,7 +90,9 @@ final class CommercialApiController
       $html = \SCM\Views\CommercialSignView::render(new \SCM\Commercial\CommercialSignService($this->db, $this->policy, $this->config), $this->policy);
     } elseif ($bucket === 'herramientas') {
       $tool = (string) ($input['herramienta'] ?? '');
-      $html = \SCM\Views\CommercialToolsView::render($tool, $this->preapprovalService(), $this->baseUrl, \SCM\Views\CommercialToolsView::context($tool, $this->policy, $this->db));
+      $preapproval = $this->preapprovalService();
+      if (!in_array($tool, ['ganancia_ocasional', 'calculadora_mercado', 'calculadora_aseo'], true) &&$this->policy->canSubview('herramientas', 'simulador_ingreso_neto')) $preapproval->syncUsury();
+      $html = \SCM\Views\CommercialToolsView::render($tool, $preapproval,$this->baseUrl, \SCM\Views\CommercialToolsView::context($tool, $this->policy, $this->db));
     } elseif ($bucket === 'precaptacion') {
       $html = CommercialDashboardView::renderPrecaptacion($this->baseUrl, $input);
     } elseif ($bucket === 'inicio') {
@@ -802,6 +804,8 @@ final class CommercialApiController
     try {
       $payload = json_decode(is_string($input['payload'] ?? null) ? $input['payload'] : '', true);
       $service = $this->preapprovalService();
+      $service->authorize();
+      $service->syncUsury();
       $estimate = $service->estimate(is_array($payload) ? $payload : []);
       $bytes = \SCM\Commercial\CommercialOwnerPreapprovalPdf::bytes($estimate, $service->signer());
     } catch (\SCM\Commercial\CommercialSignAccessDenied $exception) {

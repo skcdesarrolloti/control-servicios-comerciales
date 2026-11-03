@@ -90,6 +90,9 @@ final class CommercialToolsView
   {
     $settings = $service->settings();
     $rates = $service->rates();
+    $credit = $service->creditRate();
+    $creditRate = CommercialOwnerPreapprovalService::percent($credit['monthly']) . ' mensual';
+    $creditNote = ($credit['capped'] ? 'Tope de usura: ' : 'Equivale a ' . CommercialOwnerPreapprovalService::percent($credit['annual']) . ' E.A.; usura ') . CommercialOwnerPreapprovalService::percent($credit['usury_annual']) . ' E.A. · actualizada el ' . date('d/m/Y', (int) strtotime($credit['updated_at']));
     $months = (int) $settings['income_months'];
     $e = static fn($value): string => self::e($value);
     $rateText = rtrim(rtrim(number_format((float) $rates['comision'], 4, ',', ''), '0'), ',');
@@ -103,7 +106,7 @@ final class CommercialToolsView
     $durations = '';
     foreach ([6, 12, 18, 24, 36, 48, 60] as $value) $durations .= '<option value="' . $value . '"' . ($value === 12 ? ' selected' : '') . '>' . $value . ' meses</option>';
     ob_start(); ?>
-    <section class="ctl" data-commercial-tool="simulador_ingreso_neto" data-min-months="<?php echo CommercialOwnerPreapprovalService::MIN_CONTRACT_MONTHS; ?>" data-min-deduction="<?php echo $e((string) $settings['no_mandate_deduction']); ?>" data-income-months="<?php echo $months; ?>" data-term-margin="<?php echo (int) $settings['term_margin_months']; ?>" data-rates="<?php echo $e(json_encode($rates, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)); ?>">
+    <section class="ctl" data-commercial-tool="simulador_ingreso_neto" data-min-months="<?php echo CommercialOwnerPreapprovalService::MIN_CONTRACT_MONTHS; ?>" data-min-deduction="<?php echo $e((string) $settings['no_mandate_deduction']); ?>" data-income-months="<?php echo $months; ?>" data-term-margin="<?php echo (int) $settings['term_margin_months']; ?>" data-credit-rate="<?php echo $e($creditRate); ?>" data-rates="<?php echo $e(json_encode($rates, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)); ?>">
       <?php echo self::hero('savings', 'Simulador de ingreso neto del propietario', 'Calcula cuánto le queda al propietario cada mes después de la comisión, la garantía y los seguros, con las tarifas vigentes de SuCasa. Con ese ingreso accede a un <strong>crédito preaprobado</strong> para ponerse al día con servicios públicos, administración o reparaciones.'); ?>
       <div class="ctl-layout">
         <div class="ctl-main">
@@ -174,6 +177,7 @@ final class CommercialToolsView
             <div><dt>Canon mensual</dt><dd data-pre-gross>$0</dd></div>
             <div><dt>Descuentos promedio / mes</dt><dd data-pre-deductions>$0</dd></div>
             <div><dt>Plazo máximo estimado</dt><dd data-pre-term>Según vigencia</dd></div>
+            <div class="ctl-summary__rate"><dt>Tasa de interés estimada<small><?php echo $e($creditNote); ?></small></dt><dd data-pre-rate><?php echo $e($creditRate); ?></dd></div>
           </dl>
           <p class="ctl-error" data-pre-error role="alert" hidden></p>
           <button type="button" class="ctl-primary" data-pre-pdf><span class="material-symbols-outlined" aria-hidden="true">preview</span>Ver PDF para el propietario</button>

@@ -13,11 +13,14 @@ const { chromium } = require(process.env.SCM_PLAYWRIGHT_MODULE || 'playwright');
     await page.goto('http://127.0.0.1:8771/tests/Fixtures/commercial-tools.php');
     const tool = page.locator('[data-commercial-tool="simulador_ingreso_neto"]');
     await tool.waitFor();
-    assert.equal(await page.locator('[data-commercial-dropdown-menu="herramientas"] a').count(), 2);
+    assert.equal(await page.locator('[data-commercial-dropdown-menu="herramientas"] a').count(), 4);
     assert.match(await page.locator('[data-commercial-dropdown-menu="herramientas"]').textContent(), /Simulador de ingreso neto/);
     // Cada herramienta es su propia pestaña, como en el panel inmobiliario (sin subtab).
     assert.match(await page.locator('[data-commercial-dropdown-menu="herramientas"] a').first().getAttribute('href'), /[?&]tab=simulador_ingreso_neto$/);
     assert.equal(await tool.locator('[data-pre-total]').innerText(), '$0');
+    // Tasa del crédito (referencia con tope en la usura) con la fecha de actualización.
+    assert.match(await tool.locator('[data-pre-rate]').innerText(), /^\d+,\d{2} % mensual$/);
+    assert.match(await tool.locator('.ctl-summary__rate dt small').innerText(), /actualizada el \d{2}\/\d{2}\/\d{4}/);
 
     // Propietario registrado: sus dos contratos vigentes llenan el simulador (canon, comisión del mandato y coberturas).
     await tool.locator('[data-pre-document]').fill('12');
