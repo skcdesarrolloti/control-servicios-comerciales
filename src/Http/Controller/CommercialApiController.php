@@ -91,8 +91,8 @@ final class CommercialApiController
     } elseif ($bucket === 'herramientas') {
       $tool = (string) ($input['herramienta'] ?? '');
       $preapproval = $this->preapprovalService();
-      if (!in_array($tool, ['ganancia_ocasional', 'calculadora_mercado', 'calculadora_aseo'], true) &&$this->policy->canSubview('herramientas', 'simulador_ingreso_neto')) $preapproval->syncUsury();
-      $html = \SCM\Views\CommercialToolsView::render($tool, $preapproval,$this->baseUrl, \SCM\Views\CommercialToolsView::context($tool, $this->policy, $this->db));
+      if (!in_array($tool, ['ganancia_ocasional', 'calculadora_mercado', 'calculadora_aseo', 'generador_utm'], true) && $this->policy->canSubview('herramientas', 'simulador_ingreso_neto')) $preapproval->syncUsury();
+      $html = \SCM\Views\CommercialToolsView::render($tool, $preapproval,$this->baseUrl, \SCM\Views\CommercialToolsView::context($tool, $this->policy, $this->db, $this->settings));
     } elseif ($bucket === 'precaptacion') {
       $html = CommercialDashboardView::renderPrecaptacion($this->baseUrl, $input);
     } elseif ($bucket === 'inicio') {
@@ -874,6 +874,24 @@ final class CommercialApiController
       'without_area' => $result['without_area'],
       'items' => $admin ? array_map(static fn(array $item): array => ['precio' => round($item['precio'], 2), 'area' => round($item['area'], 2), 'm2' => round($item['m2'], 2)] + $item, $result['items']) : [],
     ]);
+  }
+
+  /**
+   * Generador UTM: fuentes, medios y campañas que ya registró el tracker de dashboard-marketing (solo lectura). No envía
+   * datos de visitantes; el catálogo del equipo llega con la vista.
+   */
+  public function utmOptions(array $input): never
+  {
+    $this->verify($input);
+    $this->authorizeTool('generador_utm', 'No tienes permiso para usar el generador UTM.');
+    $options = ['sources' => [], 'mediums' => [], 'campaigns' => []];
+    try {
+      $options = (new \SCM\Commercial\Tools\UtmTrackerOptions($this->db))->options();
+    } catch (\Throwable $exception) {
+      error_log('[commercial-tools-utm] ' . $exception->getMessage());
+      JsonResponse::error('No se pudieron cargar las campañas del tracker.', 500);
+    }
+    JsonResponse::success($options);
   }
 
   /** @return array<string,string> */

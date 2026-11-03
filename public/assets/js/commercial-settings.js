@@ -1,6 +1,7 @@
 /*
  * Menú "Configuración" del encabezado comercial. Cada opción abre un popup con su sección:
- * calendario, tiempos de atención, avisos, actualizaciones de inmuebles, cupos de destacados y calculadora de aseo.
+ * calendario, tiempos de atención, avisos, actualizaciones de inmuebles, cupos de destacados, calculadora de aseo y
+ * catálogo del Generador UTM.
  * Permisos reutiliza su modal existente.
  */
 (function () {
@@ -268,6 +269,55 @@
             return item;
           });
           if (!data[key].length) throw new Error("Agrega al menos una fila en " + box.querySelector("h4").textContent + ".");
+        });
+        return data;
+      },
+    },
+    // Catálogo compartido del Generador UTM (Herramientas). En dashboard-marketing cada navegador guardaba sus opciones.
+    utm: {
+      title: "Generador UTM",
+      lists: [
+        ["medios", "Medios / canales", "Van en utm_medium: por dónde llega el enlace (WhatsApp, correo, redes).", true],
+        ["fuentes", "Fuentes / recursos", "Van en utm_source: quién envía la visita (Facebook, Instagram, Google).", true],
+        ["campanas", "Campañas", "Van en utm_campaign. El nombre es el que ven los funcionarios; el valor es el que queda en el tracker.", false],
+      ],
+      html: function (settings) {
+        function line(row) {
+          return '<tr data-utm-row><td class="py-1 px-1"><input class="w-full px-2 py-1 rounded-lg border border-slate-300 text-sm" type="text" maxlength="60" data-field="label" value="' + esc(row.label || "") + '" placeholder="Nombre visible"></td>' +
+            '<td class="py-1 px-1"><input class="w-full px-2 py-1 rounded-lg border border-slate-300 text-sm font-mono" type="text" maxlength="100" data-field="value" value="' + esc(row.value || "") + '" placeholder="Se toma del nombre"></td>' +
+            '<td class="py-1 px-1 text-right"><button type="button" class="px-2 py-1 rounded-lg text-rose-700 hover:bg-rose-50 text-xs font-semibold" data-utm-remove-row aria-label="Quitar fila">Quitar</button></td></tr>';
+        }
+        return '<form data-config-form class="text-left space-y-5">' +
+          intro("Opciones que ofrece Herramientas › Generador UTM a todo el equipo. Los valores se guardan en minúsculas, sin tildes ni espacios; los repetidos se descartan.") +
+          this.lists.map(function (list) {
+            return '<section class="text-left" data-utm-list="' + list[0] + '" data-required="' + (list[3] ? "1" : "0") + '"><div class="flex flex-wrap items-center justify-between gap-2 mb-1"><div><h4 class="text-sm font-bold text-slate-800">' + esc(list[1]) + '</h4><p class="text-[11px] text-slate-500">' + esc(list[2]) + "</p></div>" +
+              '<button type="button" class="px-3 py-1 rounded-lg bg-slate-100 text-xs font-semibold" data-utm-add-row>Agregar fila</button></div>' +
+              '<div class="overflow-x-auto max-h-[30vh] overflow-y-auto"><table class="w-full text-sm"><thead><tr class="text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-200"><th class="py-2 px-1 text-left">Nombre visible</th><th class="py-2 px-1 text-left">Valor en la URL</th><th></th></tr></thead><tbody>' +
+              (settings[list[0]] || []).map(line).join("") + "</tbody></table></div><template data-utm-row-template>" + line({}) + "</template></section>";
+          }).join("") + "</form>";
+      },
+      bind: function (popup) {
+        popup.addEventListener("click", function (event) {
+          var add = event.target.closest("[data-utm-add-row]");
+          if (add) {
+            var box = add.closest("[data-utm-list]");
+            box.querySelector("tbody").insertAdjacentHTML("beforeend", box.querySelector("[data-utm-row-template]").innerHTML);
+            var rows = box.querySelectorAll("tbody [data-utm-row]");
+            rows[rows.length - 1].querySelector("input").focus();
+            return;
+          }
+          var remove = event.target.closest("[data-utm-remove-row]");
+          if (remove) remove.closest("tr").remove();
+        });
+      },
+      collect: function (form) {
+        var data = {};
+        form.querySelectorAll("[data-utm-list]").forEach(function (box) {
+          var key = box.getAttribute("data-utm-list");
+          data[key] = Array.prototype.map.call(box.querySelectorAll("tbody [data-utm-row]"), function (row) {
+            return { label: row.querySelector('[data-field="label"]').value.trim(), value: row.querySelector('[data-field="value"]').value.trim() };
+          }).filter(function (item) { return item.label || item.value; });
+          if (box.getAttribute("data-required") === "1" && !data[key].length) throw new Error("Agrega al menos una opción en " + box.querySelector("h4").textContent + ".");
         });
         return data;
       },

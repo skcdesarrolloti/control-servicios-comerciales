@@ -73,7 +73,7 @@ async function closeSwal(page) {
   const configSaves = calls.length;
 
   // Las demás secciones cargan y guardan desde el mismo menú.
-  for (const [section, message] of [['tiempos', 'Tiempos de atención de tareas guardados'], ['avisos', 'Plazos y valores de avisos guardados'], ['actualizaciones', 'Plazos de actualización de inmuebles guardados'], ['destacados', 'Cupos de destacados guardados']]) {
+  for (const [section, message] of [['tiempos', 'Tiempos de atención de tareas guardados'], ['avisos', 'Plazos y valores de avisos guardados'], ['actualizaciones', 'Plazos de actualización de inmuebles guardados'], ['destacados', 'Cupos de destacados guardados'], ['utm', 'Catálogo del generador UTM guardado']]) {
     await page.locator('#commercial-config-trigger').click();
     await page.locator(`[data-commercial-config-action="${section}"]`).click();
     await page.locator('[data-config-form] input').first().waitFor();
@@ -81,6 +81,33 @@ async function closeSwal(page) {
     await page.locator(`.swal2-popup:has-text("${message}")`).waitFor();
     await closeSwal(page);
   }
+
+  // Configuración → Generador UTM: catálogo compartido de Herramientas; el servidor normaliza y quita repetidos.
+  await page.locator('#commercial-config-trigger').click();
+  await page.locator('[data-commercial-config-action="utm"]').click();
+  const utmMedia = page.locator('[data-utm-list="medios"] tbody [data-utm-row]');
+  await utmMedia.first().waitFor();
+  assert(await page.locator('[data-utm-list="medios"] [data-field="value"]').first().inputValue() === 'whatsapp', 'El catálogo UTM no trae los medios por defecto');
+  await page.locator('[data-utm-list="campanas"] [data-utm-add-row]').click();
+  await page.locator('[data-utm-list="campanas"] tbody [data-utm-row] [data-field="label"]').last().fill('Feria Vivienda 2026');
+  await page.locator('[data-utm-list="campanas"] [data-utm-add-row]').click();
+  await page.locator('[data-utm-list="campanas"] tbody [data-utm-row] [data-field="label"]').last().fill('Feria vivienda 2026');
+  // La base del fixture vive en memoria por petición: lo guardado se revisa en la respuesta (settings recargados).
+  const utmSaved = page.waitForResponse(response => response.request().method() === 'POST' && (response.request().postData() || '').includes('commercial_settings_save'));
+  await page.locator('.swal2-confirm').click();
+  const utmCampaigns = (((await (await utmSaved).json()).data.settings || {}).utm || {}).campanas || [];
+  assert(JSON.stringify(utmCampaigns) === JSON.stringify([{ label: 'Feria Vivienda 2026', value: 'feria_vivienda_2026' }]), 'El catálogo UTM no normalizó la campaña: ' + JSON.stringify(utmCampaigns));
+  await page.locator('.swal2-popup:has-text("Catálogo del generador UTM guardado")').waitFor();
+  await closeSwal(page);
+  await page.locator('#commercial-config-trigger').click();
+  await page.locator('[data-commercial-config-action="utm"]').click();
+  await utmMedia.first().waitFor();
+  // Sin medios no se puede guardar: el generador quedaría sin opciones.
+  await page.locator('[data-utm-list="medios"] [data-utm-remove-row]').evaluateAll(buttons => buttons.forEach(button => button.click()));
+  await page.locator('.swal2-confirm').click();
+  await page.locator('.swal2-validation-message:has-text("Agrega al menos una opción en Medios")').waitFor();
+  await page.locator('.swal2-cancel').click();
+  await page.locator('.swal2-container').waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
   assert(configSaves > 0, 'No se consultaron las categorías del calendario');
   await page.locator('[data-scm-calendar-open-create][data-calendar-mode="single"]:not([data-calendar-kind])').first().click();
   await page.locator('.scm-calendar-create-form').waitFor();

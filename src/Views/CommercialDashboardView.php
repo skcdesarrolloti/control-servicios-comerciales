@@ -518,6 +518,7 @@ final class CommercialDashboardView
                       ['actualizaciones', 'update', 'Actualizaciones de inmuebles', 'Plazos por tipo de negocio'],
                       ['destacados', 'star', 'Cupos de destacados', 'Inmuebles destacados por portal'],
                       ['aseo', 'cleaning_services', 'Calculadora de aseo', 'Salario, márgenes, insumos, transporte y tramos'],
+                      ['utm', 'link', 'Generador UTM', 'Medios, fuentes y campañas del equipo'],
                     ];
                   ?>
                   <?php foreach ($configItems as [$configKey, $configIcon, $configLabel, $configHint]): ?>
@@ -707,6 +708,7 @@ final class CommercialDashboardView
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-signs.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-signs.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-tools.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-tools.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-calculators.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-calculators.js')); ?>"></script>
+  <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-utm.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-utm.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-property-entry.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-property-entry.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-property-media.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-property-media.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-property-video.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-property-video.js')); ?>"></script>
@@ -1069,7 +1071,7 @@ final class CommercialDashboardView
         </a>
       <?php endif; ?>
 
-      <!-- Dropdown Herramientas (Simulador de ingreso neto, Ganancia ocasional, Calculadora de mercado, Calculadora de aseo) -->
+      <!-- Dropdown Herramientas (Simulador de ingreso neto, Ganancia ocasional, Calculadora de mercado, Calculadora de aseo, Generador UTM) -->
       <?php if (in_array('herramientas', $views, true)): ?>
         <div class="relative group/nav" data-commercial-dropdown="herramientas">
           <button type="button" class="flex items-center gap-space-xs px-2 lg:px-3 py-space-xs font-label-md text-label-md <?php echo $bucket === 'herramientas' ? ($activeClasses . ' active') : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-tab="herramientas" data-commercial-dropdown-trigger="herramientas" aria-expanded="false">
@@ -1111,6 +1113,15 @@ final class CommercialDashboardView
               <div>
                 <span class="block font-semibold text-on-surface">Calculadora de aseo</span>
                 <span class="block text-[11px] text-secondary">Cotización del servicio de aseo</span>
+              </div>
+            </a>
+            <?php endif; ?>
+            <?php if (!$policy instanceof CommercialAccessPolicy || $policy->canSubview('herramientas', 'generador_utm')): ?>
+            <a class="flex items-center gap-2.5 px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="herramientas" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'generador_utm'])); ?>">
+              <span class="material-symbols-outlined text-[18px] text-secondary" aria-hidden="true">link</span>
+              <div>
+                <span class="block font-semibold text-on-surface">Generador UTM</span>
+                <span class="block text-[11px] text-secondary">Enlaces de campaña con fuente y medio</span>
               </div>
             </a>
             <?php endif; ?>

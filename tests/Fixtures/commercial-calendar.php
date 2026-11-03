@@ -24,6 +24,8 @@ $pdo->sqliteCreateFunction('IF', static fn($condition, $yes, $no) => $condition 
 foreach (['cct_status', 'cct_author_id', 'cct_created', 'cct_modified', 'departamento'] as $column) {
   $pdo->exec("ALTER TABLE wp_jet_cct_confi_sistema ADD COLUMN `{$column}` TEXT");
 }
+// Configuración › Calculadora de aseo lee sus tablas de wp_options (commercial_settings_load trae todas las secciones).
+$pdo->exec('CREATE TABLE IF NOT EXISTS wp_options (option_id INTEGER PRIMARY KEY AUTOINCREMENT, option_name TEXT, option_value TEXT, autoload TEXT)');
 $propertyColumns = ['estado', 'codigo', 'tipo_negocio', 'tipo_inmueble', 'barrio', 'direccion', 'ciudad', 'ruta', 'destinacion', 'fecha_actualizacion', 'fecha_publicacion', 'cct_created', 'cct_modified', 'desea_aviso', 'presenta_aviso', 'fecha_retoque', 'fecha_aviso', 'fecha_captacion'];
 foreach ($propertyColumns as $column) {
   $pdo->exec("ALTER TABLE wp_jet_cct_inmuebles ADD COLUMN `{$column}` TEXT");

@@ -13,7 +13,7 @@ const { chromium } = require(process.env.SCM_PLAYWRIGHT_MODULE || 'playwright');
     await page.goto('http://127.0.0.1:8771/tests/Fixtures/commercial-tools.php');
     const tool = page.locator('[data-commercial-tool="simulador_ingreso_neto"]');
     await tool.waitFor();
-    assert.equal(await page.locator('[data-commercial-dropdown-menu="herramientas"] a').count(), 4);
+    assert.equal(await page.locator('[data-commercial-dropdown-menu="herramientas"] a').count(), 5);
     assert.match(await page.locator('[data-commercial-dropdown-menu="herramientas"]').textContent(), /Simulador de ingreso neto/);
     // Cada herramienta es su propia pestaña, como en el panel inmobiliario (sin subtab).
     assert.match(await page.locator('[data-commercial-dropdown-menu="herramientas"] a').first().getAttribute('href'), /[?&]tab=simulador_ingreso_neto$/);
@@ -189,6 +189,80 @@ const { chromium } = require(process.env.SCM_PLAYWRIGHT_MODULE || 'playwright');
     await page.screenshot({ path: 'output/commercial-tools-gain-guide.png' });
     await gain.locator('[data-go-dialog] footer [data-go-close]').click();
     await page.screenshot({ path: 'output/commercial-tools-gain.png', fullPage: true });
+
+    // Generador UTM (traído de dashboard-marketing) desde el menú Herramientas.
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write'], { origin: 'http://127.0.0.1:8771' });
+    await page.locator('[data-commercial-dropdown-trigger="herramientas"]').click();
+    await page.locator('[data-commercial-dropdown-menu="herramientas"] a[href*="generador_utm"]').click();
+    const utm = page.locator('[data-commercial-tool="generador_utm"]');
+    await utm.waitFor();
+    assert.equal(new URL(page.url()).search, '?tab=generador_utm');
+    assert.equal(await page.locator('[data-commercial-dropdown-trigger="herramientas"]').evaluate(node => node.classList.contains('active')), true);
+    // commercial-utm.js arma el enlace igual que UtmLinkBuilder (mismos casos que PHPUnit).
+    const cases = JSON.parse(fs.readFileSync('tests/Fixtures/utm-cases.json', 'utf8'));
+    const mirrored = await page.evaluate(({ slugCases, buildCases }) => ({
+      slugs: slugCases.map(([input]) => window.SCMCommercialUtm.slug(input)),
+      links: buildCases.map(item => { try { return window.SCMCommercialUtm.build(item.url, item.values); } catch (error) { return { error: error.message }; } }),
+    }), { slugCases: cases.slug, buildCases: cases.build });
+    assert.deepEqual(mirrored.slugs, cases.slug.map(([, expected]) => expected));
+    assert.deepEqual(mirrored.links, cases.build.map(item => item.error ? { error: item.error } : item.expected));
+    // El catálogo compartido (Configuración › Generador UTM) llena los selectores; el tracker suma lo que no está.
+    assert.equal(await utm.locator('[data-utm-field="medium"] option[value="whatsapp"]').count(), 1);
+    await page.waitForFunction(() => document.querySelector('[data-utm-tracker-status]').textContent === '2 campañas registradas.');
+    assert.deepEqual(await utm.locator('[data-utm-tracker-campaigns] [data-utm-pick]').allInnerTexts(), ['Feria de vivienda', 'Revista Esencia']);
+    assert.equal(await utm.locator('[data-utm-field="source"] [data-utm-group="tracker"] option').allInnerTexts().then(list => list.join('|')), 'Directo');
+    assert.equal(await utm.locator('[data-utm-field="source"] option[value="instagram"]').count(), 1);
+    // Campos obligatorios y URL inválida.
+    await utm.locator('[data-utm-generate]').click();
+    assert.equal(await utm.locator('[data-utm-status]').innerText(), 'Escribe la URL de destino.');
+    assert.equal(await utm.locator('[data-utm-status]').getAttribute('data-error'), 'true');
+    await utm.locator('[data-utm-field="url"]').fill('sucasainmobiliaria.com.co/inmueble/?id=45&utm_source=viejo#galeria');
+    await utm.locator('[data-utm-generate]').click();
+    assert.equal(await utm.locator('[data-utm-status]').innerText(), 'Falta la fuente del enlace.');
+    await utm.locator('[data-utm-field="medium"]').selectOption('whatsapp');
+    await utm.locator('[data-utm-field="source"]').selectOption('__otro__');
+    assert.equal(await utm.locator('[data-utm-other="source"]').isVisible(), true);
+    await utm.locator('[data-utm-other="source"]').fill('Aliado Bancario');
+    assert.equal(await utm.locator('[data-utm-preview="source"]').innerText(), 'En el enlace: utm_source=aliado_bancario');
+    await utm.locator('[data-utm-catalog-campaigns] [data-utm-pick]', { hasText: 'Revista Esencia junio' }).click();
+    assert.equal(await utm.locator('[data-utm-field="campaign"]').inputValue(), 'esencia-inmobiliaria-edicion-junio-2026');
+    assert.equal(await utm.locator('[data-utm-catalog-campaigns] [data-utm-pick]').getAttribute('aria-pressed'), 'true');
+    await utm.locator('[data-utm-field="content"]').fill('Banner Superior');
+    await utm.locator('[data-utm-generate]').click();
+    const link = 'https://sucasainmobiliaria.com.co/inmueble/?id=45&utm_source=aliado_bancario&utm_medium=whatsapp&utm_campaign=esencia-inmobiliaria-edicion-junio-2026&utm_content=banner_superior#galeria';
+    assert.equal(await utm.locator('[data-utm-result]').inputValue(), link);
+    await page.waitForFunction(() => /copiado|Cópialo/.test(document.querySelector('[data-utm-status]').textContent));
+    if ((await utm.locator('[data-utm-status]').innerText()) === 'Enlace copiado al portapapeles.') assert.equal(await page.evaluate(() => navigator.clipboard.readText()), link);
+    assert.match(await utm.locator('[data-utm-parts]').innerText(), /utm_content\s+banner_superior/);
+    assert.equal(await utm.locator('[data-utm-copy]').isDisabled(), false);
+    await page.screenshot({ path: 'output/commercial-tools-utm.png', fullPage: true });
+    // Cambiar un dato invalida el enlace; una campaña del tracker se normaliza al usarla.
+    await utm.locator('[data-utm-tracker-campaigns] [data-utm-pick]', { hasText: 'Revista Esencia' }).click();
+    assert.equal(await utm.locator('[data-utm-result]').inputValue(), '');
+    assert.equal(await utm.locator('[data-utm-preview="campaign"]').innerText(), 'En el enlace: utm_campaign=revista_esencia');
+    await utm.locator('[data-utm-reset]').click();
+    await page.waitForFunction(() => document.querySelector('[data-utm-field="url"]').value === '' && document.querySelector('[data-utm-other-box]').hidden);
+    assert.equal(await utm.locator('[data-utm-copy]').isDisabled(), true);
+
+    // Un cargo con sus herramientas guardadas sin el generador no lo ve en el menú y el servidor rechaza sus datos.
+    const restricted = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    try {
+      const other = await restricted.newPage();
+      await other.goto('http://127.0.0.1:8771/tests/Fixtures/commercial-tools.php?cargo=8');
+      await other.locator('[data-commercial-tool="simulador_ingreso_neto"]').waitFor();
+      assert.equal(await other.locator('[data-commercial-dropdown-menu="herramientas"] a').count(), 4);
+      assert.equal(await other.locator('[data-commercial-dropdown-menu="herramientas"] a[href*="generador_utm"]').count(), 0);
+      const denied = await other.evaluate(async () => {
+        const body = new FormData();
+        body.set('action', 'commercial_tools_utm_options');
+        body.set('nonce', 'fixture');
+        const response = await fetch('http://127.0.0.1:8771/tests/Fixtures/commercial-tools.php', { method: 'POST', body, credentials: 'same-origin' });
+        return { status: response.status, json: await response.json() };
+      });
+      assert.deepEqual(denied, { status: 403, json: { success: false, data: { message: 'No tienes permiso para usar el generador UTM.' } } });
+    } finally {
+      await restricted.close();
+    }
 
     await page.setViewportSize({ width: 390, height: 900 });
     await page.screenshot({ path: 'output/commercial-tools-mobile.png', fullPage: true });

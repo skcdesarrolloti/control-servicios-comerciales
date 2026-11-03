@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SCM\Commercial;
 
 use SCM\Commercial\Tools\CleaningSettings;
+use SCM\Commercial\Tools\UtmCatalog;
 use SCM\Core\Auth;
 use SCM\Core\Database;
 use SCM\Core\Settings;
@@ -14,6 +15,7 @@ use SCM\Support\SchemaInspector;
  * Menú "Configuración" del panel comercial: lee y guarda cada sección configurable.
  * Los valores que también usan otras aplicaciones (SLA de tareas, plazos y valores de avisos,
  * cupos de destacados, calculadora de aseo) se guardan en su fila de `jet_cct_confi_sistema` para mantener una sola fuente.
+ * Lo propio del panel (plazos de actualización, catálogo del Generador UTM) va en Settings.
  */
 final class CommercialSettingsService
 {
@@ -37,7 +39,7 @@ final class CommercialSettingsService
     'factor_prestacional' => ['Factor prestacional', 0, 0, 100],
   ];
 
-  public const SECTIONS = ['calendario', 'tiempos', 'avisos', 'actualizaciones', 'destacados', 'aseo'];
+  public const SECTIONS = ['calendario', 'tiempos', 'avisos', 'actualizaciones', 'destacados', 'aseo', 'utm'];
 
   private Database $db;
   private Settings $settings;
@@ -91,6 +93,8 @@ final class CommercialSettingsService
       'actualizaciones' => ['limits' => self::propertyUpdateLimits($this->settings)],
       'destacados' => ['portals' => $highlights],
       'aseo' => $this->cleaningSettings(),
+      // Solo las listas de medios, fuentes y campañas del Generador UTM.
+      'utm' => UtmCatalog::read($this->settings),
     ];
   }
 
@@ -116,6 +120,9 @@ final class CommercialSettingsService
         // Mismas filas que la calculadora de aseo del panel inmobiliario y el plugin de WordPress.
         (new CleaningSettings($this->db))->save($data, trim(Auth::employeeId()));
         return 'Configuración de la calculadora de aseo guardada.';
+      case 'utm':
+        UtmCatalog::save($this->settings, $data, Auth::userId());
+        return 'Catálogo del generador UTM guardado.';
     }
     throw new \InvalidArgumentException('Sección de configuración no válida.');
   }

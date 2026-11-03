@@ -1,0 +1,48 @@
+{
+  "slug": [
+    ["Feria Vivienda 2026", "feria_vivienda_2026"],
+    ["Correo Electrónico", "correo_electronico"],
+    ["esencia-inmobiliaria-edicion-junio-2026", "esencia-inmobiliaria-edicion-junio-2026"],
+    ["  --Hola__Mundo--  ", "hola_mundo"],
+    ["Año Nuevo!!", "ano_nuevo"],
+    ["a - b", "a-b"],
+    ["WhatsApp", "whatsapp"],
+    ["ÑANDÚ Ç", "nandu_c"],
+    ["¿?¡!", ""],
+    ["campaña 🚀 lanzamiento", "campana_lanzamiento"]
+  ],
+  "build": [
+    {
+      "url": "sucasainmobiliaria.com.co/arriendos",
+      "values": { "source": "Facebook", "medium": "Redes Sociales", "campaign": "Feria Vivienda" },
+      "expected": "https://sucasainmobiliaria.com.co/arriendos?utm_source=facebook&utm_medium=redes_sociales&utm_campaign=feria_vivienda"
+    },
+    {
+      "url": "https://sucasainmobiliaria.com.co",
+      "values": { "source": "instagram", "medium": "whatsapp", "campaign": "esencia-junio" },
+      "expected": "https://sucasainmobiliaria.com.co/?utm_source=instagram&utm_medium=whatsapp&utm_campaign=esencia-junio"
+    },
+    {
+      "url": "https://sucasainmobiliaria.com.co/inmueble/?id=45&utm_source=viejo&orden=precio#galeria",
+      "values": { "source": "Google", "medium": "Publicidad pagada", "campaign": "Arriendos Octubre", "content": "Banner Superior", "term": "apartamento en arriendo" },
+      "expected": "https://sucasainmobiliaria.com.co/inmueble/?id=45&orden=precio&utm_source=google&utm_medium=publicidad_pagada&utm_campaign=arriendos_octubre&utm_content=banner_superior&utm_term=apartamento_en_arriendo#galeria"
+    },
+    {
+      "url": "http://localhost:8080/landing?q=a+b&utm_content=keep",
+      "values": { "source": "base de datos", "medium": "email", "campaign": "boletin" },
+      "expected": "http://localhost:8080/landing?q=a+b&utm_content=keep&utm_source=base_de_datos&utm_medium=email&utm_campaign=boletin"
+    },
+    {
+      "url": "https://sucasainmobiliaria.com.co/?#contacto",
+      "values": { "source": "tiktok", "medium": "organico", "campaign": "video_1" },
+      "expected": "https://sucasainmobiliaria.com.co/?utm_source=tiktok&utm_medium=organico&utm_campaign=video_1#contacto"
+    },
+    { "url": "", "values": { "source": "a", "medium": "b", "campaign": "c" }, "error": "Escribe la URL de destino." },
+    { "url": "https://sucasa.com/a b", "values": { "source": "a", "medium": "b", "campaign": "c" }, "error": "La URL de destino no puede tener espacios." },
+    { "url": "javascript:alert(1)", "values": { "source": "a", "medium": "b", "campaign": "c" }, "error": "La URL de destino no es válida: debe ser una página web (https://…)." },
+    { "url": "ftp://sucasa.com", "values": { "source": "a", "medium": "b", "campaign": "c" }, "error": "La URL de destino no es válida: debe ser una página web (https://…)." },
+    { "url": "https://sucasa.com", "values": { "source": "a", "medium": "", "campaign": "c" }, "error": "Falta el medio del enlace." },
+    { "url": "https://sucasa.com", "values": { "source": "a", "medium": "b", "campaign": "" }, "error": "Falta la campaña del enlace." },
+    { "url": "https://sucasa.com", "values": { "source": "a", "medium": "b", "campaign": "c", "content": "¡¡!!" }, "error": "El valor de utm_content debe tener letras o números." }
+  ]
+}

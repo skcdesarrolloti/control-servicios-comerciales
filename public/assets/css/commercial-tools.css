@@ -428,6 +428,17 @@
 .ctl-link { padding:6px 10px; border:1px solid #cbd5e1; border-radius:10px; background:#fff; color:var(--ctl-navy); font:inherit; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap }
 .ctl-link:hover { background:var(--ctl-sky) }
 
+/* Generador UTM (copia de dashboard-marketing views/utm.php y public/assets/utm.css) */
+.ctl-label small { font-weight:500; color:var(--ctl-muted) }
+.ctl-utm-result { width:100%; min-height:96px; padding:12px 14px; border:1px solid #cbd5e1; border-radius:12px; background:#f8fafc; font:12.5px/1.5 ui-monospace,Consolas,monospace; color:var(--ctl-navy); word-break:break-all; resize:vertical }
+.ctl-utm-result:focus { outline:0; border-color:var(--ctl-blue); box-shadow:0 0 0 4px rgba(30,60,118,.12) }
+[data-utm-parts] dd { font-family:ui-monospace,Consolas,monospace; font-size:12px; white-space:normal; word-break:break-all; text-align:right }
+.ctl-chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; max-height:220px; overflow-y:auto }
+.ctl-chip { min-height:32px; max-width:100%; padding:0 12px; border:1px solid #dbe4f0; border-radius:999px; background:var(--ctl-sky); color:var(--ctl-navy); font:inherit; font-size:12px; font-weight:600; cursor:pointer; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.ctl-chip:hover { border-color:var(--ctl-blue) }
+.ctl-chip[aria-pressed=true] { background:var(--ctl-navy); color:#fff; border-color:var(--ctl-navy) }
+[data-commercial-tool=generador_utm] .ctl-subtitle { margin:0 }
+
 @media (max-width:1080px) {
   .ctl-layout,
   .ctl-layout--even { grid-template-columns:1fr }

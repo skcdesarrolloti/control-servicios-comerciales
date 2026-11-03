@@ -71,6 +71,7 @@ final class CommercialAccessPolicy
       'ganancia_ocasional' => 'Calculadora de ganancia ocasional',
       'calculadora_mercado' => 'Calculadora de mercado',
       'calculadora_aseo' => 'Calculadora de aseo',
+      'generador_utm' => 'Generador UTM',
     ],
   ];
 

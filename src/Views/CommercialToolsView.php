@@ -9,12 +9,16 @@ use SCM\Commercial\CommercialNetIncomeSimulator;
 use SCM\Commercial\CommercialOwnerPreapprovalService;
 use SCM\Commercial\Tools\CleaningCalculator;
 use SCM\Commercial\Tools\CleaningSettings;
+use SCM\Commercial\Tools\UtmCatalog;
+use SCM\Commercial\Tools\UtmLinkBuilder;
 use SCM\Core\Database;
+use SCM\Core\Settings;
 
 /**
  * Herramientas del panel comercial: simulador de ingreso neto del propietario con su crédito preaprobado (y PDF para el
- * propietario), calculadora de ganancia ocasional y las calculadoras de mercado y de aseo del panel inmobiliario
- * (commercial-calculators.js; el servidor filtra inmuebles, calcula el aseo y genera sus PDF). Los cálculos en pantalla se hacen en el navegador
+ * propietario), calculadora de ganancia ocasional, las calculadoras de mercado y de aseo del panel inmobiliario
+ * (commercial-calculators.js; el servidor filtra inmuebles, calcula el aseo y genera sus PDF) y el Generador UTM de
+ * dashboard-marketing (commercial-utm.js). Los cálculos en pantalla se hacen en el navegador
  * (commercial-tools.js); el servidor busca contratos, recalcula y genera el PDF (CommercialOwnerPreapprovalPdf).
  */
 final class CommercialToolsView
@@ -37,24 +41,27 @@ final class CommercialToolsView
   ];
 
   /**
-   * Datos que necesitan las calculadoras de mercado y aseo según el permiso del cargo.
-   * @return array{market_admin:bool,cleaning_internal:bool,cleaning_config:array<string,mixed>}
+   * Datos que necesitan las calculadoras de mercado y aseo según el permiso del cargo, y el catálogo del Generador UTM
+   * (solo las listas de medios, fuentes y campañas).
+   * @return array{market_admin:bool,cleaning_internal:bool,cleaning_config:array<string,mixed>,utm_catalog:array<string,mixed>}
    */
-  public static function context(string $tool, CommercialAccessPolicy $policy, Database $db): array
+  public static function context(string $tool, CommercialAccessPolicy $policy, Database $db, ?Settings $settings = null): array
   {
     return [
       'market_admin' => $policy->canAct('mercado_vista_completa'),
       'cleaning_internal' => $policy->canAct('aseo_vista_interna'),
       'cleaning_config' => $tool === 'calculadora_aseo' ? (new CleaningSettings($db))->read() : [],
+      'utm_catalog' => $tool === 'generador_utm' && $settings instanceof Settings ? UtmCatalog::read($settings) : [],
     ];
   }
 
-  /** @param array{market_admin?:bool,cleaning_internal?:bool,cleaning_config?:array<string,mixed>} $context */
+  /** @param array{market_admin?:bool,cleaning_internal?:bool,cleaning_config?:array<string,mixed>,utm_catalog?:array<string,mixed>} $context */
   public static function render(string $tool, ?CommercialOwnerPreapprovalService $service, string $baseUrl, array $context = []): string
   {
     if ($tool === 'ganancia_ocasional') return self::occasionalGain();
     if ($tool === 'calculadora_mercado') return self::market(!empty($context['market_admin']));
     if ($tool === 'calculadora_aseo') return self::cleaning(!empty($context['cleaning_internal']), $context['cleaning_config'] ?? []);
+    if ($tool === 'generador_utm') return self::utm($context['utm_catalog'] ?? []);
     return $service instanceof CommercialOwnerPreapprovalService ? self::netIncome($service) : '';
   }
 
@@ -411,5 +418,75 @@ final class CommercialToolsView
       . '</div></div>'
       . '<div data-cleaning-result><div class="ctl-empty"><span class="material-symbols-outlined" aria-hidden="true">receipt_long</span><p>Ingresa los datos y calcula para ver el valor del servicio.</p></div></div>'
       . '</section></div></section>';
+  }
+
+  /**
+   * Generador UTM (copia de dashboard-marketing views/utm.php con el diseño de las herramientas). El enlace se arma en
+   * el navegador (commercial-utm.js, mismo algoritmo que UtmLinkBuilder); las campañas del tracker se piden al abrir.
+   * @param array<string,mixed> $catalog UtmCatalog::read
+   */
+  private static function utm(array $catalog): string
+  {
+    $catalog = $catalog + UtmCatalog::defaults();
+    $options = static function (array $rows): string {
+      $html = '';
+      foreach ($rows as $row) {
+        if (!is_array($row) || (string) ($row['value'] ?? '') === '') continue;
+        $html .= '<option value="' . self::e($row['value']) . '">' . self::e((string) ($row['label'] ?? $row['value'])) . '</option>';
+      }
+      return $html;
+    };
+    $select = static fn(string $field, string $label, string $placeholder, string $other, array $rows): string => '<div class="ctl-field" data-utm-combo="' . $field . '">'
+      . '<label class="ctl-label" for="ctl-utm-' . $field . '">' . self::e($label) . ' <b class="ctl-required" aria-hidden="true">*</b></label>'
+      . '<span class="ctl-input"><select id="ctl-utm-' . $field . '" name="' . $field . '" data-utm-field="' . $field . '" required><option value="">' . self::e($placeholder) . '</option>'
+      . '<optgroup label="Catálogo" data-utm-group="catalog">' . $options($rows) . '</optgroup>'
+      . '<option value="__otro__">Otro (escribir)…</option></select></span>'
+      . '<span class="ctl-input" data-utm-other-box hidden><input type="text" name="' . $field . '_otro" data-utm-other="' . $field . '" maxlength="' . UtmLinkBuilder::MAX_LENGTH . '" placeholder="' . self::e($other) . '"></span>'
+      . '<small class="ctl-note" data-utm-preview="' . $field . '"></small></div>';
+    $text = static fn(string $field, string $label, string $placeholder, string $extra = ''): string => '<label class="ctl-field"><span class="ctl-label">' . $label . '</span>'
+      . '<span class="ctl-input"><input type="text" name="' . $field . '" data-utm-field="' . $field . '" maxlength="' . UtmLinkBuilder::MAX_LENGTH . '" placeholder="' . self::e($placeholder) . '"' . $extra . '></span>'
+      . '<small class="ctl-note" data-utm-preview="' . $field . '"></small></label>';
+    $chips = '';
+    foreach ((array) ($catalog['campanas'] ?? []) as $row) {
+      if (!is_array($row) || (string) ($row['value'] ?? '') === '') continue;
+      $chips .= '<button type="button" class="ctl-chip" data-utm-pick="' . self::e($row['value']) . '" title="' . self::e($row['value']) . '">' . self::e((string) ($row['label'] ?? $row['value'])) . '</button>';
+    }
+    $datalist = '';
+    foreach ((array) ($catalog['campanas'] ?? []) as $row) {
+      if (is_array($row) && (string) ($row['value'] ?? '') !== '') $datalist .= '<option value="' . self::e($row['value']) . '">' . self::e((string) ($row['label'] ?? '')) . '</option>';
+    }
+
+    return '<section class="ctl" data-commercial-tool="generador_utm">'
+      . self::hero('link', 'Generador UTM', 'Crea enlaces de campaña con fuente, medio y nombre para saber de dónde llegan las visitas. Los medios, fuentes y campañas del equipo se ajustan en <strong>Configuración › Generador UTM</strong>.')
+      . '<div class="ctl-layout ctl-layout--even">'
+      . '<form class="ctl-card ctl-stack" data-utm-form autocomplete="off" novalidate>'
+      . '<div class="ctl-card__head"><span class="ctl-step">1</span><div><h2>Datos del enlace</h2><p>Los valores se escriben en minúsculas, sin tildes ni espacios, para que el tracker no parta una campaña en variantes.</p></div></div>'
+      . '<label class="ctl-field"><span class="ctl-label">URL de destino <b class="ctl-required" aria-hidden="true">*</b></span><span class="ctl-input"><input type="text" inputmode="url" name="url" data-utm-field="url" maxlength="' . UtmLinkBuilder::MAX_URL_LENGTH . '" placeholder="https://sucasainmobiliaria.com.co/..." required></span>'
+      . '<small class="ctl-note">Si la URL ya trae parámetros o un #ancla, se conservan.</small></label>'
+      . '<div class="ctl-grid">'
+      . $select('medium', 'Medio / canal', 'Selecciona el medio', 'Escribe el medio', (array) ($catalog['medios'] ?? []))
+      . $select('source', 'Fuente / recurso', 'Selecciona la fuente', 'Escribe la fuente', (array) ($catalog['fuentes'] ?? []))
+      . '<div class="ctl-full">' . $text('campaign', 'Campaña <b class="ctl-required" aria-hidden="true">*</b>', 'feria_vivienda', ' list="ctl-utm-campaigns" required') . '</div>'
+      . $text('content', 'Contenido <small>(opcional, utm_content)</small>', 'banner_superior')
+      . $text('term', 'Término <small>(opcional, utm_term)</small>', 'apartamento_arriendo')
+      . '</div>'
+      . '<datalist id="ctl-utm-campaigns" data-utm-campaign-list>' . $datalist . '</datalist>'
+      . '<div class="ctl-actions"><button class="ctl-primary" type="submit" data-utm-generate><span class="material-symbols-outlined" aria-hidden="true">link</span>Generar y copiar</button>'
+      . '<button class="ctl-ghost" type="reset" data-utm-reset>Limpiar</button>'
+      . '<span class="ctl-status" role="status" aria-live="polite" data-utm-status></span></div>'
+      . '</form>'
+      . '<div class="ctl-stack">'
+      . '<section class="ctl-card ctl-stack">'
+      . '<div class="ctl-card__head ctl-card__head--split"><div><h2>Enlace generado</h2><p>Cópialo y úsalo en la pieza o el mensaje.</p></div>'
+      . '<div class="ctl-actions"><button type="button" class="ctl-secondary" data-utm-copy disabled><span class="material-symbols-outlined" aria-hidden="true">content_copy</span>Copiar</button></div></div>'
+      . '<textarea class="ctl-utm-result" data-utm-result readonly rows="4" placeholder="El enlace aparecerá aquí." aria-label="Enlace generado"></textarea>'
+      . '<dl class="ctl-breakdown" data-utm-parts></dl>'
+      . '</section>'
+      . '<section class="ctl-card ctl-stack">'
+      . '<div class="ctl-card__head"><span class="ctl-step"><span class="material-symbols-outlined" aria-hidden="true">campaign</span></span><div><h2>Campañas</h2><p>Toca una para usarla. Las del catálogo las define un administrador; las del tracker son las que ya han traído visitas.</p></div></div>'
+      . '<div><p class="ctl-subtitle">Catálogo</p><div class="ctl-chips" data-utm-catalog-campaigns>' . ($chips !== '' ? $chips : '<p class="ctl-note">Aún no hay campañas en el catálogo.</p>') . '</div></div>'
+      . '<div><p class="ctl-subtitle">Registradas en el tracker</p><p class="ctl-note" data-utm-tracker-status>Cargando campañas del tracker…</p><div class="ctl-chips" data-utm-tracker-campaigns></div></div>'
+      . '</section>'
+      . '</div></div></section>';
   }
 }

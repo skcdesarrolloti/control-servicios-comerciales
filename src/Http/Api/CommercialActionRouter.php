@@ -56,6 +56,7 @@ final class CommercialActionRouter
       'commercial_tools_market_analyze' => 'marketAnalyze',
       'commercial_tools_cleaning_calculate' => 'cleaningCalculate',
       'commercial_tools_cleaning_pdf' => 'cleaningPdf',
+      'commercial_tools_utm_options' => 'utmOptions',
       'commercial_property_entry_form' => 'propertyEntryForm',
       'commercial_property_entry_save' => 'propertyEntrySave',
       'commercial_property_neighborhood' => 'propertyNeighborhood',
