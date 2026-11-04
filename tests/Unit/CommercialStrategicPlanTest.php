@@ -96,6 +96,14 @@ final class CommercialStrategicPlanTest extends TestCase
     self::assertSame(1, $task['campanas_total']);
     self::assertTrue($task['mine']);
 
+    // Filtro de gestión en todas las pestañas, subiendo por la cadena.
+    self::assertSame([], $plan->list('metas', ['gestion' => 'Gestión de Mercadeo'], ''));
+    self::assertCount(2, $plan->list('metas', ['gestion' => 'gestion comercial'], ''));
+    self::assertCount(2, $plan->list('tareas', ['gestion' => 'Gestión Comercial'], ''));
+    self::assertSame([$this->ids['campana']], array_column($plan->list('campanas', ['gestion' => 'Gestión Comercial'], ''), 'id'));
+    self::assertSame([], $plan->list('campanas', ['gestion' => 'Gestión de Mercadeo'], ''));
+    self::assertSame(['Gestión Comercial'], $task['gestiones']);
+
     $gestiones = $plan->list('gestiones', [], '');
     self::assertSame([1, 1], array_column($gestiones, 'objetivos_total'));
     self::assertSame('Ventas y arriendos', $gestiones[array_search('Gestión Comercial', array_column($gestiones, 'nombre'), true)]['definicion']);

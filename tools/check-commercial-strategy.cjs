@@ -79,6 +79,11 @@ const BASE = 'http://127.0.0.1:8772/tests/Fixtures/commercial-strategy.php';
     // Bitácora: el avance con "completada" cambia el estado y descuenta de Mis tareas pendientes.
     await root.locator('[data-plan-tab="tareas"]').click();
     await page.waitForFunction(() => document.querySelector('[data-plan-list]').textContent.includes('Llamar a administradores'));
+    // Filtro de gestión: las tareas suben por meta → objetivo → gestión.
+    await root.locator('[data-plan-filter="gestion"]').selectOption('Gestión de Mercadeo');
+    await page.waitForFunction(() => document.querySelector('[data-plan-list]').textContent.includes('Sin registros'));
+    await root.locator('[data-plan-filter="gestion"]').selectOption('Gestión Comercial');
+    await page.waitForFunction(() => document.querySelectorAll('[data-plan-list] tbody tr').length === 3);
     await list.locator('tr', { hasText: 'Referidos de propietarios' }).locator('[data-plan-action="log"]').first().click();
     const log = root.locator('[data-plan-log-dialog]');
     await log.waitFor({ state: 'visible' });

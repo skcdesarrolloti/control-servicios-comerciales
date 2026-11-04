@@ -100,18 +100,21 @@
 
   // ── Filtros (renderFilters del plugin) ────────────────────────────────────
 
-  // El registro padre (gestión, objetivo, meta o tarea) no es un selector: los nombres son largos. Se llega a él con
-  // "Ver" y se muestra en la barra de contexto con "Volver".
+  // El registro padre directo (objetivo, meta o tarea) no es un selector: los nombres son largos. Se llega a él con
+  // "Ver" y se muestra en la barra de contexto con "Volver". La gestión (el nivel de arriba, nombres cortos) sí se
+  // filtra en todas las pestañas: el servidor sube por la cadena gestión → objetivo → meta → tarea → campaña.
   function filterDefs(plan) {
     var plain = function (values) { return values.map(function (value) { return { value: value, label: value }; }); };
     var people = plain(plan.options.funcionarios || []);
     var catalogNames = function (key) { return catalog(plan, key).map(function (row) { return { value: row.valor, label: row.nombre }; }); };
+    // Dentro de una gestión ("Ver objetivos") el filtro de gestión sobra: la barra de contexto ya la muestra.
+    var gestion = plan.context && plan.context.filter.gestion ? [] : [["gestion", "Gestión", catalogNames("gestiones")]];
     switch (plan.tab) {
-      case "objetivos": return [["responsable", "Responsable", people]];
-      case "metas": return [["estado", "Estado", plain(plan.options.estados_meta || [])]];
-      case "tareas": return [["estado", "Estado", plain(plan.options.estados_tarea || [])], ["responsable", "Responsable", people]];
-      case "mis_tareas": return [["estado", "Estado", plain(plan.options.estados_tarea || [])]];
-      case "campanas": return [["tipo", "Tipo de campaña", catalogNames("tipos_campana")], ["medio", "Medio", catalogNames("tipos_medio")], ["responsable", "Responsable", people]];
+      case "objetivos": return gestion.concat([["responsable", "Responsable", people]]);
+      case "metas": return gestion.concat([["estado", "Estado", plain(plan.options.estados_meta || [])]]);
+      case "tareas": return gestion.concat([["estado", "Estado", plain(plan.options.estados_tarea || [])], ["responsable", "Responsable", people]]);
+      case "mis_tareas": return gestion.concat([["estado", "Estado", plain(plan.options.estados_tarea || [])]]);
+      case "campanas": return gestion.concat([["tipo", "Tipo de campaña", catalogNames("tipos_campana")], ["medio", "Medio", catalogNames("tipos_medio")], ["responsable", "Responsable", people]]);
     }
     return [];
   }

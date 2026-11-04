@@ -85,9 +85,9 @@ final class StrategicPlanRepository
       return match ($table) {
         'gestiones' => true,
         'objetivos' => $match($row, 'gestion', 'perspectiva') && $match($row, 'responsable', 'responsables', true),
-        'metas' => $match($row, 'objetivo', 'id_objetivo') && $match($row, 'estado', 'estado') && $match($row, 'unidad', 'unidad'),
-        'tareas' => $match($row, 'meta', 'id_meta', true) && $match($row, 'estado', 'estado') && $match($row, 'responsable', 'responsables', true),
-        default => $match($row, 'tarea', 'id_tarea', true) && $match($row, 'tipo', 'tipo_campana') && $match($row, 'medio', 'tipos_medio', true) && $match($row, 'responsable', 'responsables', true),
+        'metas' => $match($row, 'gestion', 'gestiones', true) && $match($row, 'objetivo', 'id_objetivo') && $match($row, 'estado', 'estado') && $match($row, 'unidad', 'unidad'),
+        'tareas' => $match($row, 'gestion', 'gestiones', true) && $match($row, 'meta', 'id_meta', true) && $match($row, 'estado', 'estado') && $match($row, 'responsable', 'responsables', true),
+        default => $match($row, 'gestion', 'gestiones', true) && $match($row, 'tarea', 'id_tarea', true) && $match($row, 'tipo', 'tipo_campana') && $match($row, 'medio', 'tipos_medio', true) && $match($row, 'responsable', 'responsables', true),
       };
     }));
     return $rows;
@@ -586,6 +586,7 @@ final class StrategicPlanRepository
         $objective = $this->find('objetivos', (int) ($row['id_objetivo'] ?? 0));
         return $out + [
           'id_objetivo' => (string) (int) ($row['id_objetivo'] ?? 0),
+          'gestiones' => $this->managementsOf('metas', $id),
           'objetivo' => self::text($objective['nombre_objetivo'] ?? ''),
           'valor_actual' => self::numeric($row['valor_actual'] ?? ''),
           'valor_meta' => self::numeric($row['valor_meta'] ?? ''),
@@ -600,6 +601,7 @@ final class StrategicPlanRepository
         $responsables = self::split((string) ($row['responsable'] ?? ''));
         return $out + [
           'descripcion' => self::text($row['descripcion'] ?? ''),
+          'gestiones' => $this->managementsOf('tareas', $id),
           'id_meta' => array_map('strval', self::ids($row['id_meta'] ?? '')),
           'metas' => $names('metas', $row['id_meta'] ?? ''),
           'responsables' => $responsables,
@@ -616,6 +618,7 @@ final class StrategicPlanRepository
       case 'campanas':
         return $out + [
           'tipo_campana' => self::text($row['tipo_campana'] ?? ''),
+          'gestiones' => $this->managementsOf('campanas', $id),
           'id_tarea' => array_map('strval', self::ids($row['id_tarea'] ?? '')),
           'tareas' => $names('tareas', $row['id_tarea'] ?? ''),
           'id_actor' => array_map('strval', self::ids($row['id_actor'] ?? '')),
@@ -630,6 +633,25 @@ final class StrategicPlanRepository
         ];
     }
     return $out;
+  }
+
+  /**
+   * Gestiones a las que llega un registro subiendo por la cadena: meta → objetivo (perspectiva), tarea → sus metas,
+   * campaña → sus tareas. Una tarea o campaña con varios padres puede quedar en varias gestiones.
+   * @return list<string>
+   */
+  private function managementsOf(string $table, int $id): array
+  {
+    $row = $this->find($table, $id);
+    if ($row === null) return [];
+    $out = match ($table) {
+      'objetivos' => [self::text($row['perspectiva'] ?? '')],
+      'metas' => $this->managementsOf('objetivos', (int) ($row['id_objetivo'] ?? 0)),
+      'tareas' => array_merge([], ...array_map(fn(int $goal): array => $this->managementsOf('metas', $goal), self::ids($row['id_meta'] ?? ''))),
+      'campanas' => array_merge([], ...array_map(fn(int $task): array => $this->managementsOf('tareas', $task), self::ids($row['id_tarea'] ?? ''))),
+      default => [],
+    };
+    return array_values(array_unique(array_filter($out, static fn(string $name): bool => $name !== '')));
   }
 
   /** @return list<array<string,mixed>> */
