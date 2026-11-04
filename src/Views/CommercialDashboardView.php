@@ -519,6 +519,7 @@ final class CommercialDashboardView
                       ['destacados', 'star', 'Cupos de destacados', 'Inmuebles destacados por portal'],
                       ['aseo', 'cleaning_services', 'Calculadora de aseo', 'Salario, márgenes, insumos, transporte y tramos'],
                       ['utm', 'link', 'Generador UTM', 'Medios, fuentes y campañas del equipo'],
+                      ['analitica', 'monitoring', 'Analítica web', 'IPs internas, robots y retención de visitas'],
                     ];
                   ?>
                   <?php foreach ($configItems as [$configKey, $configIcon, $configLabel, $configHint]): ?>
@@ -662,6 +663,8 @@ final class CommercialDashboardView
             echo CommercialSignView::render($data['sign_service'], $policy);
           } elseif ($bucket === 'herramientas') {
             echo CommercialToolsView::render((string) ($data['tools_view'] ?? ''), $data['tools_service'] ?? null, $baseUrl, $data['tools_context'] ?? []);
+          } elseif ($bucket === 'promocion') {
+            echo (string) ($data['promotion_html'] ?? '');
           } elseif ($bucket === 'notificaciones') {
             echo CommercialNotificationsView::render($data['notifications_service'], $policy);
           } else {
@@ -1128,6 +1131,31 @@ final class CommercialDashboardView
           </div>
         </div>
       <?php endif; ?>
+
+      <!-- Dropdown Promoción: una entrada por subpestaña de SUBVIEWS['promocion'] que el cargo puede abrir -->
+      <?php if (in_array('promocion', $views, true)): ?>
+        <div class="relative group/nav" data-commercial-dropdown="promocion">
+          <button type="button" class="flex items-center gap-space-xs px-2 lg:px-3 py-space-xs font-label-md text-label-md <?php echo $bucket === 'promocion' ? ($activeClasses . ' active') : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-tab="promocion" data-commercial-dropdown-trigger="promocion" aria-expanded="false">
+            <span class="material-symbols-outlined text-[16px]" aria-hidden="true">campaign</span>
+            <span>Promoción</span>
+            <span class="material-symbols-outlined text-[16px] group-hover/nav:rotate-180 transition-transform" aria-hidden="true">expand_more</span>
+          </button>
+          <div class="absolute right-0 top-full hidden group-hover/nav:block bg-surface-container-lowest shadow-[0_12px_32px_rgba(0,0,0,0.14)] rounded-2xl py-space-xs min-w-[260px] z-50 border border-outline-variant/30 text-on-surface" data-commercial-dropdown-menu="promocion">
+            <?php foreach (CommercialAccessPolicy::SUBVIEWS['promocion'] as $promoKey => $promoLabel): ?>
+              <?php if (!$policy instanceof CommercialAccessPolicy || $policy->canSubview('promocion', $promoKey)): ?>
+              <?php [$promoIcon, $promoHint] = self::promotionMenu($promoKey); ?>
+              <a class="flex items-center gap-2.5 px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="promocion" href="<?php echo esc_url(self::url($baseUrl, ['tab' => $promoKey])); ?>">
+                <span class="material-symbols-outlined text-[18px] text-secondary" aria-hidden="true"><?php echo esc_html($promoIcon); ?></span>
+                <div>
+                  <span class="block font-semibold text-on-surface"><?php echo esc_html($promoLabel); ?></span>
+                  <?php if ($promoHint !== ''): ?><span class="block text-[11px] text-secondary"><?php echo esc_html($promoHint); ?></span><?php endif; ?>
+                </div>
+              </a>
+              <?php endif; ?>
+            <?php endforeach; ?>
+          </div>
+        </div>
+      <?php endif; ?>
     </nav>
     <div class="relative group/nav lg:hidden" data-commercial-dropdown="mobile">
       <button type="button" class="flex items-center gap-2 min-h-[44px] text-sm font-medium text-on-surface" data-commercial-dropdown-trigger="mobile" aria-expanded="false" aria-label="Abrir navegación comercial">
@@ -1137,10 +1165,10 @@ final class CommercialDashboardView
       </button>
       <nav class="absolute left-0 top-full hidden bg-white border border-slate-200 rounded-2xl shadow-modal p-2 w-72 max-w-[85vw] max-h-[75vh] overflow-y-auto z-50" data-commercial-dropdown-menu="mobile" aria-label="Navegación móvil">
         <?php foreach ($views as $mobileView): ?>
-          <?php if ($mobileView === 'herramientas'): ?>
-            <?php foreach (CommercialAccessPolicy::SUBVIEWS['herramientas'] as $toolKey => $toolLabel): ?>
-              <?php if (!$policy instanceof CommercialAccessPolicy || $policy->canSubview('herramientas', $toolKey)): ?>
-              <a class="block px-3 py-3 text-sm rounded-xl hover:bg-surface-container-low" data-commercial-tab="herramientas" href="<?php echo esc_url(self::url($baseUrl, ['tab' => $toolKey])); ?>">Herramientas · <?php echo esc_html($toolLabel); ?></a>
+          <?php if (isset(CommercialAccessPolicy::TAB_GROUPS[$mobileView])): ?>
+            <?php foreach (CommercialAccessPolicy::SUBVIEWS[$mobileView] as $toolKey => $toolLabel): ?>
+              <?php if (!$policy instanceof CommercialAccessPolicy || $policy->canSubview($mobileView, $toolKey)): ?>
+              <a class="block px-3 py-3 text-sm rounded-xl hover:bg-surface-container-low" data-commercial-tab="<?php echo esc_attr($mobileView); ?>" href="<?php echo esc_url(self::url($baseUrl, ['tab' => $toolKey])); ?>"><?php echo esc_html(CommercialAccessPolicy::VIEWS[$mobileView]); ?> · <?php echo esc_html($toolLabel); ?></a>
               <?php endif; ?>
             <?php endforeach; ?>
             <?php continue; ?>
@@ -4880,6 +4908,18 @@ final class CommercialDashboardView
     return (string) ob_get_clean();
   }
 
+  /** Ícono y ayuda de cada subpestaña de Promoción en el menú de escritorio (el móvil usa solo SUBVIEWS). */
+  private const PROMOTION_MENU = [
+    'analitica_web' => ['monitoring', 'Visitas, campañas y fuentes del sitio'],
+    'actividad_portales' => ['login', 'Ingresos y menús de los portales de clientes'],
+  ];
+
+  /** @return array{0:string,1:string} Ícono y ayuda; una subpestaña nueva sin entrada usa el ícono del grupo. */
+  private static function promotionMenu(string $key): array
+  {
+    return self::PROMOTION_MENU[$key] ?? ['campaign', ''];
+  }
+
   /** Acciones de la configuración de accesos, agrupadas por módulo. Toda acción de CommercialAccessPolicy::ACTIONS va en un grupo. */
   private const PERMISSION_ACTION_GROUPS = [
     'Tareas' => ['ver_ticket', 'responder', 'agregar_nota', 'seguimiento', 'postergar', 'activar', 'cerrar', 'cambiar_estado', 'reasignar'],
@@ -4887,6 +4927,7 @@ final class CommercialDashboardView
     'Precaptación' => ['precaptacion_crear', 'precaptacion_editar', 'precaptacion_ticket', 'precaptacion_catalogos'],
     'Inmuebles y avisos' => ['ingresar_inmueble', 'registrar_aviso', 'editar_actor'],
     'Herramientas' => ['mercado_vista_completa', 'aseo_vista_interna'],
+    'Promoción' => ['promocion_ver_ip'],
   ];
 
   /** @param array<int,string> $employeeCargoIds */
@@ -4934,7 +4975,7 @@ final class CommercialDashboardView
               <?php
               $cargoId = $cargo['id'];
               $isAdmin = isset($adminCargoIds[$cargoId]);
-              $current = $permissions[$cargoId] ?? ['views' => array_keys(CommercialAccessPolicy::VIEWS), 'actions' => array_values(array_diff(array_keys(CommercialAccessPolicy::ACTIONS), CommercialAccessPolicy::OPT_IN_ACTIONS))];
+              $current = $permissions[$cargoId] ?? ['views' => CommercialAccessPolicy::defaultViews(), 'actions' => array_values(array_diff(array_keys(CommercialAccessPolicy::ACTIONS), CommercialAccessPolicy::OPT_IN_ACTIONS))];
               $field = 'permissions[' . $cargoId . ']';
               ?>
               <div class="bg-surface-container-low rounded-xl p-space-md border border-surface-container space-y-space-sm" data-cargo="<?php echo esc_attr($cargoId); ?>"<?php echo $index === 0 ? '' : ' hidden'; ?>>
@@ -4974,7 +5015,7 @@ final class CommercialDashboardView
                         <span class="block font-label-sm text-[11px] uppercase font-semibold text-secondary"><?php echo esc_html($groupLabel); ?></span>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-2 items-start">
                           <?php foreach ($groupViews as $viewKey): ?>
-                            <?php $viewLabel = CommercialAccessPolicy::VIEWS[$viewKey]; $subviews = CommercialAccessPolicy::SUBVIEWS[$viewKey] ?? []; $viewOn = in_array($viewKey, $current['views'], true); $scope = CommercialAccessPolicy::SCOPES[$viewKey] ?? ''; $scopeOptions = CommercialAccessPolicy::SCOPED_VIEWS[$viewKey] ?? null; $seesAll = in_array($viewKey, $current['scope_all'] ?? [], true); ?>
+                            <?php $viewLabel = CommercialAccessPolicy::VIEWS[$viewKey]; $subviews = CommercialAccessPolicy::SUBVIEWS[$viewKey] ?? []; $viewOn = in_array($viewKey, $current['views'], true) || ($isAdmin && in_array($viewKey, CommercialAccessPolicy::OPT_IN_VIEWS, true)); $scope = CommercialAccessPolicy::SCOPES[$viewKey] ?? ''; $scopeOptions = CommercialAccessPolicy::SCOPED_VIEWS[$viewKey] ?? null; $seesAll = in_array($viewKey, $current['scope_all'] ?? [], true); ?>
                             <div class="p-2 rounded-lg bg-surface-container-lowest" data-perm-view>
                               <label class="flex items-start gap-2 text-body-sm font-semibold text-on-surface cursor-pointer">
                                 <input type="checkbox" name="<?php echo esc_attr($field); ?>[views][]" value="<?php echo esc_attr($viewKey); ?>"<?php checked($viewOn); ?> class="rounded text-primary mt-0.5" data-perm-view-input>

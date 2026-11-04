@@ -5,20 +5,49 @@ declare(strict_types=1);
 namespace SCM\Http\Api;
 
 use SCM\Http\Controller\CommercialApiController;
+use SCM\Http\Controller\PromotionApiController;
 
 final class CommercialActionRouter
 {
-  private CommercialApiController $controller;
+  /** Endpoints de la pestaña Promoción: los atiende PromotionApiController, que se crea solo cuando se piden. */
+  public const PROMOTION_ACTIONS = [
+    'commercial_promo_analytics_logs' => 'analyticsLogs',
+  ];
 
-  public function __construct(CommercialApiController $controller)
+  private CommercialApiController $controller;
+  /** @var (\Closure():PromotionApiController)|null */
+  private ?\Closure $promotion;
+
+  /** @param (\Closure():PromotionApiController)|null $promotion */
+  public function __construct(CommercialApiController $controller, ?\Closure $promotion = null)
   {
     $this->controller = $controller;
+    $this->promotion = $promotion;
   }
 
   /** @param array<string,mixed> $input */
   public function dispatch(string $action, array $input): bool
   {
-    $method = [
+    if (isset(self::PROMOTION_ACTIONS[$action])) {
+      if ($this->promotion === null) {
+        return false;
+      }
+      $target = ($this->promotion)();
+      $method = self::PROMOTION_ACTIONS[$action];
+    } else {
+      $target = $this->controller;
+      $method = self::controllerMethod($action);
+    }
+    if ($method === null) {
+      return false;
+    }
+    $target->{$method}($input);
+    return true;
+  }
+
+  private static function controllerMethod(string $action): ?string
+  {
+    return [
       'commercial_tickets_filter' => 'filterTickets',
       'commercial_ticket_detail' => 'ticketDetail',
       'commercial_ticket_analyze' => 'analyzeTicket',
@@ -78,10 +107,5 @@ final class CommercialActionRouter
       'commercial_highlight_release' => 'releaseHighlight',
       'commercial_highlight_toggle_premium' => 'togglePremium',
     ][$action] ?? null;
-    if ($method === null) {
-      return false;
-    }
-    $this->controller->{$method}($input);
-    return true;
   }
 }

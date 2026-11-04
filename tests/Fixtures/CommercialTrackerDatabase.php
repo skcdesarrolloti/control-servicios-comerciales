@@ -26,9 +26,15 @@ final class CommercialTrackerDatabase
     $pdo->exec('CREATE TABLE information_schema.TABLES (TABLE_SCHEMA TEXT, TABLE_NAME TEXT)');
     $pdo->exec('CREATE TABLE information_schema.COLUMNS (TABLE_SCHEMA TEXT, TABLE_NAME TEXT, COLUMN_NAME TEXT)');
     $pdo->exec('CREATE TABLE wp_jet_cct_confi_sistema (_ID INTEGER PRIMARY KEY AUTOINCREMENT, cct_status TEXT, cct_author_id TEXT, cct_created TEXT, cct_modified TEXT, funcion TEXT, valor TEXT, departamento TEXT)');
-    $pdo->exec('CREATE TABLE wp_jet_cct_tracker_logs (_ID INTEGER PRIMARY KEY AUTOINCREMENT, ' . implode(', ', array_map(static fn(string $c): string => $c . ' TEXT', self::COLUMNS)) . ')');
-    $pdo->exec('CREATE TABLE wp_jet_cct_tracker_camps (_ID INTEGER PRIMARY KEY AUTOINCREMENT, slug TEXT, nombre TEXT, descripcion TEXT, fecha_creacion TEXT, activo TEXT)');
+    self::addTrackerTables($pdo);
     return new Database($pdo);
+  }
+
+  /** Tablas del tracker de dashboard-marketing (también las usa la base de Promoción). */
+  public static function addTrackerTables(PDO $pdo): void
+  {
+    $pdo->exec('CREATE TABLE IF NOT EXISTS wp_jet_cct_tracker_logs (_ID INTEGER PRIMARY KEY AUTOINCREMENT, ' . implode(', ', array_map(static fn(string $c): string => $c . ' TEXT', self::COLUMNS)) . ')');
+    $pdo->exec('CREATE TABLE IF NOT EXISTS wp_jet_cct_tracker_camps (_ID INTEGER PRIMARY KEY AUTOINCREMENT, slug TEXT, nombre TEXT, descripcion TEXT, fecha_creacion TEXT, activo TEXT)');
   }
 
   /** @param array<string,string|int|null> $row Columnas de tracker_logs; las omitidas quedan como en el tracker real. */

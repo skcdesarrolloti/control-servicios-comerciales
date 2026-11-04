@@ -24,6 +24,7 @@ final class CommercialAccessPolicy
     'avisos' => 'Avisos en fachada',
     'notificaciones' => 'Notificaciones comerciales',
     'herramientas' => 'Herramientas',
+    'promocion' => 'Promoción',
   ];
 
   public const ACTIONS = [
@@ -47,10 +48,17 @@ final class CommercialAccessPolicy
     'ingresar_inmueble' => 'Ingresar inmuebles desde una tarea',
     'mercado_vista_completa' => 'Calculadora de mercado: estadística completa y tabla de inmuebles',
     'aseo_vista_interna' => 'Calculadora de aseo: costos, márgenes, utilidades y PDF internos',
+    'promocion_ver_ip' => 'Promoción: ver IP y navegador en logs y actividad de portales',
   ];
 
   /** Acciones que un cargo sin configurar no recibe por defecto: hay que marcarlas. */
-  public const OPT_IN_ACTIONS = ['editar_actor', 'mercado_vista_completa', 'aseo_vista_interna'];
+  public const OPT_IN_ACTIONS = ['editar_actor', 'mercado_vista_completa', 'aseo_vista_interna', 'promocion_ver_ip'];
+
+  /**
+   * Vistas que un cargo sin configurar no recibe por defecto: hay que marcarlas en Permisos. Los cargos con acceso total
+   * administrativo las ven siempre.
+   */
+  public const OPT_IN_VIEWS = ['promocion'];
 
   public const SUBVIEWS = [
     'inmuebles' => [
@@ -73,6 +81,20 @@ final class CommercialAccessPolicy
       'calculadora_aseo' => 'Calculadora de aseo',
       'generador_utm' => 'Generador UTM',
     ],
+    // Promoción (traída por fases de dashboard-marketing): cada subpestaña se agrega cuando ya funciona.
+    'promocion' => [
+      'analitica_web' => 'Analítica web',
+      'actividad_portales' => 'Actividad de portales',
+    ],
+  ];
+
+  /**
+   * Grupos del menú cuyas subpestañas son pestañas propias (?tab=generador_utm, ?tab=analitica_web) y clave de la entrada
+   * donde queda la subpestaña al normalizar.
+   */
+  public const TAB_GROUPS = [
+    'herramientas' => 'herramienta',
+    'promocion' => 'promocion_sub',
   ];
 
   /** Grupos del menú del encabezado, en el mismo orden, para la configuración de accesos. */
@@ -81,6 +103,7 @@ final class CommercialAccessPolicy
     'Actividades comerciales' => ['precaptacion', 'anadir_aviso', 'actualizaciones', 'avisos', 'abiertos', 'mis_tickets', 'postergados', 'cerrados'],
     'Inventario' => ['inmuebles'],
     'Comunicación y herramientas' => ['notificaciones', 'herramientas'],
+    'Promoción' => ['promocion'],
   ];
 
   /**
@@ -122,22 +145,56 @@ final class CommercialAccessPolicy
   /**
    * Cada herramienta es su propia pestaña (?tab=simulador_ingreso_neto), igual que las vistas del panel inmobiliario;
    * "Herramientas" es solo el grupo del menú y el permiso. Devuelve la entrada con tab=herramientas y la herramienta en
-   * `herramienta`. Acepta el formato anterior (?tab=herramientas&subtab=preaprobado).
+   * `herramienta`. Acepta el formato anterior (?tab=herramientas&subtab=preaprobado). Hoy normaliza todos los grupos de
+   * TAB_GROUPS (también Promoción); se conserva el nombre porque lo usan los dos controladores y las pruebas.
    * @param array<string,mixed> $input
    * @return array<string,mixed>
    */
   public static function normalizeToolTab(array $input): array
   {
+    return self::normalizeTabGroup($input);
+  }
+
+  /**
+   * ?tab=<subpestaña> de un grupo de TAB_GROUPS queda como tab=<grupo> y la subpestaña en su clave (herramienta,
+   * promocion_sub). ?tab=<grupo>&subtab=<clave> también funciona.
+   * @param array<string,mixed> $input
+   * @return array<string,mixed>
+   */
+  public static function normalizeTabGroup(array $input): array
+  {
     $tab = trim((string) ($input['tab'] ?? ''));
-    $tools = self::SUBVIEWS['herramientas'];
-    if (isset($tools[$tab]) || isset(self::LEGACY_TOOLS[$tab])) {
-      $input['herramienta'] = self::LEGACY_TOOLS[$tab] ?? $tab;
-      $input['tab'] = 'herramientas';
-    } elseif ($tab === 'herramientas' && trim((string) ($input['herramienta'] ?? '')) === '') {
-      $legacy = trim((string) ($input['subtab'] ?? ''));
-      $input['herramienta'] = self::LEGACY_TOOLS[$legacy] ?? $legacy;
+    foreach (self::TAB_GROUPS as $group => $key) {
+      $legacy = $group === 'herramientas' ? self::LEGACY_TOOLS : [];
+      if (isset(self::SUBVIEWS[$group][$tab]) || isset($legacy[$tab])) {
+        $input[$key] = $legacy[$tab] ?? $tab;
+        $input['tab'] = $group;
+        return $input;
+      }
+      if ($tab === $group && trim((string) ($input[$key] ?? '')) === '') {
+        $previous = trim((string) ($input['subtab'] ?? ''));
+        $input[$key] = $legacy[$previous] ?? $previous;
+        return $input;
+      }
     }
     return $input;
+  }
+
+  /** Grupo de TAB_GROUPS al que pertenece una subpestaña, o '' si no es de ninguno. */
+  public static function tabGroupOf(string $tab): string
+  {
+    foreach (array_keys(self::TAB_GROUPS) as $group) {
+      if (isset(self::SUBVIEWS[$group][$tab])) {
+        return $group;
+      }
+    }
+    return '';
+  }
+
+  /** Vistas que recibe un cargo sin configuración guardada: todas menos las de OPT_IN_VIEWS. @return array<int,string> */
+  public static function defaultViews(): array
+  {
+    return array_values(array_diff(array_keys(self::VIEWS), self::OPT_IN_VIEWS));
   }
 
   private Settings $settings;
@@ -190,7 +247,7 @@ final class CommercialAccessPolicy
     if ($this->canManage()) {
       return true;
     }
-    if (!in_array($view, $this->allowed('views', array_keys(self::VIEWS)), true)) {
+    if (!in_array($view, $this->allowed('views', self::defaultViews()), true)) {
       return false;
     }
     return !isset(self::SUBVIEWS[$view]) || $this->allowedSubviews($view) !== [];
@@ -221,7 +278,7 @@ final class CommercialAccessPolicy
     if (!isset(self::SUBVIEWS[$view])) {
       return $input;
     }
-    $key = $view === 'inmuebles' ? 'property_subtab' : ($view === 'herramientas' ? 'herramienta' : 'subtab');
+    $key = $view === 'inmuebles' ? 'property_subtab' : (self::TAB_GROUPS[$view] ?? 'subtab');
     $requested = trim((string) ($input[$key] ?? ($view === 'inmuebles' ? ($input['subtab'] ?? '') : '')));
     $allowed = $this->allowedSubviews($view);
     if ($requested === '') {

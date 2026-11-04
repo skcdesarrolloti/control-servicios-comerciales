@@ -1,7 +1,7 @@
 /*
  * Menú "Configuración" del encabezado comercial. Cada opción abre un popup con su sección:
- * calendario, tiempos de atención, avisos, actualizaciones de inmuebles, cupos de destacados, calculadora de aseo y
- * catálogo del Generador UTM.
+ * calendario, tiempos de atención, avisos, actualizaciones de inmuebles, cupos de destacados, calculadora de aseo,
+ * catálogo del Generador UTM y Analítica web (Promoción).
  * Permisos reutiliza su modal existente.
  */
 (function () {
@@ -320,6 +320,56 @@
           if (box.getAttribute("data-required") === "1" && !data[key].length) throw new Error("Agrega al menos una opción en " + box.querySelector("h4").textContent + ".");
         });
         return data;
+      },
+    },
+    // Promoción › Analítica web: IPs internas, robots, retención de visitas crudas y dominios propios. El estado de los
+    // resúmenes es solo lectura (lo mueve bin/tracker-rollup.php y la puesta al día al abrir la pantalla).
+    analitica: {
+      title: "Analítica web",
+      html: function (settings) {
+        var status = settings.status || {};
+        var purge = status.last_purge || {};
+        var number = function (value) { return value == null ? "sin dato" : Number(value).toLocaleString("es-CO"); };
+        var check = function (name, label, hint, on) {
+          return '<label class="flex items-start gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white cursor-pointer text-left"><input type="checkbox" class="mt-1" name="' + name + '"' + (on ? " checked" : "") + '><span class="text-sm text-slate-800">' + esc(label) + '<small class="block text-[11px] text-slate-500">' + esc(hint) + "</small></span></label>";
+        };
+        var area = function (name, label, hint, values, placeholder) {
+          return '<label class="block text-left"><span class="block text-xs font-semibold text-slate-700 mb-1">' + esc(label) + "</span>" +
+            '<textarea class="w-full px-2 py-1.5 rounded-lg border border-slate-300 text-sm font-mono" rows="4" name="' + name + '" placeholder="' + esc(placeholder) + '">' + esc((values || []).join("\n")) + "</textarea>" +
+            '<span class="block text-[11px] text-slate-500 mt-1">' + esc(hint) + "</span></label>";
+        };
+        var rows = [
+          ["Último registro resumido", status.last_id ? "#" + number(status.last_id) + (status.last_fecha ? " · " + status.last_fecha : "") : "Todavía no se ha resumido nada"],
+          ["Visitas pendientes por resumir", number(status.pending)],
+          ["Última actualización", status.updated_at || "—"],
+          ["Última purga", purge.deleted ? number(purge.deleted) + " visitas del " + (purge.first || "") + " al " + (purge.last || "") + " (" + (purge.at || "") + ")" : "Nunca"],
+        ];
+        return '<form data-config-form class="text-left space-y-4" data-analytics-config>' +
+          intro("Cómo se cuentan las visitas en Promoción › Analítica web. Las IPs internas y los dominios propios se aplican a las visitas que se resuman desde ahora; para recalcular días anteriores se ejecuta <code>php bin/tracker-rollup.php --rebuild-from=AAAA-MM-DD</code>.") +
+          '<section class="space-y-3">' + area("internal_ips", "IPs internas (oficina y equipo)", "Una por línea: IP exacta (IPv4 o IPv6), rango CIDR (190.0.0.0/24) o prefijo IPv4 (190.0.0.).", settings.internal_ips, "190.0.0.10\n10.0.0.0/8") +
+          '<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">' +
+          check("exclude_bots", "No contar robots", "Buscadores, monitores y navegadores automáticos.", settings.exclude_bots !== false) +
+          check("exclude_internal", "No contar visitas internas", "Las que llegan desde las IPs internas de arriba.", settings.exclude_internal !== false) + "</div>" +
+          area("own_domains", "Dominios propios", "Una por línea. Las visitas que llegan desde ellos cuentan como navegación interna, no como sitio de referencia.", settings.own_domains, "sucasainmobiliaria.com.co") +
+          '<label class="block text-left"><span class="block text-xs font-semibold text-slate-700 mb-1">Conservar visitas crudas (días)</span>' +
+          numberField("raw_retention_days", settings.raw_retention_days || 0, 0, settings.max_retention_days || 3650) +
+          '<span class="block text-[11px] text-slate-500 mt-1">0 = no borrar nunca. Si pones un número (mínimo 30), solo <code>php bin/tracker-rollup.php --purge</code> borra las visitas ya resumidas más antiguas que eso, y deja el rastro. Ojo: dashboard-marketing también lee esas visitas y las pierde en su propia analítica.</span></label></section>' +
+          '<section><h4 class="text-sm font-bold text-slate-800 mb-1">Estado de los resúmenes</h4>' +
+          tableHtml(["Dato", "Valor"], rows.map(function (row) {
+            return '<tr><td class="py-2 px-2 font-medium text-slate-800">' + esc(row[0]) + '</td><td class="py-2 px-2 text-right" data-analytics-status>' + esc(row[1]) + "</td></tr>";
+          })) + "</section></form>";
+      },
+      collect: function (form) {
+        var days = String(form.querySelector('[name="raw_retention_days"]').value || "0").trim();
+        if (!/^\d+$/.test(days)) throw new Error("Los días para conservar las visitas crudas deben ser un número entero.");
+        if (Number(days) > 0 && Number(days) < 30) throw new Error("Conserva al menos 30 días de visitas crudas, o escribe 0 para no borrar nunca.");
+        return {
+          internal_ips: form.querySelector('[name="internal_ips"]').value,
+          own_domains: form.querySelector('[name="own_domains"]').value,
+          exclude_bots: form.querySelector('[name="exclude_bots"]').checked,
+          exclude_internal: form.querySelector('[name="exclude_internal"]').checked,
+          raw_retention_days: days,
+        };
       },
     },
   };
