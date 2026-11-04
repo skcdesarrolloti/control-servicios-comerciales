@@ -83,7 +83,7 @@ final class CommercialMediosTest extends TestCase
     $resolver = new MedioResolver(MedioSeed::rows());
     foreach ([
       'finca raiz' => 'Finca Raíz', 'FINCA-RAIZ' => 'Finca Raíz', 'finca_raiz' => 'Finca Raíz', 'Estado WhatsApp' => 'Estado whatsapp',
-      'Retencion de contrato' => 'Retencion de contrato', 'Retención de contrato' => 'Retencion de contrato', 'Retencion' => 'Retencion', 'Ruta' => 'Por ruta', 'por_ruta' => 'Por ruta',
+      'Retencion de contrato' => 'Retencion de contrato', 'Retención de contrato' => 'Retencion de contrato', 'Retencion' => 'Retencion', 'Ruta' => 'Ruta', 'por_ruta' => 'Por ruta',
       'ig' => 'Instagram', 'Portal Propietario' => 'Portal propietario', 'Historia Instagram' => 'Historia instagram', ' Referido ' => 'Referido',
       'Correo Electrónico' => 'Correo', 'Email' => 'Correo', 'chatgpt.com' => 'ChatGPT / IA', 'chatgpt_ia' => 'ChatGPT / IA',
     ] as $raw => $name) {
@@ -128,7 +128,7 @@ final class CommercialMediosTest extends TestCase
     self::assertFalse($catalog->ready());
     // Sin la tabla se resuelve con la lista inicial y no se puede editar.
     self::assertCount(count(MedioSeed::ROWS), $catalog->all());
-    self::assertSame('Por ruta', $catalog->canonical('Ruta'));
+    self::assertSame('Ruta', $catalog->canonical('Ruta'), 'Ruta y Por ruta son medios distintos.');
     try {
       $catalog->add('Volante');
       self::fail('Sin instalar no se puede editar.');
@@ -166,7 +166,7 @@ final class CommercialMediosTest extends TestCase
     self::assertSame('Ruta', $values['jet_cct_tickets'][3]);
     $renamed = $catalog->all()[14];
     self::assertSame(['Ruta comercial', 'ruta_comercial'], [$renamed['nombre'], $renamed['slug']]);
-    self::assertSame(['Ruta', 'Por ruta'], $renamed['aliases']);
+    self::assertSame(['Por ruta'], $renamed['aliases']);
     self::assertSame('Ruta comercial', $catalog->canonical('Por ruta'));
     self::assertSame('Ruta comercial', $catalog->canonical('por_ruta'), 'Los enlaces UTM ya publicados siguen contando.');
     $glossary = CommercialMediosDatabase::glossary($this->db);
@@ -256,7 +256,7 @@ final class CommercialMediosTest extends TestCase
     self::assertSame([['value' => 'Valor raro', 'total' => 2, 'tables' => ['jet_cct_tickets' => 1, 'jet_cct_estudios_aseguradoras' => 1]]], $unresolved['records']);
     $variants = array_column($unresolved['variants'], null, 'value');
     self::assertArrayNotHasKey('Retencion de contrato', $variants, 'Retencion de contrato es un medio propio: no se reescribe.');
-    self::assertSame('Por ruta', $variants['Ruta']['medio']);
+    self::assertArrayNotHasKey('Ruta', $variants, 'Ruta es un medio propio: no se reescribe.');
     self::assertSame('Portal propietario', $variants['Portal Propietario']['medio']);
     self::assertSame(['Base de Datos Propietarios'], array_column($unresolved['visits'], 'value'));
     self::assertSame(['jet_cct_cct_llamadas' => 0, 'jet_cct_tickets' => 1, 'jet_cct_cierres' => 0, 'jet_cct_contratos_arrendamiento' => 0, 'jet_cct_estudios_aseguradoras' => 1,
@@ -276,10 +276,10 @@ final class CommercialMediosTest extends TestCase
     self::assertSame('Otro', CommercialMediosDatabase::values($this->db)['jet_cct_estudios_aseguradoras'][1]);
     self::assertSame(2, (int) $this->db->getVar("SELECT COUNT(*) FROM wp_scm_medios_backup b JOIN wp_scm_medios_log l ON l.id = b.log_id WHERE l.action = 'rewrite'"));
     try {
-      $catalog->rewriteRaw('Ruta', $this->idOf($catalog, 'Aviso'));
-      self::fail('"Ruta" ya es de Por ruta.');
+      $catalog->rewriteRaw('Portal Propietario', $this->idOf($catalog, 'Aviso'));
+      self::fail('"Portal Propietario" ya es de Portal propietario.');
     } catch (\InvalidArgumentException $exception) {
-      self::assertStringContainsString('Por ruta', $exception->getMessage());
+      self::assertStringContainsString('Portal propietario', $exception->getMessage());
     }
   }
 
@@ -325,36 +325,37 @@ final class CommercialMediosTest extends TestCase
     }
     self::assertStringContainsString('No se escribe nada en la base.', $output);
     self::assertStringContainsString('la tabla wp_scm_medios no existe todavía', $output);
-    self::assertStringContainsString('Se agregan: Portal arrendatario, Portal propietario, Portal copropiedad, Panel administrativo, Retencion de contrato, WhatsApp cliente, WhatsApp Guardian, Otro, SMS, WhatsApp, ChatGPT / IA.', $output);
-    self::assertStringContainsString("  wp_jet_cct_tickets.medio\n    \"Portal Propietario\" -> \"Portal propietario\": 1 filas\n    \"Ruta\" -> \"Por ruta\": 1 filas", $output);
+    self::assertStringContainsString('Se agregan: Portal arrendatario, Portal propietario, Portal copropiedad, Panel administrativo, Retencion de contrato, Ruta, WhatsApp cliente, WhatsApp Guardian, Otro, SMS, WhatsApp, ChatGPT / IA.', $output);
+    self::assertStringContainsString("  wp_jet_cct_tickets.medio\n    \"Portal Propietario\" -> \"Portal propietario\": 1 filas\n", $output);
+    self::assertStringNotContainsString('"Ruta" ->', $output);
     self::assertStringContainsString("  wp_jet_cct_tracker_logs.utm_source\n    \"Estado WhatsApp\" -> \"Estado whatsapp\": 1 filas\n    \"chatgpt.com\" -> \"ChatGPT / IA\": 1 filas\n    \"ig\" -> \"Instagram\": 1 filas", $output);
     self::assertStringContainsString("  wp_jet_cct_tracker_logs.utm_medium\n    \"Correo Electrónico\" -> \"Correo\": 1 filas", $output);
-    self::assertStringContainsString('Total: 3 filas en registros y 4 en visitas web.', $output);
+    self::assertStringContainsString('Total: 1 filas en registros y 4 en visitas web.', $output);
     self::assertStringContainsString('registros "Valor raro": 2', $output);
     self::assertStringNotContainsString('"Directo"', $output);
 
     [$code, $output] = $this->normalize(['--apply'], true);
     self::assertSame(0, $code, $output);
     $values = CommercialMediosDatabase::values($this->db);
-    self::assertSame(['Referido', 'Retencion de contrato', 'Retencion de contrato', 'Por ruta', 'Portal arrendatario', 'Portal propietario', 'Retencion', 'Panel administrativo', 'Valor raro', ''], $values['jet_cct_tickets']);
-    self::assertSame(['WhatsApp Guardian', 'Por ruta'], $values['jet_cct_solicitudes_no_prorroga_contrato']);
+    self::assertSame(['Referido', 'Retencion de contrato', 'Retencion de contrato', 'Ruta', 'Portal arrendatario', 'Portal propietario', 'Retencion', 'Panel administrativo', 'Valor raro', ''], $values['jet_cct_tickets']);
+    self::assertSame(['WhatsApp Guardian', 'Ruta'], $values['jet_cct_solicitudes_no_prorroga_contrato']);
     self::assertSame(CommercialMediosDatabase::RECORDS['jet_cct_cct_llamadas'], $values['jet_cct_cct_llamadas'], 'Vacíos, NULL y nombres exactos no cambian.');
     self::assertSame([['Instagram', 'social'], ['Estado whatsapp', 'WhatsApp'], ['Base de Datos Clientes', 'Correo'], ['Directo', 'Navegador'], ['ChatGPT / IA', ''], ['Inmuebles', 'Pagina Web']],
       array_map(static fn(array $row): array => [$row['utm_source'], $row['utm_medium']], $this->db->getResults('SELECT utm_source, utm_medium FROM wp_jet_cct_tracker_logs ORDER BY _ID')));
     self::assertSame(array_keys(MedioSeed::ROWS), CommercialMediosDatabase::glossary($this->db));
     $logId = (int) $this->db->getVar("SELECT id FROM wp_scm_medios_log WHERE action = 'normalize'");
-    self::assertSame(7, (int) $this->db->getVar('SELECT COUNT(*) FROM wp_scm_medios_backup WHERE log_id = ?', [$logId]));
+    self::assertSame(5, (int) $this->db->getVar('SELECT COUNT(*) FROM wp_scm_medios_backup WHERE log_id = ?', [$logId]));
     self::assertStringContainsString('--revert=' . $logId, $output);
 
     [, $again] = $this->normalize(['--apply'], true);
     self::assertStringContainsString('No hay valores por normalizar.', $again);
 
     // Revertir devuelve cada fila a su valor anterior (solo las que siguen con el valor que les puso ese paso).
-    $this->db->update('wp_jet_cct_tickets', ['medio' => 'Aviso'], ['_ID' => 4]);
+    $this->db->update('wp_jet_cct_tickets', ['medio' => 'Aviso'], ['_ID' => 6]);
     [$code, $output] = $this->normalize(['--revert=' . $logId], true);
     self::assertSame(0, $code, $output);
     $values = CommercialMediosDatabase::values($this->db);
-    self::assertSame(['Referido', 'Retencion de contrato', 'Retencion de contrato', 'Aviso', 'Portal arrendatario', 'Portal Propietario', 'Retencion', 'Panel administrativo', 'Valor raro', ''], $values['jet_cct_tickets']);
+    self::assertSame(['Referido', 'Retencion de contrato', 'Retencion de contrato', 'Ruta', 'Portal arrendatario', 'Aviso', 'Retencion', 'Panel administrativo', 'Valor raro', ''], $values['jet_cct_tickets']);
     self::assertSame('ig', $this->db->getVar('SELECT utm_source FROM wp_jet_cct_tracker_logs WHERE _ID = 1'));
     self::assertStringContainsString('1 omitidas', $output);
 

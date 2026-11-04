@@ -20,7 +20,7 @@ use SCM\Core\Settings;
  *
  * Qué se reescribe: en las columnas `medio` de los registros y en utm_source / utm_medium de las visitas
  * (jet_cct_tracker_logs), los valores que la lista reconoce pero no están escritos con el nombre exacto del medio
- * ("Ruta" -> "Por ruta", "Portal Propietario" -> "Portal propietario",
+ * ("Portal Propietario" -> "Portal propietario",
  * "ig" -> "Instagram", "Correo Electrónico" -> "Correo"...). Los vacíos, los valores sin reconocer y los que pone el
  * tracker en las visitas sin UTM (Directo, Inmuebles, Navegador, Pagina Web) no se tocan.
  *

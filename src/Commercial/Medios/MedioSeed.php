@@ -9,7 +9,7 @@ namespace SCM\Commercial\Medios;
  *
  * - Los 32 valores del glosario de JetEngine "Medio de llamada" (wp_jet_post_types id 195), en su orden.
  * - Valores que ya están en los registros y que escribe este panel o el administrativo (portales de autoservicio,
- *   WhatsApp del portal, Panel administrativo, Retencion de contrato, WhatsApp Guardian, Otro).
+ *   WhatsApp del portal, Panel administrativo, Retencion de contrato, Ruta, WhatsApp Guardian, Otro).
  * - Canales de las notificaciones y de la analítica web: SMS, WhatsApp y los asistentes de IA (chatgpt.com, perplexity).
  *
  * Los alias son las otras formas en que llega el mismo medio (se comparan sin mayúsculas, tildes ni signos). Mientras
@@ -33,7 +33,7 @@ final class MedioSeed
     'Mitula' => [],
     'Propietario' => [],
     'Por actualización' => [],
-    'Por ruta' => ['Ruta'],
+    'Por ruta' => [],
     'Prensa' => [],
     'Presencial' => [],
     'Properati' => [],
@@ -57,6 +57,7 @@ final class MedioSeed
     'Portal copropiedad' => [],
     'Panel administrativo' => [],
     'Retencion de contrato' => [],
+    'Ruta' => [],
     'WhatsApp cliente' => [],
     'WhatsApp Guardian' => [],
     'Otro' => [],
