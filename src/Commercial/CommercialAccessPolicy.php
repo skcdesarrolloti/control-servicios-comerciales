@@ -52,13 +52,14 @@ final class CommercialAccessPolicy
     'pop_gestionar' => 'Material POP: crear y editar productos, ajustar existencias y registrar entregas',
     'pop_anular' => 'Material POP: anular entregas y archivar o reactivar productos',
     'pop_ver_costos' => 'Material POP: ver y editar precios y el valor del inventario',
+    'redes_ver_inversion' => 'Redes sociales: ver la inversión en publicidad, el costo por clic y el CPM',
     'campanas_enviar' => 'Campañas: crear, enviar, pausar, reanudar, reintentar y cancelar envíos masivos',
     'plantillas_editar' => 'Plantillas de correo: crear, editar, duplicar y archivar',
     'plan_estrategico_editar' => 'Plan estratégico: crear, editar y eliminar objetivos, metas, tareas y campañas',
   ];
 
   /** Acciones que un cargo sin configurar no recibe por defecto: hay que marcarlas. */
-  public const OPT_IN_ACTIONS = ['editar_actor', 'mercado_vista_completa', 'aseo_vista_interna', 'promocion_ver_ip', 'plan_estrategico_editar', 'pop_gestionar', 'pop_anular', 'pop_ver_costos', 'campanas_enviar', 'plantillas_editar'];
+  public const OPT_IN_ACTIONS = ['editar_actor', 'mercado_vista_completa', 'aseo_vista_interna', 'promocion_ver_ip', 'plan_estrategico_editar', 'pop_gestionar', 'pop_anular', 'pop_ver_costos', 'redes_ver_inversion', 'campanas_enviar', 'plantillas_editar'];
 
   /**
    * Vistas que un cargo sin configurar no recibe por defecto: hay que marcarlas en Permisos. Los cargos con acceso total
@@ -93,6 +94,7 @@ final class CommercialAccessPolicy
       'analitica_web' => 'Analítica web',
       'actividad_portales' => 'Actividad de portales',
       'material_pop' => 'Material POP',
+      'redes_sociales' => 'Redes sociales',
     ],
     // Notificaciones: el envío uno a uno, las campañas masivas (traídas de dashboard-marketing) y sus plantillas de correo.
     'notificaciones' => [

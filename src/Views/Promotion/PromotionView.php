@@ -35,6 +35,8 @@ final class PromotionView
       $body = AnalyticsView::render(AnalyticsView::context($input, $policy, $db, $settings, $rollup === null ? self::rollup($db, $settings) : ($rollup ?: null), $today, $catchUp), $baseUrl);
     } elseif ($sub === 'actividad_portales' && $policy->canSubview('promocion', 'actividad_portales')) {
       $body = PortalActivityView::render(PortalActivityView::context($input, $policy, $db, $today), $baseUrl);
+    } elseif ($sub === 'redes_sociales' && $policy->canSubview('promocion', 'redes_sociales')) {
+      $body = SocialView::render(SocialView::context($input, $policy, $db, $today), $baseUrl);
     } elseif ($sub === 'material_pop' && $policy->canSubview('promocion', 'material_pop')) {
       $body = MaterialPopView::render(MaterialPopView::context($input, $policy, $db, $settings), $baseUrl);
     } else {

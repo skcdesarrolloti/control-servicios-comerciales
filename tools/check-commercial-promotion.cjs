@@ -59,10 +59,11 @@ function daysBetween(from, to) {
     await page.mouse.click(5, 880);
     await page.setViewportSize({ width: 1440, height: 1000 });
     const menuLinks = page.locator('[data-commercial-dropdown-menu="promocion"] a');
-    assert.equal(await menuLinks.count(), 3);
+    assert.equal(await menuLinks.count(), 4);
     assert.match(await menuLinks.nth(0).getAttribute('href'), /[?&]tab=analitica_web$/);
     assert.match(await menuLinks.nth(1).getAttribute('href'), /[?&]tab=actividad_portales$/);
     assert.match(await menuLinks.nth(2).getAttribute('href'), /[?&]tab=material_pop$/);
+    assert.match(await menuLinks.nth(3).getAttribute('href'), /[?&]tab=redes_sociales$/);
     assert.match(await page.locator('[data-commercial-dropdown-menu="promocion"]').innerText(), /Visitas, campañas y medios del sitio/);
     await page.locator('[data-commercial-dropdown-trigger="promocion"]').click();
     await menuLinks.nth(0).click();
@@ -502,6 +503,34 @@ function daysBetween(from, to) {
       assert.equal(denied.status, 403);
     } finally {
       await popContext.close();
+    }
+
+    // ── Redes sociales (13 con inversión, 7 sin): pestañas por red, filtros y celular ────────────────────────────
+    const socialContext = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+    try {
+      const social = await socialContext.newPage();
+      const socialWatch = watch(social);
+      await social.goto(FIXTURE + '?cargo=13&tab=redes_sociales');
+      await social.locator('.cpr-stats').waitFor();
+      assert.ok((await social.locator('.cpr-filters__hint').innerText()).includes('28/09/2026'));
+      assert.ok((await social.locator('.cpr-stats').innerText()).includes('1.751'));
+      await social.locator('.cpr-tab', { hasText: 'Publicidad en Meta' }).click();
+      await social.waitForFunction(() => document.body.innerText.includes('Inversión'));
+      await social.locator('.cpr-tab', { hasText: 'YouTube' }).click();
+      await social.waitForFunction(() => document.body.innerText.includes('Recorrido casa'));
+      await social.locator('[name="pr_desde"]').fill('2026-08-05');
+      await social.locator('.cpr-filters button[type=submit]').click();
+      await social.waitForFunction(() => /Vistas\s*150/.test(document.querySelector('.cpr-stats').innerText));
+      assert.ok(!(await social.content()).includes('SECRETO'));
+      await social.setViewportSize({ width: 390, height: 844 });
+      assert.equal(await noHorizontalScroll(social), true);
+      assert.deepEqual(socialWatch.errors, []);
+      const viewer = await socialContext.newPage();
+      await viewer.goto(FIXTURE + '?cargo=7&tab=redes_sociales&pr_red=publicidad');
+      await viewer.locator('.cpr-stats').waitFor();
+      assert.ok(!(await viewer.locator('.cpr-stats').innerText()).includes('Inversión'));
+    } finally {
+      await socialContext.close();
     }
 
     // ── Solo Actividad de portales (8): el menú y el servidor respetan la subpestaña ──────────────────────────────

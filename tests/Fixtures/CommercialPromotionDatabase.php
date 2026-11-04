@@ -121,6 +121,54 @@ final class CommercialPromotionDatabase
     $settings->set('commercial_permissions', $permissions);
   }
 
+  /**
+   * Redes sociales: las tablas que llena la sincronización de dashboard-marketing (marketing_social_*, marketing_youtube_*
+   * y marketing_tiktok_*) con datos de Instagram hasta el 28/09/2026, publicidad de 2025 con fotos acumuladas repetidas
+   * de una campaña, YouTube y TikTok (con un token falso que nunca debe salir en pantalla).
+   */
+  public static function social(Database $db): void
+  {
+    if ((int) $db->getVar("SELECT COUNT(*) FROM sqlite_master WHERE name = 'wp_marketing_social_accounts'") > 0) {
+      return;
+    }
+    $pdo = $db->pdo();
+    $pdo->exec('CREATE TABLE wp_marketing_social_accounts (_ID INTEGER PRIMARY KEY, platform TEXT, account_name TEXT, account_id TEXT, username TEXT, connected INTEGER, last_sync TEXT)');
+    $pdo->exec('CREATE TABLE wp_marketing_social_daily_stats (_ID INTEGER PRIMARY KEY, metric_date TEXT, platform TEXT, followers INTEGER, reach INTEGER, impressions INTEGER, profile_views INTEGER, website_clicks INTEGER, likes INTEGER, comments INTEGER, shares INTEGER, saves INTEGER)');
+    $pdo->exec('CREATE TABLE wp_marketing_social_posts (_ID INTEGER PRIMARY KEY, post_date TEXT, platform TEXT, content_type TEXT, title TEXT, permalink TEXT, reach INTEGER, impressions INTEGER, likes INTEGER, comments INTEGER, shares INTEGER, saves INTEGER)');
+    $pdo->exec('CREATE TABLE wp_marketing_social_ads_stats (_ID INTEGER PRIMARY KEY, period_start TEXT, metric_date TEXT, level TEXT, external_id TEXT, name TEXT, status TEXT, objective TEXT, spend REAL, impressions INTEGER, reach INTEGER, clicks INTEGER, link_clicks INTEGER, ctr REAL, cpc REAL, cpm REAL)');
+    $pdo->exec('CREATE TABLE wp_marketing_social_audience (_ID INTEGER PRIMARY KEY, snapshot_date TEXT, platform TEXT, breakdown TEXT, label TEXT, value INTEGER)');
+    $pdo->exec('CREATE TABLE wp_marketing_youtube_connections (_ID INTEGER PRIMARY KEY, channel_title TEXT, channel_handle TEXT, subscriber_count INTEGER, view_count INTEGER, video_count INTEGER, access_token_enc TEXT, connected INTEGER, last_sync TEXT, last_error TEXT)');
+    $pdo->exec('CREATE TABLE wp_marketing_youtube_daily_stats (_ID INTEGER PRIMARY KEY, metric_date TEXT, views INTEGER, watch_minutes REAL, likes INTEGER, comments INTEGER, shares INTEGER, subscribers_gained INTEGER, subscribers_lost INTEGER)');
+    $pdo->exec('CREATE TABLE wp_marketing_youtube_videos (_ID INTEGER PRIMARY KEY, title TEXT, published_at TEXT, permalink TEXT, content_type TEXT, views INTEGER, watch_minutes REAL, likes INTEGER, comments INTEGER)');
+    $pdo->exec('CREATE TABLE wp_marketing_tiktok_connections (_ID INTEGER PRIMARY KEY, display_name TEXT, username TEXT, follower_count INTEGER, likes_count INTEGER, video_count INTEGER, access_token_enc TEXT, connected INTEGER, last_sync TEXT, last_error TEXT)');
+    $pdo->exec('CREATE TABLE wp_marketing_tiktok_videos (_ID INTEGER PRIMARY KEY, title TEXT, published_at TEXT, permalink TEXT, views INTEGER, likes INTEGER, comments INTEGER, shares INTEGER)');
+    $db->insert('wp_marketing_social_accounts', ['platform' => 'instagram', 'account_name' => 'SK&C Sucasa', 'username' => 'scinmobiliaria', 'connected' => 1, 'last_sync' => '2026-09-28 11:15:19']);
+    // Instagram: datos hasta el 28 de septiembre (la sincronización va atrasada).
+    foreach (['2026-09-26' => [1700, 100], '2026-09-27' => [1720, 200], '2026-09-28' => [1751, 300], '2026-05-01' => [1500, 999]] as $day => [$followers, $reach]) {
+      $db->insert('wp_marketing_social_daily_stats', ['metric_date' => $day, 'platform' => 'instagram', 'followers' => $followers, 'reach' => $reach, 'impressions' => 10, 'profile_views' => 5, 'website_clicks' => 2, 'likes' => 3, 'comments' => 1, 'shares' => 0, 'saves' => 1]);
+    }
+    $db->insert('wp_marketing_social_posts', ['post_date' => '2026-09-27', 'platform' => 'instagram', 'content_type' => 'REEL', 'title' => 'Apartamento <b>en</b> Laureles', 'permalink' => 'https://instagram.com/p/1', 'reach' => 500, 'likes' => 20, 'comments' => 2, 'shares' => 1, 'saves' => 3]);
+    $db->insert('wp_marketing_social_posts', ['post_date' => '2026-09-26', 'platform' => 'instagram', 'title' => 'Enlace raro', 'permalink' => 'javascript:alert(1)', 'reach' => 50, 'likes' => 1, 'comments' => 0, 'shares' => 0, 'saves' => 0]);
+    foreach ([['age', '25-34', 400], ['age', '35-44', 300], ['gender', 'F', 600], ['city', 'Medellín', 900]] as [$breakdown, $label, $value]) {
+      $db->insert('wp_marketing_social_audience', ['snapshot_date' => '2026-09-28', 'platform' => 'instagram', 'breakdown' => $breakdown, 'label' => $label, 'value' => $value]);
+    }
+    $db->insert('wp_marketing_social_audience', ['snapshot_date' => '2026-08-01', 'platform' => 'instagram', 'breakdown' => 'age', 'label' => 'vieja', 'value' => 9999]);
+    // Publicidad: actividad diaria en 2025 y fotos acumuladas repetidas de cada campaña.
+    foreach (['2025-08-09' => [9135, 2244, 33], '2025-08-10' => [6254, 1500, 23]] as $day => [$spend, $impressions, $clicks]) {
+      $db->insert('wp_marketing_social_ads_stats', ['period_start' => $day, 'metric_date' => $day, 'level' => 'account_daily', 'name' => 'SKC', 'spend' => $spend, 'impressions' => $impressions, 'reach' => $impressions - 100, 'clicks' => $clicks, 'link_clicks' => $clicks]);
+    }
+    foreach ([['2026-07-11', '2026-07-11', 100], ['2025-01-01', '2026-08-06', 9527], ['2026-08-06', '2026-08-06', 50]] as [$since, $date, $impressions]) {
+      $db->insert('wp_marketing_social_ads_stats', ['period_start' => $since, 'metric_date' => $date, 'level' => 'campaign', 'external_id' => 'C1', 'name' => '20 años construyendo', 'status' => 'ACTIVE', 'objective' => 'ENGAGEMENT', 'spend' => 44867, 'impressions' => $impressions, 'clicks' => 202, 'ctr' => 2.12, 'cpc' => 222.1, 'cpm' => 4709.6]);
+    }
+    $db->insert('wp_marketing_youtube_connections', ['channel_title' => 'SKC SuCasa', 'channel_handle' => '@skcsucasa', 'subscriber_count' => 320, 'view_count' => 50000, 'video_count' => 90, 'access_token_enc' => 'SECRETO-YT', 'connected' => 1, 'last_sync' => '2026-08-05 22:00:00']);
+    foreach (['2026-08-04' => 100, '2026-08-05' => 150] as $day => $views) {
+      $db->insert('wp_marketing_youtube_daily_stats', ['metric_date' => $day, 'views' => $views, 'watch_minutes' => 120.5, 'likes' => 5, 'comments' => 1, 'shares' => 0, 'subscribers_gained' => 3, 'subscribers_lost' => 1]);
+    }
+    $db->insert('wp_marketing_youtube_videos', ['title' => 'Recorrido casa', 'published_at' => '2026-08-01 10:00:00', 'permalink' => 'https://youtube.com/watch?v=1', 'content_type' => 'short', 'views' => 900, 'watch_minutes' => 40, 'likes' => 9, 'comments' => 1]);
+    $db->insert('wp_marketing_tiktok_connections', ['display_name' => 'SKC', 'username' => 'skc', 'follower_count' => 80, 'likes_count' => 500, 'video_count' => 37, 'access_token_enc' => 'SECRETO-TT', 'connected' => 1, 'last_sync' => '2026-09-23 08:00:00', 'last_error' => 'Token vencido']);
+    $db->insert('wp_marketing_tiktok_videos', ['title' => 'Tip de arriendo', 'published_at' => '2026-09-20 09:00:00', 'permalink' => 'https://tiktok.com/@skc/video/1', 'views' => 700, 'likes' => 30, 'comments' => 4, 'shares' => 2]);
+  }
+
   /** @param array<string,string> $session */
   public static function login(string $cargo, string $employee, string $name = 'Funcionario de prueba', array $session = []): void
   {

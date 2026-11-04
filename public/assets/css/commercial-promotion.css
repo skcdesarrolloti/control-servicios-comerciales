@@ -257,8 +257,8 @@
 .cpr-stats[data-pop-stats] { grid-template-columns:repeat(auto-fit,minmax(180px,1fr)) }
 .cpr-toolbar { display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between; margin-top:20px }
 .cpr-toolbar__actions { display:flex; flex-wrap:wrap; gap:10px }
-.cpr-tabs { display:inline-flex; gap:4px; padding:4px; border-radius:14px; background:var(--cpr-sky) }
-.cpr-tab { padding:8px 16px; border-radius:10px; font-size:13px; font-weight:700; color:var(--cpr-blue); text-decoration:none }
+.cpr-tabs { display:inline-flex; gap:4px; max-width:100%; padding:4px; overflow-x:auto; border-radius:14px; background:var(--cpr-sky); scrollbar-width:thin }
+.cpr-tab { padding:8px 16px; border-radius:10px; font-size:13px; font-weight:700; color:var(--cpr-blue); text-decoration:none; white-space:nowrap }
 .cpr-tab:hover { background:#fff }
 .cpr-tab.is-active { background:#fff; color:var(--cpr-navy); box-shadow:0 1px 3px rgba(15,23,42,.12) }
 .cpr-ghost.is-small,
@@ -319,7 +319,7 @@
   .cpr-toolbar__actions,
   .cpr-toolbar__actions > * { flex:1 }
   .cpr-tabs { width:100% }
-  .cpr-tab { flex:1; text-align:center; padding:8px 6px }
+  .cpr-tab { flex:1 0 auto; text-align:center; padding:8px 10px }
   .cpr-pop-grid { grid-template-columns:minmax(0,1fr) }
   .cpr-stats[data-pop-stats] { grid-template-columns:repeat(2,minmax(0,1fr)) }
   .cpr-dialog__grid { grid-template-columns:minmax(0,1fr) }
@@ -358,3 +358,6 @@
   .cpr-tpl-editor { grid-template-columns:minmax(0,1fr) }
   .cpr-camp-frame { height:360px }
 }
+.cpr-social-group { margin:14px 0 4px; font-size:13px; font-weight:700; color:var(--cpr-navy) }
+.cpr-social-group:first-of-type { margin-top:0 }
+.cpr-filters + .cpr-note { margin-top:16px }
