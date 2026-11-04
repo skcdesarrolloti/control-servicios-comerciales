@@ -96,6 +96,11 @@ final class CommercialStrategicPlanTest extends TestCase
     self::assertSame(1, $task['campanas_total']);
     self::assertTrue($task['mine']);
 
+    $gestiones = $plan->list('gestiones', [], '');
+    self::assertSame([1, 1], array_column($gestiones, 'objetivos_total'));
+    self::assertSame('Ventas y arriendos', $gestiones[array_search('Gestión Comercial', array_column($gestiones, 'nombre'), true)]['definicion']);
+    self::assertSame(['Gestión de Mercadeo'], array_column($plan->list('gestiones', ['q' => 'campañas'], ''), 'nombre'), 'Busca también en la definición.');
+
     $mine = $plan->list('mis_tareas', [], 'Funcionario de prueba');
     self::assertSame([$this->ids['tarea']], array_column($mine, 'id'));
     self::assertSame([], $plan->list('mis_tareas', ['estado' => 'Completado'], 'Funcionario de prueba'));

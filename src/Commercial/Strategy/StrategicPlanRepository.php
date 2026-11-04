@@ -24,7 +24,7 @@ final class StrategicPlanRepository
   public const TASK_STATES = ['Pendiente', 'En Proceso', 'Completado'];
   public const GOAL_STATES = ['Sin realizar', 'En Proceso', 'Realizado'];
   public const PERIODS = ['Anual', 'Semestral', 'Trimestral', 'Mensual'];
-  public const LISTS = ['mis_tareas', 'objetivos', 'metas', 'tareas', 'campanas'];
+  public const LISTS = ['mis_tareas', 'gestiones', 'objetivos', 'metas', 'tareas', 'campanas'];
   public const ENTITIES = ['objetivos', 'metas', 'tareas', 'campanas'];
 
   /**
@@ -43,7 +43,7 @@ final class StrategicPlanRepository
   ];
 
   /** Columna con el nombre visible de cada registro del plan. */
-  private const NAMES = ['objetivos' => 'nombre_objetivo', 'metas' => 'nombre_meta', 'tareas' => 'nombre_tarea', 'campanas' => 'nombre_campana', 'actores' => 'nombre_actor'];
+  private const NAMES = ['gestiones' => 'nombre', 'objetivos' => 'nombre_objetivo', 'metas' => 'nombre_meta', 'tareas' => 'nombre_tarea', 'campanas' => 'nombre_campana', 'actores' => 'nombre_actor'];
   private const MAX_TEXT = 2000;
   private const MAX_LONG = 8000;
   private const TIMEZONE = 'America/Bogota';
@@ -81,8 +81,9 @@ final class StrategicPlanRepository
       return $list ? in_array(self::fold($wanted), array_map([self::class, 'fold'], (array) $row[$field]), true) : self::fold((string) $row[$field]) === self::fold($wanted);
     };
     $rows = array_values(array_filter($rows, static function (array $row) use ($text, $match, $table): bool {
-      if ($text !== '' && !str_contains(self::fold($row['nombre'] . ' ' . ($row['descripcion'] ?? '')), $text)) return false;
+      if ($text !== '' && !str_contains(self::fold($row['nombre'] . ' ' . ($row['descripcion'] ?? '') . ' ' . ($row['definicion'] ?? '')), $text)) return false;
       return match ($table) {
+        'gestiones' => true,
         'objetivos' => $match($row, 'gestion', 'perspectiva') && $match($row, 'responsable', 'responsables', true),
         'metas' => $match($row, 'objetivo', 'id_objetivo') && $match($row, 'estado', 'estado') && $match($row, 'unidad', 'unidad'),
         'tareas' => $match($row, 'meta', 'id_meta', true) && $match($row, 'estado', 'estado') && $match($row, 'responsable', 'responsables', true),
@@ -559,8 +560,16 @@ final class StrategicPlanRepository
     $out = ['id' => $id, 'nombre' => self::text($row[self::NAMES[$table]] ?? '')];
     $names = fn(string $source, mixed $ids): array => array_values(array_filter(array_map(fn(int $item): string => self::text($this->find($source, $item)[self::NAMES[$source]] ?? ''), self::ids($ids))));
     switch ($table) {
+      case 'gestiones':
+        // Pestaña Gestiones (como en el plugin): solo lectura aquí; se editan en Configuración › Plan estratégico.
+        $objectives = array_filter($this->rows('objetivos'), static fn(array $objective): bool => self::fold((string) ($objective['perspectiva'] ?? '')) === self::fold((string) ($row['nombre'] ?? '')));
+        return $out + [
+          'definicion' => self::text($row['definicion'] ?? ''),
+          'alcance' => self::text($row['alcance'] ?? ''),
+          'objetivos_total' => count($objectives),
+        ];
       case 'objetivos':
-        $goals = array_filter($this->rows('metas'), static fn(array $meta): bool => (int) ($meta['id_objetivo'] ?? 0) === $id);
+        $goals =array_filter($this->rows('metas'), static fn(array $meta): bool => (int) ($meta['id_objetivo'] ?? 0) === $id);
         return $out + [
           'perspectiva' => self::text($row['perspectiva'] ?? ''),
           'periodo_tipo' => self::text($row['periodo_tipo'] ?? ''),

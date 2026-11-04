@@ -29,11 +29,13 @@ const BASE = 'http://127.0.0.1:8772/tests/Fixtures/commercial-strategy.php';
 
     // Objetivos agrupados por gestión; "Ver metas" abre Metas filtradas por el objetivo.
     await root.locator('[data-plan-tab="objetivos"]').click();
-    await page.waitForFunction(() => document.querySelectorAll('[data-plan-list] .cpe-group').length === 2);
-    assert.deepEqual(await list.locator('.cpe-group__title span:not(.material-symbols-outlined)').allInnerTexts(), ['Gestión Comercial', 'Gestión de Mercadeo']);
+    await page.waitForFunction(() => document.querySelectorAll('[data-plan-list] .cps-group').length === 2);
+    assert.deepEqual(await list.locator('.cps-group__title span:not(.material-symbols-outlined)').allInnerTexts(), ['Gestión Comercial', 'Gestión de Mercadeo']);
     await list.locator('tr', { hasText: 'Aumentar cierres de arriendo' }).locator('[data-plan-action="children"]').click();
     await page.waitForFunction(() => document.querySelector('[data-plan-tab="metas"]').getAttribute('aria-pressed') === 'true' && document.querySelectorAll('[data-plan-list] tbody tr').length === 2);
-    assert.equal(await root.locator('[data-plan-filter="objetivo"]').inputValue(), '1');
+    // El objetivo no es un selector: queda en la barra de contexto con "Volver".
+    assert.equal(await root.locator('[data-plan-filter="objetivo"]').count(), 0);
+    assert.match(await root.locator('[data-plan-context]').innerText(), /Volver a Objetivos[\s\S]*Metas del objetivo\s+Aumentar cierres de arriendo/i);
     assert.match(await list.locator('tr', { hasText: 'Cerrar 30 arriendos' }).innerText(), /Actual 12 \/ Meta 30 % · 40 %/);
 
     // "+" en una meta crea una tarea con esa meta ya marcada.
@@ -46,8 +48,8 @@ const BASE = 'http://127.0.0.1:8772/tests/Fixtures/commercial-strategy.php';
     assert.equal(await form.isVisible(), true, 'Sin nombre no se envía.');
     await form.locator('[name="nombre_tarea"]').fill('Llamar a administradores');
     await form.locator('[data-plan-multi="responsable"] [data-plan-multi-search]').fill('segundo');
-    assert.equal(await form.locator('[data-plan-multi="responsable"] .cpe-check:not([hidden])').count(), 1);
-    await form.locator('[data-plan-multi="responsable"] .cpe-check:not([hidden]) input').check();
+    assert.equal(await form.locator('[data-plan-multi="responsable"] .cps-check:not([hidden])').count(), 1);
+    await form.locator('[data-plan-multi="responsable"] .cps-check:not([hidden]) input').check();
     await form.locator('[name="fecha_inicio"]').fill('2026-05-10');
     await form.locator('[name="fecha_fin"]').fill('2026-05-01');
     await form.locator('[data-plan-form-submit]').click();
@@ -58,6 +60,21 @@ const BASE = 'http://127.0.0.1:8772/tests/Fixtures/commercial-strategy.php';
     await page.waitForFunction(() => document.querySelector('[data-plan-stat="tareas"]').textContent === '3');
     // La lista se vuelve a pedir después de guardar: la meta ya cuenta las dos tareas.
     await page.waitForFunction(() => /Completadas\s*0\/2/.test(Array.from(document.querySelectorAll('[data-plan-list] tr')).find(row => row.textContent.includes('Cerrar 30 arriendos')).innerText));
+
+    // Volver regresa a Objetivos sin filtro; Gestiones lleva a sus objetivos y "Volver a Gestiones".
+    await root.locator('[data-plan-back]').click();
+    await page.waitForFunction(() => document.querySelector('[data-plan-tab="objetivos"]').getAttribute('aria-pressed') === 'true' && document.querySelector('[data-plan-context]').hidden && document.querySelectorAll('[data-plan-list] tbody tr').length === 2);
+    await root.locator('[data-plan-tab="gestiones"]').click();
+    await page.waitForFunction(() => document.querySelectorAll('[data-plan-list] tbody tr').length === 2);
+    assert.equal(await root.locator('[data-plan-new]').isVisible(), false, 'Las gestiones se editan en Configuración.');
+    await list.locator('tr', { hasText: 'Gestión de Mercadeo' }).locator('[data-plan-action="children"]').click();
+    await page.waitForFunction(() => document.querySelectorAll('[data-plan-list] tbody tr').length === 1 && document.querySelector('[data-plan-list]').textContent.includes('Posicionar la marca'));
+    assert.match(await root.locator('[data-plan-context]').innerText(), /Volver a Gestiones/);
+    await root.locator('[data-plan-new]').click();
+    assert.equal(await form.locator('[name="perspectiva"]').inputValue(), 'Gestión de Mercadeo');
+    await form.locator('footer [data-plan-close]').click();
+    await root.locator('[data-plan-back]').click();
+    await page.waitForFunction(() => document.querySelector('[data-plan-tab="gestiones"]').getAttribute('aria-pressed') === 'true');
 
     // Bitácora: el avance con "completada" cambia el estado y descuenta de Mis tareas pendientes.
     await root.locator('[data-plan-tab="tareas"]').click();

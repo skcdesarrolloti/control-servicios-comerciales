@@ -58,6 +58,10 @@
     root.__plan = {
       tab: root.getAttribute("data-plan-start") || "objetivos",
       filters: {},
+      // "Ver" de una fila: la pestaña hija queda filtrada por ese registro (context) y trail guarda de dónde se vino,
+      // para el botón "Volver" (como el historial del modal del plugin).
+      context: null,
+      trail: [],
       search: "",
       rows: [],
       options: options,
@@ -96,19 +100,34 @@
 
   // ── Filtros (renderFilters del plugin) ────────────────────────────────────
 
+  // El registro padre (gestión, objetivo, meta o tarea) no es un selector: los nombres son largos. Se llega a él con
+  // "Ver" y se muestra en la barra de contexto con "Volver".
   function filterDefs(plan) {
-    var named = function (rows) { return rows.map(function (row) { return { value: String(row.id), label: row.nombre }; }); };
     var plain = function (values) { return values.map(function (value) { return { value: value, label: value }; }); };
     var people = plain(plan.options.funcionarios || []);
     var catalogNames = function (key) { return catalog(plan, key).map(function (row) { return { value: row.valor, label: row.nombre }; }); };
     switch (plan.tab) {
-      case "objetivos": return [["gestion", "Gestión", catalogNames("gestiones")], ["responsable", "Responsable", people]];
-      case "metas": return [["objetivo", "Objetivo", named(plan.options.objetivos || [])], ["estado", "Estado", plain(plan.options.estados_meta || [])]];
-      case "tareas": return [["meta", "Meta", named(plan.options.metas || [])], ["estado", "Estado", plain(plan.options.estados_tarea || [])], ["responsable", "Responsable", people]];
-      case "mis_tareas": return [["meta", "Meta", named(plan.options.metas || [])], ["estado", "Estado", plain(plan.options.estados_tarea || [])]];
-      case "campanas": return [["tarea", "Tarea", named(plan.options.tareas || [])], ["tipo", "Tipo de campaña", catalogNames("tipos_campana")], ["medio", "Medio", catalogNames("tipos_medio")], ["responsable", "Responsable", people]];
+      case "objetivos": return [["responsable", "Responsable", people]];
+      case "metas": return [["estado", "Estado", plain(plan.options.estados_meta || [])]];
+      case "tareas": return [["estado", "Estado", plain(plan.options.estados_tarea || [])], ["responsable", "Responsable", people]];
+      case "mis_tareas": return [["estado", "Estado", plain(plan.options.estados_tarea || [])]];
+      case "campanas": return [["tipo", "Tipo de campaña", catalogNames("tipos_campana")], ["medio", "Medio", catalogNames("tipos_medio")], ["responsable", "Responsable", people]];
     }
     return [];
+  }
+
+  var TAB_LABELS = { gestiones: "Gestiones", mis_tareas: "Mis tareas", objetivos: "Objetivos", metas: "Metas", tareas: "Tareas", campanas: "Campañas" };
+
+  function renderContext(root) {
+    var plan = state(root);
+    var box = root.querySelector("[data-plan-context]");
+    if (!box) return;
+    box.hidden = !plan.context;
+    if (!plan.context) { box.innerHTML = ""; return; }
+    var previous = plan.trail[plan.trail.length - 1];
+    box.innerHTML = '<button type="button" class="ctl-ghost cps-back" data-plan-back>' + icon("arrow_back") + "Volver a " + esc(TAB_LABELS[previous ? previous.tab : "objetivos"]) + "</button>" +
+      '<div class="cps-context__text"><span>' + esc(plan.context.title) + "</span><strong>" + esc(plan.context.label) + "</strong></div>" +
+      '<button type="button" class="cps-link" data-plan-context-clear>' + icon("filter_alt_off") + "Ver todas</button>";
   }
 
   function renderFilters(root) {
@@ -128,9 +147,10 @@
     var label = root.querySelector("[data-plan-new-label]");
     var create = root.querySelector("[data-plan-new]");
     var type = plan.tab === "mis_tareas" ? "tareas" : plan.tab;
-    if (label) label.textContent = "Nueva " + SINGULAR[type];
-    if (label && type === "objetivos") label.textContent = "Nuevo objetivo";
-    if (create) create.hidden = plan.tab === "mis_tareas";
+    if (label && SINGULAR[type]) label.textContent = (type === "objetivos" ? "Nuevo " : "Nueva ") + SINGULAR[type];
+    // Las gestiones se editan en Configuración › Plan estratégico.
+    if (create) create.hidden = plan.tab === "mis_tareas" || plan.tab === "gestiones";
+    renderContext(root);
   }
 
   // ── Listas (renderTableHTML del plugin) ───────────────────────────────────
@@ -141,7 +161,7 @@
     var list = root.querySelector("[data-plan-list]");
     list.setAttribute("aria-busy", "true");
     try {
-      var data = await request("commercial_plan_list", { lista: plan.tab, filters: JSON.stringify(Object.assign({ q: plan.search }, plan.filters[plan.tab] || {})) });
+      var data = await request("commercial_plan_list", { lista: plan.tab, filters: JSON.stringify(Object.assign({ q: plan.search }, plan.filters[plan.tab] || {}, plan.context ? plan.context.filter : {})) });
       if (seq !== plan.seq) return;
       plan.rows = data.rows || [];
       updateSummary(root, data.summary);
@@ -173,12 +193,14 @@
       var key = groupKey(plan.tab, row);
       (groups[key] = groups[key] || []).push(row);
     });
+    if (plan.tab === "gestiones") groups = { "": plan.rows };
     var keys = Object.keys(groups).sort(function (a, b) {
       if (a === NO_GROUP) return 1;
       if (b === NO_GROUP) return -1;
       return a.localeCompare(b, "es");
     });
     var heads = {
+      gestiones: ["Gestión", "Alcance", "Objetivos", ""],
       objetivos: ["Objetivo", "Metas", "Responsables", ""],
       metas: ["Meta (KPI)", "Tareas", "Fecha límite", ""],
       tareas: ["Tarea", "Estado", "Bitácora", "Responsables", ""],
@@ -186,51 +208,57 @@
       campanas: ["Campaña", "Detalles", "Resultados", "Responsables", ""],
     }[plan.tab];
     return keys.map(function (key) {
-      return '<section class="cpe-group"><h3 class="cpe-group__title">' + icon("layers") + "<span>" + esc(key) + "</span><small>" + groups[key].length + "</small></h3>" +
-        '<div class="ctl-table-wrap cpe-table-wrap"><table class="ctl-table ctl-table--data cpe-table"><thead><tr>' +
+      return '<section class="cps-group">' + (key !== "" ? '<h3 class="cps-group__title">' + icon("layers") + "<span>" + esc(key) + "</span><small>" + groups[key].length + "</small></h3>" : "") +
+        '<div class="ctl-table-wrap cps-table-wrap"><table class="ctl-table ctl-table--data cps-table"><thead><tr>' +
         heads.map(function (head) { return "<th>" + esc(head) + "</th>"; }).join("") + "</tr></thead><tbody>" +
         groups[key].map(function (row) { return renderRow(plan, row); }).join("") + "</tbody></table></div></section>";
     }).join("");
   }
 
   function people(names) {
-    if (!names || !names.length) return '<span class="cpe-muted">—</span>';
-    return '<span class="cpe-people">' + names.map(function (name) { return '<span class="cpe-person">' + esc(name) + "</span>"; }).join("") + "</span>";
+    if (!names || !names.length) return '<span class="cps-muted">—</span>';
+    return '<span class="cps-people">' + names.map(function (name) { return '<span class="cps-person">' + esc(name) + "</span>"; }).join("") + "</span>";
   }
 
   function badge(text) {
     var kind = { Completado: "done", Realizado: "done", "En Proceso": "progress", Pendiente: "pending", "Sin realizar": "pending" }[text] || "pending";
-    return '<span class="cpe-badge" data-kind="' + kind + '">' + esc(text) + "</span>";
+    return '<span class="cps-badge" data-kind="' + kind + '">' + esc(text) + "</span>";
   }
 
   function bar(done, total, label) {
     var pct = total > 0 ? Math.round(done / total * 100) : 0;
     var tone = pct >= 80 ? "good" : pct >= 40 ? "mid" : "low";
-    return '<div class="cpe-progress"><div class="cpe-progress__text"><span>' + esc(label) + "</span><b>" + done + "/" + total + '</b></div><div class="cpe-progress__bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + pct + '"><i data-tone="' + tone + '" style="width:' + pct + '%"></i></div></div>';
+    return '<div class="cps-progress"><div class="cps-progress__text"><span>' + esc(label) + "</span><b>" + done + "/" + total + '</b></div><div class="cps-progress__bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + pct + '"><i data-tone="' + tone + '" style="width:' + pct + '%"></i></div></div>';
   }
 
   function action(kind, row, label, iconName, extra) {
-    return '<button type="button" class="cpe-action' + (extra || "") + '" data-plan-action="' + kind + '" data-id="' + row.id + '" title="' + esc(label) + '" aria-label="' + esc(label) + '">' + icon(iconName) + "</button>";
+    return '<button type="button" class="cps-action' + (extra || "") + '" data-plan-action="' + kind + '" data-id="' + row.id + '" title="' + esc(label) + '" aria-label="' + esc(label) + '">' + icon(iconName) + "</button>";
   }
 
   function rowActions(plan, type, row, child) {
     var html = "";
     if (child) {
-      html += '<button type="button" class="cpe-link" data-plan-action="children" data-id="' + row.id + '">' + icon(child[1]) + "Ver " + esc(child[2]) + "</button>";
+      html += '<button type="button" class="cps-link" data-plan-action="children" data-id="' + row.id + '">' + icon(child[1]) + "Ver " + esc(child[2]) + "</button>";
       if (plan.canEdit) html += action("create-child", row, "Crear " + SINGULAR[child[0]] + " aquí", "add", " is-add");
     }
-    if (plan.canEdit) {
+    if (plan.canEdit && type !== "gestiones") {
       html += action("edit", row, "Editar", "edit");
       html += action("delete", row, "Eliminar", "delete", " is-danger");
     }
-    return '<td class="cpe-actions">' + html + "</td>";
+    return '<td class="cps-actions">' + html + "</td>";
   }
 
   function renderRow(plan, row) {
     var tab = plan.tab;
+    if (tab === "gestiones") {
+      return "<tr><td><strong class=\"cps-name\">" + esc(row.nombre) + "</strong>" + (row.definicion ? '<small class="cps-desc">' + esc(row.definicion) + "</small>" : "") + "</td>" +
+        '<td class="cps-details">' + (row.alcance ? esc(row.alcance) : '<span class="cps-muted">—</span>') + "</td>" +
+        '<td><span class="cps-count">' + row.objetivos_total + "</span></td>" +
+        rowActions(plan, "gestiones", row, ["objetivos", "flag", "objetivos"]) + "</tr>";
+    }
     if (tab === "objetivos") {
       var period = [row.periodo_tipo, row.periodo_valor].filter(Boolean).join(" ");
-      return "<tr><td><strong class=\"cpe-name\">" + esc(row.nombre) + "</strong><small>" +
+      return "<tr><td><strong class=\"cps-name\">" + esc(row.nombre) + "</strong><small>" +
         [row.valor_objetivo ? "Valor: " + esc(row.valor_objetivo) : "", period ? "Periodo: " + esc(period) : ""].filter(Boolean).join(" · ") + "</small></td>" +
         "<td>" + bar(row.metas_realizadas, row.metas_total, "Realizadas") + "</td><td>" + people(row.responsables) + "</td>" +
         rowActions(plan, "objetivos", row, ["metas", "target", "metas"]) + "</tr>";
@@ -238,16 +266,16 @@
     if (tab === "metas") {
       var overdue = row.fecha_limite && row.fecha_limite < today() && row.estado !== "Realizado";
       var measure = "Actual " + esc(row.valor_actual) + " / Meta " + esc(row.valor_meta) + (row.unidad ? " " + esc(row.unidad) : "") + (row.cumplimiento != null ? " · " + row.cumplimiento + " %" : "");
-      return "<tr><td><strong class=\"cpe-name\">" + esc(row.nombre) + "</strong><span class=\"cpe-line\">" + badge(row.estado) + "<small>" + measure + "</small></span></td>" +
+      return "<tr><td><strong class=\"cps-name\">" + esc(row.nombre) + "</strong><span class=\"cps-line\">" + badge(row.estado) + "<small>" + measure + "</small></span></td>" +
         "<td>" + bar(row.tareas_completadas, row.tareas_total, "Completadas") + "</td>" +
-        '<td class="cpe-date' + (overdue ? " is-late" : "") + '">' + (row.fecha_limite ? icon(overdue ? "warning" : "event") + esc(day(row.fecha_limite)) : "—") + "</td>" +
+        '<td><span class="cps-date' + (overdue ? " is-late" : "") + '">' + (row.fecha_limite ? icon(overdue ? "warning" : "event") + esc(day(row.fecha_limite)) : "—") + "</span></td>" +
         rowActions(plan, "metas", row, ["tareas", "checklist", "tareas"]) + "</tr>";
     }
     if (tab === "tareas" || tab === "mis_tareas") {
       var dates = row.fecha_inicio || row.fecha_fin ? icon("date_range") + esc(day(row.fecha_inicio) || "—") + " – " + esc(day(row.fecha_fin) || "—") : "";
-      return "<tr><td><strong class=\"cpe-name\">" + esc(row.nombre) + "</strong>" + (row.descripcion ? '<small class="cpe-desc">' + esc(row.descripcion) + "</small>" : "") +
-        (dates ? '<span class="cpe-dates">' + dates + "</span>" : "") + "</td><td>" + badge(row.estado) + "</td>" +
-        '<td><button type="button" class="cpe-log-button" data-plan-action="log" data-id="' + row.id + '">' + icon("history_edu") + "Bitácora <b>" + (row.avances || []).length + "</b></button></td>" +
+      return "<tr><td><strong class=\"cps-name\">" + esc(row.nombre) + "</strong>" + (row.descripcion ? '<small class="cps-desc">' + esc(row.descripcion) + "</small>" : "") +
+        (dates ? '<span class="cps-dates">' + dates + "</span>" : "") + "</td><td>" + badge(row.estado) + "</td>" +
+        '<td><button type="button" class="cps-log-button" data-plan-action="log" data-id="' + row.id + '">' + icon("history_edu") + "Bitácora <b>" + (row.avances || []).length + "</b></button></td>" +
         "<td>" + people(row.responsables) + "</td>" + rowActions(plan, "tareas", row, ["campanas", "campaign", "campañas"]) + "</tr>";
     }
     if (tab === "campanas") {
@@ -256,10 +284,10 @@
         row.tipos_mercadeo && row.tipos_mercadeo.length ? "<b>Mercadeo:</b> " + esc(row.tipos_mercadeo.join(", ")) : "",
         row.frecuencia ? "<b>Frecuencia:</b> " + esc(row.frecuencia) : "",
       ].filter(Boolean).join("<br>");
-      return "<tr><td><strong class=\"cpe-name\">" + esc(row.nombre) + "</strong>" + (row.tipo_campana ? '<span class="cpe-tag">' + esc(row.tipo_campana) + "</span>" : "") +
-        (row.pieza_actual ? '<small class="cpe-desc">' + esc(row.pieza_actual) + "</small>" : "") + "</td>" +
-        '<td class="cpe-details">' + (details || '<span class="cpe-muted">—</span>') + "</td>" +
-        '<td><button type="button" class="cpe-log-button" data-plan-action="log" data-id="' + row.id + '">' + icon("monitoring") + "Resultados <b>" + (row.resultados || []).length + "</b></button></td>" +
+      return "<tr><td><strong class=\"cps-name\">" + esc(row.nombre) + "</strong>" + (row.tipo_campana ? '<span class="cps-tag">' + esc(row.tipo_campana) + "</span>" : "") +
+        (row.pieza_actual ? '<small class="cps-desc">' + esc(row.pieza_actual) + "</small>" : "") + "</td>" +
+        '<td class="cps-details">' + (details || '<span class="cps-muted">—</span>') + "</td>" +
+        '<td><button type="button" class="cps-log-button" data-plan-action="log" data-id="' + row.id + '">' + icon("monitoring") + "Resultados <b>" + (row.resultados || []).length + "</b></button></td>" +
         "<td>" + people(row.responsables) + "</td>" + rowActions(plan, "campanas", row, null) + "</tr>";
     }
     return "";
@@ -269,10 +297,12 @@
     return plan.rows.filter(function (row) { return String(row.id) === String(id); })[0] || null;
   }
 
-  function switchTab(root, tab, filters) {
+  /** context: {filter, title, label} al entrar con "Ver"; sin él (pestaña elegida a mano) se olvida el recorrido. */
+  function switchTab(root, tab, context, keepTrail) {
     var plan = state(root);
     plan.tab = tab;
-    if (filters) plan.filters[tab] = filters;
+    plan.context = context || null;
+    if (!context && !keepTrail) plan.trail = [];
     renderFilters(root);
     root.querySelector("[data-plan-list]").innerHTML = '<div class="ctl-empty">' + icon("hourglass_empty") + "<p>Cargando…</p></div>";
     return load(root);
@@ -281,17 +311,17 @@
   // ── Formulario (gpe_abrir_modal del plugin) ───────────────────────────────
 
   function field(html, wide) { return '<div class="' + (wide ? "ctl-field ctl-full" : "ctl-field") + '">' + html + "</div>"; }
-  function label(name, text, required) { return '<label class="ctl-label" for="cpe-f-' + name + '">' + esc(text) + (required ? ' <b class="ctl-required" aria-hidden="true">*</b>' : "") + "</label>"; }
+  function label(name, text, required) { return '<label class="ctl-label" for="cps-f-' + name + '">' + esc(text) + (required ? ' <b class="ctl-required" aria-hidden="true">*</b>' : "") + "</label>"; }
 
   function textInput(name, text, value, opts) {
     opts = opts || {};
-    return field(label(name, text, opts.required) + '<span class="ctl-input"><input id="cpe-f-' + name + '" name="' + name + '" type="' + (opts.type || "text") + '" value="' + esc(value) + '"' +
+    return field(label(name, text, opts.required) + '<span class="ctl-input"><input id="cps-f-' + name + '" name="' + name + '" type="' + (opts.type || "text") + '" value="' + esc(value) + '"' +
       (opts.required ? " required" : "") + (opts.placeholder ? ' placeholder="' + esc(opts.placeholder) + '"' : "") + (opts.inputmode ? ' inputmode="' + opts.inputmode + '"' : "") + ' maxlength="' + (opts.max || 2000) + '"></span>', opts.wide);
   }
 
   function textArea(name, text, value, opts) {
     opts = opts || {};
-    return field(label(name, text, opts.required) + '<textarea class="cpe-textarea" id="cpe-f-' + name + '" name="' + name + '" rows="' + (opts.rows || 3) + '" maxlength="' + (opts.max || 8000) + '"' + (opts.required ? " required" : "") + ">" + esc(value) + "</textarea>", true);
+    return field(label(name, text, opts.required) + '<textarea class="cps-textarea" id="cps-f-' + name + '" name="' + name + '" rows="' + (opts.rows || 3) + '" maxlength="' + (opts.max || 8000) + '"' + (opts.required ? " required" : "") + ">" + esc(value) + "</textarea>", true);
   }
 
   /** options: [{value, label}]; si el valor guardado ya no está en la lista se agrega para no perderlo. */
@@ -300,7 +330,7 @@
     value = value == null ? "" : String(value);
     var list = options.slice();
     if (value && !list.some(function (option) { return String(option.value) === value; })) list.push({ value: value, label: value + " (ya no está en la lista)" });
-    return field(label(name, text, opts.required) + '<span class="ctl-input"><select id="cpe-f-' + name + '" name="' + name + '"' + (opts.required ? " required" : "") + '><option value="">' + esc(opts.empty || "Selecciona…") + "</option>" +
+    return field(label(name, text, opts.required) + '<span class="ctl-input"><select id="cps-f-' + name + '" name="' + name + '"' + (opts.required ? " required" : "") + '><option value="">' + esc(opts.empty || "Selecciona…") + "</option>" +
       list.map(function (option) { return '<option value="' + esc(option.value) + '"' + (String(option.value) === value ? " selected" : "") + ">" + esc(option.label) + "</option>"; }).join("") + "</select></span>", opts.wide);
   }
 
@@ -312,11 +342,11 @@
     values.forEach(function (value) {
       if (!list.some(function (option) { return String(option.value) === value; })) list.push({ value: value, label: value });
     });
-    return '<fieldset class="ctl-field ctl-full cpe-multi" data-plan-multi="' + name + '"' + (opts.required ? ' data-required="1"' : "") + '><legend class="ctl-label">' + esc(text) + (opts.required ? ' <b class="ctl-required" aria-hidden="true">*</b>' : "") +
-      ' <small data-plan-multi-count></small></legend><div class="cpe-multi__tools"><input type="search" placeholder="Buscar…" data-plan-multi-search aria-label="Buscar en ' + esc(text) + '">' +
-      '<button type="button" class="cpe-link" data-plan-multi-all="1">Todos</button><button type="button" class="cpe-link" data-plan-multi-all="0">Ninguno</button></div>' +
-      '<div class="cpe-multi__list">' + (list.length ? list.map(function (option) {
-        return '<label class="cpe-check"><input type="checkbox" name="' + name + '" value="' + esc(option.value) + '"' + (values.indexOf(String(option.value)) >= 0 ? " checked" : "") + "><span>" + esc(option.label) + "</span></label>";
+    return '<fieldset class="ctl-field ctl-full cps-multi" data-plan-multi="' + name + '"' + (opts.required ? ' data-required="1"' : "") + '><legend class="ctl-label">' + esc(text) + (opts.required ? ' <b class="ctl-required" aria-hidden="true">*</b>' : "") +
+      ' <small data-plan-multi-count></small></legend><div class="cps-multi__tools"><input type="search" placeholder="Buscar…" data-plan-multi-search aria-label="Buscar en ' + esc(text) + '">' +
+      '<button type="button" class="cps-link" data-plan-multi-all="1">Todos</button><button type="button" class="cps-link" data-plan-multi-all="0">Ninguno</button></div>' +
+      '<div class="cps-multi__list">' + (list.length ? list.map(function (option) {
+        return '<label class="cps-check"><input type="checkbox" name="' + name + '" value="' + esc(option.value) + '"' + (values.indexOf(String(option.value)) >= 0 ? " checked" : "") + "><span>" + esc(option.label) + "</span></label>";
       }).join("") : '<p class="ctl-note">No hay opciones en la lista.</p>') + "</div></fieldset>";
   }
 
@@ -462,8 +492,8 @@
     var list = root.querySelector("[data-plan-log-list]");
     entries = (entries || []).slice().reverse();
     list.innerHTML = entries.length ? entries.map(function (entry) {
-      return '<li><div class="cpe-log__meta"><span>' + esc(entry.fecha ? day(entry.fecha) + entry.fecha.slice(10, 16) : "Sin fecha") + "</span><b>" + esc(entry.funcionario || "") + "</b></div><p>" + esc(entry.descripcion) + "</p></li>";
-    }).join("") : '<li class="cpe-muted">Aún no hay registros.</li>';
+      return '<li><div class="cps-log__meta"><span>' + esc(entry.fecha ? day(entry.fecha) + entry.fecha.slice(10, 16) : "Sin fecha") + "</span><b>" + esc(entry.funcionario || "") + "</b></div><p>" + esc(entry.descripcion) + "</p></li>";
+    }).join("") : '<li class="cps-muted">Aún no hay registros.</li>';
   }
 
   function logError(root, message) {
@@ -541,7 +571,7 @@
       return "<h3>" + esc(entry[1]) + "</h3>" + (rows.length ? "<table><tbody>" + rows.map(function (row) {
         var text = row.definicion || (entry[0] === "unidades" ? "Símbolo: " + row.valor : "") || "Sin definición.";
         return "<tr><th>" + esc(row.nombre) + "</th><td>" + esc(text) + (row.alcance ? "<br><small><b>Alcance:</b> " + esc(row.alcance) + "</small>" : "") + "</td></tr>";
-      }).join("") + "</tbody></table>" : '<p class="cpe-muted">Sin elementos.</p>');
+      }).join("") + "</tbody></table>" : '<p class="cps-muted">Sin elementos.</p>');
     }).join("");
     root.querySelector("[data-plan-glossary-dialog]").showModal();
   }
@@ -563,8 +593,19 @@
       switchTab(root, tab.getAttribute("data-plan-tab"));
       return;
     }
+    if (event.target.closest("[data-plan-back]")) {
+      var previous = plan.trail.pop();
+      if (previous) switchTab(root, previous.tab, previous.context, true);
+      else switchTab(root, "objetivos");
+      return;
+    }
+    if (event.target.closest("[data-plan-context-clear]")) {
+      switchTab(root, plan.tab);
+      return;
+    }
     if (event.target.closest("[data-plan-new]")) {
-      openForm(root, plan.tab === "mis_tareas" ? "tareas" : plan.tab, null, null);
+      // Dentro de un padre ("Metas de …"), el registro nuevo ya queda en él.
+      openForm(root, plan.tab === "mis_tareas" ? "tareas" : plan.tab, null, plan.context ? plan.context.prefill : null);
       return;
     }
     if (event.target.closest("[data-plan-glossary]")) {
@@ -575,7 +616,7 @@
     if (all) {
       var box = all.closest("[data-plan-multi]");
       var on = all.getAttribute("data-plan-multi-all") === "1";
-      box.querySelectorAll(".cpe-check").forEach(function (item) {
+      box.querySelectorAll(".cps-check").forEach(function (item) {
         if (!item.hidden) item.querySelector("input").checked = on;
       });
       countMulti(box);
@@ -587,11 +628,18 @@
     if (!row) return;
     var kind = button.getAttribute("data-plan-action");
     var type = plan.tab === "mis_tareas" ? "tareas" : plan.tab;
-    var child = { objetivos: ["metas", "objetivo", function (r) { return { id_objetivo: String(r.id) }; }], metas: ["tareas", "meta", function (r) { return { id_meta: [String(r.id)] }; }], tareas: ["campanas", "tarea", function (r) { return { id_tarea: [String(r.id)] }; }] }[type];
+    // [pestaña hija, filtro, valores del formulario nuevo, valor del filtro, título]
+    var child = {
+      gestiones: ["objetivos", "gestion", function (r) { return { perspectiva: r.nombre }; }, function (r) { return r.nombre; }, "Objetivos de la gestión"],
+      objetivos: ["metas", "objetivo", function (r) { return { id_objetivo: String(r.id) }; }, function (r) { return String(r.id); }, "Metas del objetivo"],
+      metas: ["tareas", "meta", function (r) { return { id_meta: [String(r.id)] }; }, function (r) { return String(r.id); }, "Tareas de la meta"],
+      tareas: ["campanas", "tarea", function (r) { return { id_tarea: [String(r.id)] }; }, function (r) { return String(r.id); }, "Campañas de la tarea"],
+    }[type];
     if (kind === "children" && child) {
-      var filters = {};
-      filters[child[1]] = String(row.id);
-      switchTab(root, child[0], filters);
+      var filter = {};
+      filter[child[1]] = child[3](row);
+      plan.trail.push({ tab: plan.tab, context: plan.context });
+      switchTab(root, child[0], { filter: filter, prefill: child[2](row), title: child[4], label: row.nombre });
     } else if (kind === "create-child" && child) {
       openForm(root, child[0], null, child[2](row));
     } else if (kind === "edit") {
@@ -630,7 +678,7 @@
     }
     if (event.target.matches("[data-plan-multi-search]")) {
       var text = event.target.value.trim().toLowerCase();
-      event.target.closest("[data-plan-multi]").querySelectorAll(".cpe-check").forEach(function (item) {
+      event.target.closest("[data-plan-multi]").querySelectorAll(".cps-check").forEach(function (item) {
         item.hidden = text !== "" && item.textContent.toLowerCase().indexOf(text) < 0;
       });
     }
