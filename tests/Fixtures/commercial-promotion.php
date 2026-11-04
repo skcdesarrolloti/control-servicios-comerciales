@@ -41,6 +41,10 @@ $db = CommercialPromotionDatabase::create('sqlite:' . $output . '/commercial-pro
 $db->pdo()->exec('CREATE TABLE IF NOT EXISTS wp_options (option_id INTEGER PRIMARY KEY AUTOINCREMENT, option_name TEXT, option_value TEXT, autoload TEXT)');
 $settings = CommercialPromotionDatabase::settings($db);
 CommercialPromotionDatabase::seed($db, $settings, date('Y-m-d'));
+// ?pendiente=1 deja una visita de ayer sin resumir, para probar que la carga completa no resume y la pide por AJAX.
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['pendiente'])) {
+  \Tests\Fixtures\CommercialTrackerDatabase::hit($db, ['fecha_visita' => date('Y-m-d', strtotime('-1 day')) . ' 10:00:00', 'ip_address' => '181.70.0.1', 'camp_slug' => 'feria-vivienda']);
+}
 $csrf = new SCM\Core\Csrf(str_repeat('x', 40));
 SCM\Core\App::init($db, new SCM\Core\Auth($db), $csrf, $settings);
 $policy = new CommercialAccessPolicy($settings, $db, ['13']);
@@ -82,7 +86,8 @@ $html = '';
 if ($bucket === 'promocion' && $policy->canView('promocion')) {
   try {
     $input = $policy->resolveNavigation('promocion', $input);
-    $html = PromotionView::page($input, $policy, $db, $settings, SCM_BASE_URL);
+    // Como CommercialDashboardController: en la carga completa no se resume nada (la pantalla lo pide por AJAX).
+    $html = PromotionView::page($input, $policy, $db, $settings, SCM_BASE_URL, null, null, false);
   } catch (RuntimeException) {
     $bucket = 'sin_acceso';
   }

@@ -323,13 +323,20 @@
       },
     },
     // Promoción › Analítica web: IPs internas, robots, retención de visitas crudas y dominios propios. El estado de los
-    // resúmenes es solo lectura (lo mueve bin/tracker-rollup.php y la puesta al día al abrir la pantalla).
+    // resúmenes es solo lectura (lo mueve la tarea programada y la puesta al día al abrir la pantalla). Bajar los días de
+    // "Conservar visitas crudas" programa un borrado que no se deshace: pide una confirmación explícita en el mismo popup.
     analitica: {
       title: "Analítica web",
       html: function (settings) {
         var status = settings.status || {};
         var purge = status.last_purge || {};
+        var rebuild = status.rebuild || {};
         var number = function (value) { return value == null ? "sin dato" : Number(value).toLocaleString("es-CO"); };
+        // dd/mm/aaaa hh:mm de "AAAA-MM-DD HH:MM:SS" (o dd/mm/aaaa de "AAAA-MM-DD").
+        var stamp = function (value) {
+          var match = /^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}))?/.exec(String(value || ""));
+          return match ? match[3] + "/" + match[2] + "/" + match[1] + (match[4] ? " " + match[4] + ":" + match[5] : "") : String(value || "");
+        };
         var check = function (name, label, hint, on) {
           return '<label class="flex items-start gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white cursor-pointer text-left"><input type="checkbox" class="mt-1" name="' + name + '"' + (on ? " checked" : "") + '><span class="text-sm text-slate-800">' + esc(label) + '<small class="block text-[11px] text-slate-500">' + esc(hint) + "</small></span></label>";
         };
@@ -339,30 +346,48 @@
             '<span class="block text-[11px] text-slate-500 mt-1">' + esc(hint) + "</span></label>";
         };
         var rows = [
-          ["Último registro resumido", status.last_id ? "#" + number(status.last_id) + (status.last_fecha ? " · " + status.last_fecha : "") : "Todavía no se ha resumido nada"],
+          ["Última visita resumida", status.last_fecha ? stamp(status.last_fecha) : "Todavía no se ha resumido nada"],
           ["Visitas pendientes por resumir", number(status.pending)],
-          ["Última actualización", status.updated_at || "—"],
-          ["Última purga", purge.deleted ? number(purge.deleted) + " visitas del " + (purge.first || "") + " al " + (purge.last || "") + " (" + (purge.at || "") + ")" : "Nunca"],
+          ["Última actualización", status.updated_at ? stamp(status.updated_at) : "—"],
+          ["Última limpieza de visitas crudas", purge.deleted ? number(purge.deleted) + " visitas del " + stamp(String(purge.first || "").slice(0, 10)) + " al " + stamp(String(purge.last || "").slice(0, 10)) + " (el " + stamp(purge.at) + ")" : "Nunca"],
         ];
-        return '<form data-config-form class="text-left space-y-4" data-analytics-config>' +
-          intro("Cómo se cuentan las visitas en Promoción › Analítica web. Las IPs internas y los dominios propios se aplican a las visitas que se resuman desde ahora; para recalcular días anteriores se ejecuta <code>php bin/tracker-rollup.php --rebuild-from=AAAA-MM-DD</code>.") +
+        if (rebuild.from) rows.push(["Recálculo en curso", "Desde el " + stamp(rebuild.from) + ", va en el " + stamp(rebuild.next)]);
+        var retention = Number(settings.raw_retention_days || 0);
+        return '<form data-config-form class="text-left space-y-4" data-analytics-config data-initial-retention="' + esc(String(retention)) + '">' +
+          intro("Cómo se cuentan las visitas en Promoción › Analítica web. Los cambios de IPs internas y de dominios propios se aplican a las visitas nuevas; para recalcular meses anteriores, pide a sistemas que recalculen desde una fecha.") +
           '<section class="space-y-3">' + area("internal_ips", "IPs internas (oficina y equipo)", "Una por línea: IP exacta (IPv4 o IPv6), rango CIDR (190.0.0.0/24) o prefijo IPv4 (190.0.0.).", settings.internal_ips, "190.0.0.10\n10.0.0.0/8") +
           '<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">' +
           check("exclude_bots", "No contar robots", "Buscadores, monitores y navegadores automáticos.", settings.exclude_bots !== false) +
           check("exclude_internal", "No contar visitas internas", "Las que llegan desde las IPs internas de arriba.", settings.exclude_internal !== false) + "</div>" +
           area("own_domains", "Dominios propios", "Una por línea. Las visitas que llegan desde ellos cuentan como navegación interna, no como sitio de referencia.", settings.own_domains, "sucasainmobiliaria.com.co") +
           '<label class="block text-left"><span class="block text-xs font-semibold text-slate-700 mb-1">Conservar visitas crudas (días)</span>' +
-          numberField("raw_retention_days", settings.raw_retention_days || 0, 0, settings.max_retention_days || 3650) +
-          '<span class="block text-[11px] text-slate-500 mt-1">0 = no borrar nunca. Si pones un número (mínimo 30), solo <code>php bin/tracker-rollup.php --purge</code> borra las visitas ya resumidas más antiguas que eso, y deja el rastro. Ojo: dashboard-marketing también lee esas visitas y las pierde en su propia analítica.</span></label></section>' +
+          numberField("raw_retention_days", retention, 0, settings.max_retention_days || 3650) +
+          '<span class="block text-[11px] text-slate-500 mt-1">0 = no borrar nunca. Con un número (mínimo 30), la tarea programada de sistemas borra las visitas ya resumidas más antiguas que eso y deja constancia. Las cifras de esta pantalla no cambian, pero el panel de marketing anterior pierde esas visitas en su propia analítica.</span></label>' +
+          '<label class="hidden items-start gap-2 px-3 py-2 rounded-xl border border-red-200 bg-red-50 text-left cursor-pointer" data-retention-confirm><input type="checkbox" class="mt-1" name="confirm_retention"><span class="text-sm text-red-900" data-retention-confirm-text></span></label>' +
+          "</section>" +
           '<section><h4 class="text-sm font-bold text-slate-800 mb-1">Estado de los resúmenes</h4>' +
           tableHtml(["Dato", "Valor"], rows.map(function (row) {
             return '<tr><td class="py-2 px-2 font-medium text-slate-800">' + esc(row[0]) + '</td><td class="py-2 px-2 text-right" data-analytics-status>' + esc(row[1]) + "</td></tr>";
-          })) + "</section></form>";
+          })) +
+          '<details class="mt-2 text-[11px] text-slate-500"><summary class="cursor-pointer">Nota para sistemas</summary>Recalcular: <code>php bin/tracker-rollup.php --rebuild-from=AAAA-MM-DD</code>. Borrar visitas crudas según los días de arriba: <code>php bin/tracker-rollup.php --purge</code>.</details>' +
+          "</section></form>";
+      },
+      bind: function (popup) {
+        var form = popup.querySelector("[data-analytics-config]");
+        var days = form.querySelector('[name="raw_retention_days"]');
+        // Si deja de ser una reducción, la confirmación ya no aplica: se oculta y se desmarca.
+        days.addEventListener("input", function () {
+          if (!analyticsRetentionReduces(form)) analyticsRetentionConfirm(form, false);
+        });
       },
       collect: function (form) {
         var days = String(form.querySelector('[name="raw_retention_days"]').value || "0").trim();
         if (!/^\d+$/.test(days)) throw new Error("Los días para conservar las visitas crudas deben ser un número entero.");
         if (Number(days) > 0 && Number(days) < 30) throw new Error("Conserva al menos 30 días de visitas crudas, o escribe 0 para no borrar nunca.");
+        if (analyticsRetentionReduces(form) && !form.querySelector('[name="confirm_retention"]').checked) {
+          analyticsRetentionConfirm(form, true);
+          throw new Error("Confirma que entiendes el borrado de visitas crudas antes de guardar.");
+        }
         return {
           internal_ips: form.querySelector('[name="internal_ips"]').value,
           own_domains: form.querySelector('[name="own_domains"]').value,
@@ -373,6 +398,24 @@
       },
     },
   };
+
+  // Configuración › Analítica web: ¿los días de "Conservar visitas crudas" bajan (de 0 = nunca, o de un número mayor)?
+  function analyticsRetentionReduces(form) {
+    var initial = Number(form.getAttribute("data-initial-retention") || 0);
+    var days = Number(String(form.querySelector('[name="raw_retention_days"]').value || "0").trim());
+    return days > 0 && (initial === 0 || days < initial);
+  }
+
+  function analyticsRetentionConfirm(form, show) {
+    var box = form.querySelector("[data-retention-confirm]");
+    var input = box.querySelector("input");
+    var days = String(form.querySelector('[name="raw_retention_days"]').value || "0").trim();
+    box.querySelector("[data-retention-confirm-text]").textContent = "Entiendo que se conservan solo los últimos " + days +
+      " días de visitas crudas: las más antiguas se borran y no se pueden recuperar. El panel de marketing anterior también las pierde.";
+    box.classList.toggle("hidden", !show);
+    box.classList.toggle("flex", show);
+    if (!show) input.checked = false;
+  }
 
   function openSection(key) {
     var section = sections[key];

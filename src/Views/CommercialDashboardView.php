@@ -765,10 +765,10 @@ final class CommercialDashboardView
     ob_start();
 ?>
     <div class="min-w-0" data-commercial-tabs data-active-classes="<?php echo esc_attr($activeClasses); ?>">
-    <nav class="hidden lg:flex items-center gap-space-xs lg:gap-space-sm overflow-visible py-space-xs" aria-label="Navegación principal">
+    <nav class="hidden lg:flex items-center gap-0.5 xl:gap-space-sm overflow-visible py-space-xs" aria-label="Navegación principal">
       <!-- Pestaña Inicio -->
       <?php if (in_array('inicio', $views, true)): ?>
-        <a class="flex items-center gap-space-xs px-2 lg:px-3 py-space-xs transition-colors whitespace-nowrap font-label-md text-label-md <?php echo $bucket === 'inicio' ? ($activeClasses . ' active') : $inactiveClasses; ?>" data-commercial-tab="inicio" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'inicio'])); ?>"<?php echo $bucket === 'inicio' ? ' aria-current="page"' : ''; ?>>
+        <a class="flex items-center gap-space-xs px-2 xl:px-3 py-space-xs transition-colors whitespace-nowrap font-label-md text-label-md <?php echo $bucket === 'inicio' ? ($activeClasses . ' active') : $inactiveClasses; ?>" data-commercial-tab="inicio" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'inicio'])); ?>"<?php echo $bucket === 'inicio' ? ' aria-current="page"' : ''; ?>>
           <span class="material-symbols-outlined text-[16px]" aria-hidden="true">home</span>
           Inicio
         </a>
@@ -777,7 +777,7 @@ final class CommercialDashboardView
       <!-- Dropdown Calendario Comercial (Mi calendario, Calendario equipo, Vencimientos) -->
       <?php if (in_array('calendario', $views, true)): ?>
         <div class="relative group/nav" data-commercial-dropdown="calendario">
-          <button type="button" class="flex items-center gap-space-xs px-2 lg:px-3 py-space-xs font-label-md text-label-md <?php echo $bucket === 'calendario' ? ($activeClasses . ' active') : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-tab="calendario" data-commercial-dropdown-trigger="calendario" aria-expanded="false">
+          <button type="button" class="flex items-center gap-space-xs px-2 xl:px-3 py-space-xs font-label-md text-label-md <?php echo $bucket === 'calendario' ? ($activeClasses . ' active') : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-tab="calendario" data-commercial-dropdown-trigger="calendario" aria-expanded="false">
             <span class="material-symbols-outlined text-[16px]">calendar_month</span>
             <span>Calendario</span>
             <span class="material-symbols-outlined text-[16px] group-hover/nav:rotate-180 transition-transform">expand_more</span>
@@ -818,7 +818,7 @@ final class CommercialDashboardView
       <?php $commercialViews = array_merge(['precaptacion', 'anadir_aviso', 'actualizaciones', 'avisos'], $taskViews); ?>
       <?php if (array_intersect($commercialViews, $views) !== []): ?>
         <div class="relative group/nav" data-commercial-dropdown="comerciales">
-          <button type="button" class="flex items-center gap-space-xs px-2 lg:px-3 py-space-xs font-label-md text-label-md <?php echo ($isTaskActive || in_array($bucket, ['precaptacion', 'anadir_aviso', 'actualizaciones', 'avisos'], true)) ? ($activeClasses . ' active') : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-tab="comerciales" data-commercial-dropdown-trigger="comerciales" aria-expanded="false">
+          <button type="button" class="flex items-center gap-space-xs px-2 xl:px-3 py-space-xs font-label-md text-label-md <?php echo ($isTaskActive || in_array($bucket, ['precaptacion', 'anadir_aviso', 'actualizaciones', 'avisos'], true)) ? ($activeClasses . ' active') : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-tab="comerciales" data-commercial-dropdown-trigger="comerciales" aria-expanded="false">
             <span class="material-symbols-outlined text-[16px]" aria-hidden="true">business_center</span>
             <span>Actividades comerciales</span>
             <span class="material-symbols-outlined text-[16px] group-hover/nav:rotate-180 transition-transform" aria-hidden="true">expand_more</span>
@@ -993,7 +993,7 @@ final class CommercialDashboardView
       <!-- Dropdown Inmuebles (Públicos, Pendientes por publicar, No públicos, Destacados, Solicitudes, Cupos, Mis inmuebles) -->
       <?php if (in_array('inmuebles', $views, true)): ?>
         <div class="relative group/nav" data-commercial-dropdown="inmuebles">
-          <button type="button" class="flex items-center gap-space-xs px-2 lg:px-3 py-space-xs font-label-md text-label-md <?php echo $bucket === 'inmuebles' ? ($activeClasses . ' active') : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-tab="inmuebles" data-commercial-dropdown-trigger="inmuebles" aria-expanded="false">
+          <button type="button" class="flex items-center gap-space-xs px-2 xl:px-3 py-space-xs font-label-md text-label-md <?php echo $bucket === 'inmuebles' ? ($activeClasses . ' active') : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-tab="inmuebles" data-commercial-dropdown-trigger="inmuebles" aria-expanded="false">
             <span class="material-symbols-outlined text-[16px]">domain</span>
             <span>Inmuebles</span>
             <span class="material-symbols-outlined text-[16px] group-hover/nav:rotate-180 transition-transform">expand_more</span>
@@ -1069,7 +1069,7 @@ final class CommercialDashboardView
       <?php endif; ?>
 
       <?php if (in_array('notificaciones', $views, true)): ?>
-        <a class="flex items-center gap-space-xs px-2 lg:px-3 py-space-xs whitespace-nowrap font-label-md text-label-md <?php echo $bucket === 'notificaciones' ? ($activeClasses . ' active') : $inactiveClasses; ?>" data-commercial-tab="notificaciones" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'notificaciones'])); ?>"<?php echo $bucket === 'notificaciones' ? ' aria-current="page"' : ''; ?>>
+        <a class="flex items-center gap-space-xs px-2 xl:px-3 py-space-xs whitespace-nowrap font-label-md text-label-md <?php echo $bucket === 'notificaciones' ? ($activeClasses . ' active') : $inactiveClasses; ?>" data-commercial-tab="notificaciones" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'notificaciones'])); ?>"<?php echo $bucket === 'notificaciones' ? ' aria-current="page"' : ''; ?>>
           <span class="material-symbols-outlined text-[16px]" aria-hidden="true">campaign</span><span>Notificaciones</span>
         </a>
       <?php endif; ?>
@@ -1077,7 +1077,7 @@ final class CommercialDashboardView
       <!-- Dropdown Herramientas (Simulador de ingreso neto, Ganancia ocasional, Calculadora de mercado, Calculadora de aseo, Generador UTM) -->
       <?php if (in_array('herramientas', $views, true)): ?>
         <div class="relative group/nav" data-commercial-dropdown="herramientas">
-          <button type="button" class="flex items-center gap-space-xs px-2 lg:px-3 py-space-xs font-label-md text-label-md <?php echo $bucket === 'herramientas' ? ($activeClasses . ' active') : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-tab="herramientas" data-commercial-dropdown-trigger="herramientas" aria-expanded="false">
+          <button type="button" class="flex items-center gap-space-xs px-2 xl:px-3 py-space-xs font-label-md text-label-md <?php echo $bucket === 'herramientas' ? ($activeClasses . ' active') : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-tab="herramientas" data-commercial-dropdown-trigger="herramientas" aria-expanded="false">
             <span class="material-symbols-outlined text-[16px]" aria-hidden="true">handyman</span>
             <span>Herramientas</span>
             <span class="material-symbols-outlined text-[16px] group-hover/nav:rotate-180 transition-transform" aria-hidden="true">expand_more</span>
@@ -1135,7 +1135,7 @@ final class CommercialDashboardView
       <!-- Dropdown Promoción: una entrada por subpestaña de SUBVIEWS['promocion'] que el cargo puede abrir -->
       <?php if (in_array('promocion', $views, true)): ?>
         <div class="relative group/nav" data-commercial-dropdown="promocion">
-          <button type="button" class="flex items-center gap-space-xs px-2 lg:px-3 py-space-xs font-label-md text-label-md <?php echo $bucket === 'promocion' ? ($activeClasses . ' active') : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-tab="promocion" data-commercial-dropdown-trigger="promocion" aria-expanded="false">
+          <button type="button" class="flex items-center gap-space-xs px-2 xl:px-3 py-space-xs font-label-md text-label-md <?php echo $bucket === 'promocion' ? ($activeClasses . ' active') : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-tab="promocion" data-commercial-dropdown-trigger="promocion" aria-expanded="false">
             <span class="material-symbols-outlined text-[16px]" aria-hidden="true">campaign</span>
             <span>Promoción</span>
             <span class="material-symbols-outlined text-[16px] group-hover/nav:rotate-180 transition-transform" aria-hidden="true">expand_more</span>

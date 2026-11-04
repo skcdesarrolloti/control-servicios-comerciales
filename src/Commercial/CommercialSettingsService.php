@@ -112,7 +112,7 @@ final class CommercialSettingsService
       $status = TrackerRollup::readStatus($this->db, $this->settings);
     } catch (\Throwable) {
       // Sin la tabla del tracker (o sin acceso a ella) la sección se puede editar igual.
-      $status = TrackerRollup::state($this->settings) + ['pending' => null, 'schema_ready' => false];
+      $status = TrackerRollup::state($this->db) + ['pending' => null, 'schema_ready' => false];
     }
     return $config + ['max_retention_days' => TrackerAnalyticsConfig::MAX_RETENTION_DAYS, 'status' => $status];
   }
@@ -146,7 +146,7 @@ final class CommercialSettingsService
         $before = TrackerAnalyticsConfig::read($this->settings);
         $saved = TrackerAnalyticsConfig::save($this->settings, $data, Auth::userId());
         if ($saved['internal_ips'] !== $before['internal_ips'] || $saved['own_domains'] !== $before['own_domains']) {
-          return 'Configuración de la analítica web guardada. Las IPs internas y los dominios propios se aplican a las visitas nuevas; para recalcular días anteriores ejecuta bin/tracker-rollup.php --rebuild-from=AAAA-MM-DD.';
+          return 'Configuración de la analítica web guardada. Los cambios de IPs internas y de dominios propios se aplican a las visitas nuevas; para recalcular meses anteriores, pide a sistemas que recalculen desde una fecha.';
         }
         return 'Configuración de la analítica web guardada.';
     }

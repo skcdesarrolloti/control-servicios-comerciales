@@ -143,6 +143,9 @@
 
 /* Indicadores */
 .cpr-stats { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; margin-top:20px }
+/* Rango todavía sin procesar del todo: las cifras pueden estar incompletas (el aviso de arriba lo explica). */
+.cpr-stats.is-partial .cpr-stat__value { color:var(--cpr-muted) }
+.cpr-stats.is-partial .cpr-stat { border-style:dashed }
 .cpr-stat {
   position:relative;
   display:flex;

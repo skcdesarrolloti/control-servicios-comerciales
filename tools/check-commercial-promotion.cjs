@@ -46,6 +46,18 @@ function daysBetween(from, to) {
     await page.goto(FIXTURE + '?cargo=13&tab=espera');
     assert.equal(await page.locator('script[data-commercial-module-src]').count(), 0);
     assert.equal(await page.locator('link[data-commercial-module-style]').count(), 0);
+    // Entre 1024 y 1280 px el menú de escritorio cabe completo: Promoción (el último) y su menú no se cortan.
+    await page.setViewportSize({ width: 1024, height: 900 });
+    const promoTrigger = page.locator('[data-commercial-dropdown-trigger="promocion"]');
+    const triggerBox = await promoTrigger.boundingBox();
+    assert.ok(triggerBox && triggerBox.x + triggerBox.width <= 1024, 'Promoción se sale a 1024 px: ' + JSON.stringify(triggerBox));
+    assert.equal(await noHorizontalScroll(page), true);
+    await promoTrigger.click();
+    const promoMenuBox = await page.locator('[data-commercial-dropdown-menu="promocion"]').boundingBox();
+    assert.ok(promoMenuBox && promoMenuBox.x >= 0 && promoMenuBox.x + promoMenuBox.width <= 1024, 'El menú de Promoción se sale a 1024 px: ' + JSON.stringify(promoMenuBox));
+    await page.keyboard.press('Escape');
+    await page.mouse.click(5, 880);
+    await page.setViewportSize({ width: 1440, height: 1000 });
     const menuLinks = page.locator('[data-commercial-dropdown-menu="promocion"] a');
     assert.equal(await menuLinks.count(), 2);
     assert.match(await menuLinks.nth(0).getAttribute('href'), /[?&]tab=analitica_web$/);
@@ -158,9 +170,39 @@ function daysBetween(from, to) {
     assert.equal(await form.locator('[name="raw_retention_days"]').inputValue(), '0');
     assert.match(await form.innerText(), /Estado de los resúmenes/);
     assert.match(await form.innerText(), /Visitas pendientes por resumir\s+0/);
+    // Fechas en dd/mm/aaaa hh:mm, sin _ID internos ni comandos en el texto principal.
+    const statusText = await form.locator('table').innerText();
+    assert.doesNotMatch(statusText, /#\d|\d{4}-\d{2}-\d{2}/);
+    assert.match(statusText, /\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}/);
+    assert.match(await form.locator('p').first().innerText(), /pide a sistemas/);
     await form.locator('[name="raw_retention_days"]').fill('10');
     await page.locator('.swal2-confirm').click();
     await page.locator('.swal2-validation-message', { hasText: 'al menos 30 días' }).waitFor();
+    // Bajar los días (de 0 = nunca a 400) programa un borrado: pide una confirmación clara en el mismo popup.
+    const retentionConfirm = form.locator('[data-retention-confirm]');
+    assert.equal(await retentionConfirm.isVisible(), false);
+    await form.locator('[name="raw_retention_days"]').fill('400');
+    await page.locator('.swal2-confirm').click();
+    await page.locator('.swal2-validation-message', { hasText: 'Confirma que entiendes el borrado' }).waitFor();
+    assert.equal(await retentionConfirm.isVisible(), true);
+    assert.match(await retentionConfirm.innerText(), /últimos 400 días[\s\S]*no se pueden recuperar[\s\S]*panel de marketing anterior/);
+    await form.locator('[name="raw_retention_days"]').fill('0');
+    assert.equal(await retentionConfirm.isVisible(), false);
+    await form.locator('[name="raw_retention_days"]').fill('400');
+    await page.locator('.swal2-confirm').click();
+    await page.locator('.swal2-validation-message', { hasText: 'Confirma que entiendes el borrado' }).waitFor();
+    await form.locator('[name="confirm_retention"]').check();
+    const savedRetention = page.waitForResponse(response => response.request().method() === 'POST' && (response.request().postData() || '').includes('commercial_settings_save'));
+    await page.locator('.swal2-confirm').click();
+    assert.equal((await (await savedRetention).json()).data.settings.analitica.raw_retention_days, 400);
+    await page.locator('.swal2-popup', { hasText: 'Configuración de la analítica web guardada' }).waitFor();
+    await page.locator('.swal2-confirm').click().catch(() => {});
+    await page.locator('.swal2-popup').waitFor({ state: 'detached' }).catch(() => {});
+    await page.locator('#commercial-config-trigger').click();
+    await page.locator('[data-commercial-config-action="analitica"]').click();
+    await form.waitFor();
+    assert.equal(await form.locator('[name="raw_retention_days"]').inputValue(), '400');
+    // Subir a 0 (nunca borrar) no pide confirmación.
     await form.locator('[name="raw_retention_days"]').fill('0');
     await form.locator('[name="internal_ips"]').fill('10.0.0.0/8\n190.0.0.1');
     const saved = page.waitForResponse(response => response.request().method() === 'POST' && (response.request().postData() || '').includes('commercial_settings_save'));
@@ -197,7 +239,14 @@ function daysBetween(from, to) {
       const plain = watch(other);
       const bodies = [];
       other.on('response', async response => { if ((response.request().postData() || '').includes('commercial_promo_analytics_logs')) bodies.push(await response.text()); });
-      await other.goto(FIXTURE + '?cargo=7&tab=analitica_web');
+      // Con una visita sin resumir, la carga completa no la resume (sesión abierta): la pantalla la pide sola por AJAX.
+      const reloads = [];
+      other.on('request', request => { if ((request.postData() || '').includes('commercial_tickets_filter')) reloads.push(request); });
+      const documentResponse = await other.goto(FIXTURE + '?cargo=7&tab=analitica_web&pendiente=1');
+      assert.match(await documentResponse.text(), /data-cpr-sync="behind" data-cpr-sync-auto/);
+      await other.locator('[data-cpr-sync="ok"]').waitFor();
+      assert.equal(reloads.length, 1);
+      assert.equal(await other.locator('[data-cpr-sync-auto]').count(), 0);
       await other.locator('[data-cpr-kpis]').waitFor();
       assert.equal(await other.locator('#commercial-config-trigger').count(), 0);
       assert.equal(await other.locator('[data-cpr-logs]').getAttribute('data-network'), '0');

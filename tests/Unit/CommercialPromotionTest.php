@@ -14,6 +14,7 @@ use SCM\Http\Api\CommercialActionRouter;
 use SCM\Views\CommercialDashboardView;
 use SCM\Views\Promotion\AnalyticsView;
 use SCM\Views\Promotion\PortalActivityView;
+use SCM\Views\Promotion\PromotionUi;
 use SCM\Views\Promotion\PromotionView;
 use Tests\Fixtures\CommercialPromotionDatabase;
 use Tests\Fixtures\CommercialTrackerDatabase;
@@ -273,6 +274,89 @@ final class CommercialPromotionTest extends TestCase
     self::assertFalse($fresh['sync']['behind']);
     self::assertSame($before + 1, $fresh['kpis']['visits']);
     self::assertStringContainsString('data-cpr-sync="ok"', AnalyticsView::render($fresh, '/public'));
+  }
+
+  public function testFullPageLoadDoesNotSummarizeAndAsksForTheCatchUpByAjax(): void
+  {
+    $this->seed();
+    $before = $this->analytics()['kpis']['visits'];
+    // Visitas de hoy sin resumir (el rango por defecto termina hoy).
+    for ($i = 0; $i < 3; $i++) {
+      CommercialTrackerDatabase::hit($this->db, ['fecha_visita' => self::TODAY . ' 20:0' . $i . ':00', 'ip_address' => '200.9.9.' . $i]);
+    }
+    $rollup = CommercialPromotionDatabase::rollup($this->db, $this->settings, self::TODAY, $this->lockFile);
+
+    // Carga completa (index.php, sesión abierta): solo lee el estado.
+    $html = PromotionView::page(['promocion_sub' => 'analitica_web'], $this->policy(), $this->db, $this->settings, '/public', $rollup, self::TODAY, false);
+    $last = (int) $this->db->getVar('SELECT last_id FROM wp_scm_tracker_state WHERE id = 1');
+    self::assertSame($last, (int) $this->db->getVar('SELECT MAX(_ID) FROM wp_jet_cct_tracker_logs') - 3, 'No resumió nada.');
+    self::assertStringContainsString('data-cpr-sync="behind" data-cpr-sync-auto', $html);
+    self::assertStringContainsString('las cifras pueden estar incompletas', $html);
+    self::assertStringContainsString('class="cpr-stats is-partial" data-cpr-kpis data-cpr-partial', $html);
+
+    // Por AJAX (api.php ya cerró la sesión) sí resume, y el aviso ya no pide otra recarga.
+    $ajax = AnalyticsView::context([], $this->policy(), $this->db, $this->settings, $rollup, self::TODAY, true);
+    self::assertSame(3, $ajax['sync']['processed']);
+    self::assertSame($before + 3, $ajax['kpis']['visits']);
+    $html = AnalyticsView::render($ajax, '/public');
+    self::assertStringNotContainsString('data-cpr-sync-auto', $html);
+    self::assertStringContainsString('data-cpr-sync="ok"', $html);
+    self::assertStringNotContainsString('is-partial', $html);
+
+    // Pendientes posteriores al rango elegido: el rango ya está completo.
+    CommercialTrackerDatabase::hit($this->db, ['fecha_visita' => self::TODAY . ' 21:00:00']);
+    $past = AnalyticsView::context(['pr_desde' => '2026-10-10', 'pr_hasta' => '2026-10-20'], $this->policy(), $this->db, $this->settings, $rollup, self::TODAY, false);
+    self::assertSame('recent', AnalyticsView::coverage($past));
+    self::assertStringContainsString('el rango elegido ya está completo', AnalyticsView::render($past, '/public'));
+
+    // Un recálculo en curso se anuncia.
+    $this->db->pdo()->exec("UPDATE wp_scm_tracker_state SET rebuild = '{\"from\":\"2026-10-01\",\"requested\":\"2026-10-01\",\"next\":\"2026-10-15\"}' WHERE id = 1");
+    $rebuilding = AnalyticsView::render(AnalyticsView::context([], $this->policy(), $this->db, $this->settings, $rollup, self::TODAY, false), '/public');
+    self::assertStringContainsString('Recalculando las cifras desde el 01/10/2026: va en el 15/10/2026', $rebuilding);
+  }
+
+  public function testAnalyticsBeforeTheFirstRollupExplainsTheEmptyNumbers(): void
+  {
+    CommercialTrackerDatabase::hit($this->db, ['fecha_visita' => '2026-10-20 10:00:00']);
+    $rollup = CommercialPromotionDatabase::rollup($this->db, $this->settings, self::TODAY, $this->lockFile);
+    $context = AnalyticsView::context([], $this->policy(), $this->db, $this->settings, $rollup, self::TODAY, false);
+    self::assertFalse($context['ready']);
+    self::assertSame('pending', AnalyticsView::coverage($context));
+    $html = AnalyticsView::render($context, '/public');
+    self::assertStringContainsString('data-cpr-sync="pending" data-cpr-sync-auto', $html);
+    self::assertStringContainsString('la analítica web se está preparando', $html);
+    self::assertStringContainsString('is-partial', $html);
+    // Sin visitas en el rango: ni nota de exclusiones con ceros ni un "máximo 1" inventado.
+    self::assertStringNotContainsString('data-cpr-excluded', $html);
+    self::assertStringNotContainsString('máximo', $html);
+    self::assertStringContainsString('data-cpr-chart-empty', $html);
+  }
+
+  public function testAnalyticsCopyChartTicksAndExclusionNote(): void
+  {
+    $this->seed();
+    $html = AnalyticsView::render($this->analytics(), '/public');
+    self::assertStringContainsString('Visitas al sitio de SKC SuCasa Inmobiliaria: campañas, fuentes, medios, páginas e inmuebles.', $html);
+    self::assertStringNotContainsString('registradas por el tracker', $html);
+    self::assertStringContainsString('Por dirección IP (se guarda cifrada)', $html);
+    self::assertMatchesRegularExpression('/De [\d.]+ visitas registradas no se cuentan [\d.]+ de robots \([\d,]+ %\) ni [\d.]+ internas de la oficina \([\d,]+ %\)\./', $html);
+    self::assertStringContainsString('Sin campaña', $html);
+
+    // 30 barras: primera, cada semana y última, sin una semanal pegada a la última (índice 28 junto al 29).
+    preg_match_all('/<li class="cpr-chart__bar"[^>]*aria-label="([^"]+)"[^>]*>(.*?)<\/li>/s', $html, $bars, PREG_SET_ORDER);
+    self::assertCount(30, $bars);
+    $ticks = [];
+    foreach ($bars as $index => $bar) {
+      if (str_contains($bar[2], 'cpr-chart__tick')) {
+        $ticks[] = $index;
+      }
+    }
+    self::assertSame([0, 7, 14, 21, 29], $ticks);
+    self::assertStringContainsString('máximo', $html);
+
+    $empty = PromotionUi::dailyChart('Accesos por día', 'accesos', [['day' => '2026-01-01', 'value' => 0], ['day' => '2026-01-02', 'value' => 0]]);
+    self::assertStringContainsString('Sin accesos en el rango', $empty);
+    self::assertStringNotContainsString('máximo', $empty);
   }
 
   public function testActivityRespectsTheDateRangeAndExactFilters(): void

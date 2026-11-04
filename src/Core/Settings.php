@@ -38,7 +38,11 @@ final class Settings
       : $default;
   }
 
-  public function set(string $key, $value, int $updatedBy = 0): void
+  /**
+   * @param bool $keepAuthor Escritura del sistema (sin funcionario): deja cct_author_id como estaba, para no perder quién
+   *   cambió la configuración por última vez.
+   */
+  public function set(string $key, $value, int $updatedBy = 0, bool $keepAuthor = false): void
   {
     if ($this->readOnly) {
       throw new \LogicException('Este consumidor no tiene permitido modificar la configuración.');
@@ -68,12 +72,16 @@ final class Settings
       $author = $updatedBy > 0 ? $updatedBy : null;
 
       if (is_array($row)) {
-        $this->db->update($this->table, [
+        $changes = [
           'valor' => $encoded,
           'cct_author_id' => $author,
           'cct_modified' => $now,
           'departamento' => 'Control Servicios',
-        ], ['_ID' => (int) $row['_ID']]);
+        ];
+        if ($keepAuthor && $author === null) {
+          unset($changes['cct_author_id']);
+        }
+        $this->db->update($this->table, $changes, ['_ID' => (int) $row['_ID']]);
       } else {
         $this->db->insert($this->table, [
           'cct_status' => 'publish',

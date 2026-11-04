@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SCM\Views\Promotion;
 
 use SCM\Commercial\CommercialAccessPolicy;
+use SCM\Commercial\Promotion\Analytics\TrackerAggregator;
 use SCM\Commercial\Promotion\Analytics\TrackerAnalyticsConfig;
 use SCM\Commercial\Promotion\Analytics\TrackerAnalyticsFilters;
 use SCM\Commercial\Promotion\Analytics\TrackerAnalyticsRepository;
@@ -36,9 +37,11 @@ final class AnalyticsView
 
   /**
    * @param array<string,mixed> $input pr_desde, pr_hasta, pr_campana, pr_fuente, pr_medio.
+   * @param bool $catchUp false en la carga completa de la página: solo se lee el estado y la puesta al día la pide la
+   *   pantalla por AJAX (api.php cierra la sesión antes; index.php no, y otra petición del mismo usuario esperaría).
    * @return array<string,mixed>
    */
-  public static function context(array $input, CommercialAccessPolicy $policy, Database $db, Settings $settings, ?TrackerRollup $rollup = null, ?string $today = null): array
+  public static function context(array $input, CommercialAccessPolicy $policy, Database $db, Settings $settings, ?TrackerRollup $rollup = null, ?string $today = null, bool $catchUp = true): array
   {
     $today = $today ?? date('Y-m-d');
     $config = TrackerAnalyticsConfig::read($settings);
@@ -58,7 +61,7 @@ final class AnalyticsView
     if ($rollup !== null) {
       try {
         // Acotada (5.000 filas) y sin esperar: si el cron tiene el candado, la pantalla muestra lo que ya hay.
-        $context['sync'] = $rollup->catchUp();
+        $context['sync'] = $catchUp ? $rollup->catchUp() : $rollup->pendingStatus();
       } catch (\Throwable $exception) {
         error_log('[commercial-promotion-analytics] ' . $exception->getMessage());
         $context['sync'] = ['error' => true];
@@ -99,7 +102,7 @@ final class AnalyticsView
     $filters = $context['filters'];
     $e = static fn($value): string => PromotionUi::e($value);
     $applied = ['pr_desde' => $filters->from, 'pr_hasta' => $filters->to, 'pr_campana' => $filters->campaign, 'pr_fuente' => $filters->source, 'pr_medio' => $filters->medium];
-    $html = PromotionUi::hero('monitoring', 'Analítica web', 'Visitas al sitio de SKC SuCasa Inmobiliaria registradas por el tracker: campañas, fuentes, medios, páginas e inmuebles. Los datos salen de resúmenes diarios, así que la pantalla carga rápido aunque el registro crezca.');
+    $html = PromotionUi::hero('monitoring', 'Analítica web', 'Visitas al sitio de SKC SuCasa Inmobiliaria: campañas, fuentes, medios, páginas e inmuebles.');
     $html .= self::syncNotice($context);
     $html .= '<div class="cpr-live" data-cpr-live role="status" aria-live="polite"></div>';
     $html .= self::filtersForm($context, $baseUrl);
@@ -111,9 +114,11 @@ final class AnalyticsView
     }
     $kpis = $context['kpis'];
     $excluded = $kpis['excluded'];
-    $html .= '<div class="cpr-stats" data-cpr-kpis>'
+    // Mientras el rango no esté procesado del todo, los indicadores se atenúan (el aviso de arriba dice por qué).
+    $partial = in_array(self::coverage($context), ['partial', 'pending'], true);
+    $html .= '<div class="cpr-stats' . ($partial ? ' is-partial' : '') . '" data-cpr-kpis' . ($partial ? ' data-cpr-partial' : '') . '>'
       . PromotionUi::stat('Visitas', PromotionUi::number($kpis['visits']), PromotionUi::day($filters->from) . ' a ' . PromotionUi::day($filters->to), 'visibility')
-      . PromotionUi::stat('Visitantes únicos', PromotionUi::number($kpis['unique_visitors']), 'Por dispositivo (IP cifrada)', 'person')
+      . PromotionUi::stat('Visitantes únicos', PromotionUi::number($kpis['unique_visitors']), 'Por dirección IP (se guarda cifrada)', 'person')
       . PromotionUi::stat('Visitas de usuarios registrados', PromotionUi::number($kpis['registered_visits']), $kpis['visits'] > 0 ? PromotionUi::percent($kpis['registered_visits'] * 100 / $kpis['visits']) . ' de las visitas' : '', 'how_to_reg')
       . PromotionUi::stat('Campañas con visitas', PromotionUi::number($kpis['campaigns']), 'En el rango y los filtros', 'campaign')
       . '</div>';
@@ -124,9 +129,11 @@ final class AnalyticsView
     if ($excluded['internal_excluded']) {
       $notes[] = PromotionUi::number($excluded['internal']) . ' internas de la oficina (' . PromotionUi::percent($excluded['internal_pct']) . ')';
     }
-    $html .= '<p class="cpr-note" data-cpr-excluded><span class="material-symbols-outlined" aria-hidden="true">filter_alt</span>'
-      . ($notes !== [] ? 'No se cuentan ' . $e(implode(' ni ', $notes)) . ' de ' . $e(PromotionUi::number($excluded['total'])) . ' visitas registradas.' : 'Se cuentan todas las visitas, también robots e internas.')
-      . ' Se ajusta en Configuración › Analítica web.</p>';
+    if ($excluded['total'] > 0) {
+      $html .= '<p class="cpr-note" data-cpr-excluded><span class="material-symbols-outlined" aria-hidden="true">filter_alt</span>'
+        . ($notes !== [] ? 'De ' . $e(PromotionUi::number($excluded['total'])) . ' visitas registradas no se cuentan ' . $e(implode(' ni ', $notes)) . '.' : 'Se cuentan todas las visitas, también robots e internas.')
+        . ' Se ajusta en Configuración › Analítica web.</p>';
+    }
     $html .= PromotionUi::dailyChart('Visitas por día', 'visitas', $context['daily']);
     $html .= '<div class="cpr-grid" data-cpr-lists>';
     foreach (self::LISTS as $list => [$title, $column, $withUnique]) {
@@ -138,25 +145,63 @@ final class AnalyticsView
     return $html;
   }
 
+  /**
+   * ¿Qué tan completos están los datos del rango elegido?
+   *  'error'   no se pudo poner al día;
+   *  'pending' los resúmenes todavía no existen;
+   *  'partial' hay visitas sin resumir y lo procesado no llega al final del rango (las cifras pueden estar incompletas);
+   *  'recent'  solo faltan las visitas más recientes, posteriores al rango;
+   *  'ok'      todo procesado.
+   * @param array<string,mixed> $context
+   */
+  public static function coverage(array $context): string
+  {
+    $sync = $context['sync'];
+    if (is_array($sync) && !empty($sync['error'])) {
+      return 'error';
+    }
+    if (empty($context['ready'])) {
+      return 'pending';
+    }
+    if (!is_array($sync) || empty($sync['behind'])) {
+      return 'ok';
+    }
+    $last = TrackerAggregator::day((string) ($sync['last_fecha'] ?? ''));
+    /** @var TrackerAnalyticsFilters $filters */
+    $filters = $context['filters'];
+    // Las visitas pendientes son posteriores a la última procesada: si esa es del último día del rango o anterior, al
+    // rango le pueden faltar visitas.
+    return $last === null || $last <= $filters->to ? 'partial' : 'recent';
+  }
+
   /** @param array<string,mixed> $context */
   private static function syncNotice(array $context): string
   {
-    $sync = $context['sync'];
-    if (!is_array($sync)) {
-      return '';
-    }
-    if (!empty($sync['error'])) {
+    $sync = is_array($context['sync']) ? $context['sync'] : [];
+    $coverage = self::coverage($context);
+    if ($coverage === 'error') {
       return '<p class="cpr-alert" data-cpr-sync="error">No se pudieron traer las visitas más recientes; se muestran los resúmenes que ya había.</p>';
     }
     $last = (string) ($sync['last_fecha'] ?? '');
-    $until = $last !== '' ? ' Datos procesados hasta el ' . PromotionUi::day($last, true) . '.' : '';
-    if (!empty($sync['behind']) || !empty($sync['busy'])) {
-      return '<p class="cpr-alert is-sync" data-cpr-sync="behind"><span class="material-symbols-outlined" aria-hidden="true">sync</span>Actualizando datos: todavía hay visitas por resumir.' . PromotionUi::e($until)
-        . ' <button type="button" class="cpr-link" data-cpr-reload>Volver a cargar</button></p>';
+    $until = $last !== '' ? ' (procesado hasta el ' . PromotionUi::day($last, true) . ')' : '';
+    // En la carga completa la puesta al día no corre: la pantalla la pide sola por AJAX (data-cpr-sync-auto).
+    $auto = !empty($sync['deferred']) && (!empty($sync['behind']) || $coverage === 'pending') ? ' data-cpr-sync-auto' : '';
+    $reload = ' <button type="button" class="cpr-link" data-cpr-reload>Volver a cargar</button>';
+    $html = '';
+    $rebuild = is_array($sync['rebuild'] ?? null) ? $sync['rebuild'] : [];
+    if (isset($rebuild['from'], $rebuild['next'])) {
+      $html .= '<p class="cpr-alert is-sync" data-cpr-sync-rebuild><span class="material-symbols-outlined" aria-hidden="true">autorenew</span>Recalculando las cifras desde el '
+        . PromotionUi::e(PromotionUi::day((string) $rebuild['from'])) . ': va en el ' . PromotionUi::e(PromotionUi::day((string) $rebuild['next']))
+        . '. Los días que faltan todavía muestran la clasificación anterior de robots y visitas internas.</p>';
     }
-    return '<p class="cpr-sync-ok" data-cpr-sync="ok">' . PromotionUi::e(trim($until) !== '' ? trim($until) : 'Sin visitas registradas todavía.') . '</p>';
+    return $html . match ($coverage) {
+      'pending' => '<p class="cpr-alert is-sync" data-cpr-sync="pending"' . $auto . '><span class="material-symbols-outlined" aria-hidden="true">sync</span>Actualizando datos: la analítica web se está preparando y las cifras aparecen a medida que se procesan las visitas.' . $reload . '</p>',
+      'partial' => '<p class="cpr-alert is-sync" data-cpr-sync="behind"' . $auto . '><span class="material-symbols-outlined" aria-hidden="true">sync</span>Actualizando datos: las visitas de este rango aún se están procesando' . PromotionUi::e($until) . ', así que las cifras pueden estar incompletas.' . $reload . '</p>',
+      'recent' => '<p class="cpr-alert is-sync" data-cpr-sync="behind"' . $auto . '><span class="material-symbols-outlined" aria-hidden="true">sync</span>Actualizando datos: faltan las visitas más recientes' . PromotionUi::e($until) . '; el rango elegido ya está completo.' . $reload . '</p>',
+      // Sin puesta al día (sin secreto para cifrar visitantes) no hay nada que contar sobre el estado.
+      default => $sync === [] ? '' : '<p class="cpr-sync-ok" data-cpr-sync="ok">' . PromotionUi::e($last !== '' ? 'Datos procesados hasta el ' . PromotionUi::day($last, true) . '.' : 'Sin visitas registradas todavía.') . '</p>',
+    };
   }
-
   /** @param array<string,mixed> $context */
   private static function filtersForm(array $context, string $baseUrl): string
   {

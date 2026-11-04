@@ -9,7 +9,8 @@ namespace SCM\Commercial\Promotion\Analytics;
  *
  *   php bin/tracker-rollup.php                         Resume las visitas nuevas (hasta --max, 50000 por defecto). Para el cron.
  *   php bin/tracker-rollup.php --backfill              Resume todo lo pendiente, en lotes (primera carga).
- *   php bin/tracker-rollup.php --rebuild-from=AAAA-MM-DD   Recalcula esos días (p. ej. tras cambiar las IPs internas).
+ *   php bin/tracker-rollup.php --rebuild-from=AAAA-MM-DD   Recalcula esos días (p. ej. tras cambiar las IPs internas), un día por
+ *                                                      transacción; si se corta, la siguiente corrida lo retoma.
  *   php bin/tracker-rollup.php --purge                 Borra visitas crudas ya resumidas y más viejas que lo configurado.
  *   php bin/tracker-rollup.php --status                Solo muestra el estado.
  *   Opciones: --batch=N (filas por lote, 1000), --max=N.
@@ -59,12 +60,17 @@ final class TrackerRollupCommand
           }
         });
         $this->say("Visitas nuevas: {$result['processed']} filas leídas, {$result['counted']} vistas sumadas en {$result['batches']} lotes. Último _ID: {$result['last_id']}.");
+        // Un recálculo cortado (proceso detenido, conexión perdida) se retoma aquí, en la siguiente corrida del cron.
+        $resumed = isset($options['rebuild-from']) ? null : $this->rollup->resumeRebuild($batch);
+        if ($resumed !== null) {
+          $this->say("Se retomó el recálculo pendiente desde {$resumed['from']}: {$resumed['days']} días, {$resumed['processed']} filas crudas leídas, {$resumed['counted']} vistas sumadas.");
+        }
         if (isset($options['rebuild-from'])) {
           $rebuild = $this->rollup->rebuildFrom((string) $options['rebuild-from'], $batch);
           if ($rebuild['from'] !== $rebuild['requested']) {
             $this->say("Las visitas crudas empiezan el {$rebuild['from']}: se recalcula desde ese día (los anteriores se conservan).");
           }
-          $this->say("Recalculado desde {$rebuild['from']}: {$rebuild['deleted']} filas de resumen reemplazadas, {$rebuild['processed']} filas crudas leídas, {$rebuild['counted']} vistas sumadas.");
+          $this->say("Recalculado desde {$rebuild['from']} ({$rebuild['days']} días): {$rebuild['deleted']} filas de resumen reemplazadas, {$rebuild['processed']} filas crudas leídas, {$rebuild['counted']} vistas sumadas.");
         }
         if (isset($options['purge'])) {
           $purge = $this->rollup->purge($batch);
@@ -131,6 +137,9 @@ final class TrackerRollupCommand
     }
     $this->say('Estado: último _ID ' . $status['last_id'] . ($status['last_fecha'] !== '' ? " (visita del {$status['last_fecha']})" : '')
       . ', pendientes ' . $status['pending'] . ($status['updated_at'] !== '' ? ", actualizado {$status['updated_at']}" : '') . '.');
+    if ($status['rebuild'] !== []) {
+      $this->say("Recálculo pendiente desde {$status['rebuild']['from']}: sigue en el día {$status['rebuild']['next']} (se retoma en la próxima corrida).");
+    }
     if ($status['purged_before'] !== '') {
       $this->say("Visitas crudas purgadas antes del {$status['purged_before']}.");
     }

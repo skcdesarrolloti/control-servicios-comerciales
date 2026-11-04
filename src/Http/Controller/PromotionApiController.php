@@ -17,7 +17,8 @@ use SCM\Views\Promotion\AnalyticsView;
 /**
  * Endpoints de la pestaña Promoción (CommercialActionRouter los despacha aquí para no seguir creciendo
  * CommercialApiController). Cada uno valida el nonce y la pestaña y subpestaña (canView/canSubview). IP y navegador solo
- * salen con promocion_ver_ip: sin el permiso ni siquiera se leen.
+ * salen con promocion_ver_ip: sin el permiso, Registros los lee únicamente para reconocer robots y visitas internas y nunca
+ * los devuelve (TrackerAnalyticsRepository::logRow); Actividad de portales ni siquiera los lee.
  */
 final class PromotionApiController
 {

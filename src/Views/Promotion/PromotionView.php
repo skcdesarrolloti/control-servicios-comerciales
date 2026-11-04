@@ -24,13 +24,15 @@ final class PromotionView
    * Contexto y vista en un paso, para la carga inicial y la navegación por AJAX.
    * @param array<string,mixed> $input Entrada normalizada (promocion_sub y los filtros pr_*).
    * @param TrackerRollup|false|null $rollup Puesta al día de Analítica web; null = la del panel (APP_SECRET), false = ninguna.
+   * @param bool $catchUp false en la carga completa (index.php, con la sesión de PHP abierta): solo lee el estado y la
+   *   pantalla pide la puesta al día por AJAX. true por AJAX (api.php ya cerró la sesión).
    */
-  public static function page(array $input, CommercialAccessPolicy $policy, Database $db, Settings $settings, string $baseUrl, TrackerRollup|false|null $rollup = null, ?string $today = null): string
+  public static function page(array $input, CommercialAccessPolicy $policy, Database $db, Settings $settings, string $baseUrl, TrackerRollup|false|null $rollup = null, ?string $today = null, bool $catchUp = true): string
   {
     $sub = trim((string) ($input['promocion_sub'] ?? ''));
     $baseUrl = rtrim($baseUrl, '/');
     if ($sub === 'analitica_web' && $policy->canSubview('promocion', 'analitica_web')) {
-      $body = AnalyticsView::render(AnalyticsView::context($input, $policy, $db, $settings, $rollup === null ? self::rollup($db, $settings) : ($rollup ?: null), $today), $baseUrl);
+      $body = AnalyticsView::render(AnalyticsView::context($input, $policy, $db, $settings, $rollup === null ? self::rollup($db, $settings) : ($rollup ?: null), $today, $catchUp), $baseUrl);
     } elseif ($sub === 'actividad_portales' && $policy->canSubview('promocion', 'actividad_portales')) {
       $body = PortalActivityView::render(PortalActivityView::context($input, $policy, $db, $today), $baseUrl);
     } else {

@@ -76,23 +76,31 @@ final class PromotionUi
    */
   public static function dailyChart(string $title, string $unit, array $series): string
   {
-    $max = max(1, ...array_map(static fn(array $point): int => (int) $point['value'], $series ?: [['value' => 0]]));
+    // El máximo real se imprime; el de las alturas nunca es 0 para no dividir por cero.
+    $max = max(0, ...array_map(static fn(array $point): int => (int) $point['value'], $series ?: [['value' => 0]]));
+    $scale = max(1, $max);
     $total = array_sum(array_map(static fn(array $point): int => (int) $point['value'], $series));
     $bars = '';
     $rows = '';
     $count = count($series);
     foreach ($series as $index => $point) {
       $value = (int) $point['value'];
-      $height = $value > 0 ? max(2, (int) round($value * 100 / $max)) : 0;
+      $height = $value > 0 ? max(2, (int) round($value * 100 / $scale)) : 0;
       $label = self::day($point['day']) . ': ' . self::number($value) . ' ' . $unit;
-      // Etiqueta del eje solo en el primero, el último y cada semana, para no amontonar fechas.
-      $tick = $index === 0 || $index === $count - 1 || ($count > 14 && $index % 7 === 0) || $count <= 14;
+      // Etiqueta del eje solo en el primero, el último y cada semana, para no amontonar fechas; la semanal se omite si
+      // queda a menos de 3 barras de la última.
+      $tick = $count <= 14 || $index === 0 || $index === $count - 1 || ($index % 7 === 0 && $count - 1 - $index >= 3);
       $bars .= '<li class="cpr-chart__bar" tabindex="0" aria-label="' . self::e($label) . '" data-cpr-tip="' . self::e($label) . '">'
         . '<span class="cpr-chart__fill" style="height:' . $height . '%"></span>'
         . ($tick ? '<span class="cpr-chart__tick">' . self::e(substr(self::day($point['day']), 0, 5)) . '</span>' : '') . '</li>';
       $rows .= '<tr><td>' . self::e(self::day($point['day'])) . '</td><td class="is-num">' . self::e(self::number($value)) . '</td></tr>';
     }
-    return '<section class="cpr-card cpr-chart" data-cpr-chart><div class="cpr-card__head"><div><h2>' . self::e($title) . '</h2><p>' . self::e(self::number($total)) . ' ' . self::e($unit) . ' en el rango · máximo ' . self::e(self::number($max)) . ' en un día</p></div></div>'
+    $head = '<section class="cpr-card cpr-chart" data-cpr-chart><div class="cpr-card__head"><div><h2>' . self::e($title) . '</h2><p>';
+    if ($total === 0) {
+      // Sin datos no hay gráfico ni un "máximo" inventado.
+      return $head . 'Sin ' . self::e($unit) . ' en el rango</p></div></div><p class="cpr-empty" data-cpr-chart-empty>Sin ' . self::e($unit) . ' en el rango elegido.</p></section>';
+    }
+    return $head . self::e(self::number($total)) . ' ' . self::e($unit) . ' en el rango · máximo ' . self::e(self::number($max)) . ' en un día</p></div></div>'
       . '<div class="cpr-chart__plot"><span class="cpr-chart__max" aria-hidden="true">' . self::e(self::number($max)) . '</span><ol class="cpr-chart__bars" style="--cpr-bars:' . max(1, $count) . '">' . $bars . '</ol></div>'
       . '<details class="cpr-chart__table"><summary>Ver datos</summary><div class="cpr-table-wrap"><table class="cpr-table"><thead><tr><th>Día</th><th class="is-num">' . self::e(ucfirst($unit)) . '</th></tr></thead><tbody>' . $rows . '</tbody></table></div></details></section>';
   }

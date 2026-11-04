@@ -41,6 +41,15 @@
     return json.data || {};
   }
 
+  // ── Puesta al día ─────────────────────────────────────────────────────────
+  // En la carga completa de la página el servidor no resume visitas (tendría la sesión de PHP abierta y frenaría las
+  // demás peticiones del usuario): si hay pendientes, la pantalla se vuelve a pedir una vez por AJAX, que sí las resume.
+  var pendingSync = document.querySelector("[data-cpr-sync-auto]");
+  if (pendingSync) {
+    pendingSync.removeAttribute("data-cpr-sync-auto");
+    window.setTimeout(function () { navigate(""); }, 0);
+  }
+
   // ── Filtros ───────────────────────────────────────────────────────────────
   document.addEventListener("submit", function (event) {
     var form = event.target.closest && event.target.closest("form[data-cpr-filters]");

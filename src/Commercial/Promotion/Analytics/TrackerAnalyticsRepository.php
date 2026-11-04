@@ -11,9 +11,11 @@ use SCM\Core\Settings;
  * Lecturas de Analítica web. Adaptación de dashboard-marketing app/AnalyticsRepository.php (summary, generalBreakdowns,
  * options y la pestaña de registros): los indicadores, la serie diaria y las listas salen solo de los resúmenes diarios
  * (scm_tracker_*), nunca de la tabla cruda; el visor de registros es lo único que lee `jet_cct_tracker_logs`, a pedido,
- * con un rango de hasta 90 días y paginación por llave (fecha_visita, _ID).
+ * con un rango de hasta 90 días y paginación por llave sobre _ID (el tracker guarda fecha_visita al insertar, así que el
+ * orden de _ID es el de las fechas, y la llave primaria sí sirve para ordenar; fecha_visita es TEXT con índice de prefijo).
  *
- * Sin el permiso promocion_ver_ip el visor no devuelve IP ni navegador (ni siquiera en el JSON).
+ * Sin el permiso promocion_ver_ip el visor lee la IP y el navegador solo para reconocer robots y visitas internas, y nunca
+ * los devuelve (ni siquiera en el JSON).
  */
 final class TrackerAnalyticsRepository
 {
@@ -32,6 +34,8 @@ final class TrackerAnalyticsRepository
   public const LOG_PAGE_SIZE = 25;
   private const LOG_CHUNK = 100;
   private const LOG_MAX_CHUNKS = 5;
+  /** _ID de holgura alrededor de los límites del rango (visitas que se confirmaron algo desordenadas). */
+  private const LOG_ID_MARGIN = 500;
 
   private Database $db;
   private Settings $settings;
@@ -61,16 +65,22 @@ final class TrackerAnalyticsRepository
     }
     $daily = TrackerSchema::daily($this->db);
     [$where, $args] = $this->where($filters, true);
+    // 'general', 'inmueble_view' y 'event_click' los pone el tracker solo: no son campañas.
+    $pseudo = array_keys(TrackerSchema::PSEUDO_CAMPAIGNS);
+    $notPseudo = implode(', ', array_fill(0, count($pseudo), '?'));
     $row = $this->db->getRow(
       "SELECT COALESCE(SUM(`hits`), 0) AS visits, COALESCE(SUM(CASE WHEN `registered` = 1 THEN `hits` ELSE 0 END), 0) AS registered,
-              COUNT(DISTINCT `camp_slug`) AS campaigns
+              COUNT(DISTINCT CASE WHEN `camp_slug` NOT IN ({$notPseudo}) THEN `camp_slug` END) AS campaigns
          FROM `{$daily}` WHERE {$where}",
-      $args
+      array_merge($pseudo, $args)
     ) ?? [];
     [$baseWhere, $baseArgs] = $this->where($filters, false);
+    // Cada visita excluida cuenta una sola vez: con los robots excluidos, un robot interno ya está entre los robots; sin
+    // excluirlos, las internas son todas las de la oficina. Así robots + internas = total - visitas.
+    $internalCase = $filters->excludeBots ? '`bot` = 0 AND `internal` = 1' : '`internal` = 1';
     $base = $this->db->getRow(
       "SELECT COALESCE(SUM(`hits`), 0) AS total, COALESCE(SUM(CASE WHEN `bot` = 1 THEN `hits` ELSE 0 END), 0) AS bots,
-              COALESCE(SUM(CASE WHEN `bot` = 0 AND `internal` = 1 THEN `hits` ELSE 0 END), 0) AS internal
+              COALESCE(SUM(CASE WHEN {$internalCase} THEN `hits` ELSE 0 END), 0) AS internal
          FROM `{$daily}` WHERE {$baseWhere}",
       $baseArgs
     ) ?? [];
@@ -199,13 +209,17 @@ final class TrackerAnalyticsRepository
     return $out;
   }
 
-  /** Nombres de campaña de `jet_cct_tracker_camps` (slug => nombre). @return array<string,string> */
+  /**
+   * Nombres de campaña de `jet_cct_tracker_camps` (slug => nombre), con 'Sin campaña' y 'Vista de inmueble' para los slugs
+   * que pone el tracker (TrackerSchema::PSEUDO_CAMPAIGNS) si el catálogo no les da nombre.
+   * @return array<string,string>
+   */
   public function campaignNames(): array
   {
     if ($this->campaignNames !== null) {
       return $this->campaignNames;
     }
-    $this->campaignNames = [];
+    $this->campaignNames = TrackerSchema::PSEUDO_CAMPAIGNS;
     try {
       foreach ($this->db->getResults('SELECT `slug`, `nombre` FROM `' . $this->db->table('jet_cct_tracker_camps') . '`') as $row) {
         $slug = trim((string) ($row['slug'] ?? ''));
@@ -221,10 +235,15 @@ final class TrackerAnalyticsRepository
   }
 
   /**
-   * Visor de registros crudos, a pedido. Hasta 90 días; 25 filas por página ordenadas por (fecha_visita, _ID) descendente.
-   * Los robots y las visitas internas se reconocen aquí mismo y se omiten si los filtros lo piden.
+   * Visor de registros crudos, a pedido. Hasta 90 días; 25 filas por página, de la más reciente a la más antigua.
+   * Los robots y las visitas internas se reconocen aquí mismo (por eso se leen IP y navegador aunque no se devuelvan) y
+   * se omiten si los filtros lo piden.
    *
-   * @param string|null $cursor 'AAAA-MM-DD HH:MM:SS|_ID' de la última fila de la página anterior.
+   * La paginación va por _ID descendente con la llave primaria: el rango de fechas se traduce primero a un rango de _ID
+   * (búsqueda binaria sobre la llave, unas 40 lecturas de una fila) y cada tramo lee a lo sumo LOG_CHUNK filas hacia
+   * atrás, en vez de ordenar todo el rango por fecha_visita.
+   *
+   * @param string|null $cursor _ID de la última fila revisada en la página anterior.
    * @param bool $withNetwork Solo con el permiso promocion_ver_ip: agrega IP y navegador.
    * @return array{rows:list<array<string,mixed>>,next_cursor:string|null,from:string,to:string,clamped:bool}
    */
@@ -232,8 +251,15 @@ final class TrackerAnalyticsRepository
   {
     $filters = $filters->limitedTo(TrackerAnalyticsFilters::LOG_MAX_DAYS);
     $raw = TrackerSchema::raw($this->db);
-    $where = ['`fecha_visita` >= ?', '`fecha_visita` < ?'];
-    $args = [$filters->from . ' 00:00:00', TrackerAnalyticsFilters::shift($filters->to, 1) . ' 00:00:00'];
+    $start = $filters->from . ' 00:00:00';
+    $end = TrackerAnalyticsFilters::shift($filters->to, 1) . ' 00:00:00';
+    $where = ['`_ID` >= ?', '`_ID` < ?', '`fecha_visita` >= ?', '`fecha_visita` < ?'];
+    [$low, $high] = $this->idRange($start, $end);
+    $position = self::cursor($cursor);
+    if ($position !== null) {
+      $high = min($high, $position);
+    }
+    $args = [$low, $high, $start, $end];
     foreach (['camp_slug' => [$filters->campaign, TrackerSchema::EMPTY_CAMPAIGN], 'utm_source' => [$filters->source, TrackerSchema::EMPTY_SOURCE], 'utm_medium' => [$filters->medium, TrackerSchema::EMPTY_MEDIUM]] as $column => [$value, $empty]) {
       if ($value === '') {
         continue;
@@ -242,28 +268,21 @@ final class TrackerAnalyticsRepository
       $where[] = $value === $empty ? "(`{$column}` = ? OR `{$column}` = '' OR `{$column}` IS NULL)" : "`{$column}` = ?";
       $args[] = $value;
     }
-    $position = self::cursor($cursor);
     $config = TrackerAnalyticsConfig::read($this->settings);
     $internal = new InternalIpMatcher($config['internal_ips']);
     $names = $this->campaignNames();
     $kept = [];
-    $nextCursor = null;
-    $scanned = 0;
-    while ($scanned < self::LOG_MAX_CHUNKS) {
-      $pageWhere = $where;
-      $pageArgs = $args;
-      if ($position !== null) {
-        $pageWhere[] = '(`fecha_visita` < ? OR (`fecha_visita` = ? AND `_ID` < ?))';
-        array_push($pageArgs, $position[0], $position[0], $position[1]);
-      }
+    $last = null;
+    $more = $high > $low;
+    for ($scanned = 0; $more && $scanned < self::LOG_MAX_CHUNKS; $scanned++) {
+      $args[1] = $high;
       $rows = $this->db->getResults(
         'SELECT `_ID`, `fecha_visita`, `camp_slug`, `user_id`, `ip_address`, `user_agent`, `page_url`, `referrer`, `country`, `city`, `object_id`, `object_ref`, `utm_source`, `utm_medium`
-           FROM `' . $raw . '` WHERE ' . implode(' AND ', $pageWhere) . ' ORDER BY `fecha_visita` DESC, `_ID` DESC LIMIT ' . self::LOG_CHUNK,
-        $pageArgs
+           FROM `' . $raw . '` WHERE ' . implode(' AND ', $where) . ' ORDER BY `_ID` DESC LIMIT ' . self::LOG_CHUNK,
+        $args
       );
-      $scanned++;
       foreach ($rows as $row) {
-        $position = [(string) $row['fecha_visita'], (int) $row['_ID']];
+        $high = (int) $row['_ID'];
         $bot = BotDetector::isBot((string) ($row['user_agent'] ?? ''));
         $isInternal = $internal->matches((string) ($row['ip_address'] ?? ''));
         if (($filters->excludeBots && $bot) || ($filters->excludeInternal && $isInternal)) {
@@ -271,21 +290,52 @@ final class TrackerAnalyticsRepository
         }
         if (count($kept) === self::LOG_PAGE_SIZE) {
           // Hay al menos una fila más: la página siguiente empieza después de la última mostrada.
-          $last = $kept[self::LOG_PAGE_SIZE - 1];
-          return ['rows' => $kept, 'next_cursor' => $last['fecha'] . '|' . $last['id'], 'from' => $filters->from, 'to' => $filters->to, 'clamped' => $filters->clamped];
+          return ['rows' => $kept, 'next_cursor' => (string) $last, 'from' => $filters->from, 'to' => $filters->to, 'clamped' => $filters->clamped];
         }
         $kept[] = $this->logRow($row, $bot, $isInternal, $withNetwork, $names);
+        $last = $high;
       }
-      if (count($rows) < self::LOG_CHUNK) {
-        $position = null;
-        break;
+      $more = count($rows) === self::LOG_CHUNK && $high > $low;
+    }
+    // Si se cortó por revisar muchas filas omitidas (robots o internas), se sigue desde la última revisada.
+    return ['rows' => $kept, 'next_cursor' => $more ? (string) $high : null, 'from' => $filters->from, 'to' => $filters->to, 'clamped' => $filters->clamped];
+  }
+
+  /**
+   * Rango de _ID [desde, hasta) que cubre las visitas con fecha_visita en [$start, $end), con LOG_ID_MARGIN de holgura a
+   * cada lado. El filtro por fecha se aplica igual en la consulta: el rango solo acota lo que se lee.
+   * @return array{0:int,1:int}
+   */
+  private function idRange(string $start, string $end): array
+  {
+    $raw = TrackerSchema::raw($this->db);
+    $bounds = $this->db->getRow('SELECT MIN(`_ID`) AS low, MAX(`_ID`) AS high FROM `' . $raw . '`');
+    if ($bounds === null || $bounds['low'] === null) {
+      return [0, 0];
+    }
+    $min = (int) $bounds['low'];
+    $max = (int) $bounds['high'];
+    $low = $this->firstIdFrom($start, $min, $max);
+    $high = $this->firstIdFrom($end, $low, $max);
+    return [max(0, $low - self::LOG_ID_MARGIN), min($max + 1, $high + self::LOG_ID_MARGIN)];
+  }
+
+  /** Primer _ID (en [$min, $max + 1]) cuya visita es de $fecha o posterior, suponiendo _ID y fecha en el mismo orden. */
+  private function firstIdFrom(string $fecha, int $min, int $max): int
+  {
+    $raw = TrackerSchema::raw($this->db);
+    $low = $min;
+    $high = $max + 1;
+    while ($low < $high) {
+      $mid = intdiv($low + $high, 2);
+      $row = $this->db->getRow('SELECT `_ID`, `fecha_visita` FROM `' . $raw . '` WHERE `_ID` >= ? ORDER BY `_ID` ASC LIMIT 1', [$mid]);
+      if ($row === null || (string) $row['fecha_visita'] >= $fecha) {
+        $high = $mid;
+      } else {
+        $low = (int) $row['_ID'] + 1;
       }
     }
-    if ($position !== null) {
-      // Se revisaron muchas filas omitidas (robots o internas): se sigue desde la última revisada.
-      $nextCursor = $position[0] . '|' . $position[1];
-    }
-    return ['rows' => $kept, 'next_cursor' => $nextCursor, 'from' => $filters->from, 'to' => $filters->to, 'clamped' => $filters->clamped];
+    return $low;
   }
 
   /**
@@ -320,13 +370,13 @@ final class TrackerAnalyticsRepository
     return $out;
   }
 
-  /** @return array{0:string,1:int}|null */
-  private static function cursor(?string $cursor): ?array
+  /** _ID del cursor; null si no hay o está mal formado (vuelve a la primera página). */
+  private static function cursor(?string $cursor): ?int
   {
-    if ($cursor === null || preg_match('/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\|(\d{1,20})$/', trim($cursor), $match) !== 1) {
+    if ($cursor === null || preg_match('/^\d{1,18}$/', trim($cursor)) !== 1) {
       return null;
     }
-    return [$match[1], (int) $match[2]];
+    return (int) trim($cursor);
   }
 
   /**

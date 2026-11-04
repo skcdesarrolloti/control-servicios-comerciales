@@ -116,7 +116,7 @@ final class CommercialDashboardController
       'tools_service' => $bucket === 'herramientas' ? new \SCM\Commercial\CommercialOwnerPreapprovalService($this->db, $policy) : null,
       'tools_view' => $bucket === 'herramientas' ? (string) ($input['herramienta'] ?? '') : '',
       'tools_context' => $bucket === 'herramientas' ? \SCM\Views\CommercialToolsView::context((string) ($input['herramienta'] ?? ''), $policy, $this->db, $this->settings) : [],
-      'promotion_html' => $bucket === 'promocion' ? \SCM\Views\Promotion\PromotionView::page($input, $policy, $this->db, $this->settings, (string) SCM_BASE_URL) : '',
+      'promotion_html' => $bucket === 'promocion' ? \SCM\Views\Promotion\PromotionView::page($input, $policy, $this->db, $this->settings, (string) SCM_BASE_URL, null, null, false) : '',
       'visible_views' => $visibleViews,
       'ticket_employees' => $ticketEmployees,
       'commercial_employee_cargos' => $commercialEmployeeCargos,

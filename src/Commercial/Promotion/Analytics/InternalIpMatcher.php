@@ -31,9 +31,27 @@ final class InternalIpMatcher
     return $this->rules === [];
   }
 
+  /**
+   * Forma única de una IP: minúsculas, IPv6 comprimida y las IPv4 mapeadas en IPv6 (::ffff:10.1.2.3) como IPv4. La usan
+   * matches() y VisitorHasher, para que las dos formas sean la misma oficina y el mismo visitante. Lo que no es IP se
+   * devuelve recortado y en minúsculas.
+   */
+  public static function canonical(?string $ip): string
+  {
+    $ip = strtolower(trim((string) $ip));
+    if ($ip === '' || filter_var($ip, FILTER_VALIDATE_IP) === false) {
+      return $ip;
+    }
+    $binary = (string) inet_pton($ip);
+    if (strlen($binary) === 16 && str_starts_with($binary, (string) hex2bin('00000000000000000000ffff'))) {
+      $binary = substr($binary, 12);
+    }
+    return (string) inet_ntop($binary);
+  }
+
   public function matches(?string $ip): bool
   {
-    $ip = trim((string) $ip);
+    $ip = self::canonical($ip);
     if ($ip === '' || $this->rules === [] || filter_var($ip, FILTER_VALIDATE_IP) === false) {
       return false;
     }

@@ -71,7 +71,9 @@ final class CommercialPromotionDatabase
 
   public static function rollup(Database $db, Settings $settings, string $today, ?string $lockFile = null): TrackerRollup
   {
-    return new TrackerRollup($db, $settings, new VisitorHasher(self::SECRET), new TrackerLock($db, $lockFile), static fn(): string => $today);
+    return new TrackerRollup($db, $settings, new VisitorHasher(self::SECRET), new TrackerLock($db, $lockFile), static fn(): string => $today,
+      // Reloj al final del día: las visitas de muestra de hoy ya cuentan como asentadas (TrackerRollup::SETTLE_SECONDS).
+      static fn(): int => (int) strtotime($today . " 23:59:59") + TrackerRollup::SETTLE_SECONDS + 1);
   }
 
   /** Datos de muestra de los últimos 35 días (y algunos más viejos), con los resúmenes ya armados. */

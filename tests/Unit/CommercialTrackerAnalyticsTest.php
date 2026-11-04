@@ -51,9 +51,13 @@ final class CommercialTrackerAnalyticsTest extends TestCase
     }
   }
 
+  /** Reloj de las pruebas (0 = hoy a mediodía): las visitas de octubre ya están asentadas. */
+  private int $now = 0;
+
   private function rollup(): TrackerRollup
   {
-    return new TrackerRollup($this->db, $this->settings, new VisitorHasher(self::SECRET), new TrackerLock($this->db, $this->lockFile), static fn(): string => self::TODAY);
+    $now = $this->now > 0 ? $this->now : (int) strtotime(self::TODAY . ' 12:00:00');
+    return new TrackerRollup($this->db, $this->settings, new VisitorHasher(self::SECRET), new TrackerLock($this->db, $this->lockFile), static fn(): string => self::TODAY, static fn(): int => $now);
   }
 
   private function repository(): TrackerAnalyticsRepository
@@ -104,11 +108,18 @@ final class CommercialTrackerAnalyticsTest extends TestCase
   public function testBotDetectorRecognizesCrawlersPreviewsAndEmptyAgents(): void
   {
     foreach (['', 'Googlebot/2.1', 'facebookexternalhit/1.1', 'WhatsApp/2.23.20.0', 'curl/8.4.0', 'python-requests/2.31', 'Mozilla/5.0 (compatible; AhrefsBot/7.0)',
-      'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; GPTBot/1.0)', 'Mozilla/5.0 (X11; Linux x86_64) HeadlessChrome/120.0'] as $agent) {
+      'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; GPTBot/1.0)', 'Mozilla/5.0 (X11; Linux x86_64) HeadlessChrome/120.0',
+      'DuckDuckBot/1.1; (+http://duckduckgo.com/duckduckbot.html)', 'TelegramBot (like TwitterBot)', 'Mozilla/5.0 (compatible; UptimeRobot/2.0; http://www.uptimerobot.com/)',
+      'Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)', 'Mozilla/5.0 (compatible; Baiduspider/2.0)'] as $agent) {
       self::assertTrue(BotDetector::isBot($agent), $agent);
     }
+    // Navegadores reales que el patrón anterior tomaba por robots (celulares CUBOT, DuckDuckGo y el navegador de Telegram).
     foreach ([CommercialTrackerDatabase::CHROME, 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Instagram 300.0',
-      'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/120.0 Mobile Safari/537.36 [FBAN/EMA;FBAV/400.0]'] as $agent) {
+      'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/120.0 Mobile Safari/537.36 [FBAN/EMA;FBAV/400.0]',
+      'Mozilla/5.0 (Linux; Android 10; CUBOT X30) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.144 Mobile Safari/537.36',
+      'Mozilla/5.0 (Linux; Android 13; SM-A135M) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36 DuckDuckGo/5',
+      'Mozilla/5.0 (Linux; Android 12; moto g22) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Mobile Safari/537.36 Telegram-Android/10.14.5 (Motorola moto g22; Android 12; SDK 31; AVERAGE)',
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130.0 Safari/537.36 Edg/130.0 (monitor 27 pulgadas; preview; uptime)'] as $agent) {
       self::assertFalse(BotDetector::isBot($agent), $agent);
     }
   }
@@ -128,6 +139,15 @@ final class CommercialTrackerAnalyticsTest extends TestCase
     self::assertTrue($matcher->matches('2800:e2:1:0::1'));
     self::assertFalse($matcher->matches(''));
     self::assertFalse((new InternalIpMatcher([]))->matches('10.0.0.1'));
+    // IPv4 mapeada en IPv6 (algunos servidores y proxys la registran así): es la misma IP para reglas, prefijos y únicos.
+    self::assertSame('10.1.2.3', InternalIpMatcher::canonical('::FFFF:10.1.2.3'));
+    self::assertTrue($matcher->matches('::ffff:10.1.2.3'));
+    self::assertTrue($matcher->matches('::ffff:181.49.7.7'));
+    self::assertTrue($matcher->matches('::ffff:190.85.10.4'));
+    self::assertFalse($matcher->matches('::ffff:190.85.10.40'));
+    $hasher = new VisitorHasher(self::SECRET);
+    self::assertSame($hasher->hash('10.1.2.3'), $hasher->hash('::ffff:10.1.2.3'));
+    self::assertSame($hasher->hash('2800:e2:1::1'), $hasher->hash('2800:E2:1:0::1'));
 
     foreach (['999.1.1.1', '10.0.0.0/40', '10.0.0.0/4', 'oficina', '10.0'] as $invalid) {
       try {
@@ -159,8 +179,8 @@ final class CommercialTrackerAnalyticsTest extends TestCase
     self::assertSame(8, $result['processed']);
     self::assertSame(6, $result['counted']);
     self::assertSame($ids['r8'], $result['last_id']);
-    self::assertSame($ids['r8'], TrackerRollup::state($this->settings)['last_id']);
-    self::assertSame('2026-10-02 09:00:00', TrackerRollup::state($this->settings)['last_fecha']);
+    self::assertSame($ids['r8'], TrackerRollup::state($this->db)['last_id']);
+    self::assertSame('2026-10-02 09:00:00', TrackerRollup::state($this->db)['last_fecha']);
 
     self::assertSame([
       '2026-10-01|general|Directo|Sin medio|0|0|1' => 1,
@@ -195,7 +215,8 @@ final class CommercialTrackerAnalyticsTest extends TestCase
     $all = $repository->kpis($this->filters(['exclude_bots' => '0', 'exclude_internal' => '0']));
     self::assertSame(6, $all['visits']);
     self::assertSame(4, $all['unique_visitors']);
-    self::assertSame(2, $all['campaigns']);
+    // 'general' (sin campaña) no es una campaña.
+    self::assertSame(1, $all['campaigns']);
 
     self::assertSame([
       ['day' => '2026-10-01', 'visits' => 2, 'unique_visitors' => 1],
@@ -220,7 +241,7 @@ final class CommercialTrackerAnalyticsTest extends TestCase
     self::assertSame(2, $repository->kpis($this->filters(['campaign' => 'general', 'exclude_bots' => '0', 'exclude_internal' => '0']))['visits']);
 
     $options = $repository->options(self::TODAY);
-    self::assertSame([['value' => 'general', 'label' => 'general'], ['value' => 'promo-octubre', 'label' => 'Promo de octubre']], $options['campaigns']);
+    self::assertSame([['value' => 'general', 'label' => 'Sin campaña'], ['value' => 'promo-octubre', 'label' => 'Promo de octubre']], $options['campaigns']);
     self::assertSame(['Directo', 'Facebook', 'Instagram'], $options['sources']);
     self::assertSame(['Redes', 'Sin medio'], $options['mediums']);
   }
@@ -316,7 +337,7 @@ final class CommercialTrackerAnalyticsTest extends TestCase
     // r5 (clic, no resumido), r6 (sin fecha), r7 y r8 (aún sin resumir) y la visita reciente se conservan.
     self::assertSame([$ids['r5'], $ids['r6'], $ids['r7'], $ids['r8'], $recent], $left);
     self::assertSame($before, $this->dailyRows(), 'Los resúmenes no cambian al purgar.');
-    $state = TrackerRollup::state($this->settings);
+    $state = TrackerRollup::state($this->db);
     self::assertSame('2026-10-04', $state['purged_before']);
     self::assertSame(4, $state['last_purge']['deleted']);
     self::assertSame('2026-10-01 08:00:00', $state['last_purge']['first']);
@@ -365,7 +386,8 @@ final class CommercialTrackerAnalyticsTest extends TestCase
     }
 
     $message = $service->save('analitica', ['internal_ips' => "190.85.10.4\n190.85.10.4\n10.0.0.0/8", 'exclude_bots' => '0', 'exclude_internal' => 'on', 'raw_retention_days' => '365', 'own_domains' => 'https://www.sucasainmobiliaria.com.co']);
-    self::assertStringContainsString('--rebuild-from', $message);
+    self::assertStringContainsString('pide a sistemas que recalculen', $message);
+    self::assertStringNotContainsString('bin/', $message);
     $stored = $this->settings->get(TrackerAnalyticsConfig::SETTING);
     self::assertSame(['190.85.10.4', '10.0.0.0/8'], $stored['internal_ips']);
     self::assertFalse($stored['exclude_bots']);
@@ -448,5 +470,200 @@ final class CommercialTrackerAnalyticsTest extends TestCase
     self::assertStringContainsString('pendientes 0', $text);
     self::assertSame(8, (int) $this->db->getVar('SELECT COUNT(*) FROM wp_jet_cct_tracker_logs'));
     self::assertSame(['backfill' => true, 'rebuild-from' => '2026-10-01', 'max' => '10'], TrackerRollupCommand::parse(['--backfill', '--rebuild-from=2026-10-01', '--max=10']));
+  }
+
+  /** Visitas de tres días (2026-10-01 a 03): una de cada cinco desde 1.1.1.x, que luego se vuelve IP interna. */
+  private function seedThreeDays(int $count = 50): void
+  {
+    TrackerAnalyticsConfig::save($this->settings, ['internal_ips' => '10.0.0.0/8', 'exclude_bots' => '1', 'exclude_internal' => '1'], 7, self::TODAY);
+    for ($i = 0; $i < $count; $i++) {
+      CommercialTrackerDatabase::hit($this->db, ['fecha_visita' => sprintf('2026-10-%02d %02d:%02d:00', 1 + $i % 3, 8 + intdiv($i, 6), $i % 60),
+        'ip_address' => $i % 5 === 0 ? '1.1.1.' . $i : '200.2.2.' . $i, 'camp_slug' => 'promo-octubre']);
+    }
+  }
+
+  private function totalHits(): int
+  {
+    return (int) $this->db->getVar('SELECT COALESCE(SUM(hits), 0) FROM wp_scm_tracker_daily');
+  }
+
+  public function testInterruptedRebuildNeverLosesVisitsAndTheNextCronRunResumesIt(): void
+  {
+    $this->seedThreeDays();
+    $this->rollup()->run();
+    self::assertSame(50, $this->totalHits());
+    TrackerAnalyticsConfig::save($this->settings, ['internal_ips' => '10.0.0.0/8 1.1.1.0/24', 'exclude_bots' => '1', 'exclude_internal' => '1'], 7, self::TODAY);
+
+    // Se corta después del primer día (proceso detenido, conexión perdida...).
+    try {
+      $this->rollup()->rebuildFrom('2026-10-01', 10, static function (int $processed, string $day): void {
+        throw new \RuntimeException('cortado en ' . $day);
+      });
+      self::fail('El recálculo debía cortarse.');
+    } catch (\RuntimeException $exception) {
+      self::assertSame('cortado en 2026-10-01', $exception->getMessage());
+    }
+    // Ningún día queda a medias: el 1 ya tiene la clasificación nueva, el 2 y el 3 la vieja, y el total no cambia.
+    self::assertSame(50, $this->totalHits());
+    $internal = fn(string $day): int => (int) $this->db->getVar('SELECT COALESCE(SUM(hits), 0) FROM wp_scm_tracker_daily WHERE fecha = ? AND internal = 1', [$day]);
+    self::assertGreaterThan(0, $internal('2026-10-01'));
+    self::assertSame(0, $internal('2026-10-02'));
+    $state = TrackerRollup::state($this->db);
+    self::assertSame(['from' => '2026-10-01', 'requested' => '2026-10-01', 'next' => '2026-10-02'], $state['rebuild']);
+    self::assertSame($state['rebuild'], $this->rollup()->status()['rebuild']);
+    self::assertSame($state['rebuild'], $this->rollup()->catchUp()['rebuild'], 'La página sabe que hay un recálculo en curso.');
+
+    // La siguiente corrida del cron lo retoma desde el día que faltaba.
+    $out = fopen('php://memory', 'w+');
+    self::assertIsResource($out);
+    self::assertSame(0, (new TrackerRollupCommand($this->rollup(), $out))->run([]));
+    rewind($out);
+    self::assertStringContainsString('Se retomó el recálculo pendiente desde 2026-10-01', (string) stream_get_contents($out));
+    self::assertSame([], TrackerRollup::state($this->db)['rebuild']);
+    self::assertSame(50, $this->totalHits());
+    $expected = (int) $this->db->getVar("SELECT COUNT(*) FROM wp_jet_cct_tracker_logs WHERE ip_address LIKE '1.1.1.%'");
+    self::assertSame($expected, (int) $this->db->getVar('SELECT SUM(hits) FROM wp_scm_tracker_daily WHERE internal = 1'));
+    self::assertNull($this->rollup()->resumeRebuild());
+  }
+
+  public function testRecentVisitsWaitSoALateCommitWithALowerIdIsNotSkipped(): void
+  {
+    $this->now = (int) strtotime('2026-11-03 12:00:00');
+    CommercialTrackerDatabase::hit($this->db, ['_ID' => 1, 'fecha_visita' => '2026-11-03 11:00:00']);
+    // _ID 3 se confirmó; el 2 todavía no (InnoDB ya le dio el número).
+    CommercialTrackerDatabase::hit($this->db, ['_ID' => 3, 'fecha_visita' => '2026-11-03 11:59:50']);
+    $first = $this->rollup()->run();
+    self::assertSame(1, $first['processed'], 'La visita de hace 10 segundos espera.');
+    self::assertSame(1, $first['last_id']);
+    self::assertFalse($this->rollup()->catchUp()['behind'], 'Lo que espera por reciente no cuenta como atraso.');
+
+    CommercialTrackerDatabase::hit($this->db, ['_ID' => 2, 'fecha_visita' => '2026-11-03 11:59:40']);
+    $this->now += 300;
+    $second = $this->rollup()->run();
+    self::assertSame(2, $second['processed']);
+    self::assertSame(3, $second['last_id']);
+    self::assertSame(3, $this->totalHits(), 'La visita confirmada tarde (con _ID menor) también cuenta.');
+
+    // Una fecha absurda (más de un día en el futuro) no frena el rollup.
+    CommercialTrackerDatabase::hit($this->db, ['fecha_visita' => '2027-05-01 10:00:00']);
+    CommercialTrackerDatabase::hit($this->db, ['fecha_visita' => '2026-11-03 11:30:00']);
+    self::assertSame(2, $this->rollup()->run()['processed']);
+  }
+
+  public function testRollupStateHasItsOwnTableAndNeverTouchesTheConfigAuthor(): void
+  {
+    $this->seed();
+    TrackerSchema::ensure($this->db, $this->settings);
+    TrackerAnalyticsConfig::save($this->settings, ['internal_ips' => '10.0.0.0/8', 'exclude_bots' => '1', 'exclude_internal' => '1'], 101, self::TODAY);
+    $row = static fn(Database $db): array => $db->getRow("SELECT cct_author_id, cct_modified, valor FROM wp_jet_cct_confi_sistema WHERE funcion = 'control_servicios_config'") ?? [];
+    $before = $row($this->db);
+    self::assertSame('101', (string) $before['cct_author_id']);
+
+    $this->rollup()->catchUp();
+    $this->rollup()->run();
+    $this->rollup()->rebuildFrom('2026-10-01');
+    self::assertSame($before, $row($this->db), 'Ni la marca de agua ni el recálculo reescriben la configuración del panel.');
+    self::assertSame(8, (int) $this->db->getVar('SELECT last_id FROM wp_scm_tracker_state WHERE id = 1'));
+    self::assertArrayNotHasKey(TrackerSchema::LEGACY_STATE_SETTING, $this->settings->all());
+
+    // La única escritura del sistema en Settings (la versión del esquema) tampoco borra el autor.
+    $this->settings->set(TrackerSchema::SETTING, 1, 0, true);
+    self::assertSame('101', (string) $row($this->db)['cct_author_id']);
+  }
+
+  public function testSchemaVersionTwoKeysTopByDimensionAndMigratesVersionOneFromTheCommandLine(): void
+  {
+    TrackerSchema::ensure($this->db, $this->settings);
+    $pk = static function (Database $db): array {
+      $columns = [];
+      foreach ($db->getResults('PRAGMA table_info(wp_scm_tracker_daily_top)') as $column) {
+        if ((int) $column['pk'] > 0) {
+          $columns[(int) $column['pk']] = (string) $column['name'];
+        }
+      }
+      ksort($columns);
+      return array_values($columns);
+    };
+    self::assertSame(['dim', 'fecha', 'camp_slug', 'utm_source', 'utm_medium', 'value_hash', 'bot', 'internal'], $pk($this->db));
+    self::assertSame([], $this->db->getCol("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_scm_tracker_top_dim'"));
+
+    // Una base con la versión 1 (llave por fecha, índice aparte y estado dentro de Settings).
+    $db = CommercialTrackerDatabase::create();
+    $settings = new Settings($db);
+    $pdo = $db->pdo();
+    $pdo->exec("CREATE TABLE wp_scm_tracker_daily_top (fecha TEXT NOT NULL, dim TEXT NOT NULL, camp_slug TEXT NOT NULL, utm_source TEXT NOT NULL, utm_medium TEXT NOT NULL,
+      value_hash TEXT NOT NULL, bot INTEGER NOT NULL DEFAULT 0, internal INTEGER NOT NULL DEFAULT 0, value TEXT NOT NULL DEFAULT '', detail TEXT NOT NULL DEFAULT '',
+      hits INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (fecha, dim, camp_slug, utm_source, utm_medium, value_hash, bot, internal))");
+    $pdo->exec('CREATE INDEX idx_scm_tracker_top_dim ON wp_scm_tracker_daily_top (dim, fecha)');
+    $pdo->exec("INSERT INTO wp_scm_tracker_daily_top VALUES ('2026-10-01', 'page', 'general', 'Directo', 'Sin medio', 'abc', 0, 0, 'https://x/', '', 7)");
+    $settings->set(TrackerSchema::SETTING, 1);
+    $settings->set(TrackerSchema::LEGACY_STATE_SETTING, ['last_id' => 42, 'last_fecha' => '2026-10-01 10:00:00', 'updated_at' => '2026-10-01 10:05:00', 'purged_before' => '2026-09-01', 'last_purge' => ['deleted' => 3]]);
+    self::assertFalse(TrackerSchema::isReady($settings));
+
+    TrackerSchema::ensure($db, $settings);
+    self::assertTrue(TrackerSchema::isReady($settings));
+    self::assertSame(['dim', 'fecha', 'camp_slug', 'utm_source', 'utm_medium', 'value_hash', 'bot', 'internal'], $pk($db));
+    self::assertSame(7, (int) $db->getVar("SELECT hits FROM wp_scm_tracker_daily_top WHERE dim = 'page' AND value_hash = 'abc'"));
+    $state = TrackerRollup::state($db);
+    self::assertSame([42, '2026-10-01 10:00:00', '2026-09-01', ['deleted' => 3]], [$state['last_id'], $state['last_fecha'], $state['purged_before'], $state['last_purge']]);
+    self::assertNull($settings->get(TrackerSchema::LEGACY_STATE_SETTING));
+  }
+
+  public function testExclusionNoteAddsUpAndPseudoCampaignsAreNotCampaigns(): void
+  {
+    TrackerAnalyticsConfig::save($this->settings, ['internal_ips' => '10.0.0.0/8', 'exclude_bots' => '1', 'exclude_internal' => '1'], 7, self::TODAY);
+    $bot = 'Mozilla/5.0 (compatible; Googlebot/2.1)';
+    CommercialTrackerDatabase::hit($this->db, ['camp_slug' => 'inmueble_view', 'object_id' => '101']);
+    CommercialTrackerDatabase::hit($this->db, ['camp_slug' => '', 'ip_address' => '10.0.0.1']);
+    CommercialTrackerDatabase::hit($this->db, ['camp_slug' => '', 'ip_address' => '10.0.0.2', 'user_agent' => $bot]);
+    CommercialTrackerDatabase::hit($this->db, ['camp_slug' => 'inmueble_view', 'user_agent' => $bot]);
+    $this->rollup()->run();
+    $repository = $this->repository();
+
+    // Robots contados, internas excluidas: las dos internas (también la del robot) quedan por fuera.
+    $kpis = $repository->kpis($this->filters(['exclude_bots' => '0', 'exclude_internal' => '1']));
+    self::assertSame(2, $kpis['visits']);
+    self::assertSame(4, $kpis['excluded']['total']);
+    self::assertSame(2, $kpis['excluded']['internal']);
+    self::assertSame($kpis['excluded']['total'] - $kpis['visits'], $kpis['excluded']['internal']);
+
+    // Los dos excluidos: cada visita cuenta una vez (el robot interno va con los robots).
+    $both = $repository->kpis($this->filters());
+    self::assertSame(1, $both['visits']);
+    self::assertSame([2, 1], [$both['excluded']['bots'], $both['excluded']['internal']]);
+    self::assertSame($both['excluded']['total'] - $both['visits'], $both['excluded']['bots'] + $both['excluded']['internal']);
+
+    // 'general' e 'inmueble_view' los pone el tracker: no son campañas, pero se listan con un nombre claro.
+    $all = $this->filters(['exclude_bots' => '0', 'exclude_internal' => '0']);
+    self::assertSame(0, $repository->kpis($all)['campaigns']);
+    self::assertSame(['Sin campaña', 'Vista de inmueble'], array_column($repository->top('campaigns', $all), 'label'));
+    self::assertSame(['general', 'inmueble_view'], array_column($repository->top('campaigns', $all), 'value'));
+  }
+
+  public function testRawLogCursorIsTheIdAndOnlyReadsTheDateRange(): void
+  {
+    TrackerAnalyticsConfig::save($this->settings, ['internal_ips' => '', 'exclude_bots' => '1', 'exclude_internal' => '1'], 7, self::TODAY);
+    foreach (['2026-08-20', '2026-09-15', '2026-10-11', '2026-10-12'] as $day) {
+      for ($i = 0; $i < 30; $i++) {
+        CommercialTrackerDatabase::hit($this->db, ['fecha_visita' => sprintf('%s %02d:%02d:00', $day, 8 + intdiv($i, 10), $i)]);
+      }
+    }
+    $repository = $this->repository();
+    $one = TrackerAnalyticsFilters::fromInput(['from' => '2026-10-11', 'to' => '2026-10-11'], ['exclude_bots' => true, 'exclude_internal' => true], self::TODAY);
+    $first = $repository->logs($one);
+    self::assertCount(25, $first['rows']);
+    self::assertMatchesRegularExpression('/^\d+$/', (string) $first['next_cursor']);
+    self::assertSame((string) $first['rows'][24]['id'], $first['next_cursor']);
+    $second = $repository->logs($one, $first['next_cursor']);
+    self::assertCount(5, $second['rows']);
+    self::assertNull($second['next_cursor']);
+    $days = array_unique(array_map(static fn(array $row): string => substr((string) $row['fecha'], 0, 10), array_merge($first['rows'], $second['rows'])));
+    self::assertSame(['2026-10-11'], array_values($days));
+    $ids = array_column(array_merge($first['rows'], $second['rows']), 'id');
+    $sorted = $ids;
+    rsort($sorted);
+    self::assertSame($sorted, $ids, 'De la más reciente a la más antigua.');
+    // Un rango sin visitas no devuelve nada.
+    self::assertSame([], $repository->logs(TrackerAnalyticsFilters::fromInput(['from' => '2026-10-01', 'to' => '2026-10-05'], ['exclude_bots' => true, 'exclude_internal' => true], self::TODAY))['rows']);
   }
 }

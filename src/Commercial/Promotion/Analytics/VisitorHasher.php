@@ -21,10 +21,13 @@ final class VisitorHasher
     $this->secret = $secret;
   }
 
-  /** 64 caracteres hexadecimales. Sin IP se usa el navegador, para no juntar a todos en un solo visitante. */
+  /**
+   * 64 caracteres hexadecimales. Sin IP se usa el navegador, para no juntar a todos en un solo visitante. La IP va en su
+   * forma única (InternalIpMatcher::canonical): ::ffff:1.2.3.4 y 1.2.3.4 son el mismo visitante.
+   */
   public function hash(?string $ip, ?string $userAgent = ''): string
   {
-    $ip = strtolower(trim((string) $ip));
+    $ip = InternalIpMatcher::canonical($ip);
     $key = $ip !== '' ? 'ip|' . $ip : 'ua|' . trim((string) $userAgent);
     return hash_hmac('sha256', $key, $this->secret);
   }

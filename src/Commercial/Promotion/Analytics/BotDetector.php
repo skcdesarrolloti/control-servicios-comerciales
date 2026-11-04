@@ -11,13 +11,17 @@ namespace SCM\Commercial\Promotion\Analytics;
  */
 final class BotDetector
 {
-  /** Patrón compartido por el rollup y el visor de registros. Sin delimitadores; se aplica sin distinguir mayúsculas. */
-  public const PATTERN = 'bot\b|bot/|crawl|spider|slurp|scrap|archiver|facebookexternalhit|facebookcatalog|meta-externalagent|'
-    . 'whatsapp/|telegram|discord|skypeuripreview|embedly|preview|headless|phantomjs|puppeteer|playwright|selenium|'
+  /**
+   * Patrón compartido por el rollup y el visor de registros. Sin delimitadores; se aplica sin distinguir mayúsculas.
+   * Solo nombres de robots y herramientas: nada de palabras sueltas que también aparecen en navegadores reales
+   * ("monitor", "preview", "uptime"), ni la marca de celulares CUBOT, ni los navegadores de DuckDuckGo y Telegram.
+   */
+  public const PATTERN = '(?<!cu)bot\b|(?<!cu)bot/|crawl|spider|slurp|scrap|archiver|facebookexternalhit|facebookcatalog|meta-externalagent|'
+    . 'whatsapp/|skypeuripreview|embedly|google web preview|headless|phantomjs|puppeteer|playwright|selenium|'
     . 'python-|python/|curl/|wget/|go-http-client|java/|okhttp|axios/|node-fetch|undici|httpclient|libwww|guzzlehttp|'
-    . 'lighthouse|pagespeed|gtmetrix|pingdom|uptime|statuscake|site24x7|newrelic|datadog|monitor|validator|'
-    . 'ahrefs|semrush|mj12|dotbot|petalbot|bytespider|gptbot|chatgpt|oai-searchbot|claude|anthropic|ccbot|perplexity|'
-    . 'amazonbot|applebot|yandex|baidu|duckduck|sogou|bingpreview|google-inspectiontool|google-read-aloud|adsbot|'
+    . 'lighthouse|pagespeed|gtmetrix|pingdom|uptimerobot|uptime-kuma|betteruptime|statuscake|site24x7|newrelic|datadog|hetrixtools|freshping|validator|'
+    . 'ahrefs|semrush|mj12|petalbot|bytespider|gptbot|chatgpt|oai-searchbot|claude|anthropic|ccbot|perplexity|'
+    . 'amazonbot|applebot|yandex|baiduspider|duckduckbot|duckassistbot|sogou|bingpreview|google-inspectiontool|google-read-aloud|adsbot|'
     . 'mediapartners|feedfetcher|zgrab|masscan|nmap|nikto|sqlmap|censys|expanse|netcraft';
 
   public static function isBot(?string $userAgent): bool
