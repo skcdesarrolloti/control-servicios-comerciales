@@ -49,10 +49,11 @@ final class CommercialAccessPolicy
     'mercado_vista_completa' => 'Calculadora de mercado: estadística completa y tabla de inmuebles',
     'aseo_vista_interna' => 'Calculadora de aseo: costos, márgenes, utilidades y PDF internos',
     'promocion_ver_ip' => 'Promoción: ver IP y navegador en logs y actividad de portales',
+    'plan_estrategico_editar' => 'Plan estratégico: crear, editar y eliminar objetivos, metas, tareas y campañas',
   ];
 
   /** Acciones que un cargo sin configurar no recibe por defecto: hay que marcarlas. */
-  public const OPT_IN_ACTIONS = ['editar_actor', 'mercado_vista_completa', 'aseo_vista_interna', 'promocion_ver_ip'];
+  public const OPT_IN_ACTIONS = ['editar_actor', 'mercado_vista_completa', 'aseo_vista_interna', 'promocion_ver_ip', 'plan_estrategico_editar'];
 
   /**
    * Vistas que un cargo sin configurar no recibe por defecto: hay que marcarlas en Permisos. Los cargos con acceso total
@@ -80,6 +81,7 @@ final class CommercialAccessPolicy
       'calculadora_mercado' => 'Calculadora de mercado',
       'calculadora_aseo' => 'Calculadora de aseo',
       'generador_utm' => 'Generador UTM',
+      'plan_estrategico' => 'Plan estratégico',
     ],
     // Promoción (traída por fases de dashboard-marketing): cada subpestaña se agrega cuando ya funciona.
     'promocion' => [

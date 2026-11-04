@@ -519,6 +519,7 @@ final class CommercialDashboardView
                       ['destacados', 'star', 'Cupos de destacados', 'Inmuebles destacados por portal'],
                       ['aseo', 'cleaning_services', 'Calculadora de aseo', 'Salario, márgenes, insumos, transporte y tramos'],
                       ['utm', 'link', 'Generador UTM', 'Campañas del equipo'],
+                      ['plan', 'flag', 'Plan estratégico', 'Gestiones, unidades, tipos, frecuencias y actores'],
                       ['medios', 'alt_route', 'Medios', 'Lista única: registros, formularios, UTM y analítica'],
                       ['analitica', 'monitoring', 'Analítica web', 'IPs internas, robots y retención de visitas'],
                     ];
@@ -1126,6 +1127,15 @@ final class CommercialDashboardView
               <div>
                 <span class="block font-semibold text-on-surface">Generador UTM</span>
                 <span class="block text-[11px] text-secondary">Enlaces de campaña con fuente y medio</span>
+              </div>
+            </a>
+            <?php endif; ?>
+            <?php if (!$policy instanceof CommercialAccessPolicy || $policy->canSubview('herramientas', 'plan_estrategico')): ?>
+            <a class="flex items-center gap-2.5 px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="herramientas" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'plan_estrategico'])); ?>">
+              <span class="material-symbols-outlined text-[18px] text-secondary" aria-hidden="true">flag</span>
+              <div>
+                <span class="block font-semibold text-on-surface">Plan estratégico</span>
+                <span class="block text-[11px] text-secondary">Objetivos, metas, tareas y campañas</span>
               </div>
             </a>
             <?php endif; ?>
@@ -4927,7 +4937,7 @@ final class CommercialDashboardView
     'Notificaciones' => ['enviar_notificacion', 'eliminar_notificacion'],
     'Precaptación' => ['precaptacion_crear', 'precaptacion_editar', 'precaptacion_ticket', 'precaptacion_catalogos'],
     'Inmuebles y avisos' => ['ingresar_inmueble', 'registrar_aviso', 'editar_actor'],
-    'Herramientas' => ['mercado_vista_completa', 'aseo_vista_interna'],
+    'Herramientas' => ['mercado_vista_completa', 'aseo_vista_interna', 'plan_estrategico_editar'],
     'Promoción' => ['promocion_ver_ip'],
   ];
 

@@ -6,6 +6,7 @@ namespace SCM\Http\Api;
 
 use SCM\Http\Controller\CommercialApiController;
 use SCM\Http\Controller\PromotionApiController;
+use SCM\Http\Controller\StrategicPlanApiController;
 
 final class CommercialActionRouter
 {
@@ -14,15 +15,30 @@ final class CommercialActionRouter
     'commercial_promo_analytics_logs' => 'analyticsLogs',
   ];
 
+  /** Endpoints de Herramientas › Plan estratégico: los atiende StrategicPlanApiController, creado solo cuando se piden. */
+  public const STRATEGY_ACTIONS = [
+    'commercial_plan_list' => 'list',
+    'commercial_plan_save' => 'save',
+    'commercial_plan_delete' => 'delete',
+    'commercial_plan_progress' => 'progress',
+    'commercial_plan_result' => 'result',
+  ];
+
   private CommercialApiController $controller;
   /** @var (\Closure():PromotionApiController)|null */
   private ?\Closure $promotion;
+  /** @var (\Closure():StrategicPlanApiController)|null */
+  private ?\Closure $strategy;
 
-  /** @param (\Closure():PromotionApiController)|null $promotion */
-  public function __construct(CommercialApiController $controller, ?\Closure $promotion = null)
+  /**
+   * @param (\Closure():PromotionApiController)|null $promotion
+   * @param (\Closure():StrategicPlanApiController)|null $strategy
+   */
+  public function __construct(CommercialApiController $controller, ?\Closure $promotion = null, ?\Closure $strategy = null)
   {
     $this->controller = $controller;
     $this->promotion = $promotion;
+    $this->strategy = $strategy;
   }
 
   /** @param array<string,mixed> $input */
@@ -34,6 +50,12 @@ final class CommercialActionRouter
       }
       $target = ($this->promotion)();
       $method = self::PROMOTION_ACTIONS[$action];
+    } elseif (isset(self::STRATEGY_ACTIONS[$action])) {
+      if ($this->strategy === null) {
+        return false;
+      }
+      $target = ($this->strategy)();
+      $method = self::STRATEGY_ACTIONS[$action];
     } else {
       $target = $this->controller;
       $method = self::controllerMethod($action);

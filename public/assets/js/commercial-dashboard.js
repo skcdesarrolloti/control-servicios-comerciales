@@ -462,7 +462,7 @@
   // Las herramientas y las secciones de Promoción son pestañas propias (?tab=simulador_ingreso_neto, ?tab=analitica_web)
   // dentro de su grupo del menú (CommercialAccessPolicy::SUBVIEWS de herramientas y promocion).
   function topTabFor(tab) {
-    if (["simulador_ingreso_neto", "ganancia_ocasional", "calculadora_mercado", "calculadora_aseo", "generador_utm"].indexOf(tab) >= 0) return "herramientas";
+    if (["simulador_ingreso_neto", "ganancia_ocasional", "calculadora_mercado", "calculadora_aseo", "generador_utm", "plan_estrategico"].indexOf(tab) >= 0) return "herramientas";
     if (["analitica_web", "actividad_portales"].indexOf(tab) >= 0) return "promocion";
     // Tareas, precaptación, avisos y actualizaciones van dentro del menú Actividades comerciales.
     return ["abiertos", "postergados", "cerrados", "mis_tickets", "precaptacion", "anadir_aviso", "actualizaciones", "avisos"].indexOf(tab) >= 0 ? "comerciales" : tab;

@@ -1,7 +1,7 @@
 /*
  * Menú "Configuración" del encabezado comercial. Cada opción abre un popup con su sección:
  * calendario, tiempos de atención, avisos, actualizaciones de inmuebles, cupos de destacados, calculadora de aseo,
- * campañas del Generador UTM, Medios (lista única) y Analítica web (Promoción).
+ * campañas del Generador UTM, Medios (lista única), Analítica web (Promoción) y catálogos del Plan estratégico.
  * Permisos reutiliza su modal existente. "Medios" es un administrador de lista: cada acción se guarda al confirmarla en un
  * panel interno del mismo popup (sin botón Guardar).
  */
@@ -319,6 +319,91 @@
           }).filter(function (item) { return item.label || item.value; });
           if (box.getAttribute("data-required") === "1" && !data[key].length) throw new Error("Agrega al menos una opción en " + box.querySelector("h4").textContent + ".");
         });
+        return data;
+      },
+    },
+    // Catálogos de Herramientas › Plan estratégico (las tablas CCT del plugin Gestor Estratégico de WordPress). Cada
+    // catálogo se guarda completo: los cambios de nombre pasan a los registros del plan que lo usan, lo que está en uso
+    // no se puede quitar y eliminar pide una confirmación.
+    plan: {
+      title: "Plan estratégico",
+      html: function (settings) {
+        var input = 'class="w-full px-2 py-1 rounded-lg border border-slate-300 text-sm" type="text"';
+        function line(fields, row) {
+          var used = Number(row.uso || 0);
+          return '<tr data-plan-row data-id="' + esc(row.id || "") + '"><td class="py-1 px-1"><input ' + input + ' maxlength="200" data-field="nombre" value="' + esc(row.nombre || "") + '" placeholder="Nombre"></td>' +
+            Object.keys(fields).map(function (field) {
+              return '<td class="py-1 px-1"><input ' + input + ' maxlength="2000" data-field="' + esc(field) + '" value="' + esc(row[field] || "") + '" placeholder="' + esc(fields[field]) + '"></td>';
+            }).join("") +
+            '<td class="py-1 px-1 text-right text-[11px] text-slate-500">' + (used ? "En uso: " + used : "") + "</td>" +
+            '<td class="py-1 px-1 text-right">' + (used ? "" : '<button type="button" class="px-2 py-1 rounded-lg text-rose-700 hover:bg-rose-50 text-xs font-semibold" data-plan-remove>Quitar</button>') + "</td></tr>";
+        }
+        return '<form data-config-form class="text-left space-y-3">' +
+          intro("Listas que usa <strong>Herramientas › Plan estratégico</strong> (las mismas del Gestor Estratégico de WordPress). Si cambias un nombre, los objetivos, metas y campañas que lo usan quedan con el nombre nuevo. Lo que está en uso no se puede quitar.") +
+          Object.keys(settings || {}).map(function (key) {
+            var catalog = settings[key] || {};
+            var fields = catalog.fields || {};
+            return '<details class="text-left rounded-xl border border-slate-200 p-3" data-plan-catalog="' + esc(key) + '"><summary class="cursor-pointer text-sm font-bold text-slate-800">' + esc(catalog.label) + ' <span class="text-[11px] font-normal text-slate-500">(' + (catalog.rows || []).length + ")</span></summary>" +
+              '<div class="flex flex-wrap items-center justify-between gap-2 my-2"><p class="text-[11px] text-slate-500">' + esc(catalog.hint || "") + '</p><button type="button" class="px-3 py-1 rounded-lg bg-slate-100 text-xs font-semibold" data-plan-add-row>Agregar fila</button></div>' +
+              '<div class="overflow-x-auto max-h-[40vh] overflow-y-auto"><table class="w-full text-sm"><thead><tr class="text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-200"><th class="py-2 px-1 text-left">Nombre</th>' +
+              Object.keys(fields).map(function (field) { return '<th class="py-2 px-1 text-left">' + esc(fields[field]) + "</th>"; }).join("") +
+              "<th></th><th></th></tr></thead><tbody>" + (catalog.rows || []).map(function (row) { return line(fields, row); }).join("") + "</tbody></table></div>" +
+              "<template data-plan-row-template>" + line(fields, {}) + "</template></details>";
+          }).join("") +
+          '<label class="hidden items-center gap-2 p-3 rounded-xl bg-rose-50 text-sm text-rose-800" data-plan-confirm><input type="checkbox" name="confirm_delete" value="1"><span>Confirmo que se eliminarán <b data-plan-removed-count>0</b> elemento(s) de los catálogos.</span></label>' +
+          "</form>";
+      },
+      bind: function (popup) {
+        function refresh() {
+          var removed = popup.querySelectorAll('[data-plan-row][data-removed="1"]').length;
+          var confirm = popup.querySelector("[data-plan-confirm]");
+          confirm.classList.toggle("hidden", !removed);
+          confirm.classList.toggle("flex", removed > 0);
+          popup.querySelector("[data-plan-removed-count]").textContent = String(removed);
+          if (!removed) confirm.querySelector("input").checked = false;
+        }
+        popup.addEventListener("click", function (event) {
+          var add = event.target.closest("[data-plan-add-row]");
+          if (add) {
+            var box = add.closest("[data-plan-catalog]");
+            box.querySelector("tbody").insertAdjacentHTML("beforeend", box.querySelector("[data-plan-row-template]").innerHTML);
+            var rows = box.querySelectorAll("tbody [data-plan-row]");
+            rows[rows.length - 1].querySelector("input").focus();
+            return;
+          }
+          var remove = event.target.closest("[data-plan-remove]");
+          if (!remove) return;
+          var row = remove.closest("[data-plan-row]");
+          if (!row.getAttribute("data-id")) {
+            row.remove();
+            return;
+          }
+          // Las filas guardadas quedan marcadas hasta guardar: se recuperan con "Deshacer".
+          var marked = row.getAttribute("data-removed") !== "1";
+          row.setAttribute("data-removed", marked ? "1" : "0");
+          row.style.opacity = marked ? "0.45" : "";
+          row.querySelectorAll("input").forEach(function (field) { field.disabled = marked; });
+          remove.textContent = marked ? "Deshacer" : "Quitar";
+          refresh();
+        });
+      },
+      collect: function (form) {
+        var data = {};
+        form.querySelectorAll("[data-plan-catalog]").forEach(function (box) {
+          data[box.getAttribute("data-plan-catalog")] = Array.prototype.filter.call(box.querySelectorAll("tbody [data-plan-row]"), function (row) {
+            return row.getAttribute("data-removed") !== "1";
+          }).map(function (row) {
+            var item = { id: Number(row.getAttribute("data-id") || 0) };
+            row.querySelectorAll("[data-field]").forEach(function (field) { item[field.getAttribute("data-field")] = field.value.trim(); });
+            return item;
+          }).filter(function (item) {
+            return item.id || Object.keys(item).some(function (key) { return key !== "id" && item[key]; });
+          });
+        });
+        var removed = form.querySelectorAll('[data-plan-row][data-removed="1"]').length;
+        var confirmed = form.querySelector('[name="confirm_delete"]').checked;
+        if (removed && !confirmed) throw new Error("Marca la confirmación para eliminar " + removed + " elemento(s).");
+        data.confirm_delete = removed > 0 && confirmed;
         return data;
       },
     },

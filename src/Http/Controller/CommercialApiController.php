@@ -91,7 +91,7 @@ final class CommercialApiController
     } elseif ($bucket === 'herramientas') {
       $tool = (string) ($input['herramienta'] ?? '');
       $preapproval = $this->preapprovalService();
-      if (!in_array($tool, ['ganancia_ocasional', 'calculadora_mercado', 'calculadora_aseo', 'generador_utm'], true) && $this->policy->canSubview('herramientas', 'simulador_ingreso_neto')) $preapproval->syncUsury();
+      if (!in_array($tool, ['ganancia_ocasional', 'calculadora_mercado', 'calculadora_aseo', 'generador_utm', 'plan_estrategico'], true) && $this->policy->canSubview('herramientas', 'simulador_ingreso_neto')) $preapproval->syncUsury();
       $html = \SCM\Views\CommercialToolsView::render($tool, $preapproval,$this->baseUrl, \SCM\Views\CommercialToolsView::context($tool, $this->policy, $this->db, $this->settings));
     } elseif ($bucket === 'promocion') {
       $html = \SCM\Views\Promotion\PromotionView::page($input, $this->policy, $this->db, $this->settings, $this->baseUrl);

@@ -20,7 +20,7 @@ use SCM\Core\Settings;
  * Herramientas del panel comercial: simulador de ingreso neto del propietario con su crédito preaprobado (y PDF para el
  * propietario), calculadora de ganancia ocasional, las calculadoras de mercado y de aseo del panel inmobiliario
  * (commercial-calculators.js; el servidor filtra inmuebles, calcula el aseo y genera sus PDF) y el Generador UTM de
- * dashboard-marketing (commercial-utm.js). Los cálculos en pantalla se hacen en el navegador
+ * dashboard-marketing (commercial-utm.js) y el Plan estratégico (StrategicPlanView). Los cálculos en pantalla se hacen en el navegador
  * (commercial-tools.js); el servidor busca contratos, recalcula y genera el PDF (CommercialOwnerPreapprovalPdf).
  */
 final class CommercialToolsView
@@ -44,8 +44,8 @@ final class CommercialToolsView
 
   /**
    * Datos que necesitan las calculadoras de mercado y aseo según el permiso del cargo, y para el Generador UTM las campañas
-   * del catálogo y los medios activos de la lista única (nombre y slug).
-   * @return array{market_admin:bool,cleaning_internal:bool,cleaning_config:array<string,mixed>,utm_catalog:array<string,mixed>,utm_medios:list<array{label:string,value:string}>}
+   * del catálogo y los medios activos de la lista única (nombre y slug); el Plan estratégico, sus opciones e indicadores.
+   * @return array{market_admin:bool,cleaning_internal:bool,cleaning_config:array<string,mixed>,utm_catalog:array<string,mixed>,utm_medios:list<array{label:string,value:string}>,plan:array<string,mixed>}
    */
   public static function context(string $tool, CommercialAccessPolicy $policy, Database $db, ?Settings $settings = null): array
   {
@@ -55,16 +55,18 @@ final class CommercialToolsView
       'cleaning_config' => $tool === 'calculadora_aseo' ? (new CleaningSettings($db))->read() : [],
       'utm_catalog' => $tool === 'generador_utm' && $settings instanceof Settings ? UtmCatalog::read($settings) : [],
       'utm_medios' => $tool === 'generador_utm' && $settings instanceof Settings ? (new MedioCatalog($db, $settings))->utmOptions() : [],
+      'plan' => $tool === 'plan_estrategico' && $policy->canSubview('herramientas', 'plan_estrategico') ? StrategicPlanView::context($policy, $db) : [],
     ];
   }
 
-  /** @param array{market_admin?:bool,cleaning_internal?:bool,cleaning_config?:array<string,mixed>,utm_catalog?:array<string,mixed>,utm_medios?:list<array{label:string,value:string}>} $context */
+  /** @param array{market_admin?:bool,cleaning_internal?:bool,cleaning_config?:array<string,mixed>,utm_catalog?:array<string,mixed>,utm_medios?:list<array{label:string,value:string}>,plan?:array<string,mixed>} $context */
   public static function render(string $tool, ?CommercialOwnerPreapprovalService $service, string $baseUrl, array $context = []): string
   {
     if ($tool === 'ganancia_ocasional') return self::occasionalGain();
     if ($tool === 'calculadora_mercado') return self::market(!empty($context['market_admin']));
     if ($tool === 'calculadora_aseo') return self::cleaning(!empty($context['cleaning_internal']), $context['cleaning_config'] ?? []);
     if ($tool === 'generador_utm') return self::utm($context['utm_catalog'] ?? [], $context['utm_medios'] ?? []);
+    if ($tool === 'plan_estrategico') return StrategicPlanView::render($context['plan'] ?? [], $baseUrl);
     return $service instanceof CommercialOwnerPreapprovalService ? self::netIncome($service) : '';
   }
 

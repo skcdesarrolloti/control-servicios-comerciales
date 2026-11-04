@@ -13,5 +13,7 @@ parameters:
     - src/Views/CommercialTicketModalView.php
     - src/Views/CommercialNotificationsView.php
     - src/Views/Promotion
+    - src/Views/StrategicPlanView.php
+    - src/Http/Controller/StrategicPlanApiController.php
   bootstrapFiles:
     - tests/phpstan-bootstrap.php

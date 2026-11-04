@@ -9,6 +9,7 @@ use SCM\Commercial\Medios\MedioResolver;
 use SCM\Commercial\Promotion\Analytics\TrackerAnalyticsConfig;
 use SCM\Commercial\Promotion\Analytics\TrackerRollup;
 use SCM\Commercial\Promotion\Analytics\TrackerSchema;
+use SCM\Commercial\Strategy\StrategicPlanRepository;
 use SCM\Commercial\Tools\CleaningSettings;
 use SCM\Commercial\Tools\UtmCatalog;
 use SCM\Core\Auth;
@@ -22,7 +23,8 @@ use SCM\Support\SchemaInspector;
  * cupos de destacados, calculadora de aseo) se guardan en su fila de `jet_cct_confi_sistema` para mantener una sola fuente.
  * Lo propio del panel (plazos de actualización, catálogo del Generador UTM, Analítica web) va en Settings.
  * La lista única de Medios vive en su propia tabla (scm_medios, MedioCatalog): la sección "medios" la administra y, al
- * cambiarla, sincroniza el glosario "Medio de llamada" de JetEngine.
+ * cambiarla, sincroniza el glosario "Medio de llamada" de JetEngine. Los catálogos del Plan estratégico (sección "plan")
+ * son las mismas tablas CCT que usa el plugin Gestor Estratégico de WordPress.
  */
 final class CommercialSettingsService
 {
@@ -46,7 +48,7 @@ final class CommercialSettingsService
     'factor_prestacional' => ['Factor prestacional', 0, 0, 100],
   ];
 
-  public const SECTIONS = ['calendario', 'tiempos', 'avisos', 'actualizaciones', 'destacados', 'aseo', 'utm', 'medios', 'analitica'];
+  public const SECTIONS = ['calendario', 'tiempos', 'avisos', 'actualizaciones', 'destacados', 'aseo', 'utm', 'medios', 'analitica', 'plan'];
 
   /** Operaciones de la sección "medios" (todas guardan, salvo preview, que solo cuenta). */
   public const MEDIOS_OPS = ['add', 'rename', 'toggle', 'merge', 'aliases', 'alias_raw', 'rewrite_raw', 'preview'];
@@ -113,6 +115,8 @@ final class CommercialSettingsService
       'utm' => UtmCatalog::read($this->settings),
       'medios' => $this->mediosSettings($section === 'medios'),
       'analitica' => $this->analyticsSettings(),
+      // Catálogos del Plan estratégico con su uso: solo al abrir esa sección.
+      'plan' => $section === 'plan' ? (new StrategicPlanRepository($this->db))->catalogSettings() : [],
     ];
   }
 
@@ -269,6 +273,8 @@ final class CommercialSettingsService
         return 'Campañas del generador UTM guardadas.';
       case 'medios':
         return $this->saveMedios($data);
+      case 'plan':
+        return $this->savePlanCatalogs($data);
       case 'analitica':
         $before = TrackerAnalyticsConfig::read($this->settings);
         $saved = TrackerAnalyticsConfig::save($this->settings, $data, Auth::userId());
@@ -278,6 +284,20 @@ final class CommercialSettingsService
         return 'Configuración de la analítica web guardada.';
     }
     throw new \InvalidArgumentException('Sección de configuración no válida.');
+  }
+
+  /** Configuración › Plan estratégico: los catálogos completos; eliminar exige confirm_delete. @param array<string,mixed> $data */
+  private function savePlanCatalogs(array $data): string
+  {
+    $author = trim(Auth::employeeId()) !== '' ? trim(Auth::employeeId()) : (string) Auth::userId();
+    $totals = (new StrategicPlanRepository($this->db))->saveCatalogs($data, $author);
+    $this->lastResult = $totals;
+    $parts = [];
+    foreach (['added' => 'agregados', 'updated' => 'actualizados', 'deleted' => 'eliminados'] as $key => $label) {
+      if ($totals[$key] > 0) $parts[] = $totals[$key] . ' ' . $label;
+    }
+    return 'Catálogos del plan estratégico guardados' . ($parts !== [] ? ': ' . implode(', ', $parts) : ' (sin cambios)') . '.'
+      . ($totals['renamed'] > 0 ? ' ' . $totals['renamed'] . ' registros del plan tomaron el nombre nuevo.' : '');
   }
 
   /**
