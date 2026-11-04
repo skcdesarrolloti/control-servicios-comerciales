@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace SCM\Commercial;
 
+use SCM\Commercial\Promotion\Analytics\TrackerAnalyticsConfig;
+use SCM\Commercial\Promotion\Analytics\TrackerRollup;
 use SCM\Commercial\Tools\CleaningSettings;
 use SCM\Commercial\Tools\UtmCatalog;
 use SCM\Core\Auth;
@@ -15,7 +17,7 @@ use SCM\Support\SchemaInspector;
  * Menú "Configuración" del panel comercial: lee y guarda cada sección configurable.
  * Los valores que también usan otras aplicaciones (SLA de tareas, plazos y valores de avisos,
  * cupos de destacados, calculadora de aseo) se guardan en su fila de `jet_cct_confi_sistema` para mantener una sola fuente.
- * Lo propio del panel (plazos de actualización, catálogo del Generador UTM) va en Settings.
+ * Lo propio del panel (plazos de actualización, catálogo del Generador UTM, Analítica web) va en Settings.
  */
 final class CommercialSettingsService
 {
@@ -39,7 +41,7 @@ final class CommercialSettingsService
     'factor_prestacional' => ['Factor prestacional', 0, 0, 100],
   ];
 
-  public const SECTIONS = ['calendario', 'tiempos', 'avisos', 'actualizaciones', 'destacados', 'aseo', 'utm'];
+  public const SECTIONS = ['calendario', 'tiempos', 'avisos', 'actualizaciones', 'destacados', 'aseo', 'utm', 'analitica'];
 
   private Database $db;
   private Settings $settings;
@@ -95,7 +97,24 @@ final class CommercialSettingsService
       'aseo' => $this->cleaningSettings(),
       // Solo las listas de medios, fuentes y campañas del Generador UTM.
       'utm' => UtmCatalog::read($this->settings),
+      'analitica' => $this->analyticsSettings(),
     ];
+  }
+
+  /**
+   * Configuración › Analítica web y el estado de los resúmenes (solo lectura).
+   * @return array<string,mixed>
+   */
+  private function analyticsSettings(): array
+  {
+    $config = TrackerAnalyticsConfig::read($this->settings);
+    try {
+      $status = TrackerRollup::readStatus($this->db, $this->settings);
+    } catch (\Throwable) {
+      // Sin la tabla del tracker (o sin acceso a ella) la sección se puede editar igual.
+      $status = TrackerRollup::state($this->settings) + ['pending' => null, 'schema_ready' => false];
+    }
+    return $config + ['max_retention_days' => TrackerAnalyticsConfig::MAX_RETENTION_DAYS, 'status' => $status];
   }
 
   /**
@@ -123,6 +142,13 @@ final class CommercialSettingsService
       case 'utm':
         UtmCatalog::save($this->settings, $data, Auth::userId());
         return 'Catálogo del generador UTM guardado.';
+      case 'analitica':
+        $before = TrackerAnalyticsConfig::read($this->settings);
+        $saved = TrackerAnalyticsConfig::save($this->settings, $data, Auth::userId());
+        if ($saved['internal_ips'] !== $before['internal_ips'] || $saved['own_domains'] !== $before['own_domains']) {
+          return 'Configuración de la analítica web guardada. Las IPs internas y los dominios propios se aplican a las visitas nuevas; para recalcular días anteriores ejecuta bin/tracker-rollup.php --rebuild-from=AAAA-MM-DD.';
+        }
+        return 'Configuración de la analítica web guardada.';
     }
     throw new \InvalidArgumentException('Sección de configuración no válida.');
   }
