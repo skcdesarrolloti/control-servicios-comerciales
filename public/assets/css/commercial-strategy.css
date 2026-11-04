@@ -26,7 +26,13 @@
 .cps-context[hidden] { display:none }
 .cps-context .cps-back { min-height:38px; padding:0 14px }
 .cps-context__text { flex:1; min-width:200px; display:grid; gap:2px }
-.cps-context__text span { font-size:11px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--ctl-muted) }
+.cps-crumbs { display:flex; flex-wrap:wrap; align-items:center; gap:2px; margin:0; padding:0; list-style:none }
+.cps-crumbs li { display:flex; align-items:center; min-width:0 }
+.cps-crumbs li + li::before { content:"›"; margin:0 6px; color:#94a3b8; font-weight:700 }
+.cps-crumb { max-width:280px; padding:2px 6px; border:0; border-radius:8px; background:transparent; color:var(--ctl-blue); font:inherit; font-size:12.5px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer }
+button.cps-crumb:hover { background:#fff; text-decoration:underline }
+.cps-crumb.is-current { max-width:420px; color:var(--ctl-navy); font-weight:700; cursor:default }
+.cps-context__text > span { font-size:11px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--ctl-muted) }
 .cps-context__text strong { font-size:13.5px; line-height:1.4; color:var(--ctl-navy); overflow-wrap:anywhere }
 .cps-count { display:inline-grid; place-items:center; min-width:30px; height:26px; padding:0 8px; border-radius:999px; background:var(--ctl-sky); color:var(--ctl-navy); font-weight:700; font-size:12px }
 

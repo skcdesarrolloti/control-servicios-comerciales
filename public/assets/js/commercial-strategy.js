@@ -100,26 +100,30 @@
 
   // ── Filtros (renderFilters del plugin) ────────────────────────────────────
 
-  // El registro padre directo (objetivo, meta o tarea) no es un selector: los nombres son largos. Se llega a él con
-  // "Ver" y se muestra en la barra de contexto con "Volver". La gestión (el nivel de arriba, nombres cortos) sí se
-  // filtra en todas las pestañas: el servidor sube por la cadena gestión → objetivo → meta → tarea → campaña.
+  // Solo hay dos pestañas: Mis tareas y Gestiones. Objetivos, metas, tareas y campañas se abren con "Ver" desde su
+  // padre (gestión → objetivo → meta → tarea → campaña), como el modal con historial del plugin; la ruta de arriba
+  // (migas) permite volver a cualquier nivel. Los nombres de los padres no van en selectores: son muy largos.
   function filterDefs(plan) {
     var plain = function (values) { return values.map(function (value) { return { value: value, label: value }; }); };
     var people = plain(plan.options.funcionarios || []);
     var catalogNames = function (key) { return catalog(plan, key).map(function (row) { return { value: row.valor, label: row.nombre }; }); };
-    // Dentro de una gestión ("Ver objetivos") el filtro de gestión sobra: la barra de contexto ya la muestra.
-    var gestion = plan.context && plan.context.filter.gestion ? [] : [["gestion", "Gestión", catalogNames("gestiones")]];
     switch (plan.tab) {
-      case "objetivos": return gestion.concat([["responsable", "Responsable", people]]);
-      case "metas": return gestion.concat([["estado", "Estado", plain(plan.options.estados_meta || [])]]);
-      case "tareas": return gestion.concat([["estado", "Estado", plain(plan.options.estados_tarea || [])], ["responsable", "Responsable", people]]);
-      case "mis_tareas": return gestion.concat([["estado", "Estado", plain(plan.options.estados_tarea || [])]]);
-      case "campanas": return gestion.concat([["tipo", "Tipo de campaña", catalogNames("tipos_campana")], ["medio", "Medio", catalogNames("tipos_medio")], ["responsable", "Responsable", people]]);
+      case "objetivos": return [["responsable", "Responsable", people]];
+      case "metas": return [["estado", "Estado", plain(plan.options.estados_meta || [])]];
+      case "tareas": return [["estado", "Estado", plain(plan.options.estados_tarea || [])], ["responsable", "Responsable", people]];
+      // En Mis tareas, la gestión (subiendo por meta → objetivo) ayuda a separar las propias.
+      case "mis_tareas": return [["gestion", "Gestión", catalogNames("gestiones")], ["estado", "Estado", plain(plan.options.estados_tarea || [])]];
+      case "campanas": return [["tipo", "Tipo de campaña", catalogNames("tipos_campana")], ["medio", "Medio", catalogNames("tipos_medio")], ["responsable", "Responsable", people]];
     }
     return [];
   }
 
-  var TAB_LABELS = { gestiones: "Gestiones", mis_tareas: "Mis tareas", objetivos: "Objetivos", metas: "Metas", tareas: "Tareas", campanas: "Campañas" };
+  var TAB_LABELS = { gestiones: "Gestiones", mis_tareas: "Mis tareas" };
+
+  /** Pestaña de la que partió el recorrido (la que queda resaltada). */
+  function rootTab(plan) {
+    return plan.trail.length ? plan.trail[0].tab : plan.tab;
+  }
 
   function renderContext(root) {
     var plan = state(root);
@@ -127,10 +131,14 @@
     if (!box) return;
     box.hidden = !plan.context;
     if (!plan.context) { box.innerHTML = ""; return; }
-    var previous = plan.trail[plan.trail.length - 1];
-    box.innerHTML = '<button type="button" class="ctl-ghost cps-back" data-plan-back>' + icon("arrow_back") + "Volver a " + esc(TAB_LABELS[previous ? previous.tab : "objetivos"]) + "</button>" +
-      '<div class="cps-context__text"><span>' + esc(plan.context.title) + "</span><strong>" + esc(plan.context.label) + "</strong></div>" +
-      '<button type="button" class="cps-link" data-plan-context-clear>' + icon("filter_alt_off") + "Ver todas</button>";
+    // Migas: la pestaña de origen y cada registro por el que se bajó; el último es el padre de la lista actual.
+    var crumbs = plan.trail.map(function (step, index) {
+      var label = index === 0 ? TAB_LABELS[step.tab] || "Inicio" : step.context.label;
+      return '<li><button type="button" class="cps-crumb" data-plan-crumb="' + index + '" title="' + esc(label) + '">' + esc(label) + "</button></li>";
+    }).join("") + '<li aria-current="page"><span class="cps-crumb is-current" title="' + esc(plan.context.label) + '">' + esc(plan.context.label) + "</span></li>";
+    box.innerHTML = '<button type="button" class="ctl-ghost cps-back" data-plan-back>' + icon("arrow_back") + "Volver</button>" +
+      '<div class="cps-context__text"><nav aria-label="Ruta del plan"><ol class="cps-crumbs">' + crumbs + "</ol></nav>" +
+      "<span>" + esc(plan.context.title) + "</span></div>";
   }
 
   function renderFilters(root) {
@@ -145,7 +153,7 @@
       return '<label class="ctl-field"><span class="ctl-label">' + esc(def[1]) + '</span><span class="ctl-input"><select data-plan-filter="' + def[0] + '">' + options + "</select></span></label>";
     }).join("");
     root.querySelectorAll("[data-plan-tab]").forEach(function (button) {
-      button.setAttribute("aria-pressed", button.getAttribute("data-plan-tab") === plan.tab ? "true" : "false");
+      button.setAttribute("aria-pressed", button.getAttribute("data-plan-tab") === rootTab(plan) ? "true" : "false");
     });
     var label = root.querySelector("[data-plan-new-label]");
     var create = root.querySelector("[data-plan-new]");
@@ -196,7 +204,8 @@
       var key = groupKey(plan.tab, row);
       (groups[key] = groups[key] || []).push(row);
     });
-    if (plan.tab === "gestiones") groups = { "": plan.rows };
+    // Dentro de un padre la lista es una sola tabla: la ruta de arriba ya dice a qué pertenece.
+    if (plan.tab === "gestiones" || plan.context) groups = { "": plan.rows };
     var keys = Object.keys(groups).sort(function (a, b) {
       if (a === NO_GROUP) return 1;
       if (b === NO_GROUP) return -1;
@@ -599,11 +608,15 @@
     if (event.target.closest("[data-plan-back]")) {
       var previous = plan.trail.pop();
       if (previous) switchTab(root, previous.tab, previous.context, true);
-      else switchTab(root, "objetivos");
+      else switchTab(root, "gestiones");
       return;
     }
-    if (event.target.closest("[data-plan-context-clear]")) {
-      switchTab(root, plan.tab);
+    var crumb = event.target.closest("[data-plan-crumb]");
+    if (crumb) {
+      var index = Number(crumb.getAttribute("data-plan-crumb"));
+      var step = plan.trail[index];
+      plan.trail = plan.trail.slice(0, index);
+      if (step) switchTab(root, step.tab, step.context, true);
       return;
     }
     if (event.target.closest("[data-plan-new]")) {

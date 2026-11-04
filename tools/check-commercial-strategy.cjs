@@ -5,6 +5,22 @@ const { chromium } = require(process.env.SCM_PLAYWRIGHT_MODULE || 'playwright');
 
 const BASE = 'http://127.0.0.1:8772/tests/Fixtures/commercial-strategy.php';
 
+/** "Ver" en la fila que contiene el texto: baja al nivel hijo y espera a que la ruta lo muestre. */
+async function drill(page, rowText) {
+  await page.locator('[data-plan-list] tr', { hasText: rowText }).locator('[data-plan-action="children"]').click();
+  await page.waitForFunction(text => {
+    const current = document.querySelector('[data-plan-context] .cps-crumb.is-current');
+    return current && current.textContent === text && !document.querySelector('[data-plan-list]').hasAttribute('aria-busy');
+  }, rowText);
+}
+
+async function openTab(page, tab, rows) {
+  await page.locator(`[data-plan-tab="${tab}"]`).click();
+  await page.waitForFunction(([name, count]) => document.querySelector(`[data-plan-tab="${name}"]`).getAttribute('aria-pressed') === 'true'
+    && document.querySelector('[data-plan-context]').hidden && !document.querySelector('[data-plan-list]').hasAttribute('aria-busy')
+    && document.querySelectorAll('[data-plan-list] tbody tr').length === count, [tab, rows]);
+}
+
 (async () => {
   fs.rmSync('output/commercial-strategy.sqlite', { force: true });
   const browser = await browserLaunch();
@@ -20,22 +36,25 @@ const BASE = 'http://127.0.0.1:8772/tests/Fixtures/commercial-strategy.php';
     assert.equal(await menu.locator('a').count(), 6);
     assert.match(await menu.locator('a').last().getAttribute('href'), /[?&]tab=plan_estrategico$/);
 
-    // Abre en Mis tareas porque el funcionario tiene una pendiente.
+    // Solo dos pestañas; abre en Mis tareas porque el funcionario tiene una pendiente.
     const list = root.locator('[data-plan-list]');
+    assert.deepEqual(await root.locator('[data-plan-tab]').evaluateAll(nodes => nodes.map(node => node.getAttribute('data-plan-tab'))), ['mis_tareas', 'gestiones']);
     await page.waitForFunction(() => document.querySelector('[data-plan-list]').textContent.includes('Referidos de propietarios'));
     assert.equal(await root.locator('[data-plan-tab="mis_tareas"]').getAttribute('aria-pressed'), 'true');
     assert.equal(await root.locator('[data-plan-stat="mis_pendientes"]').innerText(), '1');
     assert.equal(await list.locator('tbody tr').count(), 1);
 
-    // Objetivos agrupados por gestión; "Ver metas" abre Metas filtradas por el objetivo.
-    await root.locator('[data-plan-tab="objetivos"]').click();
-    await page.waitForFunction(() => document.querySelectorAll('[data-plan-list] .cps-group').length === 2);
-    assert.deepEqual(await list.locator('.cps-group__title span:not(.material-symbols-outlined)').allInnerTexts(), ['Gestión Comercial', 'Gestión de Mercadeo']);
-    await list.locator('tr', { hasText: 'Aumentar cierres de arriendo' }).locator('[data-plan-action="children"]').click();
-    await page.waitForFunction(() => document.querySelector('[data-plan-tab="metas"]').getAttribute('aria-pressed') === 'true' && document.querySelectorAll('[data-plan-list] tbody tr').length === 2);
-    // El objetivo no es un selector: queda en la barra de contexto con "Volver".
+    // Gestiones → objetivos → metas con "Ver"; la ruta muestra cada nivel y Gestiones sigue resaltada.
+    await openTab(page, 'gestiones', 2);
+    assert.equal(await root.locator('[data-plan-new]').isVisible(), false, 'Las gestiones se editan en Configuración.');
+    await drill(page, 'Gestión Comercial');
+    assert.equal(await list.locator('tbody tr').count(), 1);
+    assert.equal(await root.locator('[data-plan-tab="gestiones"]').getAttribute('aria-pressed'), 'true');
+    await drill(page, 'Aumentar cierres de arriendo');
+    assert.equal(await list.locator('tbody tr').count(), 2);
+    assert.deepEqual(await root.locator('[data-plan-context] .cps-crumb').allInnerTexts(), ['Gestiones', 'Gestión Comercial', 'Aumentar cierres de arriendo']);
+    assert.match(await root.locator('[data-plan-context]').innerText(), /Metas del objetivo/i);
     assert.equal(await root.locator('[data-plan-filter="objetivo"]').count(), 0);
-    assert.match(await root.locator('[data-plan-context]').innerText(), /Volver a Objetivos[\s\S]*Metas del objetivo\s+Aumentar cierres de arriendo/i);
     assert.match(await list.locator('tr', { hasText: 'Cerrar 30 arriendos' }).innerText(), /Actual 12 \/ Meta 30 % · 40 %/);
 
     // "+" en una meta crea una tarea con esa meta ya marcada.
@@ -61,30 +80,16 @@ const BASE = 'http://127.0.0.1:8772/tests/Fixtures/commercial-strategy.php';
     // La lista se vuelve a pedir después de guardar: la meta ya cuenta las dos tareas.
     await page.waitForFunction(() => /Completadas\s*0\/2/.test(Array.from(document.querySelectorAll('[data-plan-list] tr')).find(row => row.textContent.includes('Cerrar 30 arriendos')).innerText));
 
-    // Volver regresa a Objetivos sin filtro; Gestiones lleva a sus objetivos y "Volver a Gestiones".
-    await root.locator('[data-plan-back]').click();
-    await page.waitForFunction(() => document.querySelector('[data-plan-tab="objetivos"]').getAttribute('aria-pressed') === 'true' && document.querySelector('[data-plan-context]').hidden && document.querySelectorAll('[data-plan-list] tbody tr').length === 2);
-    await root.locator('[data-plan-tab="gestiones"]').click();
+    // Tareas de la meta; dentro de un nivel, "Nueva tarea" ya la deja en esa meta.
+    await drill(page, 'Cerrar 30 arriendos');
     await page.waitForFunction(() => document.querySelectorAll('[data-plan-list] tbody tr').length === 2);
-    assert.equal(await root.locator('[data-plan-new]').isVisible(), false, 'Las gestiones se editan en Configuración.');
-    await list.locator('tr', { hasText: 'Gestión de Mercadeo' }).locator('[data-plan-action="children"]').click();
-    await page.waitForFunction(() => document.querySelectorAll('[data-plan-list] tbody tr').length === 1 && document.querySelector('[data-plan-list]').textContent.includes('Posicionar la marca'));
-    assert.match(await root.locator('[data-plan-context]').innerText(), /Volver a Gestiones/);
+    assert.equal(await root.locator('[data-plan-new-label]').innerText(), 'Nueva tarea');
     await root.locator('[data-plan-new]').click();
-    assert.equal(await form.locator('[name="perspectiva"]').inputValue(), 'Gestión de Mercadeo');
+    assert.equal(await form.locator('[data-plan-multi="id_meta"] input:checked').count(), 1);
     await form.locator('footer [data-plan-close]').click();
-    await root.locator('[data-plan-back]').click();
-    await page.waitForFunction(() => document.querySelector('[data-plan-tab="gestiones"]').getAttribute('aria-pressed') === 'true');
 
     // Bitácora: el avance con "completada" cambia el estado y descuenta de Mis tareas pendientes.
-    await root.locator('[data-plan-tab="tareas"]').click();
-    await page.waitForFunction(() => document.querySelector('[data-plan-list]').textContent.includes('Llamar a administradores'));
-    // Filtro de gestión: las tareas suben por meta → objetivo → gestión.
-    await root.locator('[data-plan-filter="gestion"]').selectOption('Gestión de Mercadeo');
-    await page.waitForFunction(() => document.querySelector('[data-plan-list]').textContent.includes('Sin registros'));
-    await root.locator('[data-plan-filter="gestion"]').selectOption('Gestión Comercial');
-    await page.waitForFunction(() => document.querySelectorAll('[data-plan-list] tbody tr').length === 3);
-    await list.locator('tr', { hasText: 'Referidos de propietarios' }).locator('[data-plan-action="log"]').first().click();
+    await list.locator('tr', { hasText: 'Referidos de propietarios' }).locator('[data-plan-action="log"]').click();
     const log = root.locator('[data-plan-log-dialog]');
     await log.waitFor({ state: 'visible' });
     assert.match(await log.locator('[data-plan-log-list]').innerText(), /14\/01\/2026 08:51\s+Funcionario de prueba\s+Primer contacto/);
@@ -98,9 +103,15 @@ const BASE = 'http://127.0.0.1:8772/tests/Fixtures/commercial-strategy.php';
     assert.match(await list.locator('tr', { hasText: 'Referidos de propietarios' }).innerText(), /Completado/);
     assert.equal(await root.locator('[data-plan-stat="mis_pendientes"]').innerText(), '0');
 
+    // Campañas de la tarea; un clic en la ruta vuelve directo a los objetivos de la gestión.
+    await drill(page, 'Referidos de propietarios');
+    assert.match(await list.innerText(), /Despide el año/);
+    assert.equal(await root.locator('[data-plan-context] .cps-crumb').count(), 5);
+    await root.locator('[data-plan-crumb="1"]').click();
+    await page.waitForFunction(() => document.querySelector('[data-plan-context] .cps-crumb.is-current').textContent === 'Gestión Comercial'
+      && document.querySelectorAll('[data-plan-list] tbody tr').length === 1 && document.querySelector('[data-plan-list]').textContent.includes('Aumentar cierres'));
+
     // Eliminar pide confirmación y no deja borrar un objetivo con metas.
-    await root.locator('[data-plan-tab="objetivos"]').click();
-    await page.waitForFunction(() => document.querySelectorAll('[data-plan-list] tbody tr').length === 2);
     await list.locator('tr', { hasText: 'Aumentar cierres de arriendo' }).locator('[data-plan-action="delete"]').click();
     const confirm = root.locator('[data-plan-confirm-dialog]');
     await confirm.waitFor({ state: 'visible' });
@@ -108,11 +119,26 @@ const BASE = 'http://127.0.0.1:8772/tests/Fixtures/commercial-strategy.php';
     await confirm.locator('[data-plan-confirm-ok]').click();
     await page.waitForFunction(() => /tiene 2 metas asociadas/.test(document.querySelector('[data-plan-confirm-error]').textContent));
     await confirm.locator('footer [data-plan-close]').click();
+
+    // "Volver" sube un nivel (a Gestiones); en otra gestión, "Nuevo objetivo" ya trae la gestión.
+    await root.locator('[data-plan-back]').click();
+    await page.waitForFunction(() => document.querySelector('[data-plan-context]').hidden && document.querySelectorAll('[data-plan-list] tbody tr').length === 2);
+    await drill(page, 'Gestión de Mercadeo');
+    await root.locator('[data-plan-new]').click();
+    assert.equal(await form.locator('[name="perspectiva"]').inputValue(), 'Gestión de Mercadeo');
+    await form.locator('footer [data-plan-close]').click();
     await list.locator('tr', { hasText: 'Posicionar la marca' }).locator('[data-plan-action="delete"]').click();
     await confirm.locator('[data-plan-confirm-ok]').click();
     await confirm.waitFor({ state: 'hidden' });
-    await page.waitForFunction(() => document.querySelectorAll('[data-plan-list] tbody tr').length === 1);
+    await page.waitForFunction(() => document.querySelector('[data-plan-list]').textContent.includes('Sin registros'));
     assert.equal(await root.locator('[data-plan-stat="objetivos"]').innerText(), '1');
+
+    // Mis tareas: filtro de gestión (sube por meta → objetivo → gestión).
+    await openTab(page, 'mis_tareas', 1);
+    await root.locator('[data-plan-filter="gestion"]').selectOption('Gestión de Mercadeo');
+    await page.waitForFunction(() => document.querySelector('[data-plan-list]').textContent.includes('No tienes tareas'));
+    await root.locator('[data-plan-filter="gestion"]').selectOption('Gestión Comercial');
+    await page.waitForFunction(() => document.querySelectorAll('[data-plan-list] tbody tr').length === 1);
 
     // Glosario con las definiciones de los catálogos.
     await root.locator('[data-plan-glossary]').click();
@@ -136,8 +162,12 @@ const BASE = 'http://127.0.0.1:8772/tests/Fixtures/commercial-strategy.php';
     await mediaRows.last().locator('[data-field="nombre"]').fill('Radio');
     await popup.locator('.swal2-confirm').click();
     await page.waitForFunction(() => !document.querySelector('.swal2-popup [data-plan-catalog]'));
-    await root.locator('[data-plan-tab="campanas"]').click();
-    await page.waitForFunction(() => document.querySelector('[data-plan-list]').textContent.includes('Google Ads'));
+    await openTab(page, 'gestiones', 2);
+    await drill(page, 'Gestión Comercial');
+    await drill(page, 'Aumentar cierres de arriendo');
+    await drill(page, 'Cerrar 30 arriendos');
+    await drill(page, 'Referidos de propietarios');
+    assert.match(await list.innerText(), /Google Ads/);
 
     // Quitar un elemento libre exige marcar la confirmación.
     await page.locator('#commercial-config-trigger').click();
@@ -165,17 +195,21 @@ const BASE = 'http://127.0.0.1:8772/tests/Fixtures/commercial-strategy.php';
     await readerRoot.locator('[data-plan-list] tr', { hasText: 'Visitar copropiedades' }).locator('[data-plan-action="log"]').click();
     assert.equal(await readerRoot.locator('[data-plan-log-form]').isVisible(), true);
     await readerRoot.locator('[data-plan-log-dialog] header [data-plan-close]').click();
-    await readerRoot.locator('[data-plan-tab="tareas"]').click();
-    await reader.waitForFunction(() => document.querySelector('[data-plan-list]').textContent.includes('Referidos de propietarios'));
+    await openTab(reader, 'gestiones', 2);
+    await drill(reader, 'Gestión Comercial');
+    await drill(reader, 'Aumentar cierres de arriendo');
+    await drill(reader, 'Cerrar 30 arriendos');
     await readerRoot.locator('[data-plan-list] tr', { hasText: 'Referidos de propietarios' }).locator('[data-plan-action="log"]').click();
     assert.equal(await readerRoot.locator('[data-plan-log-form]').isVisible(), false);
     await readerRoot.locator('[data-plan-log-dialog] header [data-plan-close]').click();
 
-    // Móvil: sin desplazamiento horizontal de la página.
+    // Móvil: sin desplazamiento horizontal de la página, también con la ruta abierta.
     await reader.setViewportSize({ width: 390, height: 844 });
+    let overflow = await reader.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    assert.ok(overflow <= 0, 'La página se desborda ' + overflow + ' px en móvil con la ruta abierta.');
     await reader.reload();
     await reader.waitForFunction(() => document.querySelector('[data-plan-list] tbody'));
-    const overflow = await reader.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    overflow = await reader.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     assert.ok(overflow <= 0, 'La página se desborda ' + overflow + ' px en móvil.');
     assert.equal(errors.length, 0, errors.join('\n'));
     console.log('commercial strategy: ok');

@@ -12,8 +12,8 @@ use SCM\Views\Promotion\PromotionView;
 
 /**
  * Herramientas › Plan estratégico (?tab=plan_estrategico). Adaptación del panel del plugin "Gestor Estratégico" V30.9 de
- * WordPress con el diseño de las herramientas: indicadores, pestañas Mis tareas / Gestiones / Objetivos / Metas / Tareas /
- * Campañas con sus filtros, "Ver" con su barra para volver al registro padre, y popups internos para crear, editar, eliminar y llevar las bitácoras. Las listas las pinta
+ * WordPress con el diseño de las herramientas: indicadores, pestañas Mis tareas y Gestiones, y desde cada gestión "Ver"
+ * baja por objetivos → metas → tareas → campañas con una ruta (migas) para volver a cualquier nivel, y popups internos para crear, editar, eliminar y llevar las bitácoras. Las listas las pinta
  * commercial-strategy.js con commercial_plan_list; sus estilos y su script se piden solo al abrir esta herramienta.
  * Los catálogos (gestiones, unidades, tipos, frecuencias y actores) se editan en Configuración › Plan estratégico.
  */
@@ -42,9 +42,9 @@ final class StrategicPlanView
     $canEdit = !empty($context['can_edit']);
     $summary = ($context['summary'] ?? []) + array_fill_keys(['objetivos', 'metas', 'metas_realizadas', 'metas_vencidas', 'tareas', 'tareas_completadas', 'tareas_en_proceso', 'campanas', 'mis_pendientes'], 0);
     $options = json_encode($context['options'] ?? [], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) ?: '{}';
-    $start = $summary['mis_pendientes'] > 0 ? 'mis_tareas' : 'objetivos';
+    $start = $summary['mis_pendientes'] > 0 ? 'mis_tareas' : 'gestiones';
     $tabs = '';
-    foreach (['mis_tareas' => ['person_check', 'Mis tareas'], 'gestiones' => ['account_tree', 'Gestiones'], 'objetivos' => ['flag', 'Objetivos'], 'metas' => ['target', 'Metas'], 'tareas' => ['checklist', 'Tareas'], 'campanas' => ['campaign', 'Campañas']] as $key => [$icon, $label]) {
+    foreach (['mis_tareas' => ['person_check', 'Mis tareas'], 'gestiones' => ['account_tree', 'Gestiones']] as $key => [$icon, $label]) {
       $tabs .= '<button type="button" data-plan-tab="' . $key . '" aria-pressed="' . ($key === $start ? 'true' : 'false') . '"><span class="material-symbols-outlined" aria-hidden="true">' . $icon . '</span>' . $label . '</button>';
     }
     $stat = static fn(string $key, string $label, string $hint = '', string $class = ''): string => '<div class="ctl-stat' . ($class !== '' ? ' ' . $class : '') . '"><span>' . self::e($label) . '</span><strong data-plan-stat="' . $key . '">' . (int) $summary[$key] . '</strong>'
