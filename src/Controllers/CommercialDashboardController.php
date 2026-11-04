@@ -112,6 +112,7 @@ final class CommercialDashboardController
       'tab_counts' => $tabCounts,
       'policy' => $policy,
       'notifications_service' => $bucket === 'notificaciones' ? new CommercialNotificationsService($this->db, $policy) : null,
+      'campaigns_html' => $bucket === 'notificaciones' ? \SCM\Views\Campaigns\CampaignsView::page((string) ($input['notif_sub'] ?? ''), $input, $policy, $this->db, $this->settings, (string) SCM_BASE_URL) : '',
       'sign_service' => $bucket === 'anadir_aviso' ? new \SCM\Commercial\CommercialSignService($this->db, $policy, $this->config) : null,
       'tools_service' => $bucket === 'herramientas' ? new \SCM\Commercial\CommercialOwnerPreapprovalService($this->db, $policy) : null,
       'tools_view' => $bucket === 'herramientas' ? (string) ($input['herramienta'] ?? '') : '',

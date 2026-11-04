@@ -9,8 +9,8 @@ use SCM\Core\Database;
 use SCM\Modules\AdministrativeNotifications\AdministrativeNotificationsService;
 use SCM\Support\EmailTemplate;
 
-/** Reutiliza búsqueda, contratos y preferencias del módulo inmobiliario. */
-final class CommercialNotificationsService extends AdministrativeNotificationsService
+/** Reutiliza búsqueda, contratos y preferencias del módulo inmobiliario. Campaigns\CampaignRecipients la extiende. */
+class CommercialNotificationsService extends AdministrativeNotificationsService
 {
   public const PROJECT_CODE = 'control-servicios-comerciales';
   public const SOURCE_MODULE = 'commercial_notifications';

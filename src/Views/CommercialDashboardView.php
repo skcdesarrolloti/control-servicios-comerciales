@@ -669,7 +669,8 @@ final class CommercialDashboardView
           } elseif ($bucket === 'promocion') {
             echo (string) ($data['promotion_html'] ?? '');
           } elseif ($bucket === 'notificaciones') {
-            echo CommercialNotificationsView::render($data['notifications_service'], $policy);
+            // Campañas y Plantillas de correo traen su HTML; Enviar notificaciones es la pantalla de siempre.
+            echo (string) ($data['campaigns_html'] ?? '') !== '' ? (string) $data['campaigns_html'] : CommercialNotificationsView::render($data['notifications_service'], $policy);
           } else {
             echo self::renderTickets($bucket, $result, $filters, $ticketEmployees, $filterOptions, $tabCounts, $policy, $baseUrl, $homeDashboard);
           }
@@ -1096,10 +1097,29 @@ final class CommercialDashboardView
         </div>
       <?php endif; ?>
 
+      <!-- Dropdown Notificaciones: una entrada por subpestaña de SUBVIEWS['notificaciones'] que el cargo puede abrir -->
       <?php if (in_array('notificaciones', $views, true)): ?>
-        <a class="flex items-center gap-space-xs px-2 xl:px-3 py-space-xs whitespace-nowrap font-label-md text-label-md <?php echo $bucket === 'notificaciones' ? ($activeClasses . ' active') : $inactiveClasses; ?>" data-commercial-tab="notificaciones" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'notificaciones'])); ?>"<?php echo $bucket === 'notificaciones' ? ' aria-current="page"' : ''; ?>>
-          <span class="material-symbols-outlined text-[16px]" aria-hidden="true">campaign</span><span>Notificaciones</span>
-        </a>
+        <div class="relative group/nav" data-commercial-dropdown="notificaciones">
+          <button type="button" class="flex items-center gap-space-xs px-2 xl:px-3 py-space-xs whitespace-nowrap font-label-md text-label-md <?php echo $bucket === 'notificaciones' ? ($activeClasses . ' active') : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-tab="notificaciones" data-commercial-dropdown-trigger="notificaciones" aria-expanded="false">
+            <span class="material-symbols-outlined text-[16px]" aria-hidden="true">forward_to_inbox</span>
+            <span>Notificaciones</span>
+            <span class="material-symbols-outlined text-[16px] group-hover/nav:rotate-180 transition-transform" aria-hidden="true">expand_more</span>
+          </button>
+          <div class="absolute right-0 top-full hidden group-hover/nav:block bg-surface-container-lowest shadow-[0_12px_32px_rgba(0,0,0,0.14)] rounded-2xl py-space-xs min-w-[260px] z-50 border border-outline-variant/30 text-on-surface" data-commercial-dropdown-menu="notificaciones">
+            <?php foreach (CommercialAccessPolicy::SUBVIEWS['notificaciones'] as $notifKey => $notifLabel): ?>
+              <?php if (!$policy instanceof CommercialAccessPolicy || $policy->canSubview('notificaciones', $notifKey)): ?>
+              <?php [$notifIcon, $notifHint] = self::NOTIFICATION_MENU[$notifKey] ?? ['mail', '']; ?>
+              <a class="flex items-center gap-2.5 px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="notificaciones" href="<?php echo esc_url(self::url($baseUrl, ['tab' => $notifKey])); ?>">
+                <span class="material-symbols-outlined text-[18px] text-secondary" aria-hidden="true"><?php echo esc_html($notifIcon); ?></span>
+                <div>
+                  <span class="block font-semibold text-on-surface"><?php echo esc_html($notifLabel); ?></span>
+                  <?php if ($notifHint !== ''): ?><span class="block text-[11px] text-secondary"><?php echo esc_html($notifHint); ?></span><?php endif; ?>
+                </div>
+              </a>
+              <?php endif; ?>
+            <?php endforeach; ?>
+          </div>
+        </div>
       <?php endif; ?>
 
       <!-- Dropdown Herramientas (Simulador de ingreso neto, Ganancia ocasional, Calculadora de mercado, Calculadora de aseo, Generador UTM) -->
@@ -4927,6 +4947,13 @@ final class CommercialDashboardView
     'material_pop' => ['inventory_2', 'Existencias, entregas y movimientos de souvenirs'],
   ];
 
+  /** Ícono y ayuda de cada subpestaña de Notificaciones en el menú de escritorio. */
+  private const NOTIFICATION_MENU = [
+    'enviar_notificaciones' => ['send', 'WhatsApp, correo o SMS a contactos puntuales'],
+    'campanas' => ['campaign', 'Envíos masivos por lotes con su informe'],
+    'plantillas_correo' => ['draft', 'Correos diseñados para las campañas'],
+  ];
+
   /** @return array{0:string,1:string} Ícono y ayuda; una subpestaña nueva sin entrada usa el ícono del grupo. */
   private static function promotionMenu(string $key): array
   {
@@ -4936,7 +4963,7 @@ final class CommercialDashboardView
   /** Acciones de la configuración de accesos, agrupadas por módulo. Toda acción de CommercialAccessPolicy::ACTIONS va en un grupo. */
   private const PERMISSION_ACTION_GROUPS = [
     'Tareas' => ['ver_ticket', 'responder', 'agregar_nota', 'seguimiento', 'postergar', 'activar', 'cerrar', 'cambiar_estado', 'reasignar'],
-    'Notificaciones' => ['enviar_notificacion', 'eliminar_notificacion'],
+    'Notificaciones' => ['enviar_notificacion', 'eliminar_notificacion', 'campanas_enviar', 'plantillas_editar'],
     'Precaptación' => ['precaptacion_crear', 'precaptacion_editar', 'precaptacion_ticket', 'precaptacion_catalogos'],
     'Inmuebles y avisos' => ['ingresar_inmueble', 'registrar_aviso', 'editar_actor'],
     'Herramientas' => ['mercado_vista_completa', 'aseo_vista_interna', 'plan_estrategico_editar'],

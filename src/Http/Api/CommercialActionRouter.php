@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SCM\Http\Api;
 
+use SCM\Http\Controller\CampaignApiController;
 use SCM\Http\Controller\CommercialApiController;
 use SCM\Http\Controller\PromotionApiController;
 use SCM\Http\Controller\StrategicPlanApiController;
@@ -30,21 +31,36 @@ final class CommercialActionRouter
     'commercial_plan_result' => 'result',
   ];
 
+  /** Endpoints de Notificaciones › Campañas y Plantillas de correo: los atiende CampaignApiController. */
+  public const CAMPAIGN_ACTIONS = [
+    'commercial_campaign_preview' => 'preview',
+    'commercial_campaign_send' => 'send',
+    'commercial_campaign_test' => 'test',
+    'commercial_campaign_detail' => 'detail',
+    'commercial_campaign_control' => 'control',
+    'commercial_template_get' => 'templateGet',
+    'commercial_template_save' => 'templateSave',
+  ];
+
   private CommercialApiController $controller;
   /** @var (\Closure():PromotionApiController)|null */
   private ?\Closure $promotion;
   /** @var (\Closure():StrategicPlanApiController)|null */
   private ?\Closure $strategy;
+  /** @var (\Closure():CampaignApiController)|null */
+  private ?\Closure $campaigns;
 
   /**
    * @param (\Closure():PromotionApiController)|null $promotion
    * @param (\Closure():StrategicPlanApiController)|null $strategy
+   * @param (\Closure():CampaignApiController)|null $campaigns
    */
-  public function __construct(CommercialApiController $controller, ?\Closure $promotion = null, ?\Closure $strategy = null)
+  public function __construct(CommercialApiController $controller, ?\Closure $promotion = null, ?\Closure $strategy = null, ?\Closure $campaigns = null)
   {
     $this->controller = $controller;
     $this->promotion = $promotion;
     $this->strategy = $strategy;
+    $this->campaigns = $campaigns;
   }
 
   /** @param array<string,mixed> $input */
@@ -62,6 +78,12 @@ final class CommercialActionRouter
       }
       $target = ($this->strategy)();
       $method = self::STRATEGY_ACTIONS[$action];
+    } elseif (isset(self::CAMPAIGN_ACTIONS[$action])) {
+      if ($this->campaigns === null) {
+        return false;
+      }
+      $target = ($this->campaigns)();
+      $method = self::CAMPAIGN_ACTIONS[$action];
     } else {
       $target = $this->controller;
       $method = self::controllerMethod($action);

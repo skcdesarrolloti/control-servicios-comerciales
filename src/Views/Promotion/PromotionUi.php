@@ -41,9 +41,10 @@ final class PromotionUi
     return $match[3] . '/' . $match[2] . '/' . $match[1] . ($withTime && isset($match[4]) ? ' ' . $match[4] . ':' . $match[5] : '');
   }
 
-  public static function hero(string $icon, string $title, string $text): string
+  /** $group: el menú al que pertenece la pantalla (Notificaciones › Campañas también usa estas piezas). */
+  public static function hero(string $icon, string $title, string $text, string $group = 'Promoción'): string
   {
-    return '<header class="cpr-hero"><div class="cpr-hero__text"><span class="cpr-eyebrow"><span class="material-symbols-outlined" aria-hidden="true">' . self::e($icon) . '</span>Promoción</span>'
+    return '<header class="cpr-hero"><div class="cpr-hero__text"><span class="cpr-eyebrow"><span class="material-symbols-outlined" aria-hidden="true">' . self::e($icon) . '</span>' . self::e($group) . '</span>'
       . '<h1>' . self::e($title) . '</h1><p>' . $text . '</p></div></header>';
   }
 

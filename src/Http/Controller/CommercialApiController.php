@@ -128,7 +128,10 @@ final class CommercialApiController
       $calendar = $this->calendarService()->panelConfig($subtab);
       $html = CommercialDashboardView::renderCalendarPage(array_merge($this->config, $calendar['config']), $calendar['employees'], $subtab, $this->policy, $this->baseUrl);
     } elseif ($bucket === 'notificaciones') {
-      $html = CommercialNotificationsView::render(new CommercialNotificationsService($this->db, $this->policy), $this->policy);
+      $html = \SCM\Views\Campaigns\CampaignsView::page((string) ($input['notif_sub'] ?? ''), $input, $this->policy, $this->db, $this->settings, $this->baseUrl);
+      if ($html === '') {
+        $html = CommercialNotificationsView::render(new CommercialNotificationsService($this->db, $this->policy), $this->policy);
+      }
     } elseif ($bucket === 'inmuebles') {
       $propertiesRepo = new CommercialPropertiesRepository($this->db);
       $canSeeAll = $this->policy->canSeeAll('inmuebles');
