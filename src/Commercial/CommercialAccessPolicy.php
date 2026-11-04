@@ -22,9 +22,9 @@ final class CommercialAccessPolicy
     'mis_tickets' => 'Mis tareas',
     'actualizaciones' => 'Actualizaciones de inmuebles',
     'avisos' => 'Avisos en fachada',
+    'promocion' => 'Promoción',
     'notificaciones' => 'Notificaciones comerciales',
     'herramientas' => 'Herramientas',
-    'promocion' => 'Promoción',
   ];
 
   public const ACTIONS = [
@@ -104,8 +104,8 @@ final class CommercialAccessPolicy
     'General' => ['inicio', 'calendario'],
     'Actividades comerciales' => ['precaptacion', 'anadir_aviso', 'actualizaciones', 'avisos', 'abiertos', 'mis_tickets', 'postergados', 'cerrados'],
     'Inventario' => ['inmuebles'],
-    'Comunicación y herramientas' => ['notificaciones', 'herramientas'],
     'Promoción' => ['promocion'],
+    'Comunicación y herramientas' => ['notificaciones', 'herramientas'],
   ];
 
   /**

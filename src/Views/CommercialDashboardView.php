@@ -1070,6 +1070,31 @@ final class CommercialDashboardView
         </div>
       <?php endif; ?>
 
+      <!-- Dropdown Promoción: una entrada por subpestaña de SUBVIEWS['promocion'] que el cargo puede abrir -->
+      <?php if (in_array('promocion', $views, true)): ?>
+        <div class="relative group/nav" data-commercial-dropdown="promocion">
+          <button type="button" class="flex items-center gap-space-xs px-2 xl:px-3 py-space-xs font-label-md text-label-md <?php echo $bucket === 'promocion' ? ($activeClasses . ' active') : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-tab="promocion" data-commercial-dropdown-trigger="promocion" aria-expanded="false">
+            <span class="material-symbols-outlined text-[16px]" aria-hidden="true">campaign</span>
+            <span>Promoción</span>
+            <span class="material-symbols-outlined text-[16px] group-hover/nav:rotate-180 transition-transform" aria-hidden="true">expand_more</span>
+          </button>
+          <div class="absolute right-0 top-full hidden group-hover/nav:block bg-surface-container-lowest shadow-[0_12px_32px_rgba(0,0,0,0.14)] rounded-2xl py-space-xs min-w-[260px] z-50 border border-outline-variant/30 text-on-surface" data-commercial-dropdown-menu="promocion">
+            <?php foreach (CommercialAccessPolicy::SUBVIEWS['promocion'] as $promoKey => $promoLabel): ?>
+              <?php if (!$policy instanceof CommercialAccessPolicy || $policy->canSubview('promocion', $promoKey)): ?>
+              <?php [$promoIcon, $promoHint] = self::promotionMenu($promoKey); ?>
+              <a class="flex items-center gap-2.5 px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="promocion" href="<?php echo esc_url(self::url($baseUrl, ['tab' => $promoKey])); ?>">
+                <span class="material-symbols-outlined text-[18px] text-secondary" aria-hidden="true"><?php echo esc_html($promoIcon); ?></span>
+                <div>
+                  <span class="block font-semibold text-on-surface"><?php echo esc_html($promoLabel); ?></span>
+                  <?php if ($promoHint !== ''): ?><span class="block text-[11px] text-secondary"><?php echo esc_html($promoHint); ?></span><?php endif; ?>
+                </div>
+              </a>
+              <?php endif; ?>
+            <?php endforeach; ?>
+          </div>
+        </div>
+      <?php endif; ?>
+
       <?php if (in_array('notificaciones', $views, true)): ?>
         <a class="flex items-center gap-space-xs px-2 xl:px-3 py-space-xs whitespace-nowrap font-label-md text-label-md <?php echo $bucket === 'notificaciones' ? ($activeClasses . ' active') : $inactiveClasses; ?>" data-commercial-tab="notificaciones" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'notificaciones'])); ?>"<?php echo $bucket === 'notificaciones' ? ' aria-current="page"' : ''; ?>>
           <span class="material-symbols-outlined text-[16px]" aria-hidden="true">campaign</span><span>Notificaciones</span>
@@ -1139,31 +1164,6 @@ final class CommercialDashboardView
               </div>
             </a>
             <?php endif; ?>
-          </div>
-        </div>
-      <?php endif; ?>
-
-      <!-- Dropdown Promoción: una entrada por subpestaña de SUBVIEWS['promocion'] que el cargo puede abrir -->
-      <?php if (in_array('promocion', $views, true)): ?>
-        <div class="relative group/nav" data-commercial-dropdown="promocion">
-          <button type="button" class="flex items-center gap-space-xs px-2 xl:px-3 py-space-xs font-label-md text-label-md <?php echo $bucket === 'promocion' ? ($activeClasses . ' active') : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-tab="promocion" data-commercial-dropdown-trigger="promocion" aria-expanded="false">
-            <span class="material-symbols-outlined text-[16px]" aria-hidden="true">campaign</span>
-            <span>Promoción</span>
-            <span class="material-symbols-outlined text-[16px] group-hover/nav:rotate-180 transition-transform" aria-hidden="true">expand_more</span>
-          </button>
-          <div class="absolute right-0 top-full hidden group-hover/nav:block bg-surface-container-lowest shadow-[0_12px_32px_rgba(0,0,0,0.14)] rounded-2xl py-space-xs min-w-[260px] z-50 border border-outline-variant/30 text-on-surface" data-commercial-dropdown-menu="promocion">
-            <?php foreach (CommercialAccessPolicy::SUBVIEWS['promocion'] as $promoKey => $promoLabel): ?>
-              <?php if (!$policy instanceof CommercialAccessPolicy || $policy->canSubview('promocion', $promoKey)): ?>
-              <?php [$promoIcon, $promoHint] = self::promotionMenu($promoKey); ?>
-              <a class="flex items-center gap-2.5 px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="promocion" href="<?php echo esc_url(self::url($baseUrl, ['tab' => $promoKey])); ?>">
-                <span class="material-symbols-outlined text-[18px] text-secondary" aria-hidden="true"><?php echo esc_html($promoIcon); ?></span>
-                <div>
-                  <span class="block font-semibold text-on-surface"><?php echo esc_html($promoLabel); ?></span>
-                  <?php if ($promoHint !== ''): ?><span class="block text-[11px] text-secondary"><?php echo esc_html($promoHint); ?></span><?php endif; ?>
-                </div>
-              </a>
-              <?php endif; ?>
-            <?php endforeach; ?>
           </div>
         </div>
       <?php endif; ?>
