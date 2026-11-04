@@ -70,7 +70,7 @@ final class CommercialDashboardController
     }
     $navigation = $repository->scopedNavigation($bucket, $filters, $currentEmployeeFilter, $policy);
     $tabCounts = $navigation['tabs'];
-    $result = in_array($bucket, ['actualizaciones', 'avisos', 'calendario', 'inmuebles', 'notificaciones', 'precaptacion', 'anadir_aviso', 'herramientas', 'promocion'], true) ? ['rows' => [], 'counts' => $repository->statusCounts($filters), 'pagination' => []] : $repository->search($bucket === 'inicio' ? 'abiertos' : $bucket, $filters);
+    $result = in_array($bucket, ['actualizaciones', 'avisos', 'calendario', 'inmuebles', 'notificaciones', 'precaptacion', 'anadir_aviso', 'herramientas'], true) ? ['rows' => [], 'counts' => $repository->statusCounts($filters), 'pagination' => []] : $repository->search($bucket === 'inicio' ? 'abiertos' : $bucket, $filters);
     $homeDashboard = $repository->homeDashboard($navigation['home'], $policy);
     $canSeeAll = $policy->canSeeAll('inmuebles');
     $propertiesRepository = new CommercialPropertiesRepository($this->db);
@@ -116,7 +116,6 @@ final class CommercialDashboardController
       'tools_service' => $bucket === 'herramientas' ? new \SCM\Commercial\CommercialOwnerPreapprovalService($this->db, $policy) : null,
       'tools_view' => $bucket === 'herramientas' ? (string) ($input['herramienta'] ?? '') : '',
       'tools_context' => $bucket === 'herramientas' ? \SCM\Views\CommercialToolsView::context((string) ($input['herramienta'] ?? ''), $policy, $this->db, $this->settings) : [],
-      'promotion_html' => $bucket === 'promocion' ? \SCM\Views\Promotion\PromotionView::page($input, $policy, $this->db, $this->settings, (string) SCM_BASE_URL) : '',
       'visible_views' => $visibleViews,
       'ticket_employees' => $ticketEmployees,
       'commercial_employee_cargos' => $commercialEmployeeCargos,

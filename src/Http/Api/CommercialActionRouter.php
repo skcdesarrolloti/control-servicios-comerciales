@@ -5,58 +5,20 @@ declare(strict_types=1);
 namespace SCM\Http\Api;
 
 use SCM\Http\Controller\CommercialApiController;
-use SCM\Http\Controller\PromotionApiController;
 
 final class CommercialActionRouter
 {
-  /** Endpoints de la pestaña Promoción: los atiende PromotionApiController, que se crea solo cuando se piden. */
-  public const PROMOTION_ACTIONS = [
-    'commercial_promo_meeting_save' => 'meetingSave',
-    'commercial_promo_meeting_item_save' => 'itemSave',
-    'commercial_promo_meeting_item_move' => 'itemMove',
-    'commercial_promo_meeting_item_archive' => 'itemArchive',
-    'commercial_promo_meeting_action_status' => 'actionStatus',
-    'commercial_promo_meeting_start' => 'meetingStart',
-    'commercial_promo_meeting_complete' => 'meetingComplete',
-    'commercial_promo_meeting_reopen' => 'meetingReopen',
-    'commercial_promo_meeting_archive' => 'meetingArchive',
-    'commercial_promo_meeting_delete' => 'meetingDelete',
-  ];
-
   private CommercialApiController $controller;
-  /** @var (\Closure():PromotionApiController)|null */
-  private ?\Closure $promotion;
 
-  /** @param (\Closure():PromotionApiController)|null $promotion */
-  public function __construct(CommercialApiController $controller, ?\Closure $promotion = null)
+  public function __construct(CommercialApiController $controller)
   {
     $this->controller = $controller;
-    $this->promotion = $promotion;
   }
 
   /** @param array<string,mixed> $input */
   public function dispatch(string $action, array $input): bool
   {
-    if (isset(self::PROMOTION_ACTIONS[$action])) {
-      if ($this->promotion === null) {
-        return false;
-      }
-      $target = ($this->promotion)();
-      $method = self::PROMOTION_ACTIONS[$action];
-    } else {
-      $target = $this->controller;
-      $method = self::controllerMethod($action);
-    }
-    if ($method === null) {
-      return false;
-    }
-    $target->{$method}($input);
-    return true;
-  }
-
-  private static function controllerMethod(string $action): ?string
-  {
-    return [
+    $method = [
       'commercial_tickets_filter' => 'filterTickets',
       'commercial_ticket_detail' => 'ticketDetail',
       'commercial_ticket_analyze' => 'analyzeTicket',
@@ -116,5 +78,10 @@ final class CommercialActionRouter
       'commercial_highlight_release' => 'releaseHighlight',
       'commercial_highlight_toggle_premium' => 'togglePremium',
     ][$action] ?? null;
+    if ($method === null) {
+      return false;
+    }
+    $this->controller->{$method}($input);
+    return true;
   }
 }

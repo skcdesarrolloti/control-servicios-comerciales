@@ -6,12 +6,10 @@ parameters:
     - src/Controllers/CommercialDashboardController.php
     - src/Http/Api/CommercialActionRouter.php
     - src/Http/Controller/CommercialApiController.php
-    - src/Http/Controller/PromotionApiController.php
     - src/Http/Response
     - src/Views/CommercialDashboardView.php
     - src/Views/CommercialGuideView.php
     - src/Views/CommercialTicketModalView.php
     - src/Views/CommercialNotificationsView.php
-    - src/Views/Promotion
   bootstrapFiles:
     - tests/phpstan-bootstrap.php

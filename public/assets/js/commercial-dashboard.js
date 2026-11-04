@@ -459,11 +459,9 @@
     return "inicio";
   }
 
-  // Las herramientas y las secciones de Promoción son pestañas propias (?tab=simulador_ingreso_neto, ?tab=reuniones)
-  // dentro de su grupo del menú (CommercialAccessPolicy::SUBVIEWS de herramientas y promocion).
+  // Las herramientas son pestañas propias (?tab=simulador_ingreso_neto) dentro del grupo Herramientas del menú.
   function topTabFor(tab) {
     if (["simulador_ingreso_neto", "ganancia_ocasional", "calculadora_mercado", "calculadora_aseo", "generador_utm"].indexOf(tab) >= 0) return "herramientas";
-    if (["reuniones"].indexOf(tab) >= 0) return "promocion";
     // Tareas, precaptación, avisos y actualizaciones van dentro del menú Actividades comerciales.
     return ["abiertos", "postergados", "cerrados", "mis_tickets", "precaptacion", "anadir_aviso", "actualizaciones", "avisos"].indexOf(tab) >= 0 ? "comerciales" : tab;
   }
@@ -569,20 +567,6 @@
     else window.history.pushState({ commercial: true }, "", next);
   }
 
-  // Los módulos que llegan por AJAX (Promoción) piden su script con data-commercial-module-script; se carga una sola vez.
-  function loadModuleScripts(container) {
-    if (!container) return;
-    container.querySelectorAll("[data-commercial-module-script]").forEach(function (node) {
-      var src = node.getAttribute("data-commercial-module-script") || "";
-      if (!src || document.querySelector('script[data-commercial-module-src="' + src.replace(/"/g, "") + '"]')) return;
-      var script = document.createElement("script");
-      script.src = src;
-      script.defer = true;
-      script.setAttribute("data-commercial-module-src", src);
-      document.body.appendChild(script);
-    });
-  }
-
   function loadTickets(url, options) {
     options = options || {};
     var nextUrl = normalizedUrl(url);
@@ -633,7 +617,6 @@
       "ciudad",
       "id_funcionario",
       "page",
-      "reunion", "modo", "reunion_q", "reunion_estado",
     ].forEach(function (key) {
       data.append(key, nextUrl.searchParams.get(key) || "");
     });
@@ -650,7 +633,6 @@
         if (options.history !== false) updateHistory(nextUrl, !!options.replace);
         maybeAutoOpenAdvisory();
         initHomeControls();
-        loadModuleScripts(ticketsPanel);
         if (typeof window.initCommercialNotifications === "function") {
           window.initCommercialNotifications(ticketsPanel);
         }
@@ -763,11 +745,6 @@
   }
 
   root.addEventListener("scm:task-updated", function () { loadTickets(window.location.href, { history: false, focus: false }); });
-  // Un módulo (Promoción) pide abrir otra pantalla del panel sin recargar la página: detail.url y detail.replace.
-  root.addEventListener("scm:load-tab", function (event) {
-    var detail = (event && event.detail) || {};
-    loadTickets(detail.url || window.location.href, { history: detail.url ? true : false, replace: !!detail.replace, focus: false });
-  });
 
   function closeWorkflows() {
     if (!caseContent) return;
@@ -1855,7 +1832,6 @@
     }
   });
 
-  loadModuleScripts(ticketsPanel);
   window.addEventListener("popstate", function () {
     var url = normalizedUrl(window.location.href);
     loadTickets(url.href, { history: false, focus: true });
