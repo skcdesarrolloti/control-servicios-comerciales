@@ -83,7 +83,7 @@ final class CommercialMediosTest extends TestCase
     $resolver = new MedioResolver(MedioSeed::rows());
     foreach ([
       'finca raiz' => 'Finca Raíz', 'FINCA-RAIZ' => 'Finca Raíz', 'finca_raiz' => 'Finca Raíz', 'Estado WhatsApp' => 'Estado whatsapp',
-      'Retencion de contrato' => 'Retencion', 'Retención de contrato' => 'Retencion', 'Ruta' => 'Por ruta', 'por_ruta' => 'Por ruta',
+      'Retencion de contrato' => 'Retencion de contrato', 'Retención de contrato' => 'Retencion de contrato', 'Retencion' => 'Retencion', 'Ruta' => 'Por ruta', 'por_ruta' => 'Por ruta',
       'ig' => 'Instagram', 'Portal Propietario' => 'Portal propietario', 'Historia Instagram' => 'Historia instagram', ' Referido ' => 'Referido',
       'Correo Electrónico' => 'Correo', 'Email' => 'Correo', 'chatgpt.com' => 'ChatGPT / IA', 'chatgpt_ia' => 'ChatGPT / IA',
     ] as $raw => $name) {
@@ -141,7 +141,7 @@ final class CommercialMediosTest extends TestCase
     self::assertSame(MedioSchema::VERSION, $this->settings->get(MedioSchema::SETTING));
     self::assertSame(0, $catalog->seed(), 'La lista solo se siembra una vez.');
     self::assertSame(array_keys(MedioSeed::ROWS), array_column($catalog->all(), 'nombre'));
-    self::assertSame(['Retencion de contrato'], $catalog->all()[27]['aliases']);
+    self::assertSame([], $catalog->all()[27]['aliases'], 'Retencion y Retencion de contrato son medios distintos.');
     // El glosario queda con exactamente los medios activos, en el formato de JetEngine.
     self::assertSame(array_keys(MedioSeed::ROWS), CommercialMediosDatabase::glossary($this->db));
     $items = unserialize((string) $this->db->getVar('SELECT meta_fields FROM wp_jet_post_types WHERE id = 195'), ['allowed_classes' => false]);
@@ -255,7 +255,7 @@ final class CommercialMediosTest extends TestCase
     $unresolved = $catalog->unresolved();
     self::assertSame([['value' => 'Valor raro', 'total' => 2, 'tables' => ['jet_cct_tickets' => 1, 'jet_cct_estudios_aseguradoras' => 1]]], $unresolved['records']);
     $variants = array_column($unresolved['variants'], null, 'value');
-    self::assertSame(['medio' => 'Retencion', 'total' => 3], ['medio' => $variants['Retencion de contrato']['medio'], 'total' => $variants['Retencion de contrato']['total']]);
+    self::assertArrayNotHasKey('Retencion de contrato', $variants, 'Retencion de contrato es un medio propio: no se reescribe.');
     self::assertSame('Por ruta', $variants['Ruta']['medio']);
     self::assertSame('Portal propietario', $variants['Portal Propietario']['medio']);
     self::assertSame(['Base de Datos Propietarios'], array_column($unresolved['visits'], 'value'));
@@ -325,36 +325,36 @@ final class CommercialMediosTest extends TestCase
     }
     self::assertStringContainsString('No se escribe nada en la base.', $output);
     self::assertStringContainsString('la tabla wp_scm_medios no existe todavía', $output);
-    self::assertStringContainsString('Se agregan: Portal arrendatario, Portal propietario, Portal copropiedad, Panel administrativo, WhatsApp cliente, WhatsApp Guardian, Otro, SMS, WhatsApp, ChatGPT / IA.', $output);
-    self::assertStringContainsString("  wp_jet_cct_tickets.medio\n    \"Portal Propietario\" -> \"Portal propietario\": 1 filas\n    \"Retencion de contrato\" -> \"Retencion\": 2 filas\n    \"Ruta\" -> \"Por ruta\": 1 filas", $output);
+    self::assertStringContainsString('Se agregan: Portal arrendatario, Portal propietario, Portal copropiedad, Panel administrativo, Retencion de contrato, WhatsApp cliente, WhatsApp Guardian, Otro, SMS, WhatsApp, ChatGPT / IA.', $output);
+    self::assertStringContainsString("  wp_jet_cct_tickets.medio\n    \"Portal Propietario\" -> \"Portal propietario\": 1 filas\n    \"Ruta\" -> \"Por ruta\": 1 filas", $output);
     self::assertStringContainsString("  wp_jet_cct_tracker_logs.utm_source\n    \"Estado WhatsApp\" -> \"Estado whatsapp\": 1 filas\n    \"chatgpt.com\" -> \"ChatGPT / IA\": 1 filas\n    \"ig\" -> \"Instagram\": 1 filas", $output);
     self::assertStringContainsString("  wp_jet_cct_tracker_logs.utm_medium\n    \"Correo Electrónico\" -> \"Correo\": 1 filas", $output);
-    self::assertStringContainsString('Total: 6 filas en registros y 4 en visitas web.', $output);
+    self::assertStringContainsString('Total: 3 filas en registros y 4 en visitas web.', $output);
     self::assertStringContainsString('registros "Valor raro": 2', $output);
     self::assertStringNotContainsString('"Directo"', $output);
 
     [$code, $output] = $this->normalize(['--apply'], true);
     self::assertSame(0, $code, $output);
     $values = CommercialMediosDatabase::values($this->db);
-    self::assertSame(['Referido', 'Retencion', 'Retencion', 'Por ruta', 'Portal arrendatario', 'Portal propietario', 'Retencion', 'Panel administrativo', 'Valor raro', ''], $values['jet_cct_tickets']);
+    self::assertSame(['Referido', 'Retencion de contrato', 'Retencion de contrato', 'Por ruta', 'Portal arrendatario', 'Portal propietario', 'Retencion', 'Panel administrativo', 'Valor raro', ''], $values['jet_cct_tickets']);
     self::assertSame(['WhatsApp Guardian', 'Por ruta'], $values['jet_cct_solicitudes_no_prorroga_contrato']);
     self::assertSame(CommercialMediosDatabase::RECORDS['jet_cct_cct_llamadas'], $values['jet_cct_cct_llamadas'], 'Vacíos, NULL y nombres exactos no cambian.');
     self::assertSame([['Instagram', 'social'], ['Estado whatsapp', 'WhatsApp'], ['Base de Datos Clientes', 'Correo'], ['Directo', 'Navegador'], ['ChatGPT / IA', ''], ['Inmuebles', 'Pagina Web']],
       array_map(static fn(array $row): array => [$row['utm_source'], $row['utm_medium']], $this->db->getResults('SELECT utm_source, utm_medium FROM wp_jet_cct_tracker_logs ORDER BY _ID')));
     self::assertSame(array_keys(MedioSeed::ROWS), CommercialMediosDatabase::glossary($this->db));
     $logId = (int) $this->db->getVar("SELECT id FROM wp_scm_medios_log WHERE action = 'normalize'");
-    self::assertSame(10, (int) $this->db->getVar('SELECT COUNT(*) FROM wp_scm_medios_backup WHERE log_id = ?', [$logId]));
+    self::assertSame(7, (int) $this->db->getVar('SELECT COUNT(*) FROM wp_scm_medios_backup WHERE log_id = ?', [$logId]));
     self::assertStringContainsString('--revert=' . $logId, $output);
 
     [, $again] = $this->normalize(['--apply'], true);
     self::assertStringContainsString('No hay valores por normalizar.', $again);
 
     // Revertir devuelve cada fila a su valor anterior (solo las que siguen con el valor que les puso ese paso).
-    $this->db->update('wp_jet_cct_tickets', ['medio' => 'Aviso'], ['_ID' => 2]);
+    $this->db->update('wp_jet_cct_tickets', ['medio' => 'Aviso'], ['_ID' => 4]);
     [$code, $output] = $this->normalize(['--revert=' . $logId], true);
     self::assertSame(0, $code, $output);
     $values = CommercialMediosDatabase::values($this->db);
-    self::assertSame(['Referido', 'Aviso', 'Retencion de contrato', 'Ruta', 'Portal arrendatario', 'Portal Propietario', 'Retencion', 'Panel administrativo', 'Valor raro', ''], $values['jet_cct_tickets']);
+    self::assertSame(['Referido', 'Retencion de contrato', 'Retencion de contrato', 'Aviso', 'Portal arrendatario', 'Portal Propietario', 'Retencion', 'Panel administrativo', 'Valor raro', ''], $values['jet_cct_tickets']);
     self::assertSame('ig', $this->db->getVar('SELECT utm_source FROM wp_jet_cct_tracker_logs WHERE _ID = 1'));
     self::assertStringContainsString('1 omitidas', $output);
 
@@ -516,7 +516,7 @@ final class CommercialMediosTest extends TestCase
     $id = $this->idOf($catalog, 'Volante');
     self::assertStringContainsString('Alias guardados (1)', $service->save('medios', ['op' => 'aliases', 'id' => $id, 'aliases' => ['Flyer']]));
     self::assertStringContainsString('desactivado', $service->save('medios', ['op' => 'toggle', 'id' => $id, 'active' => 0]));
-    self::assertStringContainsString('3 registros', $service->save('medios', ['op' => 'merge', 'id' => $this->idOf($catalog, 'Retencion'), 'target' => $this->idOf($catalog, 'Cesion')]) . $service->save('medios', ['op' => 'rewrite_raw', 'value' => 'Retencion de contrato', 'target' => $this->idOf($catalog, 'Cesion')]));
+    self::assertStringContainsString('3 registros', $service->save('medios', ['op' => 'merge', 'id' => $this->idOf($catalog, 'Retencion de contrato'), 'target' => $this->idOf($catalog, 'Cesion')]));
     foreach ([['op' => 'borrar'], ['op' => 'rename', 'id' => $id, 'nombre' => ''], ['op' => 'merge', 'id' => $id, 'target' => $id], ['op' => 'alias_raw', 'value' => '', 'target' => $id], ['op' => 'add', 'nombre' => 'Sin medio (directo)']] as $data) {
       try {
         $service->save('medios', $data);

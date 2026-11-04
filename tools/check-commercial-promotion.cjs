@@ -239,10 +239,11 @@ function daysBetween(from, to) {
     assert.equal(await medios.locator('[data-medios-not-ready]').count(), 0);
     assert.ok(await medios.locator('[data-medio-row]').count() >= 42);
     assert.match(await medios.locator('[data-medio-row="Finca Raíz"]').innerText(), /finca_raiz[\s\S]*\b2\b/);
-    assert.match(await medios.locator('[data-medio-row="Retencion"]').innerText(), /Retencion de contrato/);
+    assert.match(await medios.locator('[data-medio-row="Por ruta"]').innerText(), /Ruta/);
+    assert.equal(await medios.locator('[data-medio-row="Retencion de contrato"]').count(), 1);
     // Valores sin reconocer: en los registros, escritos distinto y en las visitas web.
     assert.match(await medios.locator('[data-medios-raw-row="Valor raro"][data-kind="records"]').innerText(), /Llamadas: 2/);
-    assert.equal(await medios.locator('[data-medios-raw-row="Retencion de contrato"][data-kind="variants"]').count(), 1);
+    assert.equal(await medios.locator('[data-medios-raw-row="Retencion de contrato"][data-kind="variants"]').count(), 0);
     assert.equal(await medios.locator('[data-medios-raw-row="Google"][data-kind="visits"] [data-medios-raw="rewrite"]').count(), 0);
     const mediosStatus = medios.locator('[data-medios-status]');
 
