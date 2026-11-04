@@ -162,4 +162,232 @@
       if (next) next.disabled = state.index + 1 >= state.cursors.length;
     }
   }
+
+  // ── Material POP ──────────────────────────────────────────────────────────
+  // Adaptación de los modales de dashboard-marketing views/inventory.php: cada formulario abre en un <dialog> de la
+  // misma pantalla, guarda por AJAX (commercial_pop_*) y, al terminar, vuelve a cargar la sección con los datos nuevos.
+  function notify(type, message) {
+    var core = window.SCMAdminCore || {};
+    if (typeof core.scmNotify === "function") core.scmNotify(type, message);
+    else announce(document.querySelector(".cpr"), message);
+  }
+
+  function dialogFor(name) {
+    return document.querySelector('[data-pop-dialog="' + name + '"]');
+  }
+
+  function openDialog(dialog) {
+    var error = dialog.querySelector("[data-pop-error]");
+    if (error) { error.hidden = true; error.textContent = ""; }
+    if (typeof dialog.showModal === "function") dialog.showModal();
+    else dialog.setAttribute("open", "");
+    var first = dialog.querySelector("input:not([type=hidden]):not([disabled]), select, textarea");
+    if (first) first.focus();
+  }
+
+  function closeDialog(dialog) {
+    if (dialog && typeof dialog.close === "function") dialog.close();
+    else if (dialog) dialog.removeAttribute("open");
+  }
+
+  function productData(button) {
+    try { return JSON.parse(button.getAttribute("data-product") || "{}") || {}; } catch (_error) { return {}; }
+  }
+
+  function setField(form, name, value) {
+    var field = form.querySelector('[name="' + name + '"]');
+    if (!field) return;
+    if (field.type === "checkbox") field.checked = !!value;
+    else field.value = value == null ? "" : String(value);
+  }
+
+  function localNow() {
+    var now = new Date();
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    return now.toISOString().slice(0, 16);
+  }
+
+  function addLine(dialog) {
+    var template = dialog.querySelector("[data-pop-line-template]");
+    var list = dialog.querySelector("[data-pop-line-list]");
+    list.appendChild(template.content.cloneNode(true));
+    var lines = list.querySelectorAll("[data-pop-line]");
+    lines.forEach(function (line) { line.querySelector("[data-pop-line-remove]").hidden = lines.length === 1; });
+    return lines[lines.length - 1];
+  }
+
+  var opener = {
+    product: function (button) {
+      var dialog = dialogFor("product");
+      var form = dialog.querySelector("form");
+      var data = button.hasAttribute("data-product") ? productData(button) : {};
+      var editing = Number(data.id || 0) > 0;
+      form.reset();
+      dialog.querySelector("[data-pop-title]").textContent = editing ? "Editar producto" : "Agregar producto";
+      dialog.querySelectorAll("[data-pop-create-only]").forEach(function (node) { node.hidden = editing; });
+      ["id", "name", "sku", "unit", "minimum_stock", "price", "points", "description"].forEach(function (name) {
+        if (editing || name === "id") setField(form, name, name === "id" ? (data.id || 0) : data[name]);
+      });
+      if (editing) {
+        var type = form.querySelector('[name="type"]');
+        if (data.type && !Array.prototype.some.call(type.options, function (option) { return option.value === data.type; })) {
+          // La categoría del producto ya no está en la lista de Configuración: se conserva para no cambiarla sin querer.
+          type.add(new Option(data.type, data.type));
+        }
+        type.value = data.type || "";
+        setField(form, "sync_pph", data.sync_pph);
+      }
+      dialog.querySelector("[data-pop-image-hint]").textContent = editing && data.image_url ? "JPG, PNG o WebP. Si no eliges otra, se conserva la actual." : "JPG, PNG o WebP.";
+      openDialog(dialog);
+    },
+    adjust: function (button) {
+      var dialog = dialogFor("adjust");
+      var form = dialog.querySelector("form");
+      var data = productData(button);
+      form.reset();
+      setField(form, "product_id", data.id);
+      dialog.querySelector("[data-pop-lead]").textContent = data.name + ": hay " + data.quantity + " " + (data.unit || "unidad") + ".";
+      openDialog(dialog);
+    },
+    delivery: function () {
+      var dialog = dialogFor("delivery");
+      var form = dialog.querySelector("form");
+      form.reset();
+      dialog.querySelector("[data-pop-line-list]").innerHTML = "";
+      addLine(dialog);
+      form.querySelector("[data-pop-now]").value = localNow();
+      form.querySelector("[data-pop-now]").max = localNow();
+      openDialog(dialog);
+    },
+    archive: function (button) { confirmDialog("commercial_pop_product_active", "Archivar producto", productData(button), false); },
+    restore: function (button) { confirmDialog("commercial_pop_product_active", "Reactivar producto", productData(button), true); },
+    cancel: function (button) {
+      var dialog = dialogFor("confirm");
+      var form = dialog.querySelector("form");
+      form.reset();
+      form.setAttribute("data-pop-form", "commercial_pop_delivery_cancel");
+      setField(form, "delivery_id", button.getAttribute("data-delivery"));
+      setField(form, "product_id", "");
+      dialog.querySelector("[data-pop-title]").textContent = "Anular entrega";
+      dialog.querySelector("[data-pop-lead]").textContent = button.getAttribute("data-label") || "";
+      dialog.querySelector("[data-pop-confirm-text]").textContent = "Entiendo que la entrega queda anulada y sus productos vuelven a las existencias. Queda el registro con el motivo.";
+      openDialog(dialog);
+    },
+  };
+
+  function confirmDialog(action, title, data, active) {
+    var dialog = dialogFor("confirm");
+    var form = dialog.querySelector("form");
+    form.reset();
+    form.setAttribute("data-pop-form", action);
+    setField(form, "product_id", data.id);
+    setField(form, "delivery_id", "");
+    setField(form, "active", active ? "1" : "0");
+    dialog.querySelector("[data-pop-title]").textContent = title;
+    dialog.querySelector("[data-pop-lead]").textContent = data.name || "";
+    dialog.querySelector("[data-pop-confirm-text]").textContent = active
+      ? "Entiendo que el producto vuelve a ofrecerse para entregas."
+      : "Entiendo que el producto deja de ofrecerse para entregas. Sus existencias y su historial se conservan.";
+    openDialog(dialog);
+  }
+
+  document.addEventListener("click", function (event) {
+    var target = event.target;
+    if (!target || !target.closest || !target.closest(".cpr, .cpr-dialog")) return;
+    var open = target.closest("[data-pop-open]");
+    if (open) {
+      event.preventDefault();
+      var kind = open.getAttribute("data-pop-open");
+      if (opener[kind]) opener[kind](open);
+      return;
+    }
+    if (target.closest("[data-pop-close]")) { closeDialog(target.closest("dialog")); return; }
+    var photo = target.closest("[data-pop-photo]");
+    if (photo) {
+      var viewer = dialogFor("photo");
+      viewer.querySelector("[data-pop-photo-img]").src = photo.getAttribute("data-pop-photo");
+      openDialog(viewer);
+      return;
+    }
+    if (target.closest("[data-pop-line-add]")) { addLine(target.closest("dialog")).querySelector("select").focus(); return; }
+    var remove = target.closest("[data-pop-line-remove]");
+    if (remove) {
+      var dialog = remove.closest("dialog");
+      remove.closest("[data-pop-line]").remove();
+      var lines = dialog.querySelectorAll("[data-pop-line]");
+      lines.forEach(function (line) { line.querySelector("[data-pop-line-remove]").hidden = lines.length === 1; });
+      return;
+    }
+    var sync = target.closest("[data-pop-sync]");
+    if (sync) {
+      event.preventDefault();
+      sync.disabled = true;
+      request("commercial_pop_sync", {}).then(function (data) {
+        notify("success", data.message);
+        navigate("");
+      }).catch(function (error) {
+        notify("error", error.message);
+        sync.disabled = false;
+      });
+    }
+  });
+
+  // Destinatario: con un funcionario de la lista se guarda su id_empleado; al escribir otro nombre se borra.
+  document.addEventListener("input", function (event) {
+    var input = event.target;
+    if (!input || !input.matches || !input.matches("[data-pop-recipient]")) return;
+    var form = input.form;
+    var match = Array.prototype.find.call(document.querySelectorAll("#cpr-pop-people option"), function (option) { return option.value === input.value; });
+    form.querySelector('[name="recipient_id"]').value = match ? match.getAttribute("data-id") : "";
+    if (match) form.querySelector("[data-pop-recipient-type]").value = "Funcionario";
+  });
+
+  document.addEventListener("submit", async function (event) {
+    var form = event.target.closest && event.target.closest("form[data-pop-form]");
+    if (!form) return;
+    event.preventDefault();
+    var dialog = form.closest("dialog");
+    var error = form.querySelector("[data-pop-error]");
+    var submit = form.querySelector('[type="submit"]');
+    var fail = function (message) {
+      error.textContent = message;
+      error.hidden = false;
+    };
+    if (!form.reportValidity()) return;
+    var tooMany = Array.prototype.find.call(form.querySelectorAll("input[type=file][data-pop-max]"), function (input) {
+      return input.files && input.files.length > Number(input.getAttribute("data-pop-max"));
+    });
+    if (tooMany) { fail(tooMany.getAttribute("data-pop-max") === "1" ? "Elige una sola imagen." : "Puedes adjuntar máximo " + tooMany.getAttribute("data-pop-max") + " fotos."); return; }
+    var data = new FormData(form);
+    if (form.querySelector("[data-pop-lines]")) {
+      var items = [];
+      var stockError = "";
+      form.querySelectorAll("[data-pop-line]").forEach(function (line) {
+        var select = line.querySelector("[data-pop-line-product]");
+        var quantity = Number(line.querySelector("[data-pop-line-quantity]").value || 0);
+        var option = select.options[select.selectedIndex];
+        if (option && quantity > Number(option.getAttribute("data-stock") || 0)) stockError = "No hay suficientes unidades de " + option.textContent.split(" — ")[0] + ".";
+        items.push({ product_id: Number(select.value), quantity: quantity });
+      });
+      if (stockError) { fail(stockError); return; }
+      data.set("items", JSON.stringify(items));
+    }
+    data.set("action", form.getAttribute("data-pop-form"));
+    data.set("nonce", runtime.nonce || "");
+    submit.disabled = true;
+    error.hidden = true;
+    try {
+      var response = await fetch(runtime.ajaxUrl || "api.php", { method: "POST", body: data, credentials: "same-origin" });
+      var json = null;
+      try { json = await response.json(); } catch (_error) { json = null; }
+      if (!response.ok || !json || !json.success) throw new Error((json && json.data && json.data.message) || "No se pudo guardar. Intenta de nuevo.");
+      closeDialog(dialog);
+      notify("success", json.data.message || "Cambio guardado.");
+      navigate("");
+    } catch (problem) {
+      fail(problem.message);
+    } finally {
+      submit.disabled = false;
+    }
+  });
 })();

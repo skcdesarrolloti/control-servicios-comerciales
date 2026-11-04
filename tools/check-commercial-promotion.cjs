@@ -59,9 +59,10 @@ function daysBetween(from, to) {
     await page.mouse.click(5, 880);
     await page.setViewportSize({ width: 1440, height: 1000 });
     const menuLinks = page.locator('[data-commercial-dropdown-menu="promocion"] a');
-    assert.equal(await menuLinks.count(), 2);
+    assert.equal(await menuLinks.count(), 3);
     assert.match(await menuLinks.nth(0).getAttribute('href'), /[?&]tab=analitica_web$/);
     assert.match(await menuLinks.nth(1).getAttribute('href'), /[?&]tab=actividad_portales$/);
+    assert.match(await menuLinks.nth(2).getAttribute('href'), /[?&]tab=material_pop$/);
     assert.match(await page.locator('[data-commercial-dropdown-menu="promocion"]').innerText(), /Visitas, campañas y medios del sitio/);
     await page.locator('[data-commercial-dropdown-trigger="promocion"]').click();
     await menuLinks.nth(0).click();
@@ -390,6 +391,95 @@ function daysBetween(from, to) {
       assert.equal(await other.locator('[data-cpr-recent] thead th', { hasText: /^IP$/ }).count(), 1);
     } finally {
       await ipContext.close();
+    }
+
+    // ── Material POP (13): entrega con dos productos, anulación con motivo, producto nuevo y Configuración ────────
+    const popContext = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+    try {
+      const pop = await popContext.newPage();
+      const popWatch = watch(pop);
+      await pop.goto(FIXTURE + '?cargo=13&tab=material_pop');
+      await pop.locator('[data-pop-stats]').waitFor();
+      assert.ok((await pop.locator('[data-pop-stats]').innerText()).includes('Valor del inventario'));
+      assert.equal(await pop.locator('[data-commercial-dropdown-menu="promocion"] a', { hasText: 'Material POP' }).count(), 1);
+      const card = name => pop.locator('[data-pop-products] article', { has: pop.locator('h3', { hasText: new RegExp('^' + name + '$') }) });
+      assert.ok((await card('Llaveros').innerText()).includes('12 unidad'));
+
+      await pop.locator('[data-pop-open="delivery"]').click();
+      const delivery = pop.locator('[data-pop-dialog="delivery"]');
+      await delivery.waitFor({ state: 'visible' });
+      await delivery.locator('[data-pop-recipient]').fill('Coordinadora de mercadeo');
+      assert.equal(await delivery.locator('[name="recipient_id"]').inputValue(), '505');
+      assert.equal(await delivery.locator('[name="recipient_type"]').inputValue(), 'Funcionario');
+      await delivery.locator('[data-pop-line-product]').first().selectOption({ label: 'Llaveros — 12 disponibles' });
+      await delivery.locator('[data-pop-line-quantity]').first().fill('2');
+      await delivery.locator('[data-pop-line-add]').click();
+      await delivery.locator('[data-pop-line-product]').nth(1).selectOption({ label: 'Gorras — 40 disponibles' });
+      await delivery.locator('[data-pop-line-quantity]').nth(1).fill('50');
+      await delivery.locator('button[type=submit]').click();
+      assert.ok((await delivery.locator('[data-pop-error]').innerText()).includes('No hay suficientes unidades de Gorras'));
+      await delivery.locator('[data-pop-line-quantity]').nth(1).fill('3');
+      await delivery.locator('button[type=submit]').click();
+      await delivery.waitFor({ state: 'hidden' });
+      await pop.waitForFunction(() => /10 unidad/.test((document.querySelector('[data-pop-product="1"]') || {}).innerText || ''));
+      assert.ok((await card('Gorras').innerText()).includes('37 unidad'));
+
+      await pop.locator('.cpr-tab', { hasText: 'Entregas' }).click();
+      const row = pop.locator('[data-pop-deliveries] tr', { hasText: 'Coordinadora de mercadeo' });
+      await row.waitFor();
+      assert.ok((await row.innerText()).includes('Llaveros × 2'));
+      await row.locator('[data-pop-open="cancel"]').click();
+      const confirm = pop.locator('[data-pop-dialog="confirm"]');
+      await confirm.waitFor({ state: 'visible' });
+      await confirm.locator('[name="reason"]').fill('Registrada por error');
+      await confirm.locator('[name="confirm"]').check();
+      await confirm.locator('button[type=submit]').click();
+      await confirm.waitFor({ state: 'hidden' });
+      await pop.locator('[data-pop-deliveries] tr', { hasText: 'Registrada por error' }).waitFor();
+      assert.ok((await pop.locator('[data-pop-deliveries] tr', { hasText: 'Coordinadora de mercadeo' }).innerText()).includes('Anulada'));
+
+      await pop.locator('.cpr-tab', { hasText: 'Existencias' }).click();
+      await card('Llaveros').waitFor();
+      assert.ok((await card('Llaveros').innerText()).includes('12 unidad'));
+      await pop.locator('[data-pop-open="product"]').first().click();
+      const product = pop.locator('[data-pop-dialog="product"]');
+      await product.waitFor({ state: 'visible' });
+      await product.locator('[name="name"]').fill('Termos');
+      await product.locator('[name="type"]').selectOption('merchandising');
+      await product.locator('[name="initial_quantity"]').fill('5');
+      await product.locator('[name="price"]').fill('15000');
+      await product.locator('button[type=submit]').click();
+      await product.waitFor({ state: 'hidden' });
+      await card('Termos').waitFor();
+      assert.ok((await card('Termos').innerText()).includes('$15.000'));
+
+      // Configuración › Material POP desde el menú del encabezado.
+      await pop.locator('#commercial-config-trigger').click();
+      await pop.locator('[data-commercial-config-action="material_pop"]').click();
+      await pop.locator('textarea[name="categories"]').waitFor();
+      assert.ok((await pop.locator('.swal2-popup').innerText()).includes('Coordinadora de mercadeo'));
+      await pop.locator('.swal2-cancel').click();
+
+      // Celular: sin desplazamiento horizontal y la ventana de entrega cabe en la pantalla.
+      await pop.setViewportSize({ width: 390, height: 844 });
+      assert.equal(await noHorizontalScroll(pop), true);
+      await pop.locator('[data-pop-open="delivery"]').click();
+      const box = await delivery.boundingBox();
+      assert.ok(box && box.x >= 0 && box.x + box.width <= 390, 'La entrega se sale en celular: ' + JSON.stringify(box));
+      await delivery.locator('[data-pop-close]').first().click();
+      await pop.screenshot({ path: 'output/material-pop-mobile.png', fullPage: false });
+      assert.deepEqual(popWatch.errors, []);
+
+      // Solo ve (7): sin botones de acción y el servidor rechaza la entrega.
+      const viewer = await popContext.newPage();
+      await viewer.goto(FIXTURE + '?cargo=7&tab=material_pop');
+      await viewer.locator('[data-pop-stats]').waitFor();
+      assert.equal(await viewer.locator('[data-pop-open]').count(), 0);
+      assert.ok(!(await viewer.locator('[data-pop-stats]').innerText()).includes('Valor del inventario'));
+      const denied = await post(viewer, { action: 'commercial_pop_delivery_create', recipient_name: 'X', delivered_at: '2026-11-03 10:00', items: '[{"product_id":1,"quantity":1}]' });
+      assert.equal(denied.status, 403);
+    } finally {
+      await popContext.close();
     }
 
     // ── Solo Actividad de portales (8): el menú y el servidor respetan la subpestaña ──────────────────────────────

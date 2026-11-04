@@ -49,11 +49,14 @@ final class CommercialAccessPolicy
     'mercado_vista_completa' => 'Calculadora de mercado: estadística completa y tabla de inmuebles',
     'aseo_vista_interna' => 'Calculadora de aseo: costos, márgenes, utilidades y PDF internos',
     'promocion_ver_ip' => 'Promoción: ver IP y navegador en logs y actividad de portales',
+    'pop_gestionar' => 'Material POP: crear y editar productos, ajustar existencias y registrar entregas',
+    'pop_anular' => 'Material POP: anular entregas y archivar o reactivar productos',
+    'pop_ver_costos' => 'Material POP: ver y editar precios y el valor del inventario',
     'plan_estrategico_editar' => 'Plan estratégico: crear, editar y eliminar objetivos, metas, tareas y campañas',
   ];
 
   /** Acciones que un cargo sin configurar no recibe por defecto: hay que marcarlas. */
-  public const OPT_IN_ACTIONS = ['editar_actor', 'mercado_vista_completa', 'aseo_vista_interna', 'promocion_ver_ip', 'plan_estrategico_editar'];
+  public const OPT_IN_ACTIONS = ['editar_actor', 'mercado_vista_completa', 'aseo_vista_interna', 'promocion_ver_ip', 'plan_estrategico_editar', 'pop_gestionar', 'pop_anular', 'pop_ver_costos'];
 
   /**
    * Vistas que un cargo sin configurar no recibe por defecto: hay que marcarlas en Permisos. Los cargos con acceso total
@@ -87,6 +90,7 @@ final class CommercialAccessPolicy
     'promocion' => [
       'analitica_web' => 'Analítica web',
       'actividad_portales' => 'Actividad de portales',
+      'material_pop' => 'Material POP',
     ],
   ];
 

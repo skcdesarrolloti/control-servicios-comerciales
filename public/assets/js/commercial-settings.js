@@ -491,6 +491,41 @@
         };
       },
     },
+    // Promoción › Material POP: categorías que se ofrecen al crear un producto y alerta de stock bajo (correo encolado en
+    // shared-notifications a los funcionarios marcados). Las categorías que ya usan productos se pueden quitar de la
+    // lista: esos productos las conservan, pero no se ofrecen para productos nuevos.
+    material_pop: {
+      title: "Material POP",
+      html: function (settings) {
+        var usage = settings.category_usage || [];
+        var listed = usage.filter(function (row) { return row.listed; }).map(function (row) { return row.name; });
+        var unlisted = usage.filter(function (row) { return !row.listed && row.products > 0; });
+        var selected = (settings.alert_employees || []).map(String);
+        var employees = (settings.employees || []).map(function (row) { return { id: String(row.id), label: row.name, hint: row.email }; });
+        return '<form data-config-form class="text-left space-y-4">' +
+          '<section><h4 class="text-sm font-bold text-slate-800 mb-1">Categorías de productos</h4>' +
+          intro("Una por línea. Son las que se ofrecen al crear o editar un producto en Promoción › Material POP.") +
+          '<textarea class="w-full px-2 py-1.5 rounded-lg border border-slate-300 text-sm" rows="5" name="categories" required>' + esc(listed.join("\n")) + "</textarea>" +
+          (usage.length ? tableHtml(["Categoría", "Productos"], usage.map(function (row) {
+            return '<tr><td class="py-2 px-2 font-medium text-slate-800">' + esc(row.name) + (row.listed ? "" : ' <small class="text-slate-500">(fuera de la lista)</small>') + '</td><td class="py-2 px-2 text-right">' + esc(number(row.products)) + "</td></tr>";
+          })) : "") +
+          (unlisted.length ? '<p class="text-[11px] text-slate-500 mt-1">Las categorías fuera de la lista siguen en sus productos, pero no se ofrecen para productos nuevos.</p>' : "") +
+          "</section>" +
+          '<section><h4 class="text-sm font-bold text-slate-800 mb-1">Alerta de stock bajo</h4>' +
+          intro("Cuando una entrega o un ajuste deja un producto en su stock mínimo o lo agota, se envía un correo a los funcionarios marcados (una vez por producto al día).") +
+          '<label class="flex items-start gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white cursor-pointer text-left mb-2"><input type="checkbox" class="mt-1" name="alert_enabled"' + (settings.alert_enabled ? " checked" : "") + '><span class="text-sm text-slate-800">Enviar la alerta por correo</span></label>' +
+          (employees.length ? checkboxGrid("alert_employees", employees, function (id) { return selected.indexOf(id) !== -1; }) : '<p class="text-sm text-rose-700">No hay funcionarios activos con correo.</p>') +
+          "</section></form>";
+      },
+      collect: function (form) {
+        var categories = String(form.querySelector('[name="categories"]').value || "").split(/\r?\n/).map(function (line) { return line.trim(); }).filter(Boolean);
+        if (!categories.length) throw new Error("Deja al menos una categoría de productos.");
+        var employees = Array.prototype.slice.call(form.querySelectorAll('[name="alert_employees"]:checked')).map(function (input) { return input.value; });
+        var enabled = form.querySelector('[name="alert_enabled"]').checked;
+        if (enabled && !employees.length) throw new Error("Marca al menos un funcionario para la alerta, o desactívala.");
+        return { categories: categories, alert_enabled: enabled, alert_employees: employees };
+      },
+    },
   };
 
   // Configuración › Analítica web: ¿los días de "Conservar visitas crudas" bajan (de 0 = nunca, o de un número mayor)?

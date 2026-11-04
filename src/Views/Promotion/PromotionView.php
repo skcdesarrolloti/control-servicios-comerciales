@@ -12,7 +12,7 @@ use SCM\Core\Settings;
 
 /**
  * Pestaña Promoción (oculta por defecto: OPT_IN_VIEWS). Cada subpestaña de SUBVIEWS['promocion'] es su propia pestaña
- * (?tab=analitica_web, ?tab=actividad_portales) y se pinta aquí. Sus estilos y su JS se piden solo cuando se abre esta
+ * (?tab=analitica_web, ?tab=actividad_portales, ?tab=material_pop) y se pinta aquí. Sus estilos y su JS se piden solo cuando se abre esta
  * pestaña. Los datos que el cargo no puede ver (IP y navegador sin promocion_ver_ip) no llegan a la vista.
  */
 final class PromotionView
@@ -35,6 +35,8 @@ final class PromotionView
       $body = AnalyticsView::render(AnalyticsView::context($input, $policy, $db, $settings, $rollup === null ? self::rollup($db, $settings) : ($rollup ?: null), $today, $catchUp), $baseUrl);
     } elseif ($sub === 'actividad_portales' && $policy->canSubview('promocion', 'actividad_portales')) {
       $body = PortalActivityView::render(PortalActivityView::context($input, $policy, $db, $today), $baseUrl);
+    } elseif ($sub === 'material_pop' && $policy->canSubview('promocion', 'material_pop')) {
+      $body = MaterialPopView::render(MaterialPopView::context($input, $policy, $db, $settings), $baseUrl);
     } else {
       $sub = '';
       $body = '<p class="cpr-empty">Esta sección de Promoción no está disponible.</p>';

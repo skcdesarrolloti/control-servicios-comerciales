@@ -13,6 +13,12 @@ final class CommercialActionRouter
   /** Endpoints de la pestaña Promoción: los atiende PromotionApiController, que se crea solo cuando se piden. */
   public const PROMOTION_ACTIONS = [
     'commercial_promo_analytics_logs' => 'analyticsLogs',
+    'commercial_pop_product_save' => 'popProductSave',
+    'commercial_pop_stock_adjust' => 'popStockAdjust',
+    'commercial_pop_product_active' => 'popProductActive',
+    'commercial_pop_delivery_create' => 'popDeliveryCreate',
+    'commercial_pop_delivery_cancel' => 'popDeliveryCancel',
+    'commercial_pop_sync' => 'popSync',
   ];
 
   /** Endpoints de Herramientas › Plan estratégico: los atiende StrategicPlanApiController, creado solo cuando se piden. */

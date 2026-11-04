@@ -9,6 +9,7 @@ use SCM\Commercial\Medios\MedioResolver;
 use SCM\Commercial\Promotion\Analytics\TrackerAnalyticsConfig;
 use SCM\Commercial\Promotion\Analytics\TrackerRollup;
 use SCM\Commercial\Promotion\Analytics\TrackerSchema;
+use SCM\Commercial\Promotion\Pop\PopConfig;
 use SCM\Commercial\Strategy\StrategicPlanRepository;
 use SCM\Commercial\Tools\CleaningSettings;
 use SCM\Commercial\Tools\UtmCatalog;
@@ -21,7 +22,7 @@ use SCM\Support\SchemaInspector;
  * Menú "Configuración" del panel comercial: lee y guarda cada sección configurable.
  * Los valores que también usan otras aplicaciones (SLA de tareas, plazos y valores de avisos,
  * cupos de destacados, calculadora de aseo) se guardan en su fila de `jet_cct_confi_sistema` para mantener una sola fuente.
- * Lo propio del panel (plazos de actualización, catálogo del Generador UTM, Analítica web) va en Settings.
+ * Lo propio del panel (plazos de actualización, catálogo del Generador UTM, Analítica web, Material POP) va en Settings.
  * La lista única de Medios vive en su propia tabla (scm_medios, MedioCatalog): la sección "medios" la administra y, al
  * cambiarla, sincroniza el glosario "Medio de llamada" de JetEngine. Los catálogos del Plan estratégico (sección "plan")
  * son las mismas tablas CCT que usa el plugin Gestor Estratégico de WordPress.
@@ -48,7 +49,7 @@ final class CommercialSettingsService
     'factor_prestacional' => ['Factor prestacional', 0, 0, 100],
   ];
 
-  public const SECTIONS = ['calendario', 'tiempos', 'avisos', 'actualizaciones', 'destacados', 'aseo', 'utm', 'medios', 'analitica', 'plan'];
+  public const SECTIONS = ['calendario', 'tiempos', 'avisos', 'actualizaciones', 'destacados', 'aseo', 'utm', 'medios', 'analitica', 'plan', 'material_pop'];
 
   /** Operaciones de la sección "medios" (todas guardan, salvo preview, que solo cuenta). */
   public const MEDIOS_OPS = ['add', 'rename', 'toggle', 'merge', 'aliases', 'alias_raw', 'rewrite_raw', 'preview'];
@@ -117,6 +118,7 @@ final class CommercialSettingsService
       'analitica' => $this->analyticsSettings(),
       // Catálogos del Plan estratégico con su uso: solo al abrir esa sección.
       'plan' => $section === 'plan' ? (new StrategicPlanRepository($this->db))->catalogSettings() : [],
+      'material_pop' => $section === 'material_pop' ? $this->popSettings() : [],
     ];
   }
 
@@ -275,6 +277,9 @@ final class CommercialSettingsService
         return $this->saveMedios($data);
       case 'plan':
         return $this->savePlanCatalogs($data);
+      case 'material_pop':
+        PopConfig::save($this->settings, $data, Auth::userId());
+        return 'Configuración de Material POP guardada.';
       case 'analitica':
         $before = TrackerAnalyticsConfig::read($this->settings);
         $saved = TrackerAnalyticsConfig::save($this->settings, $data, Auth::userId());
@@ -284,6 +289,37 @@ final class CommercialSettingsService
         return 'Configuración de la analítica web guardada.';
     }
     throw new \InvalidArgumentException('Sección de configuración no válida.');
+  }
+
+  /**
+   * Configuración › Material POP: categorías con cuántos productos las usan y los funcionarios activos con correo que
+   * pueden recibir la alerta de stock bajo.
+   * @return array<string,mixed>
+   */
+  private function popSettings(): array
+  {
+    $config = PopConfig::read($this->settings);
+    $usage = [];
+    $products = $this->db->table('marketing_inventory_products');
+    try {
+      foreach ($this->db->getResults("SELECT type, COUNT(*) AS total FROM `{$products}` WHERE type IS NOT NULL AND type <> '' GROUP BY type") as $row) {
+        $usage[mb_strtolower((string) $row['type'], 'UTF-8')] = ['name' => (string) $row['type'], 'total' => (int) $row['total']];
+      }
+    } catch (\Throwable) {
+      // Sin las tablas del inventario la sección se puede editar igual.
+    }
+    $listed = array_map(static fn(string $item): string => mb_strtolower($item, 'UTF-8'), $config['categories']);
+    $categories = [];
+    foreach (PopConfig::categories(array_merge($config['categories'], array_column($usage, 'name'))) as $name) {
+      $key = mb_strtolower($name, 'UTF-8');
+      $categories[] = ['name' => $name, 'products' => $usage[$key]['total'] ?? 0, 'listed' => in_array($key, $listed, true)];
+    }
+    $funcionarios = $this->db->table('jet_cct_funcionarios');
+    $employees = $this->db->getResults("SELECT id_empleado AS id, TRIM(nombre) AS name, TRIM(correo) AS email FROM `{$funcionarios}` WHERE LOWER(TRIM(COALESCE(activo, ''))) = 'si' AND TRIM(COALESCE(correo, '')) <> '' ORDER BY nombre");
+    return $config + [
+      'category_usage' => $categories,
+      'employees' => array_map(static fn(array $row): array => ['id' => (string) $row['id'], 'name' => (string) $row['name'], 'email' => (string) $row['email']], $employees),
+    ];
   }
 
   /** Configuración › Plan estratégico: los catálogos completos; eliminar exige confirm_delete. @param array<string,mixed> $data */

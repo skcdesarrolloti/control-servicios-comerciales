@@ -21,6 +21,7 @@ SCM\Core\App::init($db, new SCM\Core\Auth($db), $csrf, $settings);
 $lock = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'scm-promotion-endpoint-' . getmypid() . '.lock';
 CommercialPromotionDatabase::seed($db, $settings, date('Y-m-d'), $lock);
 @unlink($lock);
+CommercialPromotionDatabase::pop($db, $settings);
 
 CommercialPromotionDatabase::login((string) ($argv[1] ?? '10'), (string) ($argv[2] ?? '101'));
 $_SESSION['scm_csrf']['commercial_nonce'] = 'fixture';

@@ -522,6 +522,7 @@ final class CommercialDashboardView
                       ['plan', 'flag', 'Plan estratégico', 'Gestiones, unidades, tipos, frecuencias y actores'],
                       ['medios', 'alt_route', 'Medios', 'Lista única: registros, formularios, UTM y analítica'],
                       ['analitica', 'monitoring', 'Analítica web', 'IPs internas, robots y retención de visitas'],
+                      ['material_pop', 'inventory_2', 'Material POP', 'Categorías y alerta de stock bajo'],
                     ];
                   ?>
                   <?php foreach ($configItems as [$configKey, $configIcon, $configLabel, $configHint]): ?>
@@ -4923,6 +4924,7 @@ final class CommercialDashboardView
   private const PROMOTION_MENU = [
     'analitica_web' => ['monitoring', 'Visitas, campañas y medios del sitio'],
     'actividad_portales' => ['login', 'Ingresos y menús de los portales de clientes'],
+    'material_pop' => ['inventory_2', 'Existencias, entregas y movimientos de souvenirs'],
   ];
 
   /** @return array{0:string,1:string} Ícono y ayuda; una subpestaña nueva sin entrada usa el ícono del grupo. */
@@ -4938,7 +4940,7 @@ final class CommercialDashboardView
     'Precaptación' => ['precaptacion_crear', 'precaptacion_editar', 'precaptacion_ticket', 'precaptacion_catalogos'],
     'Inmuebles y avisos' => ['ingresar_inmueble', 'registrar_aviso', 'editar_actor'],
     'Herramientas' => ['mercado_vista_completa', 'aseo_vista_interna', 'plan_estrategico_editar'],
-    'Promoción' => ['promocion_ver_ip'],
+    'Promoción' => ['promocion_ver_ip', 'pop_gestionar', 'pop_anular', 'pop_ver_costos'],
   ];
 
   /** @param array<int,string> $employeeCargoIds */

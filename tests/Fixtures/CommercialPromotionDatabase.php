@@ -87,6 +87,40 @@ final class CommercialPromotionDatabase
     (new \SCM\Commercial\Medios\MedioCatalog($db, $settings, '101'))->seed();
   }
 
+  /**
+   * Material POP: las tablas de dashboard-marketing (InventorySchema) y las del Club PPH, con dos productos propios, dos
+   * del Club PPH sin importar todavía y una recompensa PPH. Cargos: 13 acceso total; 6 gestiona y anula (sin costos);
+   * 7 solo ve.
+   */
+  public static function pop(Database $db, Settings $settings): void
+  {
+    $pdo = $db->pdo();
+    $pdo->exec('CREATE TABLE IF NOT EXISTS wp_marketing_inventory_products (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, type TEXT NOT NULL DEFAULT "Souvenir", sku TEXT UNIQUE, description TEXT, image_url TEXT, quantity INTEGER NOT NULL DEFAULT 0, unit TEXT NOT NULL DEFAULT "unidad", minimum_stock INTEGER NOT NULL DEFAULT 0, price NUMERIC, points INTEGER, active INTEGER NOT NULL DEFAULT 1, sync_pph INTEGER NOT NULL DEFAULT 0, pph_product_id INTEGER UNIQUE, pph_quantity INTEGER, pph_hash TEXT, pph_modified_at TEXT, created_by INTEGER, updated_by INTEGER, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)');
+    $pdo->exec('CREATE TABLE IF NOT EXISTS wp_marketing_inventory_deliveries (id INTEGER PRIMARY KEY AUTOINCREMENT, delivered_at TEXT NOT NULL, recipient_name TEXT NOT NULL, recipient_type TEXT, recipient_id TEXT, recipient_source TEXT, recipient_document TEXT, recipient_metadata TEXT, notes TEXT, status TEXT NOT NULL DEFAULT "delivered", source TEXT NOT NULL DEFAULT "dashboard", external_id TEXT, pph_reward_id INTEGER UNIQUE, created_by INTEGER, cancelled_by INTEGER, cancelled_at TEXT, cancellation_reason TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, UNIQUE (source, external_id))');
+    $pdo->exec('CREATE TABLE IF NOT EXISTS wp_marketing_inventory_delivery_items (id INTEGER PRIMARY KEY AUTOINCREMENT, delivery_id INTEGER NOT NULL, product_id INTEGER, product_name TEXT NOT NULL, product_type TEXT, quantity INTEGER NOT NULL, unit_price NUMERIC, points INTEGER, pph_product_id INTEGER, created_at TEXT NOT NULL)');
+    $pdo->exec('CREATE TABLE IF NOT EXISTS wp_marketing_inventory_movements (id INTEGER PRIMARY KEY AUTOINCREMENT, product_id INTEGER NOT NULL, delivery_id INTEGER, movement_type TEXT NOT NULL, quantity_delta INTEGER NOT NULL, stock_before INTEGER NOT NULL, stock_after INTEGER NOT NULL, reason TEXT NOT NULL, source TEXT NOT NULL DEFAULT "dashboard", created_by INTEGER, created_at TEXT NOT NULL)');
+    $pdo->exec('CREATE TABLE IF NOT EXISTS wp_marketing_inventory_evidence (id INTEGER PRIMARY KEY AUTOINCREMENT, delivery_id INTEGER, movement_id INTEGER, product_id INTEGER, evidence_type TEXT NOT NULL, storage_path TEXT, external_url TEXT, original_name TEXT, mime_type TEXT, file_size INTEGER, created_at TEXT NOT NULL)');
+    $pdo->exec('CREATE TABLE IF NOT EXISTS wp_jet_cct_inventario_pph (_ID INTEGER PRIMARY KEY AUTOINCREMENT, cct_status TEXT, cct_author_id INTEGER, cct_created TEXT, cct_modified TEXT, cantidad TEXT, fecha INTEGER, precio TEXT, valor_punto TEXT, titulo TEXT, img TEXT)');
+    $pdo->exec('CREATE TABLE IF NOT EXISTS wp_jet_cct_recompensas_pph (_ID INTEGER PRIMARY KEY AUTOINCREMENT, cct_status TEXT, cct_author_id INTEGER, cct_created TEXT, cct_modified TEXT, fecha INTEGER, cantidad TEXT, id_pph TEXT, nombre TEXT, tarjeta_bienvenida TEXT, id_producto TEXT, producto TEXT, puntos TEXT)');
+    if ((int) $db->getVar('SELECT COUNT(*) FROM wp_marketing_inventory_products') > 0) {
+      return;
+    }
+    $now = '2026-10-01 09:00:00';
+    $db->insert('wp_marketing_inventory_products', ['name' => 'Llaveros', 'type' => 'Souvenir', 'sku' => 'LLA-1', 'quantity' => 12, 'unit' => 'unidad', 'minimum_stock' => 10, 'price' => '2500.00', 'active' => 1, 'created_by' => 1443, 'created_at' => $now, 'updated_at' => $now]);
+    $db->insert('wp_marketing_inventory_products', ['name' => 'Gorras', 'type' => 'merchandising', 'quantity' => 40, 'unit' => 'unidad', 'minimum_stock' => 0, 'price' => '18000.00', 'active' => 1, 'created_at' => $now, 'updated_at' => $now]);
+    foreach ([[1, 'opening', 12], [2, 'opening', 40]] as [$product, $type, $quantity]) {
+      $db->insert('wp_marketing_inventory_movements', ['product_id' => $product, 'movement_type' => $type, 'quantity_delta' => $quantity, 'stock_before' => 0, 'stock_after' => $quantity, 'reason' => 'Saldo inicial del producto.', 'source' => 'dashboard', 'created_by' => 1443, 'created_at' => $now]);
+    }
+    $db->insert('wp_jet_cct_inventario_pph', ['cct_status' => 'publish', 'cct_author_id' => 1, 'cct_created' => $now, 'cct_modified' => $now, 'cantidad' => '3', 'fecha' => 0, 'precio' => '40000', 'valor_punto' => '40', 'titulo' => 'CORTADORA DE PELO', 'img' => 'https://sucasainmobiliaria.com.co/wp-content/uploads/cortadora.jpg']);
+    $db->insert('wp_jet_cct_inventario_pph', ['cct_status' => 'draft', 'cct_author_id' => 1, 'cct_created' => $now, 'cct_modified' => $now, 'cantidad' => '0', 'fecha' => 0, 'precio' => '', 'valor_punto' => '20', 'titulo' => 'LÁPIZ LABIAL', 'img' => '']);
+    $db->insert('wp_jet_cct_recompensas_pph', ['cct_status' => 'publish', 'cct_author_id' => 1443, 'cct_created' => '2026-09-20 10:00:00', 'fecha' => (int) strtotime('2026-09-20 10:00:00'), 'cantidad' => '1', 'id_pph' => 'PPH-001', 'nombre' => 'Aliado Uno', 'tarjeta_bienvenida' => 'T-55', 'id_producto' => '1', 'producto' => 'CORTADORA DE PELO', 'puntos' => '40']);
+    $db->insert('wp_jet_cct_funcionarios', ['_ID' => 20, 'id_empleado' => '505', 'nombre' => 'Coordinadora de mercadeo', 'activo' => 'Si', 'correo' => 'mercadeo@example.test', 'id_cargo' => '6']);
+    $db->insert('wp_jet_cct_funcionarios', ['_ID' => 21, 'id_empleado' => '506', 'nombre' => 'Retirado', 'activo' => 'No', 'correo' => 'retirado@example.test', 'id_cargo' => '6']);
+    $permissions = $settings->get('commercial_permissions', []);
+    $permissions['6']['actions'] = array_values(array_unique(array_merge($permissions['6']['actions'] ?? [], ['pop_gestionar', 'pop_anular'])));
+    $settings->set('commercial_permissions', $permissions);
+  }
+
   /** @param array<string,string> $session */
   public static function login(string $cargo, string $employee, string $name = 'Funcionario de prueba', array $session = []): void
   {
