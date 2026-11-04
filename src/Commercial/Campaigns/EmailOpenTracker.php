@@ -26,7 +26,7 @@ final class EmailOpenTracker
   /** @return bool Si el token existía. */
   public function record(string $token, string $ip, string $userAgent, ?string $now = null): bool
   {
-    if (preg_match('/^[a-f0-9]{32}$/', $token) !== 1) {
+    if (preg_match('/^[a-f0-9]{32,64}$/', $token) !== 1) {
       return false;
     }
     $now = $now ?? gmdate('Y-m-d H:i:s');
