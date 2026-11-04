@@ -515,18 +515,86 @@
           intro("Cuando una entrega o un ajuste deja un producto en su stock mínimo o lo agota, se envía un correo a los funcionarios marcados (una vez por producto al día).") +
           '<label class="flex items-start gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white cursor-pointer text-left mb-2"><input type="checkbox" class="mt-1" name="alert_enabled"' + (settings.alert_enabled ? " checked" : "") + '><span class="text-sm text-slate-800">Enviar la alerta por correo</span></label>' +
           (employees.length ? checkboxGrid("alert_employees", employees, function (id) { return selected.indexOf(id) !== -1; }) : '<p class="text-sm text-rose-700">No hay funcionarios activos con correo.</p>') +
-          "</section></form>";
+          "</section>" + popApiHtml(settings) + "</form>";
       },
+      bind: function (popup, settings) { bindPopApi(popup, settings); },
       collect: function (form) {
         var categories = String(form.querySelector('[name="categories"]').value || "").split(/\r?\n/).map(function (line) { return line.trim(); }).filter(Boolean);
         if (!categories.length) throw new Error("Deja al menos una categoría de productos.");
         var employees = Array.prototype.slice.call(form.querySelectorAll('[name="alert_employees"]:checked')).map(function (input) { return input.value; });
         var enabled = form.querySelector('[name="alert_enabled"]').checked;
         if (enabled && !employees.length) throw new Error("Marca al menos un funcionario para la alerta, o desactívala.");
-        return { categories: categories, alert_enabled: enabled, alert_employees: employees };
+        var api = form.querySelector('[name="api_enabled"]').checked;
+        if (api && form.getAttribute("data-pop-token") !== "1") throw new Error("Genera el token de la API antes de activarla.");
+        return { categories: categories, alert_enabled: enabled, alert_employees: employees, api_enabled: api };
       },
     },
   };
+
+  // ── Configuración › Material POP › API para formularios ─────────────────
+  // El token completo solo se ve justo después de generarlo (el servidor guarda su hash). Generar otro deja sin servicio
+  // a los formularios que usen el anterior: pide un segundo clic de confirmación en el mismo popup.
+  function popApiHtml(settings) {
+    var url = settings.api_url || "inventory-api.php";
+    var status = settings.api_token_set
+      ? "Token activo terminado en …" + esc(settings.api_token_hint) + (settings.api_token_created ? " (generado el " + esc(String(settings.api_token_created).slice(0, 16)) + ")" : "") + "."
+      : "Todavía no hay token.";
+    var example = 'curl -X POST "' + url + '/deliveries" \\\n  -H "Authorization: Bearer TU_TOKEN" -H "Content-Type: application/json" \\\n' +
+      "  -d '{\"external_id\":\"form-0001\",\"nombre\":\"Laura Gómez\",\"documento\":\"1001\",\"producto\":\"LLA-1\",\"cantidad\":2}'";
+    return '<section data-pop-api><h4 class="text-sm font-bold text-slate-800 mb-1">API para formularios y sistemas externos</h4>' +
+      intro("Permite que un formulario (por ejemplo, un webhook de JetFormBuilder) registre entregas y consulte existencias. Las entregas quedan con origen Integración y avisan de stock bajo igual que las del panel.") +
+      '<label class="flex items-start gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white cursor-pointer text-left mb-2"><input type="checkbox" class="mt-1" name="api_enabled"' + (settings.api_enabled ? " checked" : "") + '><span class="text-sm text-slate-800">Activar la API</span></label>' +
+      '<div class="flex flex-wrap items-center gap-2 mb-2"><span class="text-sm text-slate-700" data-pop-token-status>' + status + "</span>" +
+      '<button type="button" class="px-3 py-1 rounded-lg bg-slate-100 text-xs font-semibold" data-pop-token-generate>' + (settings.api_token_set ? "Generar otro token" : "Generar token") + "</button></div>" +
+      '<div class="hidden mb-2 px-3 py-2 rounded-xl border border-red-200 bg-red-50 text-sm text-red-900" data-pop-token-warning>Los formularios que usan el token actual dejarán de funcionar hasta que les pongas el nuevo. Vuelve a pulsar el botón para confirmar.</div>' +
+      '<div class="hidden mb-2" data-pop-token-box><span class="block text-xs font-semibold text-slate-700 mb-1">Token nuevo (cópialo ahora, no se vuelve a mostrar)</span>' +
+      '<input class="w-full px-2 py-1.5 rounded-lg border border-slate-300 text-sm font-mono" readonly data-pop-token-value></div>' +
+      tableHtml(["Uso", "Dirección"], [
+        ["Consultar productos (GET)", url + "/products"],
+        ["Registrar entrega (POST)", url + "/deliveries"],
+      ].map(function (row) {
+        return '<tr><td class="py-2 px-2 font-medium text-slate-800">' + esc(row[0]) + '</td><td class="py-2 px-2 text-right font-mono text-[11px] break-all">' + esc(row[1]) + "</td></tr>";
+      })) +
+      '<details class="mt-2 text-[11px] text-slate-600"><summary class="cursor-pointer font-semibold">Campos y ejemplo</summary>' +
+      '<p class="mt-1">El token va en el encabezado <code>Authorization: Bearer …</code> o <code>X-Inventory-Token</code>; si el formulario no deja poner encabezados, en un campo <code>token</code> del envío (nunca en la dirección). Acepta JSON o campos de formulario.</p>' +
+      '<p class="mt-1"><b>Quién recibe:</b> <code>nombre</code> (obligatorio), <code>documento</code>, <code>tipo</code>, <code>observaciones</code>. <b>Producto:</b> <code>producto</code> (id o SKU) y <code>cantidad</code>, o varios en <code>productos</code>: <code>[{"producto":"LLA-1","cantidad":2}]</code>. <b>Sin duplicados:</b> manda un <code>id_envio</code> o <code>external_id</code> único por envío; si se repite, no se descuenta otra vez. Opcionales: <code>fecha</code> (si falta, el momento del envío) y <code>evidencias</code> (enlaces HTTPS).</p>' +
+      '<pre class="mt-1 p-2 rounded-lg bg-slate-100 whitespace-pre-wrap break-all font-mono">' + esc(example) + "</pre></details></section>";
+  }
+
+  function bindPopApi(popup, settings) {
+    var form = popup.querySelector("[data-config-form]");
+    var root = popup.querySelector("[data-pop-api]");
+    if (!form || !root) return;
+    form.setAttribute("data-pop-token", settings && settings.api_token_set ? "1" : "0");
+    var button = root.querySelector("[data-pop-token-generate]");
+    var warning = root.querySelector("[data-pop-token-warning]");
+    var armed = false;
+    button.addEventListener("click", function () {
+      if (form.getAttribute("data-pop-token") === "1" && !armed) {
+        armed = true;
+        warning.classList.remove("hidden");
+        button.textContent = "Sí, generar otro token";
+        return;
+      }
+      button.disabled = true;
+      request("commercial_settings_save", { section: "material_pop", payload: JSON.stringify({ op: "rotate_token" }) }).then(function (data) {
+        var token = (data.result || {}).token || "";
+        var box = root.querySelector("[data-pop-token-box]");
+        var input = root.querySelector("[data-pop-token-value]");
+        input.value = token;
+        box.classList.remove("hidden");
+        warning.classList.add("hidden");
+        input.focus();
+        input.select();
+        form.setAttribute("data-pop-token", "1");
+        root.querySelector("[data-pop-token-status]").textContent = "Token activo terminado en …" + token.slice(-4) + ".";
+        button.textContent = "Generar otro token";
+        armed = false;
+      }).catch(function (error) {
+        window.Swal.showValidationMessage(error.message || "No se pudo generar el token.");
+      }).then(function () { button.disabled = false; });
+    });
+  }
 
   // Configuración › Analítica web: ¿los días de "Conservar visitas crudas" bajan (de 0 = nunca, o de un número mayor)?
   function analyticsRetentionReduces(form) {

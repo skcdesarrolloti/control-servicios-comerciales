@@ -519,6 +519,60 @@ final class PopInventoryService
    */
   public function createDelivery(array $input, string $employee): int
   {
+    return $this->deliver($input, $employee, self::SOURCE, null, []);
+  }
+
+  /**
+   * Entrega que llega por la API (formularios y sistemas externos): origen 'api', sin funcionario. Con external_id es
+   * idempotente: si ya existe una entrega de la API con ese id se devuelve esa, sin descontar otra vez.
+   * @param array<string,mixed> $input Los campos de createDelivery más external_id y evidence_urls (HTTPS).
+   * @return array{id:int,duplicate:bool,status:string}
+   */
+  public function createApiDelivery(array $input): array
+  {
+    $externalId = mb_substr(trim(is_scalar($input['external_id'] ?? null) ? (string) $input['external_id'] : ''), 0, 191, 'UTF-8');
+    $existing = $externalId !== '' ? $this->db->getRow("SELECT id, status FROM `{$this->deliveries}` WHERE source = 'api' AND external_id = ? LIMIT 1", [$externalId]) : null;
+    if ($existing !== null) {
+      return ['id' => (int) $existing['id'], 'duplicate' => true, 'status' => (string) $existing['status']];
+    }
+    if (trim((string) ($input['delivered_at'] ?? '')) === '') {
+      // Los formularios suelen no mandar la fecha: la entrega es en el momento del envío.
+      $input['delivered_at'] = $this->now();
+    }
+    $urls = self::evidenceUrls($input['evidence_urls'] ?? ($input['evidence_url'] ?? []));
+    try {
+      $id = $this->deliver($input, '', 'api', $externalId !== '' ? $externalId : null, $urls);
+    } catch (\PDOException $exception) {
+      // Dos envíos simultáneos con el mismo external_id: la llave única deja pasar uno solo.
+      $existing = $externalId !== '' ? $this->db->getRow("SELECT id, status FROM `{$this->deliveries}` WHERE source = 'api' AND external_id = ? LIMIT 1", [$externalId]) : null;
+      if ($existing === null) {
+        throw $exception;
+      }
+      return ['id' => (int) $existing['id'], 'duplicate' => true, 'status' => (string) $existing['status']];
+    }
+    return ['id' => $id, 'duplicate' => false, 'status' => 'delivered'];
+  }
+
+  /**
+   * Productos activos para formularios y sistemas externos, sin precios.
+   * @return list<array{id:int,name:string,type:string,sku:string,unit:string,quantity:int,points:int|null,image_url:string,origin:string}>
+   */
+  public function apiProducts(): array
+  {
+    $rows = $this->db->getResults("SELECT id, name, type, sku, unit, quantity, points, image_url, pph_product_id FROM `{$this->products}` WHERE active = 1 ORDER BY name");
+    return array_map(static fn(array $row): array => [
+      'id' => (int) $row['id'], 'name' => (string) $row['name'], 'type' => (string) $row['type'], 'sku' => (string) ($row['sku'] ?? ''),
+      'unit' => (string) ($row['unit'] ?: 'unidad'), 'quantity' => (int) $row['quantity'], 'points' => self::integer($row['points'] ?? null),
+      'image_url' => (string) ($row['image_url'] ?? ''), 'origin' => $row['pph_product_id'] !== null ? 'pph' : 'inventory',
+    ], $rows);
+  }
+
+  /**
+   * @param array<string,mixed> $input
+   * @param list<string> $evidenceUrls Enlaces HTTPS de evidencia (solo la API).
+   */
+  private function deliver(array $input, string $employee, string $source, ?string $externalId, array $evidenceUrls): int
+  {
     $recipient = trim((string) ($input['recipient_name'] ?? ''));
     if ($recipient === '' || mb_strlen($recipient, 'UTF-8') > 255) {
       throw new \InvalidArgumentException('Escribe el nombre de quien recibe.');
@@ -529,6 +583,10 @@ final class PopInventoryService
     }
     $deliveredAt = $this->deliveryDate((string) ($input['delivered_at'] ?? ''));
     $evidence = $this->files->store('evidence', PopFiles::MAX_EVIDENCE);
+    if (count($evidence) + count($evidenceUrls) > PopFiles::MAX_EVIDENCE) {
+      $this->files->remove($evidence);
+      throw new \InvalidArgumentException('Puedes adjuntar máximo ' . PopFiles::MAX_EVIDENCE . ' evidencias.');
+    }
     $pdo = $this->db->pdo();
     $alerts = [];
     try {
@@ -537,9 +595,9 @@ final class PopInventoryService
       $deliveryId = $this->insert($this->deliveries, [
         'delivered_at' => $deliveredAt, 'recipient_name' => $recipient,
         'recipient_type' => self::text($input['recipient_type'] ?? null), 'recipient_id' => self::text($input['recipient_id'] ?? null),
-        'recipient_source' => self::text($input['recipient_source'] ?? null) ?? 'Panel comercial',
+        'recipient_source' => self::text($input['recipient_source'] ?? null) ?? ($source === 'api' ? 'Integración' : 'Panel comercial'),
         'recipient_document' => self::text($input['recipient_document'] ?? null), 'recipient_metadata' => null,
-        'notes' => self::text($input['notes'] ?? null), 'status' => 'delivered', 'source' => self::SOURCE, 'external_id' => null,
+        'notes' => self::text($input['notes'] ?? null), 'status' => 'delivered', 'source' => $source, 'external_id' => $externalId,
         'pph_reward_id' => null, 'created_by' => self::integer($employee), 'cancelled_by' => null, 'cancelled_at' => null,
         'cancellation_reason' => null, 'created_at' => $now, 'updated_at' => $now,
       ]);
@@ -559,10 +617,10 @@ final class PopInventoryService
           'quantity' => $quantity, 'unit_price' => $product['price'], 'points' => $product['points'], 'pph_product_id' => $product['pph_product_id'],
           'created_at' => $now,
         ]);
-        $this->movement($productId, $deliveryId, 'delivery', -$quantity, $before, $after, 'Entrega a ' . $recipient . '.', self::SOURCE, $employee);
+        $this->movement($productId, $deliveryId, 'delivery', -$quantity, $before, $after, 'Entrega a ' . $recipient . '.', $source, $employee);
         $alerts[] = [$product, $before, $after];
       }
-      $this->attachEvidence($evidence, $deliveryId, null, null);
+      $this->attachEvidence(array_merge($evidence, $evidenceUrls), $deliveryId, null, null);
       $pdo->commit();
     } catch (\Throwable $exception) {
       if ($pdo->inTransaction()) {
@@ -815,6 +873,34 @@ final class PopInventoryService
       }
     }
     return $items;
+  }
+
+  /**
+   * Enlaces de evidencia de la API: solo HTTPS, sin repetidos, máximo MAX_EVIDENCE.
+   * @param mixed $raw Lista, JSON o un enlace suelto.
+   * @return list<string>
+   */
+  public static function evidenceUrls($raw): array
+  {
+    if (is_string($raw)) {
+      $decoded = json_decode($raw, true);
+      $raw = is_array($decoded) ? $decoded : (trim($raw) === '' ? [] : [$raw]);
+    }
+    $urls = [];
+    foreach (is_array($raw) ? $raw : [] as $url) {
+      $url = trim(is_scalar($url) ? (string) $url : '');
+      if ($url === '') {
+        continue;
+      }
+      if (!filter_var($url, FILTER_VALIDATE_URL) || !str_starts_with(strtolower($url), 'https://')) {
+        throw new \InvalidArgumentException('Las URLs de evidencia deben usar HTTPS.');
+      }
+      $urls[$url] = $url;
+    }
+    if (count($urls) > PopFiles::MAX_EVIDENCE) {
+      throw new \InvalidArgumentException('Puedes adjuntar máximo ' . PopFiles::MAX_EVIDENCE . ' evidencias.');
+    }
+    return array_values($urls);
   }
 
   /** @param array<string,mixed> $source */

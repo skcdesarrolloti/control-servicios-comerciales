@@ -458,6 +458,28 @@ function daysBetween(from, to) {
       await pop.locator('[data-commercial-config-action="material_pop"]').click();
       await pop.locator('textarea[name="categories"]').waitFor();
       assert.ok((await pop.locator('.swal2-popup').innerText()).includes('Coordinadora de mercadeo'));
+      // API para formularios: activarla sin token se rechaza; el token se ve una sola vez y luego solo su final.
+      await pop.locator('[name="api_enabled"]').check();
+      await pop.locator('.swal2-confirm').click();
+      await pop.locator('.swal2-validation-message', { hasText: 'Genera el token' }).waitFor();
+      await pop.locator('[data-pop-token-generate]').click();
+      const tokenInput = pop.locator('[data-pop-token-value]');
+      await tokenInput.waitFor({ state: 'visible' });
+      const token = await tokenInput.inputValue();
+      assert.match(token, /^skc_pop_[0-9a-f]{48}$/);
+      assert.ok((await pop.locator('[data-pop-token-status]').innerText()).includes(token.slice(-4)));
+      assert.ok((await pop.locator('[data-pop-api]').innerText()).includes('inventory-api.php/deliveries'));
+      await pop.locator('.swal2-confirm').click();
+      await pop.locator('.swal2-popup').waitFor({ state: 'hidden' });
+      await pop.locator('#commercial-config-trigger').click();
+      await pop.locator('[data-commercial-config-action="material_pop"]').click();
+      await pop.locator('[data-pop-api]').waitFor();
+      assert.equal(await pop.locator('[name="api_enabled"]').isChecked(), true);
+      assert.ok(!(await pop.locator('.swal2-popup').innerText()).includes(token), 'El token completo no se vuelve a mostrar.');
+      // Generar otro pide un segundo clic.
+      await pop.locator('[data-pop-token-generate]').click();
+      await pop.locator('[data-pop-token-warning]').waitFor({ state: 'visible' });
+      assert.equal(await pop.locator('[data-pop-token-box]').isVisible(), false);
       await pop.locator('.swal2-cancel').click();
 
       // Celular: sin desplazamiento horizontal y la ventana de entrega cabe en la pantalla.

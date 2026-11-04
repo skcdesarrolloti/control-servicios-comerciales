@@ -278,6 +278,11 @@ final class CommercialSettingsService
       case 'plan':
         return $this->savePlanCatalogs($data);
       case 'material_pop':
+        if (($data['op'] ?? '') === 'rotate_token') {
+          // El token completo sale solo en esta respuesta; luego únicamente se ven sus últimos 4 caracteres.
+          $this->lastResult = ['token' => PopConfig::rotateToken($this->settings, Auth::userId())];
+          return 'Token nuevo generado. Cópialo ahora: no se vuelve a mostrar y el anterior dejó de funcionar.';
+        }
         PopConfig::save($this->settings, $data, Auth::userId());
         return 'Configuración de Material POP guardada.';
       case 'analitica':
@@ -316,7 +321,9 @@ final class CommercialSettingsService
     }
     $funcionarios = $this->db->table('jet_cct_funcionarios');
     $employees = $this->db->getResults("SELECT id_empleado AS id, TRIM(nombre) AS name, TRIM(correo) AS email FROM `{$funcionarios}` WHERE LOWER(TRIM(COALESCE(activo, ''))) = 'si' AND TRIM(COALESCE(correo, '')) <> '' ORDER BY nombre");
+    $base = rtrim((string) ($this->config['base_url'] ?? (defined('SCM_BASE_URL') ? constant('SCM_BASE_URL') : '')), '/');
     return $config + [
+      'api_url' => $base . '/inventory-api.php',
       'category_usage' => $categories,
       'employees' => array_map(static fn(array $row): array => ['id' => (string) $row['id'], 'name' => (string) $row['name'], 'email' => (string) $row['email']], $employees),
     ];

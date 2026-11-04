@@ -14,5 +14,8 @@ DirectoryIndex index.php
 
 <IfModule mod_rewrite.c>
   RewriteEngine On
+  # inventory-api.php: Apache con PHP CGI/FPM no pasa el encabezado Authorization si no se copia.
+  RewriteCond %{HTTP:Authorization} .
+  RewriteRule ^ - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
   RewriteRule ^settings(?:\.php)?$ index.php [R=301,L]
 </IfModule>

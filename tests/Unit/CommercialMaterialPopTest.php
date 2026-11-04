@@ -329,4 +329,170 @@ final class CommercialMaterialPopTest extends TestCase
     self::assertSame(200, $archived['status']);
     self::assertSame(200, self::endpoint('6', '202', 'commercial_pop_sync')['status']);
   }
+
+  public function testApiTokenIsGeneratedOnceStoredAsHashAndRequiredToEnable(): void
+  {
+    self::assertFalse(PopConfig::read($this->settings)['api_token_set']);
+    try {
+      PopConfig::save($this->settings, ['categories' => 'Souvenir', 'api_enabled' => true], 7);
+      self::fail('Sin token no se puede activar.');
+    } catch (\InvalidArgumentException $exception) {
+      self::assertStringContainsString('Genera el token', $exception->getMessage());
+    }
+    $service = new CommercialSettingsService($this->db, $this->settings, $this->policy(), ['base_url' => 'https://panel.test/public']);
+    self::assertStringContainsString('no se vuelve a mostrar', $service->save('material_pop', ['op' => 'rotate_token']));
+    $token = (string) $service->lastResult()['token'];
+    self::assertMatchesRegularExpression('/^skc_pop_[0-9a-f]{48}$/', $token);
+    $raw = json_encode($this->settings->get(PopConfig::KEY));
+    self::assertStringNotContainsString($token, (string) $raw, 'Solo se guarda el hash.');
+    self::assertTrue(PopConfig::validToken($this->settings, $token));
+    self::assertFalse(PopConfig::validToken($this->settings, $token . 'x'));
+    self::assertFalse(PopConfig::validToken($this->settings, ''));
+
+    // Guardar el resto de la sección conserva el token.
+    $service->save('material_pop', ['categories' => ['Souvenir'], 'api_enabled' => true]);
+    $section = $service->load('material_pop')['material_pop'];
+    self::assertSame([true, true, substr($token, -4), 'https://panel.test/public/inventory-api.php'], [$section['api_enabled'], $section['api_token_set'], $section['api_token_hint'], $section['api_url']]);
+    self::assertArrayNotHasKey('api_token_hash', $section, 'El hash no llega al navegador.');
+    self::assertTrue(PopConfig::validToken($this->settings, $token));
+
+    // Uno nuevo invalida el anterior.
+    $service->save('material_pop', ['op' => 'rotate_token']);
+    self::assertFalse(PopConfig::validToken($this->settings, $token));
+  }
+
+  public function testApiAcceptsFormFieldsInSpanishSkusAndDoesNotDuplicate(): void
+  {
+    $service = $this->service();
+    $controller = new \SCM\Http\Controller\PopPublicApiController($service, $this->settings, new \SCM\Support\FileRateLimiter(sys_get_temp_dir()));
+    $input = $controller->normalize(['token' => 'secreto', 'nombre' => 'Laura Gómez', 'documento' => '1001', 'producto' => 'lla-1', 'cantidad' => '2', 'id_envio' => 'jfb-77', 'observaciones' => 'Feria']);
+    self::assertSame(['Laura Gómez', '1001', [['product_id' => 1, 'quantity' => 2]], 'jfb-77', 'Feria'], [$input['recipient_name'], $input['recipient_document'], $input['items'], $input['external_id'], $input['notes']]);
+    self::assertArrayNotHasKey('token', $input);
+    $several = $controller->normalize(['recipient_name' => 'Pedro', 'productos' => json_encode([['sku' => 'LLA-1', 'cantidad' => 1], ['product_id' => 2, 'quantity' => 3]])]);
+    self::assertSame([['product_id' => 1, 'quantity' => 1], ['product_id' => 2, 'quantity' => 3]], $several['items']);
+    try {
+      $controller->normalize(['nombre' => 'X', 'producto' => 'NO-EXISTE']);
+      self::fail('Un SKU desconocido se rechaza.');
+    } catch (\InvalidArgumentException $exception) {
+      self::assertStringContainsString('"NO-EXISTE"', $exception->getMessage());
+    }
+
+    $first = $service->createApiDelivery($input);
+    self::assertSame([false, 'delivered'], [$first['duplicate'], $first['status']]);
+    $again = $service->createApiDelivery($input);
+    self::assertSame([true, $first['id']], [$again['duplicate'], $again['id']]);
+    self::assertSame(10, (int) $this->product('Llaveros')['quantity'], 'El reenvío no descuenta otra vez.');
+    $delivery = $this->db->getRow('SELECT * FROM wp_marketing_inventory_deliveries WHERE id = ?', [$first['id']]);
+    self::assertSame(['api', 'jfb-77', 'Integración', null], [$delivery['source'], $delivery['external_id'], $delivery['recipient_source'], $delivery['created_by']]);
+    self::assertNotSame('', (string) $delivery['delivered_at'], 'Sin fecha, la del envío.');
+    self::assertSame('api', $this->db->getVar('SELECT source FROM wp_marketing_inventory_movements WHERE delivery_id = ?', [$first['id']]));
+
+    $this->expectExceptionMessage('HTTPS');
+    $service->createApiDelivery(['recipient_name' => 'Y', 'items' => [['product_id' => 1, 'quantity' => 1]], 'evidence_urls' => 'http://inseguro.test/foto.jpg']);
+  }
+
+  /**
+   * La API en un proceso aparte; "{token}" en encabezados y campos se cambia por el token generado en esa base.
+   * @param array<string,mixed> $request
+   * @return array{status:int,json:array<string,mixed>}
+   */
+  private static function api(array $request): array
+  {
+    $command = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(dirname(__DIR__) . '/Fixtures/inventory-api-endpoint.php') . ' ' . escapeshellarg(base64_encode(json_encode($request, JSON_THROW_ON_ERROR)));
+    $lines = preg_split('/\R/', trim((string) shell_exec($command))) ?: [];
+    $status = (int) array_pop($lines);
+    return ['status' => $status, 'json' => json_decode(implode("\n", $lines), true, 512, JSON_THROW_ON_ERROR)];
+  }
+
+  public function testPublicApiChecksTokenSwitchAndMethodAndKeepsTheLegacyResponses(): void
+  {
+    $sqlite = tempnam(sys_get_temp_dir(), 'scm-pop-api');
+    $limits = 'case-' . bin2hex(random_bytes(4));
+    try {
+      $base = ['sqlite' => $sqlite, 'limits' => $limits];
+      $none = self::api($base + ['token' => 'ninguno', 'headers' => ['Authorization' => 'Bearer algo']]);
+      self::assertSame([401, false], [$none['status'], $none['json']['ok']]);
+      $off = self::api($base + ['token' => 'inactivo', 'headers' => ['Authorization' => 'Bearer {token}']]);
+      self::assertSame(503, $off['status']);
+      self::assertStringContainsString('desactivada', $off['json']['message']);
+
+      $products = self::api($base + ['token' => 'activo', 'headers' => ['X-Inventory-Token' => '{token}']]);
+      self::assertSame([200, true], [$products['status'], $products['json']['ok']]);
+      self::assertSame(['Gorras', 'Llaveros'], array_column($products['json']['products'], 'name'));
+      self::assertArrayNotHasKey('price', $products['json']['products'][0], 'Sin precios.');
+
+      // Webhook de formulario: campos en español y el token en el cuerpo.
+      $form = ['token' => '{token}', 'nombre' => 'Laura', 'producto' => 'LLA-1', 'cantidad' => '2', 'id_envio' => 'jfb-1'];
+      $created = self::api($base + ['token' => 'activo', 'method' => 'POST', 'resource' => 'deliveries', 'post' => $form]);
+      self::assertSame([201, false], [$created['status'], $created['json']['delivery']['duplicate']]);
+      $repeated = self::api($base + ['token' => 'activo', 'method' => 'POST', 'resource' => 'deliveries', 'post' => $form]);
+      self::assertSame([200, true, $created['json']['delivery']['id']], [$repeated['status'], $repeated['json']['delivery']['duplicate'], $repeated['json']['delivery']['id']]);
+      $json = self::api($base + ['token' => 'activo', 'method' => 'POST', 'resource' => 'deliveries', 'content_type' => 'application/json', 'headers' => ['Authorization' => 'Bearer {token}'],
+        'body' => json_encode(['recipient_name' => 'Pedro', 'items' => [['product_id' => 2, 'quantity' => 500]]])]);
+      self::assertSame(422, $json['status']);
+      self::assertStringContainsString('No hay existencias suficientes', $json['json']['message']);
+      self::assertSame(400, self::api($base + ['token' => 'activo', 'method' => 'POST', 'resource' => 'deliveries', 'content_type' => 'application/json', 'body' => '{roto'])['status']);
+      self::assertSame(405, self::api($base + ['token' => 'activo', 'method' => 'POST', 'resource' => 'products', 'post' => ['token' => '{token}']])['status']);
+      self::assertSame(404, self::api($base + ['token' => 'activo', 'resource' => 'otra'])['status']);
+
+      // Diez tokens malos desde una IP la bloquean 15 minutos, también con el token bueno.
+      for ($i = 0; $i < 10; $i++) {
+        self::api($base + ['token' => 'activo', 'ip' => '10.9.9.9', 'headers' => ['Authorization' => 'Bearer malo']]);
+      }
+      self::assertSame(429, self::api($base + ['token' => 'activo', 'ip' => '10.9.9.9', 'headers' => ['Authorization' => 'Bearer {token}']])['status']);
+      self::assertSame(200, self::api($base + ['token' => 'activo', 'ip' => '10.9.9.8', 'headers' => ['Authorization' => 'Bearer {token}']])['status']);
+    } finally {
+      @unlink($sqlite);
+    }
+  }
+
+  public function testImageMigrationCopiesPreviewsAppliesAndReverts(): void
+  {
+    $png = (string) base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==');
+    $root = sys_get_temp_dir() . '/scm-pop-migration-' . bin2hex(random_bytes(4));
+    mkdir($root . '/legacy/public/uploads/inventory-products/2026/08', 0777, true);
+    file_put_contents($root . '/legacy/public/uploads/inventory-products/2026/08/abc.png', $png);
+    $legacy = 'https://sucasainmobiliaria.com.co/dashboard-marketing/public/uploads/inventory-products/2026/08/';
+    $this->db->update('wp_marketing_inventory_products', ['image_url' => $legacy . 'abc.png'], ['id' => 1]);
+    $this->db->update('wp_marketing_inventory_products', ['image_url' => $legacy . 'remota.png'], ['id' => 2]);
+    $fetched = [];
+    $run = function (array $arguments) use ($root, $png, &$fetched): array {
+      $out = fopen('php://memory', 'w+');
+      $migration = new \SCM\Commercial\Promotion\Pop\PopImageMigration($this->db, $this->settings, $root . '/uploads', static fn(string $name): string => 'https://panel.test/file.php?n=' . $name, $root . '/legacy',
+        static function (string $url) use ($png, &$fetched): ?string { $fetched[] = $url; return $png; }, $out);
+      $code = $migration->run($arguments);
+      rewind($out);
+      return [$code, (string) stream_get_contents($out)];
+    };
+    try {
+      [$code, $text] = $run([]);
+      self::assertSame(0, $code);
+      self::assertStringContainsString('Se migrarían: 2', $text);
+      self::assertStringContainsString('#1 Llaveros: se copiaría desde la carpeta del panel de marketing (PNG', $text);
+      self::assertStringContainsString('#2 Gorras: se copiaría desde su dirección pública', $text);
+      self::assertSame($legacy . 'abc.png', $this->product('Llaveros')['image_url'], 'La vista previa no cambia nada.');
+      self::assertFalse(is_dir($root . '/uploads'));
+
+      [$code, $text] = $run(['--apply']);
+      self::assertSame(0, $code);
+      $url = (string) $this->product('Llaveros')['image_url'];
+      self::assertMatchesRegularExpression('#^https://panel\.test/file\.php\?n=[a-f0-9]{24}_[0-9]+\.png$#', $url);
+      $name = substr($url, strpos($url, 'n=') + 2);
+      self::assertSame($png, file_get_contents($root . '/uploads/' . $name));
+      self::assertContains($legacy . 'remota.png', $fetched);
+      self::assertCount(2, $this->settings->get(\SCM\Commercial\Promotion\Pop\PopImageMigration::KEY));
+      self::assertStringContainsString('Migradas: 0', $run(['--apply'])[1], 'Una segunda pasada no encuentra nada.');
+
+      [$code, $text] = $run(['--revert']);
+      self::assertSame([$legacy . 'abc.png', $legacy . 'remota.png'], [$this->product('Llaveros')['image_url'], $this->product('Gorras')['image_url']]);
+      self::assertFileDoesNotExist($root . '/uploads/' . $name);
+      self::assertFileExists($root . '/legacy/public/uploads/inventory-products/2026/08/abc.png', 'Los archivos del panel anterior no se tocan.');
+      self::assertSame([], $this->settings->get(\SCM\Commercial\Promotion\Pop\PopImageMigration::KEY));
+    } finally {
+      foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS), \RecursiveIteratorIterator::CHILD_FIRST) as $file) {
+        $file->isDir() ? @rmdir($file->getPathname()) : @unlink($file->getPathname());
+      }
+      @rmdir($root);
+    }
+  }
 }

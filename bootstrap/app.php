@@ -79,7 +79,8 @@ ini_set('error_log', $logsDir . '/php-error.log');
 
 date_default_timezone_set((string) ($scmConfig['timezone'] ?? 'America/Bogota'));
 
-if (session_status() === PHP_SESSION_NONE) {
+// Las APIs públicas (inventory-api.php) definen SCM_NO_SESSION: no abren sesión ni envían su cookie.
+if (session_status() === PHP_SESSION_NONE && !defined('SCM_NO_SESSION')) {
   ini_set('session.use_strict_mode', '1');
   session_name('scm_sess');
   session_start([
