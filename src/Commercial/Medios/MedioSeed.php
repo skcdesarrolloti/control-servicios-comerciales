@@ -10,7 +10,8 @@ namespace SCM\Commercial\Medios;
  * - Los 32 valores del glosario de JetEngine "Medio de llamada" (wp_jet_post_types id 195), en su orden.
  * - Valores que ya están en los registros y que escribe este panel o el administrativo (portales de autoservicio,
  *   WhatsApp del portal, Panel administrativo, Retencion de contrato, Ruta, WhatsApp Guardian, Otro).
- * - Canales de las notificaciones y de la analítica web: SMS, WhatsApp y los asistentes de IA (chatgpt.com, perplexity).
+ * - Canales de las notificaciones y de la analítica web: SMS, WhatsApp y los asistentes de IA, uno por uno (ChatGPT,
+ *   Gemini, Claude, Perplexity, Copilot, Meta AI, DeepSeek, Grok).
  *
  * Los alias son las otras formas en que llega el mismo medio (se comparan sin mayúsculas, tildes ni signos). Mientras
  * la tabla scm_medios no exista (antes de php bin/medios-normalize.php --apply) el panel resuelve con esta lista.
@@ -64,7 +65,15 @@ final class MedioSeed
     // Canales de las notificaciones del panel ("Base de Datos ..." por SMS, correo o WhatsApp) y de la analítica web.
     'SMS' => ['Mensaje de texto'],
     'WhatsApp' => ['wa'],
-    'ChatGPT / IA' => ['chatgpt.com', 'chatgpt', 'perplexity', 'perplexity.ai', 'gemini.google.com', 'copilot.microsoft.com'],
+    // Asistentes de IA, cada uno por separado (los alias son los dominios desde donde llegan las visitas).
+    'ChatGPT' => ['chatgpt.com', 'chat.openai.com', 'openai'],
+    'Gemini' => ['gemini.google.com', 'bard.google.com'],
+    'Claude' => ['claude.ai'],
+    'Perplexity' => ['perplexity.ai', 'www.perplexity.ai'],
+    'Copilot' => ['copilot.microsoft.com', 'Microsoft Copilot'],
+    'Meta AI' => ['meta.ai', 'www.meta.ai'],
+    'DeepSeek' => ['chat.deepseek.com', 'deepseek.com'],
+    'Grok' => ['grok.com', 'x.ai'],
   ];
 
   /** Cuántos medios vienen del glosario original (los primeros de ROWS). */

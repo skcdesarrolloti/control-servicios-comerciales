@@ -85,7 +85,7 @@ final class CommercialMediosTest extends TestCase
       'finca raiz' => 'Finca Raíz', 'FINCA-RAIZ' => 'Finca Raíz', 'finca_raiz' => 'Finca Raíz', 'Estado WhatsApp' => 'Estado whatsapp',
       'Retencion de contrato' => 'Retencion de contrato', 'Retención de contrato' => 'Retencion de contrato', 'Retencion' => 'Retencion', 'Ruta' => 'Ruta', 'por_ruta' => 'Por ruta',
       'ig' => 'Instagram', 'Portal Propietario' => 'Portal propietario', 'Historia Instagram' => 'Historia instagram', ' Referido ' => 'Referido',
-      'Correo Electrónico' => 'Correo', 'Email' => 'Correo', 'chatgpt.com' => 'ChatGPT / IA', 'chatgpt_ia' => 'ChatGPT / IA',
+      'Correo Electrónico' => 'Correo', 'Email' => 'Correo', 'chatgpt.com' => 'ChatGPT', 'chatgpt' => 'ChatGPT', 'gemini.google.com' => 'Gemini', 'claude.ai' => 'Claude', 'perplexity' => 'Perplexity', 'meta_ai' => 'Meta AI',
     ] as $raw => $name) {
       self::assertSame($name, $resolver->resolve($raw), $raw);
     }
@@ -107,8 +107,8 @@ final class CommercialMediosTest extends TestCase
       [['Base de Datos Propietarios', 'SMS'], ['SMS', true]],
       [['WhatsApp Clientes', 'WhatsApp'], ['WhatsApp', true]],
       [['Estado WhatsApp', 'WhatsApp'], ['Estado whatsapp', true]],
-      [['chatgpt.com', ''], ['ChatGPT / IA', true]],
-      [['perplexity', ''], ['ChatGPT / IA', true]],
+      [['chatgpt.com', ''], ['ChatGPT', true]],
+      [['perplexity', ''], ['Perplexity', true]],
       [['ig', 'social'], ['Instagram', true]],
       [['fb', 'paid'], ['Facebook', true]],
       // Lo que sale del Generador UTM: el mismo slug en los dos parámetros.
@@ -325,10 +325,10 @@ final class CommercialMediosTest extends TestCase
     }
     self::assertStringContainsString('No se escribe nada en la base.', $output);
     self::assertStringContainsString('la tabla wp_scm_medios no existe todavía', $output);
-    self::assertStringContainsString('Se agregan: Portal arrendatario, Portal propietario, Portal copropiedad, Panel administrativo, Retencion de contrato, Ruta, WhatsApp cliente, WhatsApp Guardian, Otro, SMS, WhatsApp, ChatGPT / IA.', $output);
+    self::assertStringContainsString('Se agregan: Portal arrendatario, Portal propietario, Portal copropiedad, Panel administrativo, Retencion de contrato, Ruta, WhatsApp cliente, WhatsApp Guardian, Otro, SMS, WhatsApp, ChatGPT, Gemini, Claude, Perplexity, Copilot, Meta AI, DeepSeek, Grok.', $output);
     self::assertStringContainsString("  wp_jet_cct_tickets.medio\n    \"Portal Propietario\" -> \"Portal propietario\": 1 filas\n", $output);
     self::assertStringNotContainsString('"Ruta" ->', $output);
-    self::assertStringContainsString("  wp_jet_cct_tracker_logs.utm_source\n    \"Estado WhatsApp\" -> \"Estado whatsapp\": 1 filas\n    \"chatgpt.com\" -> \"ChatGPT / IA\": 1 filas\n    \"ig\" -> \"Instagram\": 1 filas", $output);
+    self::assertStringContainsString("  wp_jet_cct_tracker_logs.utm_source\n    \"Estado WhatsApp\" -> \"Estado whatsapp\": 1 filas\n    \"chatgpt.com\" -> \"ChatGPT\": 1 filas\n    \"ig\" -> \"Instagram\": 1 filas", $output);
     self::assertStringContainsString("  wp_jet_cct_tracker_logs.utm_medium\n    \"Correo Electrónico\" -> \"Correo\": 1 filas", $output);
     self::assertStringContainsString('Total: 1 filas en registros y 4 en visitas web.', $output);
     self::assertStringContainsString('registros "Valor raro": 2', $output);
@@ -340,7 +340,7 @@ final class CommercialMediosTest extends TestCase
     self::assertSame(['Referido', 'Retencion de contrato', 'Retencion de contrato', 'Ruta', 'Portal arrendatario', 'Portal propietario', 'Retencion', 'Panel administrativo', 'Valor raro', ''], $values['jet_cct_tickets']);
     self::assertSame(['WhatsApp Guardian', 'Ruta'], $values['jet_cct_solicitudes_no_prorroga_contrato']);
     self::assertSame(CommercialMediosDatabase::RECORDS['jet_cct_cct_llamadas'], $values['jet_cct_cct_llamadas'], 'Vacíos, NULL y nombres exactos no cambian.');
-    self::assertSame([['Instagram', 'social'], ['Estado whatsapp', 'WhatsApp'], ['Base de Datos Clientes', 'Correo'], ['Directo', 'Navegador'], ['ChatGPT / IA', ''], ['Inmuebles', 'Pagina Web']],
+    self::assertSame([['Instagram', 'social'], ['Estado whatsapp', 'WhatsApp'], ['Base de Datos Clientes', 'Correo'], ['Directo', 'Navegador'], ['ChatGPT', ''], ['Inmuebles', 'Pagina Web']],
       array_map(static fn(array $row): array => [$row['utm_source'], $row['utm_medium']], $this->db->getResults('SELECT utm_source, utm_medium FROM wp_jet_cct_tracker_logs ORDER BY _ID')));
     self::assertSame(array_keys(MedioSeed::ROWS), CommercialMediosDatabase::glossary($this->db));
     $logId = (int) $this->db->getVar("SELECT id FROM wp_scm_medios_log WHERE action = 'normalize'");

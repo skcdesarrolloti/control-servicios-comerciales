@@ -230,7 +230,7 @@ final class CommercialUtmGeneratorTest extends TestCase
     $context = CommercialToolsView::context('generador_utm', $policy, $db, $settings);
     self::assertSame(UtmCatalog::defaults(), $context['utm_catalog']);
     self::assertSame(['label' => 'Aviso', 'value' => 'aviso'], $context['utm_medios'][0]);
-    self::assertContains(['label' => 'ChatGPT / IA', 'value' => 'chatgpt_ia'], $context['utm_medios']);
+    self::assertContains(['label' => 'ChatGPT', 'value' => 'chatgpt'], $context['utm_medios']);
     self::assertSame([], CommercialToolsView::context('ganancia_ocasional', $policy, $db, $settings)['utm_medios']);
   }
 }

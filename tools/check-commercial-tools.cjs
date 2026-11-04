@@ -239,7 +239,7 @@ const { chromium } = require(process.env.SCM_PLAYWRIGHT_MODULE || 'playwright');
     assert.equal(await utm.locator('[data-utm-copy]').isDisabled(), false);
     await page.screenshot({ path: 'output/commercial-tools-utm.png', fullPage: true });
     // Cambiar el medio invalida el enlace.
-    await utm.locator('[data-utm-field="medio"]').selectOption('chatgpt_ia');
+    await utm.locator('[data-utm-field="medio"]').selectOption('chatgpt');
     assert.equal(await utm.locator('[data-utm-result]').inputValue(), '');
     assert.equal(await utm.locator('[data-utm-status]').innerText(), 'Cambiaste los datos: vuelve a generar el enlace.');
     // Una campaña del tracker va tal cual para sumar a lo ya registrado.
@@ -248,7 +248,7 @@ const { chromium } = require(process.env.SCM_PLAYWRIGHT_MODULE || 'playwright');
     assert.equal(await utm.locator('[data-utm-tracker-campaigns] [data-utm-pick]', { hasText: 'Revista Esencia' }).getAttribute('aria-pressed'), 'true');
     assert.equal(await utm.locator('[data-utm-catalog-campaigns] [data-utm-pick]').getAttribute('aria-pressed'), 'false');
     await utm.locator('[data-utm-generate]').click();
-    assert.equal(await utm.locator('[data-utm-result]').inputValue(), 'https://sucasainmobiliaria.com.co/inmueble/?id=45&utm_source=chatgpt_ia&utm_medium=chatgpt_ia&utm_campaign=Revista%20Esencia&utm_content=banner_superior#galeria');
+    assert.equal(await utm.locator('[data-utm-result]').inputValue(), 'https://sucasainmobiliaria.com.co/inmueble/?id=45&utm_source=chatgpt&utm_medium=chatgpt&utm_campaign=Revista%20Esencia&utm_content=banner_superior#galeria');
     // Escrita a mano y distinta del tracker, la campaña se normaliza; las reservadas del tracker se rechazan.
     await utm.locator('[data-utm-field="campaign"]').fill('revista esencia');
     assert.equal(await utm.locator('[data-utm-preview="campaign"]').innerText(), 'En el enlace: utm_campaign=revista_esencia');
