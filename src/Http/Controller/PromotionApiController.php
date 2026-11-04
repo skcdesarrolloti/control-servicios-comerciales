@@ -39,7 +39,7 @@ final class PromotionApiController
 
   /**
    * Analítica web › Registros: una página de visitas crudas (hasta 90 días, 25 filas, paginación por llave).
-   * @param array<string,mixed> $input pr_desde, pr_hasta, pr_campana, pr_fuente, pr_medio, cursor.
+   * @param array<string,mixed> $input pr_desde, pr_hasta, pr_campana, pr_medio (medio de la lista única), cursor.
    */
   public function analyticsLogs(array $input): never
   {

@@ -8,46 +8,35 @@ use SCM\Core\Database;
 
 /**
  * Copia de dashboard-marketing (app/AnalyticsRepository.php, filterOptions/options): si cambia la consulta, cambiarla en
- * ambos. Solo lectura: fuentes, medios y campañas que ya registró el tracker (jet_cct_tracker_logs) más el catálogo de
- * campañas (jet_cct_tracker_camps), para sugerirlos en el Generador UTM. Las tablas son del legado: si no existen o
- * cambian, se devuelve la lista vacía sin romper la herramienta. No envía IP, URL ni ningún dato de visitantes.
+ * ambos. Solo lectura: campañas que ya registró el tracker (jet_cct_tracker_logs) más el catálogo de campañas
+ * (jet_cct_tracker_camps), para sugerirlas en el Generador UTM. Las tablas son del legado: si no existen o cambian, se
+ * devuelve la lista vacía sin romper la herramienta. No envía IP, URL ni ningún dato de visitantes.
+ *
+ * Fuentes y medios ya no se sugieren desde el tracker: el generador usa la lista única de Medios (MedioCatalog).
  */
 final class UtmTrackerOptions
 {
   /** Segundos que se reutiliza el resultado en la sesión (el legado cacheaba 15 minutos). */
   private const CACHE_TTL = 900;
-  private const CACHE_KEY = 'scm_utm_tracker_options_v2';
-
-  /**
-   * Valores que el tracker (dashboard-marketing app/TrackerRepository.php) escribe en las visitas sin UTM: no se sugieren,
-   * porque un enlace con ellos se mezcla con el tráfico directo o de la página. Se comparan sin distinguir mayúsculas.
-   */
-  public const TRACKER_DEFAULTS = [
-    'sources' => ['directo', 'inmuebles'],
-    'mediums' => ['navegador', 'pagina web'],
-  ];
+  private const CACHE_KEY = 'scm_utm_tracker_options_v3';
 
   /** @var array<string,bool> */
   private array $exists = [];
 
   public function __construct(private Database $db) {}
 
-  /** @return array{sources:list<string>,mediums:list<string>,campaigns:list<array{value:string,label:string}>} */
+  /** @return array{campaigns:list<array{value:string,label:string}>} */
   public function options(bool $useCache = true): array
   {
     $cached = $useCache ? ($_SESSION[self::CACHE_KEY] ?? null) : null;
     if (is_array($cached) && (int) ($cached['expires'] ?? 0) > time() && is_array($cached['data'] ?? null)) {
-      /** @var array{sources:list<string>,mediums:list<string>,campaigns:list<array{value:string,label:string}>} $data */
+      /** @var array{campaigns:list<array{value:string,label:string}>} $data */
       $data = $cached['data'];
       return $data;
     }
     $logs = $this->db->table('jet_cct_tracker_logs');
     $camps = $this->db->table('jet_cct_tracker_camps');
-    $data = [
-      'sources' => self::without($this->distinct($logs, 'utm_source', 200), self::TRACKER_DEFAULTS['sources']),
-      'mediums' => self::without($this->distinct($logs, 'utm_medium', 200), self::TRACKER_DEFAULTS['mediums']),
-      'campaigns' => [],
-    ];
+    $data = ['campaigns' => []];
     $campaigns = [];
     if ($this->exists($camps)) {
       try {
@@ -67,16 +56,6 @@ final class UtmTrackerOptions
       $_SESSION[self::CACHE_KEY] = ['expires' => time() + self::CACHE_TTL, 'data' => $data];
     }
     return $data;
-  }
-
-  /**
-   * @param list<string> $values
-   * @param list<string> $excluded En minúsculas.
-   * @return list<string>
-   */
-  private static function without(array $values, array $excluded): array
-  {
-    return array_values(array_filter($values, static fn(string $value): bool => !in_array(mb_strtolower($value, 'UTF-8'), $excluded, true)));
   }
 
   /** @return list<string> */

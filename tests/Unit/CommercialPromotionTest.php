@@ -241,11 +241,12 @@ final class CommercialPromotionTest extends TestCase
     self::assertStringNotContainsString('Eventos', $html);
 
     // Filtro por campaña y medio, desde los resúmenes.
-    $filtered = $this->analytics(['pr_campana' => 'promo-octubre', 'pr_medio' => 'Redes']);
+    $filtered = $this->analytics(['pr_campana' => 'promo-octubre', 'pr_medio' => 'Instagram']);
     self::assertGreaterThan(0, $filtered['kpis']['visits']);
     self::assertLessThan($expected, $filtered['kpis']['visits']);
     self::assertSame(['promo-octubre'], array_column($filtered['lists']['campaigns'], 'value'));
-    self::assertSame([], array_diff(array_column($filtered['lists']['mediums'], 'value'), ['Redes']));
+    self::assertSame(['Instagram'], array_column($filtered['lists']['medios'], 'value'));
+    self::assertArrayNotHasKey('sources', $filtered['lists']);
 
     CommercialPromotionDatabase::login('6', '202');
     self::assertTrue($this->analytics()['can_network']);
@@ -336,7 +337,7 @@ final class CommercialPromotionTest extends TestCase
   {
     $this->seed();
     $html = AnalyticsView::render($this->analytics(), '/public');
-    self::assertStringContainsString('Visitas al sitio de SKC SuCasa Inmobiliaria: campañas, fuentes, medios, páginas e inmuebles.', $html);
+    self::assertStringContainsString('Visitas al sitio de SKC SuCasa Inmobiliaria: campañas, medios, páginas e inmuebles.', $html);
     self::assertStringNotContainsString('registradas por el tracker', $html);
     self::assertStringContainsString('Por dirección IP (se guarda cifrada)', $html);
     self::assertMatchesRegularExpression('/De [\d.]+ visitas registradas no se cuentan [\d.]+ de robots \([\d,]+ %\) ni [\d.]+ internas de la oficina \([\d,]+ %\)\./', $html);

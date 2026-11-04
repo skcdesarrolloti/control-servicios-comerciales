@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace SCM\Commercial;
 
+use SCM\Commercial\Medios\MedioCatalog;
+use SCM\Commercial\Medios\MedioResolver;
 use SCM\Commercial\Promotion\Analytics\TrackerAnalyticsConfig;
 use SCM\Commercial\Promotion\Analytics\TrackerRollup;
+use SCM\Commercial\Promotion\Analytics\TrackerSchema;
 use SCM\Commercial\Tools\CleaningSettings;
 use SCM\Commercial\Tools\UtmCatalog;
 use SCM\Core\Auth;
@@ -18,6 +21,8 @@ use SCM\Support\SchemaInspector;
  * Los valores que también usan otras aplicaciones (SLA de tareas, plazos y valores de avisos,
  * cupos de destacados, calculadora de aseo) se guardan en su fila de `jet_cct_confi_sistema` para mantener una sola fuente.
  * Lo propio del panel (plazos de actualización, catálogo del Generador UTM, Analítica web) va en Settings.
+ * La lista única de Medios vive en su propia tabla (scm_medios, MedioCatalog): la sección "medios" la administra y, al
+ * cambiarla, sincroniza el glosario "Medio de llamada" de JetEngine.
  */
 final class CommercialSettingsService
 {
@@ -41,7 +46,10 @@ final class CommercialSettingsService
     'factor_prestacional' => ['Factor prestacional', 0, 0, 100],
   ];
 
-  public const SECTIONS = ['calendario', 'tiempos', 'avisos', 'actualizaciones', 'destacados', 'aseo', 'utm', 'analitica'];
+  public const SECTIONS = ['calendario', 'tiempos', 'avisos', 'actualizaciones', 'destacados', 'aseo', 'utm', 'medios', 'analitica'];
+
+  /** Operaciones de la sección "medios" (todas guardan, salvo preview, que solo cuenta). */
+  public const MEDIOS_OPS = ['add', 'rename', 'toggle', 'merge', 'aliases', 'alias_raw', 'rewrite_raw', 'preview'];
 
   private Database $db;
   private Settings $settings;
@@ -49,6 +57,8 @@ final class CommercialSettingsService
   private SchemaInspector $schema;
   /** @var array<string,mixed> */
   private array $config;
+  /** @var array<string,mixed> Datos extra de la última operación (conteos de la sección Medios). */
+  private array $lastResult = [];
 
   /** @param array<string,mixed> $config */
   public function __construct(Database $db, Settings $settings, CommercialAccessPolicy $policy, array $config)
@@ -60,8 +70,12 @@ final class CommercialSettingsService
     $this->config = $config;
   }
 
-  /** @return array<string,mixed> */
-  public function load(): array
+  /**
+   * @param string $section Con 'medios' se agrega el detalle de la lista (uso en registros, valores sin reconocer e
+   *   historial), que es más costoso y solo hace falta al abrir esa sección.
+   * @return array<string,mixed>
+   */
+  public function load(string $section = ''): array
   {
     $this->authorize();
     $calendar = new CommercialCalendarService($this->db, $this->settings, $this->policy, $this->config);
@@ -97,8 +111,119 @@ final class CommercialSettingsService
       'aseo' => $this->cleaningSettings(),
       // Solo las listas de medios, fuentes y campañas del Generador UTM.
       'utm' => UtmCatalog::read($this->settings),
+      'medios' => $this->mediosSettings($section === 'medios'),
       'analitica' => $this->analyticsSettings(),
     ];
+  }
+
+  /**
+   * Solo la sección Medios con su detalle (lo mismo que load('medios')['medios']).
+   * @return array<string,mixed>
+   */
+  public function loadMedios(): array
+  {
+    $this->authorize();
+    return $this->mediosSettings(true);
+  }
+
+  /** @return array<string,mixed> */
+  public function lastResult(): array
+  {
+    return $this->lastResult;
+  }
+
+  private function medios(): MedioCatalog
+  {
+    return new MedioCatalog($this->db, $this->settings, trim(Auth::employeeId()));
+  }
+
+  /**
+   * Configuración › Medios: la lista y, con $detail, cuántos registros usa cada medio, los valores sin reconocer y el
+   * historial.
+   * @return array<string,mixed>
+   */
+  private function mediosSettings(bool $detail): array
+  {
+    $catalog = $this->medios();
+    $out = [
+      'ready' => $catalog->ready(),
+      'direct' => MedioResolver::DIRECT,
+      'tables' => MedioCatalog::TABLE_LABELS,
+      'medios' => $catalog->all(),
+    ];
+    if (!$detail) {
+      return $out;
+    }
+    try {
+      $values = $catalog->recordValues();
+      $out['usage'] = $catalog->usage($values);
+      $out['unresolved'] = $catalog->unresolved();
+    } catch (\Throwable $exception) {
+      error_log('[medios] ' . $exception->getMessage());
+      $out['usage'] = [];
+      $out['unresolved'] = ['records' => [], 'variants' => [], 'visits' => []];
+      $out['error'] = 'No se pudieron contar los registros por medio.';
+    }
+    $out['history'] = $catalog->history(12);
+    // ¿La analítica web ya clasificó las visitas con la versión vigente de la lista?
+    $out['analytics_pending'] = false;
+    if (TrackerSchema::isReady($this->settings)) {
+      $out['analytics_pending'] = TrackerRollup::state($this->db)['medios_rev'] !== $catalog->revision();
+    }
+    return $out;
+  }
+
+  /**
+   * Operaciones de Configuración › Medios. Cada una valida en el servidor y va en una transacción con su historial.
+   * @param array<string,mixed> $data op y sus datos (id, nombre, target, value, aliases, active).
+   */
+  private function saveMedios(array $data): string
+  {
+    $op = is_string($data['op'] ?? null) ? $data['op'] : '';
+    if (!in_array($op, self::MEDIOS_OPS, true)) {
+      throw new \InvalidArgumentException('Operación de medios no válida.');
+    }
+    $catalog = $this->medios();
+    $id = (int) ($data['id'] ?? 0);
+    $target = (int) ($data['target'] ?? 0);
+    $text = static fn(string $key): string => is_scalar($data[$key] ?? null) ? (string) $data[$key] : '';
+    $analytics = ' La analítica web lo aplica en la siguiente corrida de la tarea programada (unos minutos).';
+    $sum = static fn(array $counts): int => (int) array_sum($counts);
+    switch ($op) {
+      case 'preview':
+        $counts = $catalog->preview($text('value'));
+        $this->lastResult = ['preview' => $counts, 'total' => $sum($counts)];
+        return '';
+      case 'add':
+        $added = $catalog->add($text('nombre'));
+        $this->lastResult = $added;
+        return 'Medio "' . $added['nombre'] . '" agregado. Ya aparece en el glosario de los formularios y en el Generador UTM.';
+      case 'rename':
+        $counts = $catalog->rename($id, $text('nombre'));
+        $this->lastResult = ['records' => $counts];
+        return 'Medio renombrado: ' . $sum($counts) . ' registros quedaron con el nombre nuevo y el anterior queda como alias.' . $analytics;
+      case 'toggle':
+        $active = !empty($data['active']) && $data['active'] !== 'false';
+        $catalog->setActive($id, $active);
+        return $active ? 'Medio activado: vuelve a ofrecerse en los formularios y en el Generador UTM.' : 'Medio desactivado: ya no se ofrece, pero sus registros y visitas se siguen reconociendo.';
+      case 'merge':
+        $counts = $catalog->merge($id, $target);
+        $this->lastResult = ['records' => $counts];
+        return 'Medios unidos: ' . $sum($counts) . ' registros pasaron al medio de destino.' . $analytics;
+      case 'aliases':
+        $aliases = $catalog->setAliases($id, is_array($data['aliases'] ?? null) ? array_values(array_map('strval', array_filter($data['aliases'], 'is_scalar'))) : $text('aliases'));
+        $this->lastResult = ['aliases' => $aliases];
+        return 'Alias guardados (' . count($aliases) . ').' . $analytics;
+      case 'alias_raw':
+        $catalog->aliasRaw($text('value'), $target);
+        return 'Valor agregado como alias; los registros no cambian.' . $analytics;
+      case 'rewrite_raw':
+        $counts = $catalog->rewriteRaw($text('value'), $target);
+        $this->lastResult = ['records' => $counts];
+        return $sum($counts) . ' registros reescritos con el medio elegido (quedan en el historial y se pueden revertir).' . $analytics;
+      default:
+        throw new \InvalidArgumentException('Operación de medios no válida.');
+    }
   }
 
   /**
@@ -141,7 +266,9 @@ final class CommercialSettingsService
         return 'Configuración de la calculadora de aseo guardada.';
       case 'utm':
         UtmCatalog::save($this->settings, $data, Auth::userId());
-        return 'Catálogo del generador UTM guardado.';
+        return 'Campañas del generador UTM guardadas.';
+      case 'medios':
+        return $this->saveMedios($data);
       case 'analitica':
         $before = TrackerAnalyticsConfig::read($this->settings);
         $saved = TrackerAnalyticsConfig::save($this->settings, $data, Auth::userId());

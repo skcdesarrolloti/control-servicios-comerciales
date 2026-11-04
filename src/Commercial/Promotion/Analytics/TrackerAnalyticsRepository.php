@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace SCM\Commercial\Promotion\Analytics;
 
+use SCM\Commercial\Medios\MedioCatalog;
+use SCM\Commercial\Medios\MedioResolver;
 use SCM\Core\Database;
 use SCM\Core\Settings;
 
@@ -16,14 +18,16 @@ use SCM\Core\Settings;
  *
  * Sin el permiso promocion_ver_ip el visor lee la IP y el navegador solo para reconocer robots y visitas internas, y nunca
  * los devuelve (ni siquiera en el JSON).
+ *
+ * Fuentes y medios UTM ya no se listan ni se filtran por separado: la dimensión es el Medio de la lista única (columna
+ * `medio` de los resúmenes). En Registros se siguen viendo utm_source y utm_medium crudos, junto al medio que resultó.
  */
 final class TrackerAnalyticsRepository
 {
   /** Listas disponibles => [tabla de origen, columna o dimensión]. */
   public const LISTS = [
     'campaigns' => ['daily', 'camp_slug'],
-    'sources' => ['daily', 'utm_source'],
-    'mediums' => ['daily', 'utm_medium'],
+    'medios' => ['daily', 'medio'],
     'pages' => ['top', 'page'],
     'referrers' => ['top', 'referrer'],
     'countries' => ['top', 'country'],
@@ -41,6 +45,7 @@ final class TrackerAnalyticsRepository
   private Settings $settings;
   /** @var array<string,string>|null */
   private ?array $campaignNames = null;
+  private ?MedioCatalog $medios = null;
 
   public function __construct(Database $db, Settings $settings)
   {
@@ -134,7 +139,8 @@ final class TrackerAnalyticsRepository
   }
 
   /**
-   * Lista de los más visitados. Campañas, fuentes y medios incluyen visitantes únicos.
+   * Lista de los más visitados. Campañas y medios incluyen visitantes únicos. En los medios, el detalle marca los que no
+   * están en la lista ("Sin reconocer"): se ajustan en Configuración › Medios.
    * @return list<array{value:string,label:string,detail:string,hits:int,unique_visitors:int|null}>
    */
   public function top(string $list, TrackerAnalyticsFilters $filters, int $limit = 10): array
@@ -166,10 +172,11 @@ final class TrackerAnalyticsRepository
         }
       }
       $names = $list === 'campaigns' ? $this->campaignNames() : [];
+      $resolver = $list === 'medios' ? $this->medios()->resolver() : null;
       return array_map(static fn(array $row): array => [
         'value' => (string) $row['label'],
-        'label' => $names[(string) $row['label']] ?? (string) $row['label'],
-        'detail' => '',
+        'label' => $names[(string) $row['label']] ?? ((string) $row['label'] === '' && $resolver !== null ? 'Sin clasificar' : (string) $row['label']),
+        'detail' => $resolver !== null ? self::medioDetail($resolver, (string) $row['label']) : '',
         'hits' => (int) $row['hits'],
         'unique_visitors' => $uniques[mb_strtolower((string) $row['label'])] ?? 0,
       ], $rows);
@@ -188,13 +195,27 @@ final class TrackerAnalyticsRepository
     ], $rows);
   }
 
+  /** Detalle de una fila de la lista de medios: vacío si es de la lista o 'Sin medio (directo)'. */
+  private static function medioDetail(MedioResolver $resolver, string $medio): string
+  {
+    if ($medio === '') {
+      return 'Pendiente de clasificar (la tarea programada lo completa)';
+    }
+    return $medio === MedioResolver::DIRECT || $resolver->isName($medio) ? '' : 'Sin reconocer · se ajusta en Configuración › Medios';
+  }
+
+  private function medios(): MedioCatalog
+  {
+    return $this->medios ??= new MedioCatalog($this->db, $this->settings);
+  }
+
   /**
    * Opciones de los filtros: lo que aparece en los resúmenes de los últimos 12 meses, con el nombre de cada campaña.
-   * @return array{campaigns:list<array{value:string,label:string}>,sources:list<string>,mediums:list<string>}
+   * @return array{campaigns:list<array{value:string,label:string}>,medios:list<string>}
    */
   public function options(?string $today = null): array
   {
-    $out = ['campaigns' => [], 'sources' => [], 'mediums' => []];
+    $out = ['campaigns' => [], 'medios' => []];
     if (!$this->ready()) {
       return $out;
     }
@@ -204,8 +225,7 @@ final class TrackerAnalyticsRepository
     foreach ($this->db->getCol("SELECT DISTINCT `camp_slug` FROM `{$daily}` WHERE `fecha` >= ? ORDER BY `camp_slug`", [$since]) as $slug) {
       $out['campaigns'][] = ['value' => (string) $slug, 'label' => $names[(string) $slug] ?? (string) $slug];
     }
-    $out['sources'] = array_map('strval', $this->db->getCol("SELECT DISTINCT `utm_source` FROM `{$daily}` WHERE `fecha` >= ? ORDER BY `utm_source`", [$since]));
-    $out['mediums'] = array_map('strval', $this->db->getCol("SELECT DISTINCT `utm_medium` FROM `{$daily}` WHERE `fecha` >= ? ORDER BY `utm_medium`", [$since]));
+    $out['medios'] = array_values(array_filter(array_map('strval', $this->db->getCol("SELECT DISTINCT `medio` FROM `{$daily}` WHERE `fecha` >= ? ORDER BY `medio`", [$since])), static fn(string $medio): bool => $medio !== ''));
     return $out;
   }
 
@@ -260,14 +280,13 @@ final class TrackerAnalyticsRepository
       $high = min($high, $position);
     }
     $args = [$low, $high, $start, $end];
-    foreach (['camp_slug' => [$filters->campaign, TrackerSchema::EMPTY_CAMPAIGN], 'utm_source' => [$filters->source, TrackerSchema::EMPTY_SOURCE], 'utm_medium' => [$filters->medium, TrackerSchema::EMPTY_MEDIUM]] as $column => [$value, $empty]) {
-      if ($value === '') {
-        continue;
-      }
-      // En los resúmenes los vacíos quedaron con su nombre ('general', 'Directo', 'Sin medio'): aquí se buscan ambos.
-      $where[] = $value === $empty ? "(`{$column}` = ? OR `{$column}` = '' OR `{$column}` IS NULL)" : "`{$column}` = ?";
-      $args[] = $value;
+    if ($filters->campaign !== '') {
+      // En los resúmenes la campaña vacía quedó como 'general': aquí se buscan ambas.
+      $where[] = $filters->campaign === TrackerSchema::EMPTY_CAMPAIGN ? "(`camp_slug` = ? OR `camp_slug` = '' OR `camp_slug` IS NULL)" : '`camp_slug` = ?';
+      $args[] = $filters->campaign;
     }
+    // El medio sale de utm_source y utm_medium con la lista vigente: se filtra aquí mismo, como los robots.
+    $resolver = $this->medios()->resolver();
     $config = TrackerAnalyticsConfig::read($this->settings);
     $internal = new InternalIpMatcher($config['internal_ips']);
     $names = $this->campaignNames();
@@ -288,6 +307,14 @@ final class TrackerAnalyticsRepository
         if (($filters->excludeBots && $bot) || ($filters->excludeInternal && $isInternal)) {
           continue;
         }
+        $medio = $resolver->forVisit(
+          TrackerAggregator::dimension($row['utm_source'] ?? '', TrackerSchema::EMPTY_SOURCE),
+          TrackerAggregator::dimension($row['utm_medium'] ?? '', TrackerSchema::EMPTY_MEDIUM)
+        )[0];
+        if ($filters->medio !== '' && mb_strtolower($medio) !== mb_strtolower($filters->medio)) {
+          continue;
+        }
+        $row['medio'] = $medio;
         if (count($kept) === self::LOG_PAGE_SIZE) {
           // Hay al menos una fila más: la página siguiente empieza después de la última mostrada.
           return ['rows' => $kept, 'next_cursor' => (string) $last, 'from' => $filters->from, 'to' => $filters->to, 'clamped' => $filters->clamped];
@@ -353,6 +380,7 @@ final class TrackerAnalyticsRepository
       'campaign_name' => $names[$campaign] ?? $campaign,
       'source' => TrackerAggregator::dimension($row['utm_source'] ?? '', TrackerSchema::EMPTY_SOURCE),
       'medium' => TrackerAggregator::dimension($row['utm_medium'] ?? '', TrackerSchema::EMPTY_MEDIUM),
+      'medio' => (string) ($row['medio'] ?? ''),
       'page_url' => (string) ($row['page_url'] ?? ''),
       'referrer' => (string) ($row['referrer'] ?? ''),
       'country' => (string) ($row['country'] ?? ''),
@@ -380,14 +408,14 @@ final class TrackerAnalyticsRepository
   }
 
   /**
-   * Condición sobre los resúmenes. Las tres tablas comparten fecha, campaña, fuente, medio, robot e interna.
+   * Condición sobre los resúmenes. Las tres tablas comparten fecha, campaña, medio, robot e interna.
    * @return array{0:string,1:list<string|int>}
    */
   private function where(TrackerAnalyticsFilters $filters, bool $applyExclusions): array
   {
     $where = ['`fecha` BETWEEN ? AND ?'];
     $args = [$filters->from, $filters->to];
-    foreach (['camp_slug' => $filters->campaign, 'utm_source' => $filters->source, 'utm_medium' => $filters->medium] as $column => $value) {
+    foreach (['camp_slug' => $filters->campaign, 'medio' => $filters->medio] as $column => $value) {
       if ($value !== '') {
         $where[] = "`{$column}` = ?";
         $args[] = $value;

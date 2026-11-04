@@ -18,8 +18,8 @@ final class TrackerAnalyticsFilters
     public readonly string $from,
     public readonly string $to,
     public readonly string $campaign = '',
-    public readonly string $source = '',
-    public readonly string $medium = '',
+    /** Medio de la lista única (columna `medio` de los resúmenes); reemplaza los filtros de fuente y medio UTM. */
+    public readonly string $medio = '',
     public readonly bool $excludeBots = true,
     public readonly bool $excludeInternal = true,
     public readonly bool $clamped = false,
@@ -27,7 +27,7 @@ final class TrackerAnalyticsFilters
   }
 
   /**
-   * @param array<string,mixed> $input from, to (AAAA-MM-DD), campaign, source, medium, exclude_bots, exclude_internal.
+   * @param array<string,mixed> $input from, to (AAAA-MM-DD), campaign, medio, exclude_bots, exclude_internal.
    * @param array{exclude_bots:bool,exclude_internal:bool} $config Valores por defecto de Configuración › Analítica web.
    */
   public static function fromInput(array $input, array $config, ?string $today = null, int $maxDays = self::MAX_DAYS): self
@@ -51,8 +51,7 @@ final class TrackerAnalyticsFilters
       $from,
       $to,
       self::text($input['campaign'] ?? ''),
-      self::text($input['source'] ?? ''),
-      self::text($input['medium'] ?? ''),
+      self::text($input['medio'] ?? ''),
       array_key_exists('exclude_bots', $input) ? self::flag($input['exclude_bots']) : $config['exclude_bots'],
       array_key_exists('exclude_internal', $input) ? self::flag($input['exclude_internal']) : $config['exclude_internal'],
       $clamped,
@@ -66,7 +65,7 @@ final class TrackerAnalyticsFilters
     if ($this->from >= $earliest) {
       return $this;
     }
-    return new self($earliest, $this->to, $this->campaign, $this->source, $this->medium, $this->excludeBots, $this->excludeInternal, true);
+    return new self($earliest, $this->to, $this->campaign, $this->medio, $this->excludeBots, $this->excludeInternal, true);
   }
 
   public function days(): int
@@ -78,7 +77,7 @@ final class TrackerAnalyticsFilters
   public function toArray(): array
   {
     return [
-      'from' => $this->from, 'to' => $this->to, 'campaign' => $this->campaign, 'source' => $this->source, 'medium' => $this->medium,
+      'from' => $this->from, 'to' => $this->to, 'campaign' => $this->campaign, 'medio' => $this->medio,
       'exclude_bots' => $this->excludeBots, 'exclude_internal' => $this->excludeInternal, 'clamped' => $this->clamped,
     ];
   }

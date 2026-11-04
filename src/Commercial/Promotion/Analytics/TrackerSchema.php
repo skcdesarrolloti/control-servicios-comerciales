@@ -20,11 +20,17 @@ use SCM\Core\Settings;
  * Versión 2: la llave de scm_tracker_daily_top empieza por (dim, fecha), que es como se lee (WHERE dim = ? AND fecha
  * BETWEEN), sin índice secundario. La 1 nunca se publicó; si existiera, migrateFromV1() la convierte desde la línea de
  * comandos (nunca desde una petición web).
+ *
+ * Versión 3: columna `medio` en las tres tablas (el Medio de la lista única, MedioResolver::forVisit sobre utm_source y
+ * utm_medium) y `medios_rev` en el estado. No va en las llaves: es función de (utm_source, utm_medium), así que agregarla
+ * no parte ninguna fila. migrateFromV2() (solo línea de comandos) agrega las columnas y clasifica lo ya resumido con
+ * TrackerRollup::remapMedios(); mientras tanto la web muestra que la analítica necesita esa actualización.
  */
 final class TrackerSchema
 {
-  public const VERSION = 2;
+  public const VERSION = 3;
   public const SETTING = 'promotion_tracker_schema';
+  public const MIGRATION_MESSAGE = 'Los resúmenes de la analítica web necesitan una actualización: se hace con php bin/tracker-rollup.php.';
   /** Donde la versión 1 guardaba el estado del rollup (dentro de la configuración del panel). */
   public const LEGACY_STATE_SETTING = 'promotion_tracker_rollup';
 
@@ -42,6 +48,13 @@ final class TrackerSchema
     'inmueble_view' => 'Vista de inmueble',
     'event_click' => 'Clic registrado',
   ];
+
+  /** ¿Hay resúmenes de una versión anterior que solo se pueden migrar desde la línea de comandos? */
+  public static function needsMigration(Settings $settings): bool
+  {
+    $version = self::version($settings);
+    return $version > 0 && $version < self::VERSION;
+  }
 
   /** Dimensiones de scm_tracker_daily_top. */
   public const TOP_DIMS = ['page', 'referrer', 'country', 'city', 'object'];
@@ -100,10 +113,10 @@ final class TrackerSchema
       return;
     }
     $current = self::version($settings);
+    if ($current > 0 && $current < self::VERSION && PHP_SAPI !== 'cli') {
+      throw new \RuntimeException(self::MIGRATION_MESSAGE);
+    }
     if ($current === 1) {
-      if (PHP_SAPI !== 'cli') {
-        throw new \RuntimeException('Los resúmenes de la analítica web necesitan una actualización: se hace con php bin/tracker-rollup.php.');
-      }
       self::migrateFromV1($db, $settings);
     }
     foreach (self::tables($db, self::top($db)) as $query) {
@@ -111,6 +124,9 @@ final class TrackerSchema
     }
     if ((int) $db->getVar('SELECT COUNT(*) FROM `' . self::state($db) . '` WHERE `id` = 1') === 0) {
       $db->pdo()->exec('INSERT INTO `' . self::state($db) . '` (`id`) VALUES (1)');
+    }
+    if ($current >= 1 && $current < 3) {
+      self::migrateFromV2($db);
     }
     if ($current < self::VERSION) {
       $settings->set(self::SETTING, self::VERSION, 0, true);
@@ -165,6 +181,33 @@ final class TrackerSchema
     }
   }
 
+  /**
+   * Versión 2 -> 3: agrega `medio` a las tres tablas y `medios_rev` al estado (en MariaDB, ADD COLUMN con valor por
+   * defecto es instantáneo). TrackerRollup::remapMedios() los llena después, ya con la lista de Medios.
+   */
+  private static function migrateFromV2(Database $db): void
+  {
+    $sqlite = $db->pdo()->getAttribute(\PDO::ATTR_DRIVER_NAME) === 'sqlite';
+    $columns = [
+      self::daily($db) => 'medio',
+      self::top($db) => 'medio',
+      self::visitors($db) => 'medio',
+      self::state($db) => 'medios_rev',
+    ];
+    foreach ($columns as $table => $column) {
+      try {
+        $db->getVar('SELECT `' . $column . '` FROM `' . $table . '` LIMIT 1');
+        continue;
+      } catch (\Throwable) {
+        // La columna no existe todavía.
+      }
+      $definition = $column === 'medios_rev'
+        ? ($sqlite ? 'INTEGER NOT NULL DEFAULT -1' : 'BIGINT NOT NULL DEFAULT -1')
+        : ($sqlite ? "TEXT NOT NULL DEFAULT ''" : "VARCHAR(120) NOT NULL DEFAULT ''");
+      $db->pdo()->exec('ALTER TABLE `' . $table . '` ADD COLUMN `' . $column . '` ' . $definition);
+    }
+  }
+
   /** @return list<string> */
   private static function tables(Database $db, string $top): array
   {
@@ -174,7 +217,7 @@ final class TrackerSchema
   /** @return list<string> */
   private static function mysqlTables(Database $db, string $top): array
   {
-    $dims = 'camp_slug VARCHAR(120) NOT NULL, utm_source VARCHAR(120) NOT NULL, utm_medium VARCHAR(120) NOT NULL';
+    $dims = "camp_slug VARCHAR(120) NOT NULL, utm_source VARCHAR(120) NOT NULL, utm_medium VARCHAR(120) NOT NULL, medio VARCHAR(120) NOT NULL DEFAULT ''";
     $flags = 'bot TINYINT UNSIGNED NOT NULL DEFAULT 0, internal TINYINT UNSIGNED NOT NULL DEFAULT 0';
     $engine = 'ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci';
     return [
@@ -198,7 +241,7 @@ final class TrackerSchema
       'CREATE TABLE IF NOT EXISTS `' . self::state($db) . "` (
         id TINYINT UNSIGNED NOT NULL, last_id BIGINT UNSIGNED NOT NULL DEFAULT 0, last_fecha VARCHAR(19) NOT NULL DEFAULT '',
         updated_at VARCHAR(19) NOT NULL DEFAULT '', purged_before VARCHAR(10) NOT NULL DEFAULT '',
-        last_purge VARCHAR(1000) NOT NULL DEFAULT '', rebuild VARCHAR(255) NOT NULL DEFAULT '',
+        last_purge VARCHAR(1000) NOT NULL DEFAULT '', rebuild VARCHAR(255) NOT NULL DEFAULT '', medios_rev BIGINT NOT NULL DEFAULT -1,
         PRIMARY KEY (id)
       ) {$engine}",
     ];
@@ -207,7 +250,7 @@ final class TrackerSchema
   /** Las mismas tablas para las pruebas con SQLite. @return list<string> */
   private static function sqliteTables(Database $db, string $top): array
   {
-    $dims = 'camp_slug TEXT NOT NULL, utm_source TEXT NOT NULL, utm_medium TEXT NOT NULL';
+    $dims = "camp_slug TEXT NOT NULL, utm_source TEXT NOT NULL, utm_medium TEXT NOT NULL, medio TEXT NOT NULL DEFAULT ''";
     $flags = 'bot INTEGER NOT NULL DEFAULT 0, internal INTEGER NOT NULL DEFAULT 0';
     return [
       'CREATE TABLE IF NOT EXISTS `' . self::daily($db) . "` (fecha TEXT NOT NULL, {$dims}, registered INTEGER NOT NULL DEFAULT 0, {$flags},
@@ -219,7 +262,7 @@ final class TrackerSchema
         hits INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (fecha, visitor_hash, camp_slug, utm_source, utm_medium, bot, internal))",
       'CREATE TABLE IF NOT EXISTS `' . self::state($db) . "` (id INTEGER NOT NULL PRIMARY KEY, last_id INTEGER NOT NULL DEFAULT 0,
         last_fecha TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL DEFAULT '', purged_before TEXT NOT NULL DEFAULT '',
-        last_purge TEXT NOT NULL DEFAULT '', rebuild TEXT NOT NULL DEFAULT '')",
+        last_purge TEXT NOT NULL DEFAULT '', rebuild TEXT NOT NULL DEFAULT '', medios_rev INTEGER NOT NULL DEFAULT -1)",
     ];
   }
 }

@@ -633,7 +633,7 @@
       "ciudad",
       "id_funcionario",
       "page",
-      "pr_desde", "pr_hasta", "pr_campana", "pr_fuente", "pr_medio", "pr_actor", "pr_proyecto", "pr_menu", "pr_q", "pr_pag",
+      "pr_desde", "pr_hasta", "pr_campana", "pr_medio", "pr_actor", "pr_proyecto", "pr_menu", "pr_q", "pr_pag",
     ].forEach(function (key) {
       data.append(key, nextUrl.searchParams.get(key) || "");
     });

@@ -2,8 +2,9 @@
   "use strict";
   // Generador UTM: copia de dashboard-marketing (views/utm.php y la sección "UTM" de public/assets/app.js) con el diseño
   // de las herramientas comerciales. slug() y build() repiten src/Commercial/Tools/UtmLinkBuilder.php: si cambia uno,
-  // cambiar el otro (los dos se prueban con tests/Fixtures/utm-cases.json). El catálogo (medios, fuentes y campañas) ya
-  // no se guarda en el navegador: lo define un administrador en Configuración › Generador UTM.
+  // cambiar el otro (los dos se prueban con tests/Fixtures/utm-cases.json). Las campañas ya no se guardan en el navegador:
+  // las define un administrador en Configuración › Generador UTM. Fuente y medio salen de un solo selector "Medio" (la
+  // lista única de Configuración › Medios): utm_source y utm_medium llevan el mismo slug.
   var MAX_LENGTH = 100;
   var MAX_URL_LENGTH = 2000;
   var MAX_RAW_LENGTH = 120;
@@ -20,7 +21,6 @@
     "ñ": "n", "Ñ": "n", "ç": "c", "Ç": "c",
   };
   var ACCENT_RE = new RegExp("[" + Object.keys(ACCENTS).join("") + "]", "g");
-  var OTHER = "__otro__";
 
   function trimSeparators(value) { return value.replace(/^[-_]+|[-_]+$/g, ""); }
 
@@ -137,15 +137,10 @@
 
   function field(root, name) { return root.querySelector('[data-utm-field="' + name + '"]'); }
 
-  /** Valor escrito o elegido en cada campo; "Otro" toma el texto del cuadro que aparece debajo. */
+  /** Valor escrito o elegido en cada campo; fuente y medio UTM salen los dos del selector "Medio". */
   function value(root, name) {
-    var input = field(root, name);
-    if (!input) return "";
-    if (input.tagName === "SELECT" && input.value === OTHER) {
-      var other = root.querySelector('[data-utm-other="' + name + '"]');
-      return other ? other.value : "";
-    }
-    return input.value;
+    var input = field(root, name === "source" || name === "medium" ? "medio" : name);
+    return input ? input.value : "";
   }
 
   function values(root) {
@@ -155,16 +150,11 @@
   }
 
   /**
-   * Campos que van tal cual porque ya los registró el tracker: la fuente o el medio elegidos en "Usados en el tracker"
-   * y la campaña escrita exactamente como una del tracker. Así el enlace suma a esa campaña en vez de crear una variante.
+   * Campos que van tal cual porque ya los registró el tracker: la campaña escrita exactamente como una del tracker. Así
+   * el enlace suma a esa campaña en vez de crear una variante.
    */
   function verbatim(root) {
     var out = [];
-    ["source", "medium"].forEach(function (name) {
-      var input = field(root, name);
-      var option = input && input.tagName === "SELECT" ? input.options[input.selectedIndex] : null;
-      if (option && option.hasAttribute("data-utm-raw")) out.push(name);
-    });
     var known = trackerCampaigns.get(root) || {};
     if (Object.prototype.hasOwnProperty.call(known, trimText(value(root, "campaign")))) out.push("campaign");
     return out;
@@ -178,6 +168,11 @@
 
   function refreshPreviews(root) {
     var kept = verbatim(root);
+    var medio = root.querySelector('[data-utm-preview="medio"]');
+    if (medio) {
+      var slugged = slug(value(root, "medio"));
+      medio.innerHTML = slugged === "" ? "" : "En el enlace: <code>" + escapeHtml("utm_source=" + slugged + "&utm_medium=" + slugged) + "</code>";
+    }
     PARAMS.forEach(function (pair) {
       var node = root.querySelector('[data-utm-preview="' + pair[0] + '"]');
       if (!node) return;
@@ -218,6 +213,7 @@
     var link;
     var kept = verbatim(root);
     try {
+      if (trimText(value(root, "url")) !== "" && value(root, "medio") === "") throw new Error("Elige el medio del enlace.");
       link = build(value(root, "url"), values(root), kept);
     } catch (error) {
       clearResult(root);
@@ -244,29 +240,14 @@
   }
 
   /**
-   * Fuentes, medios y campañas que ya registró el tracker (solo lectura), como sugerencias además del catálogo. Se
-   * ofrecen con su valor exacto (como el generador original) para sumar a lo ya registrado; se omiten los que el
-   * catálogo ya tiene (el tracker compara sin distinguir mayúsculas).
+   * Campañas que ya registró el tracker (solo lectura), como sugerencias además del catálogo. Se ofrecen con su valor
+   * exacto (como el generador original) para sumar a lo ya registrado; se omiten las que el catálogo ya tiene (el
+   * tracker compara sin distinguir mayúsculas).
    */
   function loadTracker(root) {
     root.setAttribute("data-loaded", "1");
     var status = root.querySelector("[data-utm-tracker-status]");
     post("commercial_tools_utm_options").then(function (data) {
-      [["source", data.sources || []], ["medium", data.mediums || []]].forEach(function (entry) {
-        var select = field(root, entry[0]);
-        if (!select) return;
-        var known = {};
-        Array.prototype.forEach.call(select.options, function (option) { known[asciiLower(option.value)] = true; });
-        var html = "";
-        entry[1].forEach(function (raw) {
-          raw = trimText(raw);
-          var key = asciiLower(raw);
-          if (!raw || known[key]) return;
-          known[key] = true;
-          html += '<option value="' + escapeHtml(raw) + '" data-utm-raw>' + escapeHtml(raw) + "</option>";
-        });
-        if (html) select.querySelector('option[value="' + OTHER + '"]').insertAdjacentHTML("beforebegin", '<optgroup label="Usados en el tracker" data-utm-group="tracker">' + html + "</optgroup>");
-      });
       var campaigns = (data.campaigns || []).filter(function (item) { return item && trimText(item.value) !== ""; });
       var list = root.querySelector("[data-utm-campaign-list]");
       var known = {};
@@ -304,7 +285,6 @@
     var root = event.target instanceof Element && event.target.matches("[data-utm-form]") ? toolRoot(event.target) : null;
     if (!root) return;
     window.setTimeout(function () {
-      root.querySelectorAll("[data-utm-other-box]").forEach(function (box) { box.hidden = true; });
       clearResult(root);
       setStatus(root, "", false);
       refreshPreviews(root);
@@ -314,11 +294,9 @@
   document.addEventListener("change", function (event) {
     var root = toolRoot(event.target);
     if (!root) return;
-    var target = event.target;
-    if (target.matches("select[data-utm-field]")) {
-      var box = target.closest("[data-utm-combo]").querySelector("[data-utm-other-box]");
-      box.hidden = target.value !== OTHER;
-      if (!box.hidden) box.querySelector("input").focus();
+    if (root.querySelector("[data-utm-result]").value && event.target.matches("select[data-utm-field]")) {
+      clearResult(root);
+      setStatus(root, "Cambiaste los datos: vuelve a generar el enlace.", false);
     }
     refreshPreviews(root);
   });

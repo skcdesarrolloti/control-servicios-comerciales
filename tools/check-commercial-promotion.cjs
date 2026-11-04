@@ -62,7 +62,7 @@ function daysBetween(from, to) {
     assert.equal(await menuLinks.count(), 2);
     assert.match(await menuLinks.nth(0).getAttribute('href'), /[?&]tab=analitica_web$/);
     assert.match(await menuLinks.nth(1).getAttribute('href'), /[?&]tab=actividad_portales$/);
-    assert.match(await page.locator('[data-commercial-dropdown-menu="promocion"]').innerText(), /Visitas, campañas y fuentes del sitio/);
+    assert.match(await page.locator('[data-commercial-dropdown-menu="promocion"]').innerText(), /Visitas, campañas y medios del sitio/);
     await page.locator('[data-commercial-dropdown-trigger="promocion"]').click();
     await menuLinks.nth(0).click();
     await page.locator('[data-commercial-promotion="analitica_web"] [data-cpr-kpis]').waitFor();
@@ -72,16 +72,25 @@ function daysBetween(from, to) {
     assert.equal(await page.locator('.cpr').evaluate(node => getComputedStyle(node).maxWidth), '1240px');
     assert.equal(await page.locator('script[data-commercial-module-src]').count(), 1);
 
-    // Rango por defecto: los últimos 30 días, con un gráfico de 30 barras y las ocho listas.
+    // Rango por defecto: los últimos 30 días, con un gráfico de 30 barras y las siete listas (fuente y medio UTM se ven
+    // como una sola: Medios, de la lista única).
     const from = await page.locator('[data-cpr-filters] [name="pr_desde"]').inputValue();
     const to = await page.locator('[data-cpr-filters] [name="pr_hasta"]').inputValue();
     assert.equal(daysBetween(from, to), 29);
     assert.equal(await page.locator('[data-cpr-chart] .cpr-chart__bar').count(), 30);
-    assert.equal(await page.locator('[data-cpr-list]').count(), 8);
-    for (const list of ['campaigns', 'sources', 'mediums', 'pages', 'referrers', 'countries', 'cities', 'objects']) {
+    assert.equal(await page.locator('[data-cpr-list]').count(), 7);
+    for (const list of ['campaigns', 'medios', 'pages', 'referrers', 'countries', 'cities', 'objects']) {
       assert.ok(await page.locator(`[data-cpr-list="${list}"] tbody tr`).count() > 0, 'lista vacía: ' + list);
     }
     assert.match(await page.locator('[data-cpr-list="campaigns"]').innerText(), /Promoción de octubre/);
+    const mediosList = await page.locator('[data-cpr-list="medios"]').innerText();
+    assert.match(mediosList, /^Medios/);
+    assert.match(mediosList, /Sin medio \(directo\)/);
+    assert.match(mediosList, /Facebook/);
+    // Lo que no está en la lista se ve con su texto y la indicación de dónde ajustarlo.
+    assert.match(mediosList, /Google\s+Sin reconocer · se ajusta en Configuración › Medios/);
+    assert.equal(await page.locator('[data-cpr-filters] [name="pr_fuente"]').count(), 0);
+    assert.deepEqual(await page.locator('[data-cpr-filters] [name="pr_medio"] option').allInnerTexts(), ['Todos los medios', 'Facebook', 'Google', 'Instagram', 'Sin medio (directo)']);
     assert.match(await page.locator('[data-cpr-list="objects"]').innerText(), /INM-101/);
     assert.doesNotMatch(await page.locator('[data-cpr-list="pages"]').innerText(), /fbclid|utm_source/);
     assert.match(await page.locator('[data-cpr-excluded]').innerText(), /robots/);
@@ -115,6 +124,9 @@ function daysBetween(from, to) {
     await page.waitForFunction(() => document.querySelectorAll('[data-cpr-log-row]').length === 25);
     assert.equal(admin.logRequests.length, 1);
     assert.equal(await page.locator('[data-cpr-logs] thead th', { hasText: /^IP$/ }).count(), 1);
+    // Registros: el medio de la lista y, debajo, utm_source · utm_medium crudos.
+    assert.equal(await page.locator('[data-cpr-logs] thead th', { hasText: /^Medio$/ }).count(), 1);
+    assert.match(await page.locator('[data-cpr-logs-rows]').innerText(), /Instagram\s+Instagram · Redes|Facebook\s+Facebook · Redes/);
     assert.match(await page.locator('[data-cpr-logs-rows]').innerText(), /181\.50\./);
     const firstPage = await page.locator('[data-cpr-log-row] td:first-child').allInnerTexts();
     await page.locator('[data-cpr-logs-next]').click();
@@ -216,6 +228,97 @@ function daysBetween(from, to) {
     const invalid = await post(page, { action: 'commercial_settings_save', section: 'analitica', payload: JSON.stringify({ internal_ips: 'no-es-ip', raw_retention_days: '0' }) });
     assert.equal(invalid.status, 422);
 
+    // Configuración › Medios: lista única en su propia tabla. Cada acción se confirma en un panel interno del mismo popup
+    // y responde con un mensaje dentro de la lista (sin abrir otro popup).
+    await page.locator('.swal2-container').waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
+    await page.locator('#commercial-config-trigger').click();
+    await page.locator('[data-commercial-config-action="medios"]').click();
+    const medios = page.locator('[data-medios-root]');
+    await medios.waitFor();
+    assert.equal(await page.locator('.swal2-confirm').isVisible(), false, 'Medios no tiene botón Guardar');
+    assert.equal(await medios.locator('[data-medios-not-ready]').count(), 0);
+    assert.ok(await medios.locator('[data-medio-row]').count() >= 42);
+    assert.match(await medios.locator('[data-medio-row="Finca Raíz"]').innerText(), /finca_raiz[\s\S]*\b2\b/);
+    assert.match(await medios.locator('[data-medio-row="Retencion"]').innerText(), /Retencion de contrato/);
+    // Valores sin reconocer: en los registros, escritos distinto y en las visitas web.
+    assert.match(await medios.locator('[data-medios-raw-row="Valor raro"][data-kind="records"]').innerText(), /Llamadas: 2/);
+    assert.equal(await medios.locator('[data-medios-raw-row="Retencion de contrato"][data-kind="variants"]').count(), 1);
+    assert.equal(await medios.locator('[data-medios-raw-row="Google"][data-kind="visits"] [data-medios-raw="rewrite"]').count(), 0);
+    const mediosStatus = medios.locator('[data-medios-status]');
+
+    // Agregar.
+    await medios.locator('[data-medios-new]').fill('Volante');
+    await medios.locator('[data-medios-new]').press('Enter');
+    await medios.locator('[data-medio-row="Volante"]').waitFor();
+    assert.match(await mediosStatus.innerText(), /Medio "Volante" agregado/);
+    // Repetido (otra forma de un medio existente): el servidor lo rechaza y se avisa en la lista.
+    await medios.locator('[data-medios-new]').fill('INSTAGRAM');
+    await medios.locator('[data-medios-add]').click();
+    await page.waitForFunction(() => /ya corresponde al medio Instagram/.test(document.querySelector('[data-medios-status]').textContent));
+    assert.equal(await mediosStatus.getAttribute('data-type'), 'error');
+
+    // Reescribir un valor sin reconocer: el panel muestra cuántos registros cambian antes de confirmar.
+    const rawRow = medios.locator('[data-medios-raw-row="Valor raro"]');
+    await rawRow.locator('[data-medios-raw-target]').selectOption({ label: 'Otro' });
+    await rawRow.locator('[data-medios-raw="rewrite"]').click();
+    const panel = medios.locator('[data-medios-panel]');
+    await panel.locator('[data-medios-preview]').waitFor();
+    assert.equal(await panel.locator('[data-medios-preview]').getAttribute('data-total'), '2');
+    assert.match(await panel.innerText(), /Cambiarán 2 registros \(Llamadas: 2\)/);
+    await panel.locator('[data-medios-panel-cancel]').click();
+    assert.equal(await panel.isVisible(), false);
+    await rawRow.locator('[data-medios-raw="rewrite"]').click();
+    await panel.locator('[data-medios-preview]').waitFor();
+    await panel.locator('[data-medios-panel-confirm]').click();
+    await page.waitForFunction(() => /2 registros reescritos/.test(document.querySelector('[data-medios-status]').textContent));
+    assert.equal(await medios.locator('[data-medios-raw-row="Valor raro"]').count(), 0);
+
+    // Alias de un valor sin reconocer (sin cambiar registros).
+    const volanteRaw = medios.locator('[data-medios-raw-row="Volante feria"]');
+    await volanteRaw.locator('[data-medios-raw-target]').selectOption({ label: 'Volante' });
+    await volanteRaw.locator('[data-medios-raw="alias"]').click();
+    await page.waitForFunction(() => /agregado como alias/.test(document.querySelector('[data-medios-status]').textContent));
+    assert.match(await medios.locator('[data-medio-row="Volante"]').innerText(), /Volante feria/);
+
+    // Renombrar: confirmación con el conteo y el nombre anterior queda como alias.
+    await medios.locator('[data-medio-row="Volante"] [data-medios-action="rename"]').click();
+    await panel.locator('[data-medios-rename]').waitFor();
+    await panel.locator('[data-medios-rename]').fill('Volantes');
+    await panel.locator('[data-medios-panel-confirm]').click();
+    await medios.locator('[data-medio-row="Volantes"]').waitFor();
+    assert.match(await medios.locator('[data-medio-row="Volantes"]').innerText(), /volantes[\s\S]*Volante feria, Volante/);
+
+    // Unir: elige el medio que se conserva; el otro sale de la lista.
+    await medios.locator('[data-medio-row="Volantes"] [data-medios-action="merge"]').click();
+    await panel.locator('[data-medios-merge-target]').waitFor();
+    await panel.locator('[data-medios-panel-confirm]').click();
+    await panel.locator('[data-medios-panel-error]', { hasText: 'Elige el medio que se conserva' }).waitFor();
+    await panel.locator('[data-medios-merge-target]').selectOption({ label: 'Publicidad' });
+    await panel.locator('[data-medios-panel-confirm]').click();
+    await page.waitForFunction(() => /Medios unidos/.test(document.querySelector('[data-medios-status]').textContent));
+    assert.equal(await medios.locator('[data-medio-row="Volantes"]').count(), 0);
+
+    // Desactivar pide confirmación; activar no.
+    await medios.locator('[data-medio-row="Prensa"] [data-medios-action="toggle"]').click();
+    await panel.locator('[data-medios-panel-confirm]', { hasText: 'Desactivar' }).click();
+    await page.waitForFunction(() => /Medio desactivado/.test(document.querySelector('[data-medios-status]').textContent));
+    assert.match(await medios.locator('[data-medio-row="Prensa"]').innerText(), /inactivo/i);
+    await medios.locator('[data-medio-row="Prensa"] [data-medios-action="toggle"]').click();
+    await page.waitForFunction(() => /Medio activado/.test(document.querySelector('[data-medios-status]').textContent));
+
+    // Alias desde su panel.
+    await medios.locator('[data-medio-row="Tiktok"] [data-medios-action="aliases"]').click();
+    await panel.locator('[data-medios-aliases]').fill('tiktok.com\nTik Tok');
+    await panel.locator('[data-medios-panel-confirm]').click();
+    await page.waitForFunction(() => /Alias guardados \(1\)/.test(document.querySelector('[data-medios-status]').textContent));
+    assert.match(await medios.locator('[data-medios-history]').evaluate(node => node.textContent), /Unido[\s\S]*Volantes → Publicidad/);
+    await page.screenshot({ path: 'output/commercial-settings-medios.png', fullPage: true });
+    await page.locator('.swal2-cancel').click();
+    await page.locator('.swal2-container').waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
+    // El servidor valida aunque se salte la pantalla.
+    const badOp = await post(page, { action: 'commercial_settings_save', section: 'medios', payload: JSON.stringify({ op: 'borrar' }) });
+    assert.equal(badOp.status, 422);
+
     // Móvil: menú con las dos subpestañas y sin desplazamiento horizontal.
     await page.setViewportSize({ width: 390, height: 900 });
     assert.equal(await noHorizontalScroll(page), true);
@@ -264,6 +367,8 @@ function daysBetween(from, to) {
       assert.equal(await other.locator('[data-cpr-recent] thead th', { hasText: /^IP$/ }).count(), 0);
       assert.doesNotMatch(await other.content(), /181\.60\.|Chrome\/130/);
       // Configuración es solo para administradores, también en el servidor.
+      const mediosDenied = await post(other, { action: 'commercial_settings_save', section: 'medios', payload: JSON.stringify({ op: 'add', nombre: 'Intruso' }) });
+      assert.equal(mediosDenied.status, 403);
       const settingsDenied = await post(other, { action: 'commercial_settings_save', section: 'analitica', payload: JSON.stringify({ internal_ips: '', raw_retention_days: '0' }) });
       assert.equal(settingsDenied.status, 403);
       assert.deepEqual(plain.errors, []);

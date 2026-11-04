@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SCM\Precaptacion;
 
 use SCM\Commercial\CommercialAccessPolicy;
+use SCM\Commercial\Medios\MedioCatalog;
 use SCM\Core\Auth;
 use SCM\Core\Csrf;
 use SCM\Core\Database;
@@ -16,6 +17,7 @@ use SCM\Support\StoredFileService;
 final class Module
 {
   private static Database $database;
+  private static ?Settings $settings = null;
   private static CommercialAccessPolicy $access;
   private static Csrf $csrf;
   private static array $emails = [];
@@ -25,6 +27,7 @@ final class Module
   public static function init(Database $db, Settings $settings, Csrf $csrf, array $config): void
   {
     self::$database = $db;
+    self::$settings = $settings;
     self::$csrf = $csrf;
     self::$access = new CommercialAccessPolicy($settings, $db, $config['dashboard_admin_cargos'] ?? ['11','12','13','14']);
     require_once __DIR__ . '/Compatibility.php';
@@ -196,6 +199,9 @@ final class Module
           if (($assigned['activo'] ?? '') !== 'Si') wp_send_json_error(['message'=>'Selecciona un funcionario activo.'], 422);
           // Preserve the existing medium/origin while deriving identity from the saved record.
           foreach (['solicitante'=>'contacto','correo_solicitante'=>'correo','celular_solicitante'=>'celular','medio'=>'origen','tipo_inmueble'=>'tipo_inmueble','destinacion'=>'categoria'] as $target => $source) $input[$target] = $row[$source] ?? '';
+          // El origen de la precaptación (glosario 185: "Ruta", "Club PPH") se guarda en la tarea con el nombre de la lista
+          // única de Medios ("Ruta" -> "Por ruta"), para que el registro coincida con el glosario "Medio de llamada".
+          if (self::$settings instanceof Settings) $input['medio'] = (new MedioCatalog(self::db(), self::$settings))->canonical((string) $input['medio']);
           $input['tema_ayuda'] = 'Captacion';
           if (trim((string) $input['solicitante']) === '' || trim((string) $input['celular_solicitante']) === '' || trim((string) ($input['asunto'] ?? '')) === '' || trim((string) ($input['descripcion'] ?? '')) === '') throw new \InvalidArgumentException('Completa contacto, celular, asunto y descripción de la tarea.');
         }

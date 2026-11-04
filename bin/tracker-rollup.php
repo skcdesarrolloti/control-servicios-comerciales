@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 // Resúmenes diarios de la analítica web (Promoción › Analítica web) a partir de wp_jet_cct_tracker_logs.
 // Cron sugerido, cada 10 minutos:   php bin/tracker-rollup.php
-// Primera carga (al publicar, antes de abrir la pestaña; también migra los resúmenes de la versión 1 si existieran):
+// Primera carga (al publicar, antes de abrir la pestaña; también migra los resúmenes de versiones anteriores: la 3 agrega
+// la columna medio, de la lista única de Medios, y la clasifica):
 //                                   php bin/tracker-rollup.php --backfill
 //   Hasta que termine, Analítica web avisa que las cifras del rango pueden estar incompletas.
+// Cada corrida reclasifica el medio de lo resumido si cambió la lista de Medios (Configuración › Medios);
+// forzarlo:                         php bin/tracker-rollup.php --remap-medios
 // Tras cambiar las IPs internas:    php bin/tracker-rollup.php --rebuild-from=AAAA-MM-DD
 //   Va un día por transacción; si se corta, la siguiente corrida del cron lo retoma desde el día que faltaba.
 // Retención (opcional, una vez al día, solo si "Conservar visitas crudas" es mayor que 0):

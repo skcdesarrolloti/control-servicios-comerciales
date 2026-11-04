@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace SCM\Commercial\Promotion\Analytics;
 
+use SCM\Commercial\Medios\MedioResolver;
+use SCM\Commercial\Medios\MedioSeed;
+
 /**
  * Convierte filas crudas de `jet_cct_tracker_logs` en filas de los tres resúmenes diarios, sin tocar la base.
  *
@@ -12,6 +15,8 @@ namespace SCM\Commercial\Promotion\Analytics;
  *   clics, se omiten aquí y hará falta un resumen propio para ellos.
  * - Filas sin fecha válida ('AAAA-MM-DD HH:MM:SS') se omiten.
  * - Campaña, fuente y medio vacíos quedan como 'general', 'Directo' y 'Sin medio' (como los mostraba dashboard-marketing).
+ * - `medio`: el Medio de la lista única (MedioResolver::forVisit sobre utm_source y utm_medium); lo que no se reconoce
+ *   queda con su texto crudo, y las visitas sin UTM como 'Sin medio (directo)'.
  * - Robot: BotDetector sobre el user agent. Interna: la IP está en Configuración › Analítica web.
  * - Páginas sin parámetros de seguimiento (UrlNormalizer); sitios de referencia por dominio, y los dominios propios
  *   (o el mismo dominio de la página) como 'Navegación interna'.
@@ -29,6 +34,9 @@ final class TrackerAggregator
   private InternalIpMatcher $internal;
   /** @var list<string> */
   private array $ownDomains;
+  private MedioResolver $medios;
+  /** @var array<string,string> "fuente\x1Fmedio" => medio ya resuelto */
+  private array $medioCache = [];
 
   /** @var array<string,array<string,int|string>> */
   private array $daily = [];
@@ -39,11 +47,18 @@ final class TrackerAggregator
   private int $counted = 0;
 
   /** @param list<string> $ownDomains */
-  public function __construct(VisitorHasher $hasher, InternalIpMatcher $internal, array $ownDomains = [])
+  public function __construct(VisitorHasher $hasher, InternalIpMatcher $internal, array $ownDomains = [], ?MedioResolver $medios = null)
   {
     $this->hasher = $hasher;
     $this->internal = $internal;
     $this->ownDomains = $ownDomains;
+    $this->medios = $medios ?? new MedioResolver(MedioSeed::rows());
+  }
+
+  /** Medio de una visita con estos utm_source / utm_medium (ya normalizados con dimension()). */
+  public function medio(string $source, string $medium): string
+  {
+    return $this->medioCache[$source . "\x1F" . $medium] ??= $this->medios->forVisit($source, $medium)[0];
   }
 
   /**
@@ -71,9 +86,11 @@ final class TrackerAggregator
     $registered = (int) ($row['user_id'] ?? 0) > 0 ? 1 : 0;
     $base = ['fecha' => $day, 'camp_slug' => $campaign, 'utm_source' => $source, 'utm_medium' => $medium];
     $flags = ['bot' => $bot, 'internal' => $internal];
+    // `medio` no es parte de la llave (depende de fuente y medio UTM): va como columna extra, igual que value/detail.
+    $medio = ['medio' => $this->medio($source, $medium)];
 
-    $this->bump($this->daily, $base + ['registered' => $registered] + $flags);
-    $this->bump($this->visitors, ['fecha' => $day, 'visitor_hash' => $this->hasher->hash($ip, $userAgent)] + array_slice($base, 1, 3, true) + $flags);
+    $this->bump($this->daily, $base + ['registered' => $registered] + $flags, $medio);
+    $this->bump($this->visitors, ['fecha' => $day, 'visitor_hash' => $this->hasher->hash($ip, $userAgent)] + array_slice($base, 1, 3, true) + $flags, $medio);
 
     $page = UrlNormalizer::page((string) ($row['page_url'] ?? ''));
     $this->topRow($base, $flags, 'page', $page !== '' ? $page : self::NO_URL);
@@ -158,13 +175,14 @@ final class TrackerAggregator
     $this->bump($this->top, $base + ['dim' => $dim, 'value_hash' => md5($hashKey ?? $value)] + $flags, [
       'value' => self::text($value, 255),
       'detail' => self::text($detail, 255),
+      'medio' => $this->medio($base['utm_source'], $base['utm_medium']),
     ]);
   }
 
   /**
    * @param array<string,array<string,int|string>> $bucket
    * @param array<string,int|string> $key
-   * @param array<string,string> $extra Columnas que no son llave (valor visible y detalle).
+   * @param array<string,string> $extra Columnas que no son llave (valor visible, detalle y medio).
    */
   private function bump(array &$bucket, array $key, array $extra = []): void
   {
@@ -173,6 +191,10 @@ final class TrackerAggregator
       $bucket[$id] = $key + $extra + ['hits' => 0];
     }
     foreach ($extra as $column => $value) {
+      if ($column === 'medio') {
+        $bucket[$id][$column] = $value;
+        continue;
+      }
       // Igual que el upsert: gana el último valor no vacío, salvo que sea una URL y ya haya una referencia.
       $current = (string) $bucket[$id][$column];
       if ($value !== '' && ($current === '' || stripos($value, 'http') !== 0)) {

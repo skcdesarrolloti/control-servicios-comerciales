@@ -41,6 +41,8 @@ $db = CommercialPromotionDatabase::create('sqlite:' . $output . '/commercial-pro
 $db->pdo()->exec('CREATE TABLE IF NOT EXISTS wp_options (option_id INTEGER PRIMARY KEY AUTOINCREMENT, option_name TEXT, option_value TEXT, autoload TEXT)');
 $settings = CommercialPromotionDatabase::settings($db);
 CommercialPromotionDatabase::seed($db, $settings, date('Y-m-d'));
+// Configuración › Medios: la lista instalada, con llamadas que traen valores sin reconocer.
+CommercialPromotionDatabase::medios($db, $settings);
 // ?pendiente=1 deja una visita de ayer sin resumir, para probar que la carga completa no resume y la pide por AJAX.
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['pendiente'])) {
   \Tests\Fixtures\CommercialTrackerDatabase::hit($db, ['fecha_visita' => date('Y-m-d', strtotime('-1 day')) . ' 10:00:00', 'ip_address' => '181.70.0.1', 'camp_slug' => 'feria-vivienda']);

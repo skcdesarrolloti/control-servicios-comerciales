@@ -63,6 +63,30 @@ final class CommercialPromotionDatabase
     return $settings;
   }
 
+  /**
+   * Lista de Medios instalada (tablas, lista inicial y glosario 195) y unas llamadas con valores para Configuración ›
+   * Medios en el navegador. Las tablas se crean con el DDL de MedioSchema (install() solo corre en la línea de comandos).
+   */
+  public static function medios(Database $db, Settings $settings): void
+  {
+    if (\SCM\Commercial\Medios\MedioSchema::isReady($settings)) {
+      return;
+    }
+    $pdo = $db->pdo();
+    $pdo->exec('CREATE TABLE IF NOT EXISTS wp_jet_post_types (id INTEGER PRIMARY KEY, slug TEXT, status TEXT, labels TEXT, args TEXT, meta_fields TEXT)');
+    $glossary = array_map(static fn(string $name): array => ['value' => $name, 'label' => $name, 'is_checked' => false], array_slice(array_keys(\SCM\Commercial\Medios\MedioSeed::ROWS), 0, \SCM\Commercial\Medios\MedioSeed::GLOSSARY_COUNT));
+    $pdo->prepare('INSERT OR REPLACE INTO wp_jet_post_types (id, slug, status, labels, args, meta_fields) VALUES (?, ?, ?, ?, ?, ?)')->execute([\SCM\Commercial\Medios\MedioCatalog::GLOSSARY_ID, '', 'glossary', '', '', serialize($glossary)]);
+    $pdo->exec('CREATE TABLE IF NOT EXISTS wp_jet_cct_cct_llamadas (_ID INTEGER PRIMARY KEY AUTOINCREMENT, medio TEXT, cct_author_id TEXT)');
+    foreach (['Finca Raíz', 'Finca Raíz', 'Referido', 'Retencion de contrato', 'Valor raro', 'Valor raro', 'Volante feria'] as $value) {
+      $db->insert('wp_jet_cct_cct_llamadas', ['medio' => $value, 'cct_author_id' => '101']);
+    }
+    foreach (\SCM\Commercial\Medios\MedioSchema::tables($db) as $query) {
+      $pdo->exec($query);
+    }
+    $settings->set(\SCM\Commercial\Medios\MedioSchema::SETTING, \SCM\Commercial\Medios\MedioSchema::VERSION);
+    (new \SCM\Commercial\Medios\MedioCatalog($db, $settings, '101'))->seed();
+  }
+
   /** @param array<string,string> $session */
   public static function login(string $cargo, string $employee, string $name = 'Funcionario de prueba', array $session = []): void
   {

@@ -206,48 +206,49 @@ const { chromium } = require(process.env.SCM_PLAYWRIGHT_MODULE || 'playwright');
     }), { slugCases: cases.slug, buildCases: cases.build });
     assert.deepEqual(mirrored.slugs, cases.slug.map(([, expected]) => expected));
     assert.deepEqual(mirrored.links, cases.build.map(item => item.error ? { error: item.error } : item.expected));
-    // El catálogo compartido (Configuración › Generador UTM) llena los selectores; el tracker suma lo que no está.
-    assert.equal(await utm.locator('[data-utm-field="medium"] option[value="whatsapp"]').count(), 1);
+    // Un solo selector "Medio" con la lista única (Configuración › Medios): llena utm_source y utm_medium con el mismo slug.
+    assert.equal(await utm.locator('[data-utm-field="source"]').count(), 0);
+    assert.equal(await utm.locator('[data-utm-field="medium"]').count(), 0);
+    assert.equal(await utm.locator('[data-utm-field="medio"] option[value="whatsapp"]').count(), 1);
+    assert.equal(await utm.locator('[data-utm-field="medio"] option[value="por_ruta"]').innerText(), 'Por ruta');
+    assert.equal(await utm.locator('[data-utm-field="medio"] option[value="__otro__"]').count(), 0);
     await page.waitForFunction(() => document.querySelector('[data-utm-tracker-status]').textContent === '2 campañas registradas.');
     assert.deepEqual(await utm.locator('[data-utm-tracker-campaigns] [data-utm-pick]').allInnerTexts(), ['Feria de vivienda', 'Revista Esencia']);
-    // El tracker suma sus valores exactos; no ofrece los que escribe en las visitas sin UTM (Directo, Navegador).
-    assert.equal(await utm.locator('[data-utm-field="source"] [data-utm-group="tracker"] option').allInnerTexts().then(list => list.join('|')), 'Revista Impresa');
-    assert.equal(await utm.locator('[data-utm-field="medium"] [data-utm-group="tracker"] option').allInnerTexts().then(list => list.join('|')), 'Volante|cpc');
-    assert.equal(await utm.locator('[data-utm-field="source"] option[value="instagram"]').count(), 1);
+    // El tracker ya no agrega fuentes ni medios sueltos.
+    assert.equal(await utm.locator('[data-utm-group="tracker"]').count(), 0);
     // Campos obligatorios y URL inválida.
     await utm.locator('[data-utm-generate]').click();
     assert.equal(await utm.locator('[data-utm-status]').innerText(), 'Escribe la URL de destino.');
     assert.equal(await utm.locator('[data-utm-status]').getAttribute('data-error'), 'true');
     await utm.locator('[data-utm-field="url"]').fill('sucasainmobiliaria.com.co/inmueble/?id=45&utm_source=viejo#galeria');
     await utm.locator('[data-utm-generate]').click();
-    assert.equal(await utm.locator('[data-utm-status]').innerText(), 'Falta la fuente del enlace.');
-    await utm.locator('[data-utm-field="medium"]').selectOption('whatsapp');
-    await utm.locator('[data-utm-field="source"]').selectOption('__otro__');
-    assert.equal(await utm.locator('[data-utm-other="source"]').isVisible(), true);
-    await utm.locator('[data-utm-other="source"]').fill('Aliado Bancario');
-    assert.equal(await utm.locator('[data-utm-preview="source"]').innerText(), 'En el enlace: utm_source=aliado_bancario');
+    assert.equal(await utm.locator('[data-utm-status]').innerText(), 'Elige el medio del enlace.');
+    await utm.locator('[data-utm-field="medio"]').selectOption('whatsapp');
+    assert.equal(await utm.locator('[data-utm-preview="medio"]').innerText(), 'En el enlace: utm_source=whatsapp&utm_medium=whatsapp');
     await utm.locator('[data-utm-catalog-campaigns] [data-utm-pick]', { hasText: 'Revista Esencia junio' }).click();
     assert.equal(await utm.locator('[data-utm-field="campaign"]').inputValue(), 'esencia-inmobiliaria-edicion-junio-2026');
     assert.equal(await utm.locator('[data-utm-catalog-campaigns] [data-utm-pick]').getAttribute('aria-pressed'), 'true');
     await utm.locator('[data-utm-field="content"]').fill('Banner Superior');
     await utm.locator('[data-utm-generate]').click();
-    const link = 'https://sucasainmobiliaria.com.co/inmueble/?id=45&utm_source=aliado_bancario&utm_medium=whatsapp&utm_campaign=esencia-inmobiliaria-edicion-junio-2026&utm_content=banner_superior#galeria';
+    const link = 'https://sucasainmobiliaria.com.co/inmueble/?id=45&utm_source=whatsapp&utm_medium=whatsapp&utm_campaign=esencia-inmobiliaria-edicion-junio-2026&utm_content=banner_superior#galeria';
     assert.equal(await utm.locator('[data-utm-result]').inputValue(), link);
     await page.waitForFunction(() => /copiado|Cópialo/.test(document.querySelector('[data-utm-status]').textContent));
     if ((await utm.locator('[data-utm-status]').innerText()) === 'Enlace copiado al portapapeles.') assert.equal(await page.evaluate(() => navigator.clipboard.readText()), link);
+    assert.match(await utm.locator('[data-utm-parts]').innerText(), /utm_source\s+whatsapp\s+utm_medium\s+whatsapp/);
     assert.match(await utm.locator('[data-utm-parts]').innerText(), /utm_content\s+banner_superior/);
     assert.equal(await utm.locator('[data-utm-copy]').isDisabled(), false);
     await page.screenshot({ path: 'output/commercial-tools-utm.png', fullPage: true });
-    // Cambiar un dato invalida el enlace; una campaña o fuente del tracker va tal cual para sumar a lo ya registrado.
-    await utm.locator('[data-utm-tracker-campaigns] [data-utm-pick]', { hasText: 'Revista Esencia' }).click();
+    // Cambiar el medio invalida el enlace.
+    await utm.locator('[data-utm-field="medio"]').selectOption('chatgpt_ia');
     assert.equal(await utm.locator('[data-utm-result]').inputValue(), '');
+    assert.equal(await utm.locator('[data-utm-status]').innerText(), 'Cambiaste los datos: vuelve a generar el enlace.');
+    // Una campaña del tracker va tal cual para sumar a lo ya registrado.
+    await utm.locator('[data-utm-tracker-campaigns] [data-utm-pick]', { hasText: 'Revista Esencia' }).click();
     assert.equal(await utm.locator('[data-utm-preview="campaign"]').innerText(), 'En el enlace: utm_campaign=Revista Esencia (tal como lo registró el tracker)');
     assert.equal(await utm.locator('[data-utm-tracker-campaigns] [data-utm-pick]', { hasText: 'Revista Esencia' }).getAttribute('aria-pressed'), 'true');
     assert.equal(await utm.locator('[data-utm-catalog-campaigns] [data-utm-pick]').getAttribute('aria-pressed'), 'false');
-    await utm.locator('[data-utm-field="source"]').selectOption('Revista Impresa');
-    assert.equal(await utm.locator('[data-utm-preview="source"]').innerText(), 'En el enlace: utm_source=Revista Impresa (tal como lo registró el tracker)');
     await utm.locator('[data-utm-generate]').click();
-    assert.equal(await utm.locator('[data-utm-result]').inputValue(), 'https://sucasainmobiliaria.com.co/inmueble/?id=45&utm_source=Revista%20Impresa&utm_medium=whatsapp&utm_campaign=Revista%20Esencia&utm_content=banner_superior#galeria');
+    assert.equal(await utm.locator('[data-utm-result]').inputValue(), 'https://sucasainmobiliaria.com.co/inmueble/?id=45&utm_source=chatgpt_ia&utm_medium=chatgpt_ia&utm_campaign=Revista%20Esencia&utm_content=banner_superior#galeria');
     // Escrita a mano y distinta del tracker, la campaña se normaliza; las reservadas del tracker se rechazan.
     await utm.locator('[data-utm-field="campaign"]').fill('revista esencia');
     assert.equal(await utm.locator('[data-utm-preview="campaign"]').innerText(), 'En el enlace: utm_campaign=revista_esencia');
@@ -256,7 +257,7 @@ const { chromium } = require(process.env.SCM_PLAYWRIGHT_MODULE || 'playwright');
     assert.equal(await utm.locator('[data-utm-status]').innerText(), '"general" lo usa el tracker para las visitas sin campaña: elige otro nombre de campaña.');
     assert.equal(await utm.locator('[data-utm-result]').inputValue(), '');
     await utm.locator('[data-utm-reset]').click();
-    await page.waitForFunction(() => document.querySelector('[data-utm-field="url"]').value === '' && document.querySelector('[data-utm-other-box]').hidden);
+    await page.waitForFunction(() => document.querySelector('[data-utm-field="url"]').value === '' && document.querySelector('[data-utm-field="medio"]').value === '');
     assert.equal(await utm.locator('[data-utm-copy]').isDisabled(), true);
 
     // Un cargo con sus herramientas guardadas sin el generador no lo ve en el menú y el servidor rechaza sus datos.

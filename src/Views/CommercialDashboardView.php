@@ -518,7 +518,8 @@ final class CommercialDashboardView
                       ['actualizaciones', 'update', 'Actualizaciones de inmuebles', 'Plazos por tipo de negocio'],
                       ['destacados', 'star', 'Cupos de destacados', 'Inmuebles destacados por portal'],
                       ['aseo', 'cleaning_services', 'Calculadora de aseo', 'Salario, márgenes, insumos, transporte y tramos'],
-                      ['utm', 'link', 'Generador UTM', 'Medios, fuentes y campañas del equipo'],
+                      ['utm', 'link', 'Generador UTM', 'Campañas del equipo'],
+                      ['medios', 'alt_route', 'Medios', 'Lista única: registros, formularios, UTM y analítica'],
                       ['analitica', 'monitoring', 'Analítica web', 'IPs internas, robots y retención de visitas'],
                     ];
                   ?>
@@ -4910,7 +4911,7 @@ final class CommercialDashboardView
 
   /** Ícono y ayuda de cada subpestaña de Promoción en el menú de escritorio (el móvil usa solo SUBVIEWS). */
   private const PROMOTION_MENU = [
-    'analitica_web' => ['monitoring', 'Visitas, campañas y fuentes del sitio'],
+    'analitica_web' => ['monitoring', 'Visitas, campañas y medios del sitio'],
     'actividad_portales' => ['login', 'Ingresos y menús de los portales de clientes'],
   ];
 

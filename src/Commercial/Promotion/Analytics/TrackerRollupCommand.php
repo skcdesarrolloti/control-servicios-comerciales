@@ -12,6 +12,8 @@ namespace SCM\Commercial\Promotion\Analytics;
  *   php bin/tracker-rollup.php --rebuild-from=AAAA-MM-DD   Recalcula esos días (p. ej. tras cambiar las IPs internas), un día por
  *                                                      transacción; si se corta, la siguiente corrida lo retoma.
  *   php bin/tracker-rollup.php --purge                 Borra visitas crudas ya resumidas y más viejas que lo configurado.
+ *   php bin/tracker-rollup.php --remap-medios          Vuelve a clasificar el medio de todo lo resumido con la lista de Medios
+ *                                                      (cada corrida ya lo hace sola si la lista cambió).
  *   php bin/tracker-rollup.php --status                Solo muestra el estado.
  *   Opciones: --batch=N (filas por lote, 1000), --max=N.
  */
@@ -72,6 +74,11 @@ final class TrackerRollupCommand
           }
           $this->say("Recalculado desde {$rebuild['from']} ({$rebuild['days']} días): {$rebuild['deleted']} filas de resumen reemplazadas, {$rebuild['processed']} filas crudas leídas, {$rebuild['counted']} vistas sumadas.");
         }
+        // La lista de Medios cambió (Configuración › Medios) o se acaba de migrar a la versión 3: se reclasifica lo resumido.
+        $remap = $this->rollup->remapMedios(isset($options['remap-medios']));
+        if ($remap['ran']) {
+          $this->say("Medios: {$remap['changed']} de {$remap['pairs']} combinaciones de fuente y medio reclasificadas ({$remap['rows']} filas de resumen), con la revisión {$remap['revision']} de la lista.");
+        }
         if (isset($options['purge'])) {
           $purge = $this->rollup->purge($batch);
           if (!$purge['enabled']) {
@@ -101,7 +108,7 @@ final class TrackerRollupCommand
   {
     $options = [];
     foreach ($argv as $arg) {
-      if (preg_match('/^--(backfill|purge|status|help)$/', $arg, $match) === 1) {
+      if (preg_match('/^--(backfill|purge|status|help|remap-medios)$/', $arg, $match) === 1) {
         $options[$match[1]] = true;
         continue;
       }
@@ -124,7 +131,7 @@ final class TrackerRollupCommand
 
   public static function usage(): string
   {
-    return "Uso: php bin/tracker-rollup.php [--backfill] [--rebuild-from=AAAA-MM-DD] [--purge] [--status] [--batch=N] [--max=N]";
+    return "Uso: php bin/tracker-rollup.php [--backfill] [--rebuild-from=AAAA-MM-DD] [--remap-medios] [--purge] [--status] [--batch=N] [--max=N]";
   }
 
   private function printStatus(): void

@@ -202,7 +202,8 @@ final class CommercialApiController
   {
     $this->verify($input);
     try {
-      JsonResponse::success(['settings' => $this->settingsService()->load()]);
+      // section=medios agrega el detalle de la lista (uso, valores sin reconocer, historial).
+      JsonResponse::success(['settings' => $this->settingsService()->load(trim((string) ($input['section'] ?? '')))]);
     } catch (\RuntimeException $exception) {
       JsonResponse::error($exception->getMessage(), 403);
     }
@@ -213,9 +214,14 @@ final class CommercialApiController
   {
     $this->verify($input);
     $payload = json_decode((string) ($input['payload'] ?? '{}'), true);
+    $section = trim((string) ($input['section'] ?? ''));
     try {
-      $message = $this->settingsService()->save(trim((string) ($input['section'] ?? '')), is_array($payload) ? $payload : []);
-      JsonResponse::success(['message' => $message, 'settings' => $this->settingsService()->load()]);
+      $service = $this->settingsService();
+      $message = $service->save($section, is_array($payload) ? $payload : []);
+      // "Medios" es una lista que se administra en el mismo popup: se devuelve su detalle actualizado y los conteos.
+      // Una vista previa (conteos antes de confirmar) no cambia nada: no se recarga la configuración.
+      $preview = $section === 'medios' && is_array($payload) && ($payload['op'] ?? '') === 'preview';
+      JsonResponse::success(['message' => $message, 'result' => $service->lastResult(), 'settings' => $preview ? [] : $this->settingsService()->load($section)]);
     } catch (\InvalidArgumentException $exception) {
       JsonResponse::error($exception->getMessage(), 422);
     } catch (\RuntimeException $exception) {
@@ -886,7 +892,7 @@ final class CommercialApiController
   {
     $this->verify($input);
     $this->authorizeTool('generador_utm', 'No tienes permiso para usar el generador UTM.');
-    $options = ['sources' => [], 'mediums' => [], 'campaigns' => []];
+    $options = ['campaigns' => []];
     try {
       $options = (new \SCM\Commercial\Tools\UtmTrackerOptions($this->db))->options();
     } catch (\Throwable $exception) {

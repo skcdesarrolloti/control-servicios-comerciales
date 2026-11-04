@@ -10,6 +10,7 @@ use SCM\Commercial\Promotion\Analytics\TrackerAnalyticsConfig;
 use SCM\Commercial\Promotion\Analytics\TrackerAnalyticsFilters;
 use SCM\Commercial\Promotion\Analytics\TrackerAnalyticsRepository;
 use SCM\Commercial\Promotion\Analytics\TrackerRollup;
+use SCM\Commercial\Promotion\Analytics\TrackerSchema;
 use SCM\Core\Database;
 use SCM\Core\Settings;
 
@@ -20,14 +21,16 @@ use SCM\Core\Settings;
  * abrir la pantalla y en "Registros", que se pide aparte (commercial_promo_analytics_logs).
  *
  * No hay sección "Eventos": el tracker solo guarda vistas de página (event_type siempre 'view').
+ *
+ * Fuentes y medios UTM se ven como una sola dimensión, "Medios" (la lista única de Configuración › Medios): la lista y el
+ * filtro usan el medio resuelto; Registros conserva utm_source y utm_medium crudos.
  */
 final class AnalyticsView
 {
   /** Listas de la pantalla => [título, columna del valor, con visitantes únicos]. */
   public const LISTS = [
     'campaigns' => ['Campañas', 'Campaña', true],
-    'sources' => ['Fuentes', 'Fuente', true],
-    'mediums' => ['Medios', 'Medio', true],
+    'medios' => ['Medios', 'Medio', true],
     'pages' => ['Páginas más vistas', 'Página', false],
     'referrers' => ['Sitios de referencia', 'Sitio', false],
     'countries' => ['Países', 'País', false],
@@ -36,7 +39,7 @@ final class AnalyticsView
   ];
 
   /**
-   * @param array<string,mixed> $input pr_desde, pr_hasta, pr_campana, pr_fuente, pr_medio.
+   * @param array<string,mixed> $input pr_desde, pr_hasta, pr_campana, pr_medio.
    * @param bool $catchUp false en la carga completa de la página: solo se lee el estado y la puesta al día la pide la
    *   pantalla por AJAX (api.php cierra la sesión antes; index.php no, y otra petición del mismo usuario esperaría).
    * @return array<string,mixed>
@@ -52,13 +55,14 @@ final class AnalyticsView
       'can_network' => $policy->canAct('promocion_ver_ip'),
       'sync' => null,
       'ready' => false,
+      'migrate' => TrackerSchema::needsMigration($settings),
       'error' => '',
       'kpis' => null,
       'daily' => [],
       'lists' => [],
-      'options' => ['campaigns' => [], 'sources' => [], 'mediums' => []],
+      'options' => ['campaigns' => [], 'medios' => []],
     ];
-    if ($rollup !== null) {
+    if ($rollup !== null && !$context['migrate']) {
       try {
         // Acotada (5.000 filas) y sin esperar: si el cron tiene el candado, la pantalla muestra lo que ya hay.
         $context['sync'] = $catchUp ? $rollup->catchUp() : $rollup->pendingStatus();
@@ -90,8 +94,7 @@ final class AnalyticsView
       'from' => $input['pr_desde'] ?? null,
       'to' => $input['pr_hasta'] ?? null,
       'campaign' => $input['pr_campana'] ?? '',
-      'source' => $input['pr_fuente'] ?? '',
-      'medium' => $input['pr_medio'] ?? '',
+      'medio' => $input['pr_medio'] ?? '',
     ];
   }
 
@@ -101,8 +104,8 @@ final class AnalyticsView
     /** @var TrackerAnalyticsFilters $filters */
     $filters = $context['filters'];
     $e = static fn($value): string => PromotionUi::e($value);
-    $applied = ['pr_desde' => $filters->from, 'pr_hasta' => $filters->to, 'pr_campana' => $filters->campaign, 'pr_fuente' => $filters->source, 'pr_medio' => $filters->medium];
-    $html = PromotionUi::hero('monitoring', 'Analítica web', 'Visitas al sitio de SKC SuCasa Inmobiliaria: campañas, fuentes, medios, páginas e inmuebles.');
+    $applied = ['pr_desde' => $filters->from, 'pr_hasta' => $filters->to, 'pr_campana' => $filters->campaign, 'pr_medio' => $filters->medio];
+    $html = PromotionUi::hero('monitoring', 'Analítica web', 'Visitas al sitio de SKC SuCasa Inmobiliaria: campañas, medios, páginas e inmuebles.');
     $html .= self::syncNotice($context);
     $html .= '<div class="cpr-live" data-cpr-live role="status" aria-live="polite"></div>';
     $html .= self::filtersForm($context, $baseUrl);
@@ -115,7 +118,7 @@ final class AnalyticsView
     $kpis = $context['kpis'];
     $excluded = $kpis['excluded'];
     // Mientras el rango no esté procesado del todo, los indicadores se atenúan (el aviso de arriba dice por qué).
-    $partial = in_array(self::coverage($context), ['partial', 'pending'], true);
+    $partial = in_array(self::coverage($context), ['partial', 'pending', 'migrate'], true);
     $html .= '<div class="cpr-stats' . ($partial ? ' is-partial' : '') . '" data-cpr-kpis' . ($partial ? ' data-cpr-partial' : '') . '>'
       . PromotionUi::stat('Visitas', PromotionUi::number($kpis['visits']), PromotionUi::day($filters->from) . ' a ' . PromotionUi::day($filters->to), 'visibility')
       . PromotionUi::stat('Visitantes únicos', PromotionUi::number($kpis['unique_visitors']), 'Por dirección IP (se guarda cifrada)', 'person')
@@ -147,6 +150,7 @@ final class AnalyticsView
 
   /**
    * ¿Qué tan completos están los datos del rango elegido?
+   *  'migrate' los resúmenes son de una versión anterior y se actualizan desde la línea de comandos;
    *  'error'   no se pudo poner al día;
    *  'pending' los resúmenes todavía no existen;
    *  'partial' hay visitas sin resumir y lo procesado no llega al final del rango (las cifras pueden estar incompletas);
@@ -157,6 +161,9 @@ final class AnalyticsView
   public static function coverage(array $context): string
   {
     $sync = $context['sync'];
+    if (!empty($context['migrate'])) {
+      return 'migrate';
+    }
     if (is_array($sync) && !empty($sync['error'])) {
       return 'error';
     }
@@ -179,6 +186,9 @@ final class AnalyticsView
   {
     $sync = is_array($context['sync']) ? $context['sync'] : [];
     $coverage = self::coverage($context);
+    if ($coverage === 'migrate') {
+      return '<p class="cpr-alert is-sync" data-cpr-sync="migrate"><span class="material-symbols-outlined" aria-hidden="true">build</span>La analítica web se está actualizando para mostrar los Medios de la lista única. Mientras sistemas termina la actualización (php bin/tracker-rollup.php), las cifras no están disponibles.</p>';
+    }
     if ($coverage === 'error') {
       return '<p class="cpr-alert" data-cpr-sync="error">No se pudieron traer las visitas más recientes; se muestran los resúmenes que ya había.</p>';
     }
@@ -218,15 +228,13 @@ final class AnalyticsView
     // Un valor elegido que ya no aparece en los últimos 12 meses sigue en su lista para no perder el filtro.
     $keep = static fn(array $list, string $value): array => $value !== '' && !in_array($value, $list, true) ? array_merge($list, [$value]) : $list;
     $campaigns = $keep($campaigns, $filters->campaign);
-    $options['sources'] = $keep($options['sources'], $filters->source);
-    $options['mediums'] = $keep($options['mediums'], $filters->medium);
+    $options['medios'] = $keep($options['medios'], $filters->medio);
     return '<form class="cpr-card cpr-filters" data-cpr-filters data-tab="analitica_web" action="' . PromotionUi::e(PromotionUi::url($baseUrl, ['tab' => 'analitica_web'])) . '">'
       . '<div class="cpr-filters__grid">'
       . PromotionUi::dateField('pr_desde', 'Desde', $filters->from, $min, $context['today'])
       . PromotionUi::dateField('pr_hasta', 'Hasta', $filters->to, $min, $context['today'])
       . PromotionUi::select('pr_campana', 'Campaña', $campaigns, $filters->campaign, 'Todas las campañas', $labels)
-      . PromotionUi::select('pr_fuente', 'Fuente', $options['sources'], $filters->source, 'Todas las fuentes')
-      . PromotionUi::select('pr_medio', 'Medio', $options['mediums'], $filters->medium, 'Todos los medios')
+      . PromotionUi::select('pr_medio', 'Medio', $options['medios'], $filters->medio, 'Todos los medios')
       . '</div><div class="cpr-filters__actions"><a class="cpr-ghost" data-cpr-nav href="' . PromotionUi::e(PromotionUi::url($baseUrl, ['tab' => 'analitica_web'])) . '">Últimos 30 días</a>'
       . '<button type="submit" class="cpr-primary"><span class="material-symbols-outlined" aria-hidden="true">filter_alt</span>Aplicar</button></div>'
       . '<p class="cpr-filters__hint">Hasta 12 meses. Los cambios se aplican al pulsar Aplicar.</p></form>';
@@ -257,7 +265,7 @@ final class AnalyticsView
     return match ($list) {
       'campaigns' => '<span class="cpr-cell-main">' . $e($row['label']) . '</span>' . ($row['label'] !== $row['value'] ? '<span class="cpr-cell-sub">' . $e($row['value']) . '</span>' : ''),
       'pages' => '<span class="cpr-cell-main cpr-url" title="' . $e($row['label']) . '">' . $e(self::shortUrl($row['label'])) . '</span>',
-      'cities' => '<span class="cpr-cell-main">' . $e($row['label']) . '</span>' . ($row['detail'] !== '' ? '<span class="cpr-cell-sub">' . $e($row['detail']) . '</span>' : ''),
+      'cities', 'medios' => '<span class="cpr-cell-main">' . $e($row['label']) . '</span>' . ($row['detail'] !== '' ? '<span class="cpr-cell-sub">' . $e($row['detail']) . '</span>' : ''),
       'objects' => '<span class="cpr-cell-main' . (str_starts_with($row['detail'], 'http') ? ' cpr-url' : '') . '" title="' . $e($row['detail']) . '">' . $e($row['detail'] !== '' ? self::shortUrl($row['detail']) : 'Inmueble ' . $row['label']) . '</span><span class="cpr-cell-sub">ID ' . $e($row['label']) . '</span>',
       default => '<span class="cpr-cell-main">' . $e($row['label']) . '</span>',
     };
@@ -281,7 +289,7 @@ final class AnalyticsView
       . '<div class="cpr-card__head cpr-card__head--split"><div><h2>Registros</h2><p>Cada visita del rango, de la más reciente a la más antigua: hasta 90 días y ' . TrackerAnalyticsRepository::LOG_PAGE_SIZE . ' por página.'
       . ($network ? ' Incluye IP y navegador.' : ' La IP y el navegador solo los ve quien tiene el permiso.') . ' Se consultan solo cuando los pides.</p></div>'
       . '<button type="button" class="cpr-ghost" data-cpr-logs-load><span class="material-symbols-outlined" aria-hidden="true">list_alt</span>Cargar registros</button></div>'
-      . '<div data-cpr-logs-body hidden><p class="cpr-alert" data-cpr-logs-note hidden></p><div class="cpr-table-wrap"><table class="cpr-table cpr-logs__table"><thead><tr><th>Fecha</th><th>Campaña</th><th>Fuente / medio</th><th>Página</th><th>Referencia</th><th>Ubicación</th>'
+      . '<div data-cpr-logs-body hidden><p class="cpr-alert" data-cpr-logs-note hidden></p><div class="cpr-table-wrap"><table class="cpr-table cpr-logs__table"><thead><tr><th>Fecha</th><th>Campaña</th><th>Medio</th><th>Página</th><th>Referencia</th><th>Ubicación</th>'
       . ($network ? '<th>IP</th><th>Navegador</th>' : '') . '</tr></thead><tbody data-cpr-logs-rows></tbody></table></div>'
       . '<div class="cpr-pager"><button type="button" class="cpr-ghost" data-cpr-logs-prev disabled>Anteriores</button><span data-cpr-logs-page>Página 1</span><button type="button" class="cpr-ghost" data-cpr-logs-next disabled>Siguientes</button></div></div>'
       . '</section>';

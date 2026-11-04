@@ -7,6 +7,8 @@ namespace SCM\Views;
 use SCM\Commercial\CommercialAccessPolicy;
 use SCM\Commercial\CommercialNetIncomeSimulator;
 use SCM\Commercial\CommercialOwnerPreapprovalService;
+use SCM\Commercial\Medios\MedioCatalog;
+use SCM\Commercial\Medios\MedioSeed;
 use SCM\Commercial\Tools\CleaningCalculator;
 use SCM\Commercial\Tools\CleaningSettings;
 use SCM\Commercial\Tools\UtmCatalog;
@@ -41,9 +43,9 @@ final class CommercialToolsView
   ];
 
   /**
-   * Datos que necesitan las calculadoras de mercado y aseo según el permiso del cargo, y el catálogo del Generador UTM
-   * (solo las listas de medios, fuentes y campañas).
-   * @return array{market_admin:bool,cleaning_internal:bool,cleaning_config:array<string,mixed>,utm_catalog:array<string,mixed>}
+   * Datos que necesitan las calculadoras de mercado y aseo según el permiso del cargo, y para el Generador UTM las campañas
+   * del catálogo y los medios activos de la lista única (nombre y slug).
+   * @return array{market_admin:bool,cleaning_internal:bool,cleaning_config:array<string,mixed>,utm_catalog:array<string,mixed>,utm_medios:list<array{label:string,value:string}>}
    */
   public static function context(string $tool, CommercialAccessPolicy $policy, Database $db, ?Settings $settings = null): array
   {
@@ -52,16 +54,17 @@ final class CommercialToolsView
       'cleaning_internal' => $policy->canAct('aseo_vista_interna'),
       'cleaning_config' => $tool === 'calculadora_aseo' ? (new CleaningSettings($db))->read() : [],
       'utm_catalog' => $tool === 'generador_utm' && $settings instanceof Settings ? UtmCatalog::read($settings) : [],
+      'utm_medios' => $tool === 'generador_utm' && $settings instanceof Settings ? (new MedioCatalog($db, $settings))->utmOptions() : [],
     ];
   }
 
-  /** @param array{market_admin?:bool,cleaning_internal?:bool,cleaning_config?:array<string,mixed>,utm_catalog?:array<string,mixed>} $context */
+  /** @param array{market_admin?:bool,cleaning_internal?:bool,cleaning_config?:array<string,mixed>,utm_catalog?:array<string,mixed>,utm_medios?:list<array{label:string,value:string}>} $context */
   public static function render(string $tool, ?CommercialOwnerPreapprovalService $service, string $baseUrl, array $context = []): string
   {
     if ($tool === 'ganancia_ocasional') return self::occasionalGain();
     if ($tool === 'calculadora_mercado') return self::market(!empty($context['market_admin']));
     if ($tool === 'calculadora_aseo') return self::cleaning(!empty($context['cleaning_internal']), $context['cleaning_config'] ?? []);
-    if ($tool === 'generador_utm') return self::utm($context['utm_catalog'] ?? []);
+    if ($tool === 'generador_utm') return self::utm($context['utm_catalog'] ?? [], $context['utm_medios'] ?? []);
     return $service instanceof CommercialOwnerPreapprovalService ? self::netIncome($service) : '';
   }
 
@@ -423,26 +426,27 @@ final class CommercialToolsView
   /**
    * Generador UTM (copia de dashboard-marketing views/utm.php con el diseño de las herramientas). El enlace se arma en
    * el navegador (commercial-utm.js, mismo algoritmo que UtmLinkBuilder); las campañas del tracker se piden al abrir.
+   * Un solo selector "Medio" con la lista única de Medios: llena utm_source y utm_medium con el mismo slug, para que la
+   * analítica (que resuelve el medio por fuente y luego por medio UTM) cuente siempre en el mismo medio.
    * @param array<string,mixed> $catalog UtmCatalog::read
+   * @param list<array{label:string,value:string}> $medios MedioCatalog::utmOptions (sin la base: los de MedioSeed)
    */
-  private static function utm(array $catalog): string
+  private static function utm(array $catalog, array $medios = []): string
   {
     $catalog = $catalog + UtmCatalog::defaults();
-    $options = static function (array $rows): string {
-      $html = '';
-      foreach ($rows as $row) {
-        if (!is_array($row) || (string) ($row['value'] ?? '') === '') continue;
-        $html .= '<option value="' . self::e($row['value']) . '">' . self::e((string) ($row['label'] ?? $row['value'])) . '</option>';
-      }
-      return $html;
-    };
-    $select = static fn(string $field, string $label, string $placeholder, string $other, array $rows): string => '<div class="ctl-field" data-utm-combo="' . $field . '">'
-      . '<label class="ctl-label" for="ctl-utm-' . $field . '">' . self::e($label) . ' <b class="ctl-required" aria-hidden="true">*</b></label>'
-      . '<span class="ctl-input"><select id="ctl-utm-' . $field . '" name="' . $field . '" data-utm-field="' . $field . '" required><option value="">' . self::e($placeholder) . '</option>'
-      . '<optgroup label="Catálogo" data-utm-group="catalog">' . $options($rows) . '</optgroup>'
-      . '<option value="__otro__">Otro (escribir)…</option></select></span>'
-      . '<span class="ctl-input" data-utm-other-box hidden><input type="text" name="' . $field . '_otro" data-utm-other="' . $field . '" maxlength="' . UtmLinkBuilder::MAX_LENGTH . '" placeholder="' . self::e($other) . '"></span>'
-      . '<small class="ctl-note" data-utm-preview="' . $field . '"></small></div>';
+    if ($medios === []) {
+      $medios = array_map(static fn(array $row): array => ['label' => $row['nombre'], 'value' => $row['slug']], MedioSeed::rows());
+    }
+    $options = '';
+    foreach ($medios as $row) {
+      if ((string) ($row['value'] ?? '') === '') continue;
+      $options .= '<option value="' . self::e($row['value']) . '">' . self::e((string) ($row['label'] ?? $row['value'])) . '</option>';
+    }
+    $select = '<div class="ctl-field" data-utm-combo="medio">'
+      . '<label class="ctl-label" for="ctl-utm-medio">Medio <b class="ctl-required" aria-hidden="true">*</b></label>'
+      . '<span class="ctl-input"><select id="ctl-utm-medio" name="medio" data-utm-field="medio" required><option value="">Selecciona el medio</option>' . $options . '</select></span>'
+      . '<small class="ctl-note">La lista de medios es la misma de los registros; se ajusta en <strong>Configuración › Medios</strong>.</small>'
+      . '<small class="ctl-note" data-utm-preview="medio"></small></div>';
     $text = static fn(string $field, string $label, string $placeholder, string $extra = ''): string => '<label class="ctl-field"><span class="ctl-label">' . $label . '</span>'
       . '<span class="ctl-input"><input type="text" name="' . $field . '" data-utm-field="' . $field . '" maxlength="' . UtmLinkBuilder::MAX_LENGTH . '" placeholder="' . self::e($placeholder) . '"' . $extra . '></span>'
       . '<small class="ctl-note" data-utm-preview="' . $field . '"></small></label>';
@@ -457,15 +461,14 @@ final class CommercialToolsView
     }
 
     return '<section class="ctl" data-commercial-tool="generador_utm">'
-      . self::hero('link', 'Generador UTM', 'Crea enlaces de campaña con fuente, medio y nombre para saber de dónde llegan las visitas. Los medios, fuentes y campañas del equipo se ajustan en <strong>Configuración › Generador UTM</strong>.')
+      . self::hero('link', 'Generador UTM', 'Crea enlaces de campaña con medio y nombre para saber de dónde llegan las visitas. Las campañas del equipo se ajustan en <strong>Configuración › Generador UTM</strong> y los medios en <strong>Configuración › Medios</strong>.')
       . '<div class="ctl-layout ctl-layout--even">'
       . '<form class="ctl-card ctl-stack" data-utm-form autocomplete="off" novalidate>'
-      . '<div class="ctl-card__head"><span class="ctl-step">1</span><div><h2>Datos del enlace</h2><p>Los valores se escriben en minúsculas, sin tildes ni espacios, para que el tracker no parta una campaña en variantes. Los que ya registró el tracker se envían tal cual, para sumar a lo que ya tiene.</p></div></div>'
+      . '<div class="ctl-card__head"><span class="ctl-step">1</span><div><h2>Datos del enlace</h2><p>Los valores se escriben en minúsculas, sin tildes ni espacios, para que el tracker no parta una campaña en variantes. El medio va en utm_source y utm_medium con el mismo valor; las campañas que ya registró el tracker se envían tal cual, para sumar a lo que ya tienen.</p></div></div>'
       . '<label class="ctl-field"><span class="ctl-label">URL de destino <b class="ctl-required" aria-hidden="true">*</b></span><span class="ctl-input"><input type="text" inputmode="url" name="url" data-utm-field="url" maxlength="' . UtmLinkBuilder::MAX_URL_LENGTH . '" placeholder="https://sucasainmobiliaria.com.co/..." required></span>'
       . '<small class="ctl-note">Si la URL ya trae parámetros o un #ancla, se conservan.</small></label>'
       . '<div class="ctl-grid">'
-      . $select('medium', 'Medio / canal', 'Selecciona el medio', 'Escribe el medio', (array) ($catalog['medios'] ?? []))
-      . $select('source', 'Fuente / recurso', 'Selecciona la fuente', 'Escribe la fuente', (array) ($catalog['fuentes'] ?? []))
+      . '<div class="ctl-full">' . $select . '</div>'
       . '<div class="ctl-full">' . $text('campaign', 'Campaña <b class="ctl-required" aria-hidden="true">*</b>', 'feria_vivienda', ' list="ctl-utm-campaigns" required') . '</div>'
       . $text('content', 'Contenido <small>(opcional, utm_content)</small>', 'banner_superior')
       . $text('term', 'Término <small>(opcional, utm_term)</small>', 'apartamento_arriendo')

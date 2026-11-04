@@ -454,6 +454,8 @@
   border: 1px solid #dbe6f2 !important;
   color: #334155 !important;
   min-width: 92px; }
+/* Configuración › Medios administra una lista: cada acción se guarda al confirmarla, sin botón Guardar. */
+.swal2-container .swal2-popup.scm-calendar-swal-popup.scm-config-manage .swal2-actions .swal2-confirm.swal2-styled { display: none !important; }
 .swal2-popup .scm-calendar-popup-form { color: #0f2742;
   display: grid;
   gap: 18px;

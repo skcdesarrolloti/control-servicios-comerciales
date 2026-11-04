@@ -7,10 +7,14 @@ namespace SCM\Commercial\Tools;
 use SCM\Core\Settings;
 
 /**
- * Catálogo compartido del Generador UTM: medios, fuentes y campañas (alias con nombre visible). En dashboard-marketing
+ * Catálogo compartido del Generador UTM: las campañas (alias con nombre visible). En dashboard-marketing
  * (public/assets/app.js, UTM_DEFAULTS y localStorage "dashboardMarketing.utm.*") cada navegador guardaba sus propias
  * opciones; aquí lo edita un administrador en Configuración › Generador UTM y se guarda en Settings
  * (control_servicios_comerciales_config), igual para todo el equipo.
+ *
+ * Los medios y fuentes ya no son listas de este catálogo: el generador ofrece un solo selector con la lista única de
+ * Medios (MedioCatalog, Configuración › Medios) y llena utm_source y utm_medium con el mismo slug. Las listas "medios" y
+ * "fuentes" que hubiera guardadas se conservan sin cambios en Settings (no se leen ni se borran).
  */
 final class UtmCatalog
 {
@@ -18,10 +22,11 @@ final class UtmCatalog
 
   /** Lista => [título, parámetro que llena]. */
   public const LISTS = [
-    'medios' => ['Medios / canales', 'utm_medium'],
-    'fuentes' => ['Fuentes / recursos', 'utm_source'],
     'campanas' => ['Campañas', 'utm_campaign'],
   ];
+
+  /** Listas de versiones anteriores que se conservan tal cual al guardar. */
+  private const LEGACY_LISTS = ['medios', 'fuentes'];
 
   public const MAX_ITEMS = 80;
   public const MAX_LABEL = 60;
@@ -29,27 +34,15 @@ final class UtmCatalog
   /** Slugs que el tracker usa para el tráfico sin campaña: no pueden ser el nombre de una campaña. */
   public const RESERVED_CAMPAIGNS = UtmLinkBuilder::RESERVED_CAMPAIGNS;
 
-  /** Opciones por defecto de dashboard-marketing (UTM_DEFAULTS) mientras no se guarde el catálogo. */
-  private const DEFAULTS = [
-    'medios' => ['WhatsApp', 'Correo electrónico', 'Redes sociales', 'SMS', 'Publicidad pagada', 'QR Code', 'Email', 'Display', 'Orgánico', 'Referido'],
-    'fuentes' => ['Facebook', 'Instagram', 'TikTok', 'Google', 'Base de datos', 'Estado WhatsApp', 'Landing page', 'Portal web', 'YouTube', 'LinkedIn'],
-    'campanas' => [],
-  ];
-
-  /** @return array{medios:list<array{label:string,value:string}>,fuentes:list<array{label:string,value:string}>,campanas:list<array{label:string,value:string}>} */
+  /** @return array{campanas:list<array{label:string,value:string}>} */
   public static function defaults(): array
   {
-    $out = [];
-    foreach (self::DEFAULTS as $list => $labels) {
-      $out[$list] = array_map(static fn(string $label): array => ['label' => $label, 'value' => UtmLinkBuilder::slug($label)], $labels);
-    }
-    /** @var array{medios:list<array{label:string,value:string}>,fuentes:list<array{label:string,value:string}>,campanas:list<array{label:string,value:string}>} $out */
-    return $out;
+    return ['campanas' => []];
   }
 
   /**
    * Catálogo vigente; lo guardado se vuelve a limpiar al leer (filas inválidas se omiten).
-   * @return array{medios:list<array{label:string,value:string}>,fuentes:list<array{label:string,value:string}>,campanas:list<array{label:string,value:string}>}
+   * @return array{campanas:list<array{label:string,value:string}>}
    */
   public static function read(Settings $settings): array
   {
@@ -71,7 +64,7 @@ final class UtmCatalog
   }
 
   /**
-   * Valida y guarda las tres listas.
+   * Valida y guarda las campañas (las listas anteriores de medios y fuentes se conservan como estaban).
    * @param array<string,mixed> $data
    * @throws \InvalidArgumentException Con el mensaje para el administrador.
    */
@@ -81,8 +74,15 @@ final class UtmCatalog
     foreach (array_keys(self::LISTS) as $list) {
       $clean[$list] = self::sanitizeList($list, is_array($data[$list] ?? null) ? $data[$list] : [], true);
     }
-    if ($clean['medios'] === [] || $clean['fuentes'] === []) {
-      throw new \InvalidArgumentException('Deja al menos un medio y una fuente en el catálogo.');
+    try {
+      $stored = $settings->get(self::SETTING, null);
+    } catch (\Throwable) {
+      $stored = null;
+    }
+    foreach (self::LEGACY_LISTS as $legacy) {
+      if (is_array($stored) && array_key_exists($legacy, $stored)) {
+        $clean[$legacy] = $stored[$legacy];
+      }
     }
     $settings->set(self::SETTING, $clean, $userId);
     $settings->refresh();

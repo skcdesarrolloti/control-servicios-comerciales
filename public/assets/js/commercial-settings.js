@@ -1,8 +1,9 @@
 /*
  * Menú "Configuración" del encabezado comercial. Cada opción abre un popup con su sección:
  * calendario, tiempos de atención, avisos, actualizaciones de inmuebles, cupos de destacados, calculadora de aseo,
- * catálogo del Generador UTM y Analítica web (Promoción).
- * Permisos reutiliza su modal existente.
+ * campañas del Generador UTM, Medios (lista única) y Analítica web (Promoción).
+ * Permisos reutiliza su modal existente. "Medios" es un administrador de lista: cada acción se guarda al confirmarla en un
+ * panel interno del mismo popup (sin botón Guardar).
  */
 (function () {
   "use strict";
@@ -273,12 +274,11 @@
         return data;
       },
     },
-    // Catálogo compartido del Generador UTM (Herramientas). En dashboard-marketing cada navegador guardaba sus opciones.
+    // Campañas compartidas del Generador UTM (Herramientas). En dashboard-marketing cada navegador guardaba sus opciones.
+    // Medios y fuentes ya no se configuran aquí: el generador usa la lista única de Configuración › Medios.
     utm: {
       title: "Generador UTM",
       lists: [
-        ["medios", "Medios / canales", "Van en utm_medium: por dónde llega el enlace (WhatsApp, correo, redes).", true],
-        ["fuentes", "Fuentes / recursos", "Van en utm_source: quién envía la visita (Facebook, Instagram, Google).", true],
         ["campanas", "Campañas", "Van en utm_campaign. El nombre es el que ven los funcionarios; el valor es el que queda en el tracker.", false],
       ],
       html: function (settings) {
@@ -288,7 +288,7 @@
             '<td class="py-1 px-1 text-right"><button type="button" class="px-2 py-1 rounded-lg text-rose-700 hover:bg-rose-50 text-xs font-semibold" data-utm-remove-row aria-label="Quitar fila">Quitar</button></td></tr>';
         }
         return '<form data-config-form class="text-left space-y-5">' +
-          intro("Opciones que ofrece Herramientas › Generador UTM a todo el equipo. Los valores se guardan en minúsculas, sin tildes ni espacios; los repetidos se descartan.") +
+          intro("Campañas que ofrece Herramientas › Generador UTM a todo el equipo. Los valores se guardan en minúsculas, sin tildes ni espacios; los repetidos se descartan. El medio del enlace sale de la lista única de <strong>Configuración › Medios</strong>.") +
           this.lists.map(function (list) {
             return '<section class="text-left" data-utm-list="' + list[0] + '" data-required="' + (list[3] ? "1" : "0") + '"><div class="flex flex-wrap items-center justify-between gap-2 mb-1"><div><h4 class="text-sm font-bold text-slate-800">' + esc(list[1]) + '</h4><p class="text-[11px] text-slate-500">' + esc(list[2]) + "</p></div>" +
               '<button type="button" class="px-3 py-1 rounded-lg bg-slate-100 text-xs font-semibold" data-utm-add-row>Agregar fila</button></div>' +
@@ -321,6 +321,15 @@
         });
         return data;
       },
+    },
+    // Lista única de Medios (tabla scm_medios): registros, glosario de los formularios, Generador UTM y analítica web.
+    medios: {
+      title: "Medios",
+      manage: true,
+      html: function (settings) {
+        return '<div class="text-left space-y-4" data-medios-root>' + mediosBody(settings) + "</div>";
+      },
+      bind: function (popup, settings) { bindMedios(popup, settings); },
     },
     // Promoción › Analítica web: IPs internas, robots, retención de visitas crudas y dominios propios. El estado de los
     // resúmenes es solo lectura (lo mueve la tarea programada y la puesta al día al abrir la pantalla). Bajar los días de
@@ -417,22 +426,291 @@
     if (!show) input.checked = false;
   }
 
+  // ── Configuración › Medios ────────────────────────────────────────────
+  var MEDIOS_ACTIONS = { rename: "Renombrar", aliases: "Alias", merge: "Unir con…", toggle: "" };
+
+  function number(value) { return Number(value || 0).toLocaleString("es-CO"); }
+
+  function tableCounts(counts, labels) {
+    var parts = Object.keys(counts || {}).filter(function (table) { return Number(counts[table]) > 0; }).map(function (table) {
+      return esc((labels || {})[table] || table) + ": " + number(counts[table]);
+    });
+    return parts.length ? parts.join(" · ") : "Ningún registro";
+  }
+
+  function medioOptions(medios, exceptId) {
+    return '<option value="">Elige un medio…</option>' + (medios || []).filter(function (row) { return row.id !== exceptId; }).map(function (row) {
+      return '<option value="' + esc(String(row.id)) + '">' + esc(row.nombre) + (row.activo ? "" : " (inactivo)") + "</option>";
+    }).join("");
+  }
+
+  function mediosBody(settings) {
+    var medios = settings.medios || [];
+    var usage = settings.usage || {};
+    var ready = !!settings.ready;
+    var unresolved = settings.unresolved || { records: [], variants: [], visits: [] };
+    var labels = settings.tables || {};
+    var button = function (attrs, text, tone) {
+      return '<button type="button" class="px-2 py-1 rounded-lg text-xs font-semibold ' + (tone || "bg-slate-100 text-slate-700 hover:bg-slate-200") + '" ' + attrs + ">" + esc(text) + "</button>";
+    };
+    var html = '<p class="hidden" data-medios-status role="status" aria-live="polite"></p>' + intro("Una sola lista de medios (cómo llegó el cliente o la visita) para las columnas <strong>medio</strong> de llamadas, tareas, cierres, contratos, estudios y solicitudes, el glosario <strong>Medio de llamada</strong> de los formularios, el Generador UTM y la analítica web. Renombrar o unir cambia los registros con ese nombre exacto y deja el nombre anterior como alias.");
+    if (!ready) {
+      html += '<p class="text-sm rounded-xl border border-amber-200 bg-amber-50 text-amber-900 px-3 py-2" data-medios-not-ready>La lista todavía no está instalada en la base: pide a sistemas que ejecuten <code>php bin/medios-normalize.php --apply</code>. Mientras tanto se muestra la lista inicial y no se puede editar.</p>';
+    }
+    if (settings.error) html += '<p class="text-sm text-rose-700">' + esc(settings.error) + "</p>";
+    if (settings.analytics_pending) {
+      html += '<p class="text-xs rounded-xl border border-sky-200 bg-sky-50 text-sky-900 px-3 py-2" data-medios-analytics-pending>La analítica web aplica los últimos cambios de la lista en la siguiente corrida de la tarea programada (cada pocos minutos).</p>';
+    }
+    if (ready) {
+      html += '<div class="flex flex-wrap items-end gap-2"><label class="flex-1 min-w-[12rem] text-left"><span class="block text-xs font-semibold text-slate-700 mb-1">Nuevo medio</span>' +
+        '<input class="w-full px-2 py-1.5 rounded-lg border border-slate-300 text-sm" type="text" maxlength="60" data-medios-new placeholder="Ej.: Volante"></label>' +
+        button("data-medios-add", "Agregar", "bg-slate-800 text-white hover:bg-slate-700") + "</div>";
+    }
+    html += '<section><h4 class="text-sm font-bold text-slate-800 mb-1">Lista (' + medios.length + ")</h4>" +
+      '<div class="overflow-x-auto max-h-[38vh] overflow-y-auto border border-slate-200 rounded-xl"><table class="w-full text-sm text-left"><thead><tr class="text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-200 bg-slate-50">' +
+      '<th class="py-2 px-2">Medio</th><th class="py-2 px-2">Valor UTM</th><th class="py-2 px-2">Alias</th><th class="py-2 px-2 text-right">Registros</th><th class="py-2 px-2"></th></tr></thead><tbody class="divide-y divide-slate-100">' +
+      medios.map(function (row) {
+        var actions = ready ? Object.keys(MEDIOS_ACTIONS).map(function (action) {
+          var text = action === "toggle" ? (row.activo ? "Desactivar" : "Activar") : MEDIOS_ACTIONS[action];
+          var tone = action === "toggle" && row.activo ? "bg-rose-50 text-rose-700 hover:bg-rose-100" : "";
+          return button('data-medios-action="' + action + '" data-id="' + esc(String(row.id)) + '"', text, tone);
+        }).join(" ") : "";
+        return '<tr data-medio-row="' + esc(row.nombre) + '"' + (row.activo ? "" : ' class="opacity-60"') + '><td class="py-2 px-2 font-medium text-slate-800">' + esc(row.nombre) +
+          (row.activo ? "" : ' <span class="text-[10px] font-bold uppercase text-slate-500">inactivo</span>') + "</td>" +
+          '<td class="py-2 px-2"><code class="text-xs">' + esc(row.slug) + "</code></td>" +
+          '<td class="py-2 px-2 text-xs text-slate-600">' + esc((row.aliases || []).join(", ")) + "</td>" +
+          '<td class="py-2 px-2 text-right">' + number(usage[row.nombre]) + "</td>" +
+          '<td class="py-2 px-2 text-right whitespace-nowrap">' + actions + "</td></tr>";
+      }).join("") + "</tbody></table></div>" +
+      '<p class="text-[11px] text-slate-500 mt-1">Un medio inactivo no se ofrece en los formularios ni en el Generador UTM, pero sus registros y visitas se siguen reconociendo. Las visitas sin enlace UTM cuentan como «' + esc(settings.direct || "Sin medio (directo)") + "».</p></section>";
+
+    var rawRows = function (items, kind) {
+      return items.map(function (item) {
+        var where = kind === "visits" ? esc((item.pairs || []).slice(0, 3).join(" | ")) : tableCounts(item.tables, labels);
+        var controls = "";
+        if (ready) {
+          controls = '<select class="px-2 py-1 rounded-lg border border-slate-300 text-xs max-w-[11rem]" data-medios-raw-target>' + medioOptions(medios, null) + "</select> " +
+            (kind !== "variants" ? button('data-medios-raw="alias"', "Agregar como alias") + " " : "") +
+            (kind !== "visits" ? button('data-medios-raw="rewrite"', "Reescribir registros", "bg-amber-100 text-amber-900 hover:bg-amber-200") : "");
+        }
+        return '<tr data-medios-raw-row="' + esc(item.value) + '" data-kind="' + kind + '"><td class="py-2 px-2 font-medium text-slate-800">' + esc(item.value) +
+          (item.medio ? ' <span class="text-[11px] text-slate-500">→ ' + esc(item.medio) + "</span>" : "") + "</td>" +
+          '<td class="py-2 px-2 text-right">' + number(item.total) + '</td><td class="py-2 px-2 text-xs text-slate-600">' + where + "</td>" +
+          '<td class="py-2 px-2 text-right whitespace-nowrap">' + controls + "</td></tr>";
+      }).join("");
+    };
+    var groups = [
+      ["records", "En los registros", "Valores que no corresponden a ningún medio. «Agregar como alias» los reconoce sin cambiar los registros; «Reescribir registros» los cambia por el medio elegido."],
+      ["variants", "Escritos distinto", "Ya se reconocen (mayúsculas, tildes o alias), pero los registros no tienen el nombre exacto del medio."],
+      ["visits", "En las visitas web", "utm_source / utm_medium que no se reconocen (se muestran con su texto en la analítica). Solo se pueden agregar como alias."],
+    ];
+    var total = groups.reduce(function (sum, group) { return sum + (unresolved[group[0]] || []).length; }, 0);
+    html += '<section data-medios-unresolved><h4 class="text-sm font-bold text-slate-800 mb-1">Valores sin reconocer (' + total + ")</h4>" +
+      (total === 0 ? '<p class="text-sm text-slate-600">Todos los valores de los registros y de las visitas corresponden a un medio de la lista.</p>' : groups.map(function (group) {
+        var items = unresolved[group[0]] || [];
+        if (!items.length) return "";
+        return '<div class="mb-3"><p class="text-xs font-semibold text-slate-700">' + esc(group[1]) + '</p><p class="text-[11px] text-slate-500 mb-1">' + esc(group[2]) + "</p>" +
+          '<div class="overflow-x-auto"><table class="w-full text-sm text-left"><thead><tr class="text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-200"><th class="py-2 px-2">Valor</th><th class="py-2 px-2 text-right">Cantidad</th><th class="py-2 px-2">Dónde</th><th class="py-2 px-2"></th></tr></thead><tbody class="divide-y divide-slate-100">' +
+          rawRows(items, group[0]) + "</tbody></table></div></div>";
+      }).join("")) + "</section>";
+
+    var history = settings.history || [];
+    if (history.length) {
+      var actionLabels = { seed: "Lista creada", add: "Agregado", rename: "Renombrado", merge: "Unido", activate: "Activado", deactivate: "Desactivado", aliases: "Alias", alias: "Alias", rewrite: "Registros reescritos", normalize: "Normalización", revert: "Revertido", "import": "Importado del glosario" };
+      html += '<details class="text-left"><summary class="cursor-pointer text-sm font-bold text-slate-800">Historial de cambios</summary><ul class="mt-2 space-y-1 text-xs text-slate-600" data-medios-history>' +
+        history.map(function (row) {
+          var records = row.detail && row.detail.records ? Object.keys(row.detail.records).reduce(function (sum, key) { return sum + Number(row.detail.records[key] || 0); }, 0) : null;
+          return "<li><strong>" + esc(actionLabels[row.action] || row.action) + "</strong> " + esc([row.from, row.to].filter(Boolean).join(" → ")) +
+            (records !== null ? " · " + number(records) + " registros" : "") + ' <span class="text-slate-400">' + esc(row.at) + (row.id_empleado ? " · funcionario " + esc(row.id_empleado) : "") + " · #" + esc(String(row.id)) + "</span></li>";
+        }).join("") + "</ul></details>";
+    }
+    // Panel interno de confirmación (renombrar, alias, unir, desactivar, reescribir): no abre otro popup.
+    html += '<div class="hidden fixed inset-0 z-[2000] items-center justify-center bg-slate-900/40 p-4" data-medios-panel role="dialog" aria-modal="true">' +
+      '<div class="w-full max-w-md bg-white rounded-2xl shadow-xl p-4 text-left space-y-3" data-medios-panel-box></div></div>';
+    return html;
+  }
+
+  function bindMedios(popup, initial) {
+    var root = popup.querySelector("[data-medios-root]");
+    var state = { settings: initial || {} };
+    var panel = function () { return root.querySelector("[data-medios-panel]"); };
+
+    function render(settings) {
+      state.settings = settings || state.settings;
+      root.innerHTML = mediosBody(state.settings);
+    }
+
+    // Mensajes dentro del popup (notify abriría otro SweetAlert y cerraría esta lista).
+    function status(type, message) {
+      var line = root.querySelector("[data-medios-status]");
+      line.textContent = message || "";
+      line.setAttribute("data-type", type);
+      line.className = "text-sm rounded-xl px-3 py-2 " + (type === "error" ? "bg-rose-50 text-rose-800 border border-rose-200" : "bg-emerald-50 text-emerald-800 border border-emerald-200");
+    }
+
+    function find(id) {
+      return (state.settings.medios || []).filter(function (row) { return String(row.id) === String(id); })[0] || null;
+    }
+
+    function op(payload) {
+      return request("commercial_settings_save", { section: "medios", payload: JSON.stringify(payload) });
+    }
+
+    function closePanel() {
+      var box = panel();
+      box.classList.add("hidden");
+      box.classList.remove("flex");
+    }
+
+    // Abre el panel con un cuerpo y un botón de confirmar; onConfirm devuelve la operación a enviar.
+    function openPanel(title, body, confirmText, onConfirm, danger) {
+      var box = panel();
+      box.querySelector("[data-medios-panel-box]").innerHTML = '<h4 class="text-base font-bold text-slate-800">' + esc(title) + "</h4>" + body +
+        '<p class="text-sm text-rose-700 hidden" data-medios-panel-error></p><div class="flex justify-end gap-2">' +
+        '<button type="button" class="px-3 py-1.5 rounded-lg bg-slate-100 text-sm font-semibold" data-medios-panel-cancel>Cancelar</button>' +
+        '<button type="button" class="px-3 py-1.5 rounded-lg text-sm font-semibold text-white ' + (danger ? "bg-rose-600 hover:bg-rose-700" : "bg-slate-800 hover:bg-slate-700") + '" data-medios-panel-confirm>' + esc(confirmText) + "</button></div>";
+      box.classList.remove("hidden");
+      box.classList.add("flex");
+      var first = box.querySelector("input, textarea, select");
+      if (first) first.focus();
+      box.querySelector("[data-medios-panel-cancel]").addEventListener("click", closePanel);
+      box.querySelector("[data-medios-panel-confirm]").addEventListener("click", function () {
+        var error = box.querySelector("[data-medios-panel-error]");
+        var payload;
+        try {
+          payload = onConfirm(box);
+        } catch (problem) {
+          error.textContent = problem.message;
+          error.classList.remove("hidden");
+          return;
+        }
+        var confirm = box.querySelector("[data-medios-panel-confirm]");
+        confirm.disabled = true;
+        op(payload).then(function (data) {
+          closePanel();
+          render((data.settings || {}).medios);
+          status("success", data.message || "Cambios guardados.");
+        }).catch(function (problem) {
+          confirm.disabled = false;
+          error.textContent = problem.message;
+          error.classList.remove("hidden");
+        });
+      });
+    }
+
+    // Cuántos registros cambiarían (por tabla) antes de confirmar.
+    function previewHtml(value, verb) {
+      return op({ op: "preview", value: value }).then(function (data) {
+        var result = data.result || {};
+        return '<p class="text-sm text-slate-700" data-medios-preview data-total="' + esc(String(result.total || 0)) + '">' + esc(verb) + " <strong>" + number(result.total) + " registros</strong>" +
+          (result.total ? " (" + tableCounts(result.preview, state.settings.tables) + ")" : "") + ".</p>";
+      });
+    }
+
+    root.addEventListener("click", function (event) {
+      var add = event.target.closest("[data-medios-add]");
+      if (add) {
+        var input = root.querySelector("[data-medios-new]");
+        if (!input.value.trim()) { input.focus(); return; }
+        add.disabled = true;
+        op({ op: "add", nombre: input.value }).then(function (data) {
+          render((data.settings || {}).medios);
+          status("success", data.message);
+        }).catch(function (problem) {
+          add.disabled = false;
+          status("error", problem.message);
+        });
+        return;
+      }
+      var action = event.target.closest("[data-medios-action]");
+      if (action) {
+        var medio = find(action.getAttribute("data-id"));
+        if (!medio) return;
+        var kind = action.getAttribute("data-medios-action");
+        if (kind === "aliases") {
+          openPanel("Alias de «" + medio.nombre + "»", '<p class="text-sm text-slate-600">Otras formas en que llega este medio (en los registros o en utm_source / utm_medium), una por línea. Se comparan sin mayúsculas, tildes ni signos.</p>' +
+            '<textarea class="w-full px-2 py-1.5 rounded-lg border border-slate-300 text-sm font-mono" rows="6" data-medios-aliases>' + esc((medio.aliases || []).join("\n")) + "</textarea>", "Guardar alias", function (box) {
+            return { op: "aliases", id: medio.id, aliases: box.querySelector("[data-medios-aliases]").value.split(/\r?\n/) };
+          });
+          return;
+        }
+        if (kind === "toggle" && !medio.activo) {
+          op({ op: "toggle", id: medio.id, active: 1 }).then(function (data) {
+            render((data.settings || {}).medios);
+            status("success", data.message);
+          }).catch(function (problem) { status("error", problem.message); });
+          return;
+        }
+        previewHtml(medio.nombre, kind === "toggle" ? "Lo usan" : "Cambiarán").then(function (preview) {
+          if (kind === "toggle") {
+            openPanel("Desactivar «" + medio.nombre + "»", preview + '<p class="text-sm text-slate-600">Deja de ofrecerse en el glosario de los formularios y en el Generador UTM. Los registros no cambian y se sigue reconociendo en la analítica.</p>', "Desactivar", function () {
+              return { op: "toggle", id: medio.id, active: 0 };
+            }, true);
+          } else if (kind === "rename") {
+            openPanel("Renombrar «" + medio.nombre + "»", '<label class="block"><span class="block text-xs font-semibold text-slate-700 mb-1">Nombre nuevo</span><input class="w-full px-2 py-1.5 rounded-lg border border-slate-300 text-sm" type="text" maxlength="60" data-medios-rename value="' + esc(medio.nombre) + '"></label>' +
+              preview + '<p class="text-sm text-slate-600">Los registros con el nombre exacto «' + esc(medio.nombre) + "» pasan al nombre nuevo, y «" + esc(medio.nombre) + "» queda como alias (los enlaces UTM ya publicados siguen contando).</p>", "Renombrar", function (box) {
+              var name = box.querySelector("[data-medios-rename]").value.trim();
+              if (!name) throw new Error("Escribe el nombre nuevo.");
+              return { op: "rename", id: medio.id, nombre: name };
+            }, true);
+          } else if (kind === "merge") {
+            openPanel("Unir «" + medio.nombre + "» con otro medio", '<label class="block"><span class="block text-xs font-semibold text-slate-700 mb-1">Medio que se conserva</span><select class="w-full px-2 py-1.5 rounded-lg border border-slate-300 text-sm" data-medios-merge-target>' + medioOptions(state.settings.medios, medio.id) + "</select></label>" +
+              preview + '<p class="text-sm text-slate-600">«' + esc(medio.nombre) + "» sale de la lista: sus registros pasan al medio elegido y su nombre, valor UTM y alias quedan como alias de ese medio. Queda en el historial.</p>", "Unir", function (box) {
+              var target = box.querySelector("[data-medios-merge-target]").value;
+              if (!target) throw new Error("Elige el medio que se conserva.");
+              return { op: "merge", id: medio.id, target: Number(target) };
+            }, true);
+          }
+        }).catch(function (problem) { status("error", problem.message); });
+        return;
+      }
+      var raw = event.target.closest("[data-medios-raw]");
+      if (raw) {
+        var row = raw.closest("[data-medios-raw-row]");
+        var value = row.getAttribute("data-medios-raw-row");
+        var targetId = row.querySelector("[data-medios-raw-target]").value;
+        var target = find(targetId);
+        if (!target) { status("error", "Elige el medio al que corresponde «" + value + "»."); return; }
+        if (raw.getAttribute("data-medios-raw") === "alias") {
+          op({ op: "alias_raw", value: value, target: target.id }).then(function (data) {
+            render((data.settings || {}).medios);
+            status("success", data.message);
+          }).catch(function (problem) { status("error", problem.message); });
+          return;
+        }
+        previewHtml(value, "Cambiarán").then(function (preview) {
+          openPanel("Reescribir «" + value + "»", preview + '<p class="text-sm text-slate-600">Los registros con el valor exacto «' + esc(value) + "» quedan con «" + esc(target.nombre) + "». El valor anterior de cada registro queda guardado en el historial.</p>", "Reescribir registros", function () {
+            return { op: "rewrite_raw", value: value, target: target.id };
+          }, true);
+        }).catch(function (problem) { status("error", problem.message); });
+      }
+    });
+    root.addEventListener("keydown", function (event) {
+      if (event.key === "Enter" && event.target.matches("[data-medios-new]")) {
+        event.preventDefault();
+        root.querySelector("[data-medios-add]").click();
+      }
+    });
+  }
+
   function openSection(key) {
     var section = sections[key];
     if (!section || !window.Swal) return;
     window.Swal.fire({ title: section.title, text: "Cargando configuración...", allowOutsideClick: false, didOpen: function () { window.Swal.showLoading(); } });
-    request("commercial_settings_load").then(function (data) {
+    request("commercial_settings_load", { section: key }).then(function (data) {
       var settings = (data.settings || {})[key] || {};
       return Promise.resolve(section.prepare ? section.prepare(settings) : settings);
     }).then(function (prepared) {
       return window.Swal.fire({
         title: section.title,
         html: section.html(prepared),
-        width: 760,
+        width: section.manage ? 980 : 760,
         showCancelButton: true,
+        // Las secciones que administran una lista guardan cada acción al confirmarla: no tienen botón Guardar.
+        showConfirmButton: !section.manage,
         confirmButtonText: "Guardar",
         cancelButtonText: "Cerrar",
-        customClass: { popup: "scm-calendar-swal-popup" },
+        customClass: { popup: "scm-calendar-swal-popup" + (section.manage ? " scm-config-manage" : "") },
         didOpen: function () {
           var popup = window.Swal.getPopup();
           popup.querySelectorAll("[data-toggle-all]").forEach(function (button) {
@@ -441,7 +719,7 @@
               popup.querySelectorAll('[name="' + button.getAttribute("data-toggle-all") + '"]').forEach(function (input) { input.checked = value; });
             });
           });
-          if (section.bind) section.bind(popup);
+          if (section.bind) section.bind(popup, prepared);
         },
         preConfirm: function () {
           var form = window.Swal.getPopup().querySelector("[data-config-form]");

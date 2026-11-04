@@ -111,7 +111,8 @@
     return "<tr data-cpr-log-row>" +
       "<td>" + esc(stamp(row.fecha)) + chips + "</td>" +
       '<td><span class="cpr-cell-main">' + esc(row.campaign_name) + "</span>" + (row.campaign_name !== row.campaign ? '<span class="cpr-cell-sub">' + esc(row.campaign) + "</span>" : "") + "</td>" +
-      '<td><span class="cpr-cell-main">' + esc(row.source) + '</span><span class="cpr-cell-sub">' + esc(row.medium) + "</span></td>" +
+      // Medio de la lista única y, debajo, lo que llegó en el enlace (utm_source · utm_medium) tal cual.
+      '<td><span class="cpr-cell-main">' + esc(row.medio || row.source) + '</span><span class="cpr-cell-sub" title="utm_source · utm_medium">' + esc(row.source + " · " + row.medium) + "</span></td>" +
       '<td><span class="cpr-cell-main cpr-url" title="' + esc(row.page_url) + '">' + esc(shortUrl(row.page_url) || "Sin URL") + "</span>" + object + "</td>" +
       '<td><span class="cpr-cell-sub cpr-url" title="' + esc(row.referrer) + '">' + esc(shortUrl(row.referrer) || "Directo") + "</span></td>" +
       "<td>" + esc(place || "Sin ubicación") + "</td>" +

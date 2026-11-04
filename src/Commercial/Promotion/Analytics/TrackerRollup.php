@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SCM\Commercial\Promotion\Analytics;
 
+use SCM\Commercial\Medios\MedioCatalog;
 use SCM\Core\Database;
 use SCM\Core\Settings;
 
@@ -24,6 +25,11 @@ use SCM\Core\Settings;
  *
  * La tabla cruda es de dashboard-marketing, que la sigue escribiendo y leyendo: aquí solo se lee, salvo la purga opcional
  * de purge(), que solo corre desde la línea de comandos.
+ *
+ * La columna `medio` se llena con la lista de Medios vigente (MedioCatalog). Si la lista cambia (alias, renombrar, unir),
+ * remapMedios() vuelve a clasificar lo ya resumido sin leer la tabla cruda: el medio depende solo de (utm_source,
+ * utm_medium), que ya están en los resúmenes. Lo corre el cron (TrackerRollupCommand) cuando la revisión de la lista
+ * (MedioCatalog::revision) no es la guardada en scm_tracker_state.medios_rev.
  */
 final class TrackerRollup
 {
@@ -40,6 +46,7 @@ final class TrackerRollup
   private VisitorHasher $hasher;
   private TrackerLock $lock;
   private int $lockDepth = 0;
+  private ?MedioCatalog $medios = null;
   /** @var \Closure():string */
   private \Closure $today;
   /** @var \Closure():int */
@@ -61,7 +68,7 @@ final class TrackerRollup
 
   /**
    * Estado guardado del rollup (scm_tracker_state). Sin la tabla todavía, todo en cero.
-   * @return array{last_id:int,last_fecha:string,updated_at:string,purged_before:string,last_purge:array<string,mixed>,rebuild:array<string,string>}
+   * @return array{last_id:int,last_fecha:string,updated_at:string,purged_before:string,last_purge:array<string,mixed>,rebuild:array<string,string>,medios_rev:int}
    */
   public static function state(Database $db): array
   {
@@ -83,19 +90,20 @@ final class TrackerRollup
       'purged_before' => (string) ($row['purged_before'] ?? ''),
       'last_purge' => $json($row['last_purge'] ?? ''),
       'rebuild' => isset($rebuild['next'], $rebuild['from']) ? $rebuild : [],
+      'medios_rev' => isset($row['medios_rev']) ? (int) $row['medios_rev'] : -1,
     ];
   }
 
   /**
    * Estado para Configuración y para la página: último _ID y fecha procesados y filas pendientes. Solo lee.
-   * @return array{last_id:int,last_fecha:string,updated_at:string,purged_before:string,last_purge:array<string,mixed>,rebuild:array<string,string>,pending:int,schema_ready:bool}
+   * @return array{last_id:int,last_fecha:string,updated_at:string,purged_before:string,last_purge:array<string,mixed>,rebuild:array<string,string>,medios_rev:int,pending:int,schema_ready:bool}
    */
   public function status(): array
   {
     return self::readStatus($this->db, $this->settings);
   }
 
-  /** @return array{last_id:int,last_fecha:string,updated_at:string,purged_before:string,last_purge:array<string,mixed>,rebuild:array<string,string>,pending:int,schema_ready:bool} */
+  /** @return array{last_id:int,last_fecha:string,updated_at:string,purged_before:string,last_purge:array<string,mixed>,rebuild:array<string,string>,medios_rev:int,pending:int,schema_ready:bool} */
   public static function readStatus(Database $db, Settings $settings): array
   {
     $state = self::state($db);
@@ -117,8 +125,9 @@ final class TrackerRollup
       if (!$this->lock->acquire()) {
         throw new TrackerRollupBusy('Otro proceso está actualizando los resúmenes de la analítica web.');
       }
-      // La versión del esquema vive en Settings: se relee por si otro proceso la cambió.
+      // La versión del esquema vive en Settings: se relee por si otro proceso la cambió. La lista de Medios también.
       $this->settings->refresh();
+      $this->medios = null;
     }
     $this->lockDepth++;
     try {
@@ -349,6 +358,70 @@ final class TrackerRollup
     return [$deleted, $processed, $counted];
   }
 
+  /** Lista de Medios con que se clasifican las visitas (se relee cada vez que se toma el candado). */
+  private function medios(): MedioCatalog
+  {
+    return $this->medios ??= new MedioCatalog($this->db, $this->settings);
+  }
+
+  /** ¿La lista de Medios cambió desde la última clasificación de los resúmenes? Solo lee. */
+  public function mediosPending(): bool
+  {
+    if (!TrackerSchema::isReady($this->settings)) {
+      return false;
+    }
+    return self::state($this->db)['medios_rev'] !== (new MedioCatalog($this->db, $this->settings))->revision();
+  }
+
+  /**
+   * Vuelve a clasificar el medio de lo ya resumido con la lista vigente: por cada par (utm_source, utm_medium) cuyo medio
+   * guardado no es el que da la lista, actualiza las tres tablas. Una transacción por par; al final guarda la revisión.
+   * @param bool $force Aunque la revisión guardada sea la vigente.
+   * @return array{ran:bool,pairs:int,changed:int,rows:int,revision:int}
+   */
+  public function remapMedios(bool $force = false): array
+  {
+    return $this->locked(function () use ($force): array {
+      TrackerSchema::ensure($this->db, $this->settings);
+      $this->medios = null;
+      $catalog = $this->medios();
+      $revision = $catalog->revision();
+      if (!$force && self::state($this->db)['medios_rev'] === $revision) {
+        return ['ran' => false, 'pairs' => 0, 'changed' => 0, 'rows' => 0, 'revision' => $revision];
+      }
+      $resolver = $catalog->resolver();
+      $tables = [TrackerSchema::daily($this->db), TrackerSchema::top($this->db), TrackerSchema::visitors($this->db)];
+      $pairs = [];
+      foreach ($tables as $table) {
+        foreach ($this->db->getResults("SELECT `utm_source` AS s, `utm_medium` AS m, `medio` AS medio FROM `{$table}` GROUP BY `utm_source`, `utm_medium`, `medio`") as $row) {
+          $key = (string) $row['s'] . "\x1F" . (string) $row['m'];
+          $pairs[$key] ??= ['source' => (string) $row['s'], 'medium' => (string) $row['m'], 'stored' => []];
+          $pairs[$key]['stored'][(string) $row['medio']] = true;
+        }
+      }
+      $changed = 0;
+      $rows = 0;
+      foreach ($pairs as $pair) {
+        $medio = $resolver->forVisit($pair['source'], $pair['medium'])[0];
+        if (array_keys($pair['stored']) === [$medio]) {
+          continue;
+        }
+        $changed++;
+        $rows += $this->transaction(function () use ($tables, $pair, $medio): int {
+          $count = 0;
+          foreach ($tables as $table) {
+            $statement = $this->db->pdo()->prepare("UPDATE `{$table}` SET `medio` = ? WHERE `utm_source` = ? AND `utm_medium` = ? AND `medio` <> ?");
+            $statement->execute([$medio, $pair['source'], $pair['medium'], $medio]);
+            $count += $statement->rowCount();
+          }
+          return $count;
+        });
+      }
+      $this->transaction(fn() => $this->writeState(['medios_rev' => $revision]));
+      return ['ran' => true, 'pairs' => count($pairs), 'changed' => $changed, 'rows' => $rows, 'revision' => $revision];
+    });
+  }
+
   /**
    * Retención opcional de visitas crudas (Configuración › Analítica web, "Conservar visitas crudas N días"; 0 = nunca).
    * Solo borra vistas ya resumidas (_ID <= marca de agua) y anteriores al día de corte, en lotes, y deja el rastro en
@@ -455,13 +528,13 @@ final class TrackerRollup
   private function store(array $rows, ?string $minDay): int
   {
     $config = TrackerAnalyticsConfig::read($this->settings);
-    $aggregator = new TrackerAggregator($this->hasher, new InternalIpMatcher($config['internal_ips']), $config['own_domains']);
+    $aggregator = new TrackerAggregator($this->hasher, new InternalIpMatcher($config['internal_ips']), $config['own_domains'], $this->medios()->resolver());
     foreach ($rows as $row) {
       $aggregator->add($row, $minDay);
     }
-    $this->upsert(TrackerSchema::daily($this->db), ['fecha', 'camp_slug', 'utm_source', 'utm_medium', 'registered', 'bot', 'internal'], $aggregator->dailyRows());
-    $this->upsert(TrackerSchema::top($this->db), ['dim', 'fecha', 'camp_slug', 'utm_source', 'utm_medium', 'value_hash', 'bot', 'internal'], $aggregator->topRows(), ['value', 'detail']);
-    $this->upsert(TrackerSchema::visitors($this->db), ['fecha', 'visitor_hash', 'camp_slug', 'utm_source', 'utm_medium', 'bot', 'internal'], $aggregator->visitorRows());
+    $this->upsert(TrackerSchema::daily($this->db), ['fecha', 'camp_slug', 'utm_source', 'utm_medium', 'registered', 'bot', 'internal'], $aggregator->dailyRows(), [], ['medio']);
+    $this->upsert(TrackerSchema::top($this->db), ['dim', 'fecha', 'camp_slug', 'utm_source', 'utm_medium', 'value_hash', 'bot', 'internal'], $aggregator->topRows(), ['value', 'detail'], ['medio']);
+    $this->upsert(TrackerSchema::visitors($this->db), ['fecha', 'visitor_hash', 'camp_slug', 'utm_source', 'utm_medium', 'bot', 'internal'], $aggregator->visitorRows(), [], ['medio']);
     return $aggregator->counted();
   }
 
@@ -470,24 +543,31 @@ final class TrackerRollup
    * @param list<string> $keys
    * @param list<array<string,int|string>> $rows
    * @param list<string> $latest Columnas que toman el último valor no vacío (una referencia le gana a una URL).
+   * @param list<string> $replace Columnas que siempre toman el valor nuevo (el medio, que depende de la lista vigente).
    */
-  private function upsert(string $table, array $keys, array $rows, array $latest = []): void
+  private function upsert(string $table, array $keys, array $rows, array $latest = [], array $replace = []): void
   {
     if ($rows === []) {
       return;
     }
-    $columns = array_merge($keys, $latest, ['hits']);
+    $columns = array_merge($keys, $latest, $replace, ['hits']);
     $mysql = $this->db->pdo()->getAttribute(\PDO::ATTR_DRIVER_NAME) === 'mysql';
     if ($mysql) {
       $updates = ['`hits` = `hits` + VALUES(`hits`)'];
       foreach ($latest as $column) {
         $updates[] = "`{$column}` = IF(VALUES(`{$column}`) <> '' AND (`{$column}` = '' OR VALUES(`{$column}`) NOT LIKE 'http%'), VALUES(`{$column}`), `{$column}`)";
       }
+      foreach ($replace as $column) {
+        $updates[] = "`{$column}` = VALUES(`{$column}`)";
+      }
       $suffix = ' ON DUPLICATE KEY UPDATE ' . implode(', ', $updates);
     } else {
       $updates = ['`hits` = `hits` + excluded.`hits`'];
       foreach ($latest as $column) {
         $updates[] = "`{$column}` = CASE WHEN excluded.`{$column}` <> '' AND (`{$column}` = '' OR excluded.`{$column}` NOT LIKE 'http%') THEN excluded.`{$column}` ELSE `{$column}` END";
+      }
+      foreach ($replace as $column) {
+        $updates[] = "`{$column}` = excluded.`{$column}`";
       }
       $suffix = ' ON CONFLICT (' . implode(', ', array_map(static fn(string $c): string => "`{$c}`", $keys)) . ') DO UPDATE SET ' . implode(', ', $updates);
     }

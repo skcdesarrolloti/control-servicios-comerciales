@@ -235,15 +235,17 @@ final class CommercialTrackerAnalyticsTest extends TestCase
     $raw = $this->filters(['exclude_bots' => '0', 'exclude_internal' => '0']);
     self::assertContains(['value' => 'Navegación interna', 'label' => 'Navegación interna', 'detail' => '', 'hits' => 1, 'unique_visitors' => null], $repository->top('referrers', $raw));
     self::assertContains('Sin país', array_column($repository->top('countries', $raw), 'label'));
-    self::assertSame(['Facebook', 'Directo', 'Instagram'], array_column($repository->top('sources', $raw), 'value'));
-    self::assertSame(1, $repository->kpis($this->filters(['source' => 'Instagram', 'exclude_bots' => '0']))['visits']);
+    // Fuente y medio UTM se ven como el Medio de la lista única; sin UTM, "Sin medio (directo)".
+    self::assertSame(['Facebook', 'Sin medio (directo)', 'Instagram'], array_column($repository->top('medios', $raw), 'value'));
+    self::assertSame(['', '', ''], array_column($repository->top('medios', $raw), 'detail'));
+    self::assertSame(1, $repository->kpis($this->filters(['medio' => 'Instagram', 'exclude_bots' => '0']))['visits']);
     self::assertSame(0, $repository->kpis($this->filters(['campaign' => 'general']))['visits']);
     self::assertSame(2, $repository->kpis($this->filters(['campaign' => 'general', 'exclude_bots' => '0', 'exclude_internal' => '0']))['visits']);
 
     $options = $repository->options(self::TODAY);
     self::assertSame([['value' => 'general', 'label' => 'Sin campaña'], ['value' => 'promo-octubre', 'label' => 'Promo de octubre']], $options['campaigns']);
-    self::assertSame(['Directo', 'Facebook', 'Instagram'], $options['sources']);
-    self::assertSame(['Redes', 'Sin medio'], $options['mediums']);
+    self::assertSame(['Facebook', 'Instagram', 'Sin medio (directo)'], $options['medios']);
+    self::assertArrayNotHasKey('sources', $options);
   }
 
   public function testRunningTwiceDoesNotDoubleCountAndPicksUpNewRows(): void
