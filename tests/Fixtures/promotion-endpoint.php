@@ -11,6 +11,7 @@ require dirname(__DIR__, 2) . '/src/Core/Helpers.php';
 require __DIR__ . '/CommercialPromotionDatabase.php';
 define('SCM_BASE_URL', 'http://127.0.0.1/public');
 define('SCM_PUBLIC_PATH', dirname(__DIR__, 2) . '/public');
+define('SCM_PIECES_ROOT', sys_get_temp_dir() . '/scm-pieces-endpoint-' . getmypid());
 
 use Tests\Fixtures\CommercialPromotionDatabase;
 
@@ -22,6 +23,7 @@ $lock = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'scm-promotion-endpoint-' . g
 CommercialPromotionDatabase::seed($db, $settings, date('Y-m-d'), $lock);
 @unlink($lock);
 CommercialPromotionDatabase::pop($db, $settings);
+CommercialPromotionDatabase::pieces($db);
 
 CommercialPromotionDatabase::login((string) ($argv[1] ?? '10'), (string) ($argv[2] ?? '101'));
 $_SESSION['scm_csrf']['commercial_nonce'] = 'fixture';

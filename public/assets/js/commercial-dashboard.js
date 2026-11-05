@@ -463,7 +463,7 @@
   // dentro de su grupo del menú (CommercialAccessPolicy::SUBVIEWS de herramientas y promocion).
   function topTabFor(tab) {
     if (["simulador_ingreso_neto", "ganancia_ocasional", "calculadora_mercado", "calculadora_aseo", "generador_utm", "plan_estrategico"].indexOf(tab) >= 0) return "herramientas";
-    if (["analitica_web", "actividad_portales", "material_pop", "redes_sociales"].indexOf(tab) >= 0) return "promocion";
+    if (["analitica_web", "actividad_portales", "material_pop", "redes_sociales", "banco_piezas"].indexOf(tab) >= 0) return "promocion";
     if (["enviar_notificaciones", "campanas", "plantillas_correo"].indexOf(tab) >= 0) return "notificaciones";
     // Tareas, precaptación, avisos y actualizaciones van dentro del menú Actividades comerciales.
     return ["abiertos", "postergados", "cerrados", "mis_tickets", "precaptacion", "anadir_aviso", "actualizaciones", "avisos"].indexOf(tab) >= 0 ? "comerciales" : tab;
@@ -635,7 +635,7 @@
       "id_funcionario",
       "page",
       "pr_desde", "pr_hasta", "pr_campana", "pr_medio", "pr_actor", "pr_proyecto", "pr_menu", "pr_q", "pr_pag",
-      "pr_vista", "pr_estado", "pr_producto", "pr_origen", "pr_tipo", "tpl_archivadas", "pr_red",
+      "pr_vista", "pr_estado", "pr_categoria", "pr_canal", "pr_visibilidad", "pr_producto", "pr_origen", "pr_tipo", "tpl_archivadas", "pr_red",
     ].forEach(function (key) {
       data.append(key, nextUrl.searchParams.get(key) || "");
     });

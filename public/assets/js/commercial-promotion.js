@@ -446,4 +446,195 @@
       box.hidden = false;
     });
   });
+
+  // ── Banco de piezas ───────────────────────────────────────────────────────
+  // Adaptación de los modales de dashboard-marketing views/branding.php: cada ventana guarda por AJAX
+  // (commercial_piece_*) y al terminar vuelve a cargar la pantalla con los filtros que tenía.
+  function pieceDialog(name) {
+    return document.querySelector('[data-piece-dialog="' + name + '"]');
+  }
+
+  function openPiece(dialog) {
+    var error = dialog.querySelector("[data-piece-error]");
+    if (error) { error.hidden = true; error.textContent = ""; }
+    dialog.showModal();
+  }
+
+  function complianceLabel(form) {
+    var range = form.querySelector("[data-piece-compliance]");
+    form.querySelector("[data-piece-compliance-output]").textContent = range.value + " %";
+  }
+
+  function openPieceForm(button) {
+    var dialog = pieceDialog("form");
+    var form = dialog.querySelector("form");
+    var data = {};
+    try { data = JSON.parse(button.getAttribute("data-piece") || "{}") || {}; } catch (_error) { data = {}; }
+    var editing = Number(data.id || 0) > 0;
+    form.reset();
+    ["title", "asset_code", "description", "category", "status", "campaign_name", "designer_name", "approver_name", "implementer_name", "creation_date", "approval_date", "publication_date", "implementation_date", "brand_compliance", "views_count", "reach_count", "clicks_count", "leads_count", "referrals_count", "acquisitions_count", "observations"].forEach(function (name) {
+      if (editing) setField(form, name, data[name]);
+    });
+    setField(form, "id", editing ? data.id : 0);
+    if (!editing) form.querySelector('[name="creation_date"]').value = localNow().slice(0, 10);
+    form.querySelectorAll('[name="channels[]"]').forEach(function (box) { box.checked = (data.channels || []).indexOf(box.value) >= 0; });
+    var file = form.querySelector("[data-piece-file]");
+    file.required = !editing;
+    form.querySelector("[data-piece-file-label]").textContent = editing ? "Reemplazar arte final" : "Arte final *";
+    dialog.querySelector("[data-piece-title]").textContent = editing ? "Editar pieza" : "Subir pieza";
+    complianceLabel(form);
+    openPiece(dialog);
+  }
+
+  function openPieceDetail(button) {
+    var dialog = pieceDialog("detail");
+    var body = dialog.querySelector("[data-piece-detail-body]");
+    var template = document.querySelector('[data-piece-detail="' + button.getAttribute("data-id") + '"]');
+    dialog.querySelector("[data-piece-title]").textContent = button.getAttribute("data-title") || "Detalle de la pieza";
+    body.innerHTML = "";
+    if (template) body.appendChild(template.content.cloneNode(true));
+    body.querySelectorAll("[data-piece-src]").forEach(function (node) { node.src = node.getAttribute("data-piece-src"); });
+    openPiece(dialog);
+  }
+
+  function openPieceConfirm(button, active) {
+    var dialog = pieceDialog("archive");
+    var form = dialog.querySelector("form");
+    form.reset();
+    setField(form, "id", button.getAttribute("data-id"));
+    setField(form, "active", active ? "1" : "0");
+    dialog.querySelector("[data-piece-title]").textContent = active ? "Restaurar pieza" : "Archivar pieza";
+    dialog.querySelector("[data-piece-lead]").textContent = button.getAttribute("data-title") || "";
+    dialog.querySelector("[data-piece-confirm-text]").textContent = active
+      ? "Entiendo que la pieza vuelve al banco activo."
+      : "Entiendo que la pieza sale del banco activo. Su archivo y sus vínculos se conservan y puedo restaurarla después.";
+    openPiece(dialog);
+  }
+
+  // Publicaciones de la ventana abierta. selected incluye las vinculadas aunque queden fuera de las 1.000 de la lista.
+  var pieceLinks = { posts: [], selected: new Set(), asset: 0 };
+
+  function postRow(post) {
+    var other = Number(post.linked_asset_id || 0) > 0 && Number(post.linked_asset_id) !== pieceLinks.asset;
+    var id = Number(post._ID);
+    return '<label class="cpr-piece-post' + (other ? " is-taken" : "") + '"><input type="checkbox" value="' + id + '"' + (pieceLinks.selected.has(id) ? " checked" : "") + (other ? " disabled" : "") + ">" +
+      (post.thumbnail_url ? '<img src="' + esc(post.thumbnail_url) + '" alt="" loading="lazy" width="56" height="56">' : '<span class="cpr-piece-post__mark" aria-hidden="true">' + (post.platform === "instagram" ? "IG" : "FB") + "</span>") +
+      '<span class="cpr-piece-post__text"><span class="cpr-cell-main">' + esc(post.title || "Publicación sin texto") + "</span>" +
+      '<span class="cpr-cell-sub">' + esc((post.platform === "instagram" ? "Instagram" : post.platform === "facebook" ? "Facebook" : "Meta") + " · " + stamp(post.post_date + " 00:00").slice(0, 10) + " · " + (post.content_type || "post") + " · " + Number(post.reach || 0).toLocaleString("es-CO") + " de alcance") + "</span>" +
+      (other ? '<span class="cpr-cell-sub">Ya vinculada a “' + esc(post.linked_asset_title) + "”</span>" : "") + "</span></label>";
+  }
+
+  function drawPosts(dialog) {
+    var query = dialog.querySelector("[data-piece-links-search]").value.trim().toLowerCase();
+    var platform = dialog.querySelector("[data-piece-links-platform]").value;
+    var list = pieceLinks.posts.filter(function (post) {
+      if (platform && post.platform !== platform) return false;
+      return !query || [post.title, post.post_date, post.content_type].join(" ").toLowerCase().indexOf(query) >= 0;
+    });
+    dialog.querySelector("[data-piece-links-list]").innerHTML = list.length ? list.map(postRow).join("") : '<p class="cpr-empty">' + (pieceLinks.posts.length ? "Prueba con otro texto o cambia la red social." : "Sincroniza Facebook o Instagram para cargar publicaciones.") + "</p>";
+    dialog.querySelector("[data-piece-links-count]").textContent = list.length + " de " + pieceLinks.posts.length + " publicaciones · " + pieceLinks.selected.size + " seleccionadas";
+  }
+
+  async function openPieceLinks(button) {
+    var dialog = pieceDialog("links");
+    var form = dialog.querySelector("form");
+    var ids = [];
+    try { ids = JSON.parse(button.getAttribute("data-linked") || "[]") || []; } catch (_error) { ids = []; }
+    form.reset();
+    setField(form, "id", button.getAttribute("data-id"));
+    dialog.querySelector("[data-piece-links-name]").textContent = button.getAttribute("data-title") || "esta pieza";
+    pieceLinks = { posts: [], selected: new Set(ids.map(Number)), asset: Number(button.getAttribute("data-id")) };
+    dialog.querySelector("[data-piece-links-list]").innerHTML = '<p class="cpr-empty">Cargando publicaciones…</p>';
+    dialog.querySelector("[data-piece-links-count]").textContent = "";
+    openPiece(dialog);
+    var submit = form.querySelector('[type="submit"]');
+    submit.disabled = true;
+    try {
+      pieceLinks.posts = (await request("commercial_piece_posts", {})).posts || [];
+      drawPosts(dialog);
+      submit.disabled = false;
+    } catch (error) {
+      dialog.querySelector("[data-piece-links-list]").innerHTML = '<p class="cpr-empty">' + esc(error.message) + "</p>";
+    }
+  }
+
+  document.addEventListener("click", function (event) {
+    var target = event.target;
+    if (!target || !target.closest) return;
+    var open = target.closest("[data-piece-open]");
+    if (open) {
+      event.preventDefault();
+      var kind = open.getAttribute("data-piece-open");
+      if (kind === "form") openPieceForm(open);
+      else if (kind === "detail") openPieceDetail(open);
+      else if (kind === "links") openPieceLinks(open);
+      else openPieceConfirm(open, kind === "restore");
+      return;
+    }
+    if (target.closest("[data-piece-close]")) closeDialog(target.closest("dialog"));
+  });
+
+  // Al cerrar el detalle se quita su contenido para detener el video y soltar el PDF.
+  document.addEventListener("close", function (event) {
+    var dialog = event.target;
+    if (dialog && dialog.matches && dialog.matches('[data-piece-dialog="detail"]')) dialog.querySelector("[data-piece-detail-body]").innerHTML = "";
+  }, true);
+
+  document.addEventListener("input", function (event) {
+    var input = event.target;
+    if (!input || !input.matches) return;
+    if (input.matches("[data-piece-compliance]")) complianceLabel(input.form);
+    if (input.matches("[data-piece-links-search]")) drawPosts(input.closest("dialog"));
+  });
+
+  document.addEventListener("change", function (event) {
+    var input = event.target;
+    if (!input || !input.matches) return;
+    if (input.matches("[data-piece-links-platform]")) { drawPosts(input.closest("dialog")); return; }
+    if (input.matches("[data-piece-links-list] input[type=checkbox]")) {
+      if (input.checked) pieceLinks.selected.add(Number(input.value));
+      else pieceLinks.selected.delete(Number(input.value));
+      drawPosts(input.closest("dialog"));
+    }
+  });
+
+  document.addEventListener("submit", async function (event) {
+    var form = event.target.closest && event.target.closest("form[data-piece-form], form[data-piece-links-form]");
+    if (!form) return;
+    event.preventDefault();
+    var error = form.querySelector("[data-piece-error]");
+    var submit = form.querySelector('[type="submit"]');
+    var fail = function (message) {
+      error.textContent = message;
+      error.hidden = false;
+    };
+    if (!form.reportValidity()) return;
+    var links = form.hasAttribute("data-piece-links-form");
+    var data = new FormData(form);
+    if (links) {
+      data.set("post_ids", JSON.stringify(Array.from(pieceLinks.selected)));
+    } else if (form.querySelector("[data-piece-file]")) {
+      var file = form.querySelector("[data-piece-file]");
+      var max = Number(file.getAttribute("data-piece-max") || 0);
+      if (file.files[0] && max && file.files[0].size > max) { fail("El archivo pesa más de lo permitido."); return; }
+      if (!form.querySelector('[name="channels[]"]:checked')) { fail("Selecciona al menos un canal de uso."); return; }
+    }
+    data.set("action", links ? "commercial_piece_links" : form.getAttribute("data-piece-form"));
+    data.set("nonce", runtime.nonce || "");
+    submit.disabled = true;
+    error.hidden = true;
+    try {
+      var response = await fetch(runtime.ajaxUrl || "api.php", { method: "POST", body: data, credentials: "same-origin" });
+      var json = null;
+      try { json = await response.json(); } catch (_error) { json = null; }
+      if (!response.ok || !json || !json.success) throw new Error((json && json.data && json.data.message) || "No se pudo guardar. Intenta de nuevo.");
+      closeDialog(form.closest("dialog"));
+      notify("success", json.data.message || "Cambio guardado.");
+      navigate("");
+    } catch (problem) {
+      fail(problem.message);
+    } finally {
+      submit.disabled = false;
+    }
+  });
 })();

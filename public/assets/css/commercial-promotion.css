@@ -361,3 +361,57 @@
 .cpr-social-group { margin:14px 0 4px; font-size:13px; font-weight:700; color:var(--cpr-navy) }
 .cpr-social-group:first-of-type { margin-top:0 }
 .cpr-filters + .cpr-note { margin-top:16px }
+
+/* Promoción › Banco de piezas */
+.cpr-piece-insights { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; margin-top:16px }
+.cpr-piece-insights .cpr-card { margin-top:0 }
+.cpr-piece-bar { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:4px 10px; margin-bottom:10px; font-size:12.5px }
+.cpr-piece-bar strong { color:var(--cpr-navy) }
+.cpr-piece-bar i { grid-column:1 / -1; display:block; height:6px; border-radius:999px; background:linear-gradient(90deg,var(--cpr-blue) var(--bar),var(--cpr-sky) var(--bar)) }
+.cpr-piece-top { margin:0; padding-left:18px; font-size:12.5px }
+.cpr-piece-top li { margin-bottom:8px }
+.cpr-piece-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(290px,1fr)); gap:14px }
+.cpr-piece-card { display:flex; flex-direction:column; min-width:0; overflow:hidden; border:1px solid var(--cpr-line); border-radius:16px; background:#fff }
+.cpr-piece-card.is-archived { opacity:.7; background:#f8fafc }
+.cpr-piece-card__preview { position:relative; display:flex; align-items:center; justify-content:center; height:190px; background:var(--cpr-sky) }
+.cpr-piece-card__preview img,
+.cpr-piece-card__preview video { width:100%; height:100%; object-fit:cover }
+.cpr-piece-card__preview .cpr-chip { position:absolute; top:10px; left:10px; background:#fff }
+.cpr-piece-file { padding:8px 14px; border-radius:12px; background:#fff; font-size:13px; font-weight:700; color:var(--cpr-blue) }
+.cpr-piece-card__body { display:flex; flex:1; flex-direction:column; gap:8px; min-width:0; padding:14px }
+.cpr-piece-card__body h3 { font-size:14px; line-height:1.35; font-weight:700; color:var(--cpr-navy); overflow-wrap:anywhere }
+.cpr-piece-card__text { font-size:12.5px; line-height:1.5; color:var(--cpr-muted); overflow-wrap:anywhere }
+.cpr-piece-chips { display:flex; flex-wrap:wrap; gap:4px }
+.cpr-pop-meta.is-kpis { grid-template-columns:repeat(auto-fit,minmax(70px,1fr)); margin-top:0 }
+.cpr-piece-card .cpr-pop-card__actions { margin-top:auto; padding-top:4px }
+.cpr-piece-channels { display:flex; flex-wrap:wrap; gap:8px 16px; margin:0; padding:12px; border:1px solid var(--cpr-line); border-radius:14px; font-size:13px }
+.cpr-piece-channels legend { padding:0 6px; font-size:12.5px; font-weight:600; color:#334155 }
+.cpr-piece-channels label { display:inline-flex; gap:6px; align-items:center; cursor:pointer }
+.cpr-dialog input[type=range] { width:100%; padding:0; border:0 }
+.cpr-dialog output { font-weight:700; color:var(--cpr-navy) }
+.cpr-piece-detail { display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,1fr); gap:20px }
+.cpr-piece-detail__media { display:flex; flex-direction:column; gap:8px; min-width:0 }
+.cpr-piece-detail__media img,
+.cpr-piece-detail__media video { display:block; width:100%; max-height:60vh; object-fit:contain; border-radius:12px; background:var(--cpr-sky) }
+.cpr-piece-detail__media iframe { display:block; width:100%; height:60vh; border:1px solid var(--cpr-line); border-radius:12px }
+.cpr-piece-detail__info { min-width:0; font-size:13px; line-height:1.5; overflow-wrap:anywhere }
+.cpr-piece-detail__info h3:first-child { margin-top:0 }
+.cpr-piece-posts { margin:10px 0 0; padding:0; list-style:none }
+.cpr-piece-posts li { padding:8px 0; border-top:1px solid var(--cpr-line) }
+.cpr-piece-links { display:flex; flex-direction:column; gap:6px; max-height:46vh; margin-top:10px; overflow:auto }
+.cpr-piece-post { display:flex; gap:10px; align-items:center; padding:8px 10px; border:1px solid var(--cpr-line); border-radius:12px; cursor:pointer }
+.cpr-piece-post:has(input:checked) { border-color:var(--cpr-blue); background:var(--cpr-sky) }
+.cpr-piece-post.is-taken { opacity:.6; cursor:not-allowed }
+.cpr-piece-post img,
+.cpr-piece-post__mark { flex:0 0 56px; width:56px; height:56px; border-radius:10px; object-fit:cover }
+.cpr-piece-post__mark { display:flex; align-items:center; justify-content:center; background:var(--cpr-sky); font-size:12px; font-weight:700; color:var(--cpr-blue) }
+.cpr-piece-post__text { min-width:0; overflow-wrap:anywhere }
+.cpr-dialog [data-piece-links-count] { margin-top:10px }
+@media (max-width:980px) {
+  .cpr-piece-insights,
+  .cpr-piece-detail { grid-template-columns:minmax(0,1fr) }
+}
+@media (max-width:640px) {
+  .cpr-piece-grid { grid-template-columns:minmax(0,1fr) }
+  .cpr-stats[data-piece-stats] { grid-template-columns:repeat(2,minmax(0,1fr)) }
+}

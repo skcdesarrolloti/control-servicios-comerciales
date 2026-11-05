@@ -22,6 +22,10 @@ final class CommercialActionRouter
     'commercial_pop_sync' => 'popSync',
     'commercial_social_sync' => 'socialSync',
     'commercial_social_disconnect' => 'socialDisconnect',
+    'commercial_piece_save' => 'pieceSave',
+    'commercial_piece_active' => 'pieceActive',
+    'commercial_piece_posts' => 'piecePosts',
+    'commercial_piece_links' => 'pieceLinks',
   ];
 
   /** Endpoints de Herramientas › Plan estratégico: los atiende StrategicPlanApiController, creado solo cuando se piden. */

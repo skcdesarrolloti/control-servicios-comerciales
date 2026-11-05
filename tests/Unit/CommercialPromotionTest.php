@@ -80,7 +80,7 @@ final class CommercialPromotionTest extends TestCase
     self::assertSame(['promocion'], CommercialAccessPolicy::VIEW_GROUPS['Promoción']);
     // En el encabezado va después de Inmuebles y antes de Notificaciones y Herramientas.
     self::assertSame(['Inventario', 'Promoción', 'Comunicación y herramientas'], array_slice(array_keys(CommercialAccessPolicy::VIEW_GROUPS), 2, 3));
-    self::assertSame(['analitica_web' => 'Analítica web', 'actividad_portales' => 'Actividad de portales', 'material_pop' => 'Material POP', 'redes_sociales' => 'Redes sociales'], CommercialAccessPolicy::SUBVIEWS['promocion']);
+    self::assertSame(['analitica_web' => 'Analítica web', 'actividad_portales' => 'Actividad de portales', 'material_pop' => 'Material POP', 'redes_sociales' => 'Redes sociales', 'banco_piezas' => 'Banco de piezas'], CommercialAccessPolicy::SUBVIEWS['promocion']);
     self::assertArrayNotHasKey('promocion', CommercialAccessPolicy::SCOPED_VIEWS);
     self::assertContains('promocion_ver_ip', CommercialAccessPolicy::OPT_IN_ACTIONS);
     self::assertSame('Promoción: ver IP y navegador en logs y actividad de portales', CommercialAccessPolicy::ACTIONS['promocion_ver_ip']);

@@ -37,6 +37,7 @@ function daysBetween(from, to) {
 
 (async () => {
   fs.rmSync('output/commercial-promotion.sqlite', { force: true });
+  fs.rmSync('output/commercial-pieces', { recursive: true, force: true });
   const browser = await chromium.launch({ headless: true, channel: process.env.SCM_BROWSER_CHANNEL || (process.platform === 'win32' ? 'msedge' : undefined) });
   try {
     // ── Administrador: llega por AJAX, filtros, gráfico, listas y registros con IP ──────────────────────────────
@@ -59,7 +60,7 @@ function daysBetween(from, to) {
     await page.mouse.click(5, 880);
     await page.setViewportSize({ width: 1440, height: 1000 });
     const menuLinks = page.locator('[data-commercial-dropdown-menu="promocion"] a');
-    assert.equal(await menuLinks.count(), 4);
+    assert.equal(await menuLinks.count(), 5);
     assert.match(await menuLinks.nth(0).getAttribute('href'), /[?&]tab=analitica_web$/);
     assert.match(await menuLinks.nth(1).getAttribute('href'), /[?&]tab=actividad_portales$/);
     assert.match(await menuLinks.nth(2).getAttribute('href'), /[?&]tab=material_pop$/);
@@ -503,6 +504,107 @@ function daysBetween(from, to) {
       assert.equal(denied.status, 403);
     } finally {
       await popContext.close();
+    }
+
+    // ── Banco de piezas (13): subir, ver, editar, vincular y archivar; 7 solo consulta ─────────────────────────
+    const pieceContext = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+    // El archivo real exige sesión de public/: aquí se responde con una imagen mínima.
+    await pieceContext.route('**/piece-file.php*', route => route.fulfill({ status: 200, contentType: 'image/png', body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64') }));
+    try {
+      const pieces = await pieceContext.newPage();
+      const pieceWatch = watch(pieces);
+      await pieces.goto(FIXTURE + '?cargo=13&tab=banco_piezas');
+      await pieces.locator('[data-piece-stats]').waitFor();
+      assert.equal(await pieces.locator('[data-commercial-dropdown-menu="promocion"] a', { hasText: 'Banco de piezas' }).count(), 1);
+      assert.equal(await pieces.locator('[data-piece-card]').count(), 2);
+      assert.ok((await pieces.locator('[data-piece-card="1"] h3').innerText()).includes('Logo <nuevo>'));
+
+      // Subir: sin canal avisa dentro de la ventana y no se cierra.
+      await pieces.locator('.cpr-toolbar [data-piece-open="form"]').click();
+      const form = pieces.locator('[data-piece-dialog="form"]');
+      await form.waitFor({ state: 'visible' });
+      assert.match(await form.locator('[name="creation_date"]').inputValue(), /^\d{4}-\d{2}-\d{2}$/);
+      await form.locator('[name="title"]').fill('Volante feria');
+      await form.locator('[name="category"]').selectOption('physical');
+      await form.locator('[data-piece-file]').setInputFiles({ name: 'volante.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4') });
+      await form.locator('[type=submit]').click();
+      await form.locator('[data-piece-error]', { hasText: 'al menos un canal' }).waitFor();
+      await form.locator('[name="channels[]"][value="print"]').check();
+      await form.locator('[name="brand_compliance"]').fill('85');
+      assert.equal(await form.locator('[data-piece-compliance-output]').innerText(), '85 %');
+      await form.locator('[type=submit]').click();
+      await pieces.waitForFunction(() => document.body.innerText.includes('Pieza guardada en el banco.'));
+      await pieces.locator('.swal2-confirm').click();
+      const volante = pieces.locator('[data-piece-card]', { hasText: 'Volante feria' });
+      await volante.waitFor();
+
+      // Detalle: el archivo se carga al abrir y se suelta al cerrar.
+      await pieces.locator('[data-piece-card="1"] [data-piece-open="detail"]').click();
+      const detail = pieces.locator('[data-piece-dialog="detail"]');
+      await detail.waitFor({ state: 'visible' });
+      assert.match(await detail.locator('.cpr-piece-detail__media img').getAttribute('src'), /piece-file\.php\?id=1$/);
+      assert.ok((await detail.innerText()).includes('BR-001'));
+      await detail.locator('[data-piece-close]').click();
+      await pieces.waitForFunction(() => document.querySelector('[data-piece-detail-body]').children.length === 0);
+
+      // Editar conserva los datos y no vuelve a pedir el archivo.
+      await volante.locator('[data-piece-open="form"]').click();
+      await form.waitFor({ state: 'visible' });
+      assert.equal(await form.locator('[name="title"]').inputValue(), 'Volante feria');
+      assert.equal(await form.locator('[name="channels[]"][value="print"]').isChecked(), true);
+      assert.equal(await form.locator('[data-piece-file]').evaluate(input => input.required), false);
+      await form.locator('[name="status"]').selectOption('approved');
+      await form.locator('[type=submit]').click();
+      await pieces.waitForFunction(() => document.body.innerText.includes('Pieza actualizada.'));
+      await pieces.locator('.swal2-confirm').click();
+      await pieces.locator('[data-piece-card]', { hasText: 'Volante feria' }).locator('.cpr-chip', { hasText: 'Aprobada' }).waitFor();
+
+      // Vincular: las publicaciones llegan al abrir, la de otra pieza no se puede elegir y la búsqueda filtra.
+      await pieces.locator('[data-piece-card]', { hasText: 'Volante feria' }).locator('[data-piece-open="links"]').click();
+      const links = pieces.locator('[data-piece-dialog="links"]');
+      await links.locator('.cpr-piece-post').first().waitFor();
+      assert.equal(await links.locator('.cpr-piece-post.is-taken input').isDisabled(), true);
+      assert.ok(!(await links.innerText()).includes('Post demo'));
+      await links.locator('[data-piece-links-search]').fill('feria de vivienda');
+      assert.equal(await links.locator('.cpr-piece-post').count(), 1);
+      await links.locator('.cpr-piece-post input').check();
+      await links.locator('[data-piece-links-count]', { hasText: '1 seleccionadas' }).waitFor();
+      await links.locator('[type=submit]').click();
+      await pieces.waitForFunction(() => document.body.innerText.includes('1 publicación vinculada.'));
+      await pieces.locator('.swal2-confirm').click();
+      await pieces.locator('[data-piece-card]', { hasText: 'Volante feria' }).locator('[data-piece-open="links"]', { hasText: 'Administrar vínculos' }).waitFor();
+
+      // Archivar pide confirmación, sale de la lista y se ve con el filtro.
+      await pieces.locator('[data-piece-card]', { hasText: 'Volante feria' }).locator('[data-piece-open="archive"]').click();
+      const archive = pieces.locator('[data-piece-dialog="archive"]');
+      await archive.waitFor({ state: 'visible' });
+      await archive.locator('[type=submit]').click();
+      assert.equal(await archive.isVisible(), true);
+      await archive.locator('[name="confirm"]').check();
+      await archive.locator('[type=submit]').click();
+      await pieces.waitForFunction(() => document.body.innerText.includes('Pieza archivada.'));
+      await pieces.locator('.swal2-confirm').click();
+      await pieces.locator('[data-piece-card]', { hasText: 'Volante feria' }).waitFor({ state: 'detached' });
+      await pieces.locator('[name="pr_visibilidad"]').selectOption('0');
+      await pieces.locator('.cpr-filters button[type=submit]').click();
+      await pieces.locator('[data-piece-card]', { hasText: 'Volante feria' }).locator('[data-piece-open="restore"]').waitFor();
+
+      await pieces.setViewportSize({ width: 390, height: 844 });
+      await pieces.goto(FIXTURE + '?cargo=13&tab=banco_piezas');
+      await pieces.locator('[data-piece-stats]').waitFor();
+      assert.equal(await noHorizontalScroll(pieces), true);
+      await pieces.screenshot({ path: 'output/banco-piezas-mobile.png', fullPage: false });
+      assert.deepEqual(pieceWatch.errors, []);
+
+      // Solo consulta (7): ve y descarga, sin botones de cambio; el servidor rechaza lo demás.
+      const reader = await pieceContext.newPage();
+      await reader.goto(FIXTURE + '?cargo=7&tab=banco_piezas');
+      await reader.locator('[data-piece-stats]').waitFor();
+      assert.equal(await reader.locator('[data-piece-open="form"], [data-piece-open="links"], [data-piece-open="archive"]').count(), 0);
+      assert.ok((await reader.locator('[data-piece-card="1"] [data-piece-open="detail"]').count()) === 1);
+      assert.equal((await post(reader, { action: 'commercial_piece_posts' })).status, 403);
+    } finally {
+      await pieceContext.close();
     }
 
     // ── Redes sociales (13 con inversión, 7 sin): pestañas por red, filtros y celular ────────────────────────────

@@ -14,6 +14,8 @@ require __DIR__ . '/CommercialPromotionDatabase.php';
 define('SCM_BASE_URL', 'http://127.0.0.1:8773/public');
 define('SCM_PUBLIC_PATH', dirname(__DIR__, 2) . '/public');
 define('SCM_VERSION', 'fixture');
+// Los archivos del Banco de piezas van a output/, nunca a storage/.
+define('SCM_PIECES_ROOT', dirname(__DIR__, 2) . '/output/commercial-pieces');
 // El mismo secreto con que seed() armó los resúmenes, para que la puesta al día de la página cuente igual.
 define('SCM_APP_SECRET', \Tests\Fixtures\CommercialPromotionDatabase::SECRET);
 
@@ -47,6 +49,13 @@ CommercialPromotionDatabase::medios($db, $settings);
 CommercialPromotionDatabase::pop($db, $settings);
 // Redes sociales: Instagram, publicidad, YouTube y TikTok con datos de muestra.
 CommercialPromotionDatabase::social($db);
+// Banco de piezas: piezas de muestra, con sus archivos para que no aparezcan como pendientes de copiar.
+CommercialPromotionDatabase::pieces($db);
+if (!is_dir(SCM_PIECES_ROOT . '/storage/branding-assets/2026/08')) {
+  mkdir(SCM_PIECES_ROOT . '/storage/branding-assets/2026/08', 0777, true);
+  file_put_contents(SCM_PIECES_ROOT . '/storage/branding-assets/2026/08/logo.png', 'x');
+  file_put_contents(SCM_PIECES_ROOT . '/storage/branding-assets/2026/08/feria.psd', 'x');
+}
 // ?pendiente=1 deja una visita de ayer sin resumir, para probar que la carga completa no resume y la pide por AJAX.
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['pendiente'])) {
   \Tests\Fixtures\CommercialTrackerDatabase::hit($db, ['fecha_visita' => date('Y-m-d', strtotime('-1 day')) . ' 10:00:00', 'ip_address' => '181.70.0.1', 'camp_slug' => 'feria-vivienda']);

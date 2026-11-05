@@ -55,7 +55,7 @@ final class CommercialPromotionDatabase
     if (!isset($permissions['7'])) {
       $settings->set('commercial_admin_cargos', ['13']);
       $settings->set('commercial_permissions', (is_array($permissions) ? $permissions : []) + [
-        '6' => ['views' => ['promocion'], 'actions' => ['promocion_ver_ip']],
+        '6' => ['views' => ['promocion'], 'actions' => ['promocion_ver_ip', 'piezas_gestionar']],
         '7' => ['views' => ['promocion', 'herramientas'], 'actions' => []],
         '8' => ['views' => ['promocion'], 'actions' => [], 'subviews' => ['promocion' => ['actividad_portales']]],
       ]);
@@ -167,6 +167,32 @@ final class CommercialPromotionDatabase
     $db->insert('wp_marketing_youtube_videos', ['title' => 'Recorrido casa', 'published_at' => '2026-08-01 10:00:00', 'permalink' => 'https://youtube.com/watch?v=1', 'content_type' => 'short', 'views' => 900, 'watch_minutes' => 40, 'likes' => 9, 'comments' => 1]);
     $db->insert('wp_marketing_tiktok_connections', ['display_name' => 'SKC', 'username' => 'skc', 'follower_count' => 80, 'likes_count' => 500, 'video_count' => 37, 'access_token_enc' => 'SECRETO-TT', 'connected' => 1, 'last_sync' => '2026-09-23 08:00:00', 'last_error' => 'Token vencido']);
     $db->insert('wp_marketing_tiktok_videos', ['title' => 'Tip de arriendo', 'published_at' => '2026-09-20 09:00:00', 'permalink' => 'https://tiktok.com/@skc/video/1', 'views' => 700, 'likes' => 30, 'comments' => 4, 'shares' => 2]);
+  }
+
+  /**
+   * Banco de piezas: tres piezas (una archivada y una con publicaciones vinculadas) sobre las publicaciones de social().
+   * marketing_social_posts gana las columnas que usa el vínculo con Meta.
+   */
+  public static function pieces(Database $db): void
+  {
+    self::social($db);
+    if ((int) $db->getVar("SELECT COUNT(*) FROM sqlite_master WHERE name = 'wp_marketing_brand_assets'") > 0) {
+      return;
+    }
+    $pdo = $db->pdo();
+    foreach (['post_time TEXT', 'external_id TEXT', 'thumbnail_url TEXT', 'metrics_json TEXT', "source TEXT DEFAULT 'meta'"] as $column) {
+      $pdo->exec('ALTER TABLE wp_marketing_social_posts ADD COLUMN ' . $column);
+    }
+    $pdo->exec("UPDATE wp_marketing_social_posts SET external_id = 'ext-' || _ID, metrics_json = '{\"views\":900,\"post_clicks\":7}', source = 'meta'");
+    $db->insert('wp_marketing_social_posts', ['post_date' => '2026-09-20', 'platform' => 'facebook', 'title' => 'Post demo', 'external_id' => 'demo-1', 'source' => 'demo', 'reach' => 1]);
+    $db->insert('wp_marketing_social_posts', ['post_date' => '2026-09-19', 'platform' => 'facebook', 'title' => 'Feria de vivienda', 'external_id' => 'ext-fb', 'source' => 'meta', 'reach' => 40, 'likes' => 2, 'comments' => 0, 'shares' => 0, 'saves' => 0]);
+    $pdo->exec('CREATE TABLE wp_marketing_brand_assets (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, asset_code TEXT UNIQUE, description TEXT, category TEXT, status TEXT, channels_json TEXT, campaign_name TEXT, designer_name TEXT, approver_name TEXT, implementer_name TEXT, creation_date TEXT, approval_date TEXT, publication_date TEXT, implementation_date TEXT, brand_compliance INTEGER DEFAULT 0, views_count INTEGER DEFAULT 0, reach_count INTEGER DEFAULT 0, clicks_count INTEGER DEFAULT 0, leads_count INTEGER DEFAULT 0, referrals_count INTEGER DEFAULT 0, acquisitions_count INTEGER DEFAULT 0, observations TEXT, storage_path TEXT, original_name TEXT, mime_type TEXT, file_size INTEGER, active INTEGER DEFAULT 1, created_by INTEGER, updated_by INTEGER, created_at TEXT, updated_at TEXT)');
+    $pdo->exec('CREATE TABLE wp_marketing_brand_asset_posts (id INTEGER PRIMARY KEY AUTOINCREMENT, asset_id INTEGER, social_post_id INTEGER UNIQUE, created_by INTEGER, created_at TEXT)');
+    $base = ['channels_json' => '["instagram","web"]', 'file_size' => 2048, 'created_at' => '2026-08-29 09:00:00', 'updated_at' => '2026-08-29 09:00:00'];
+    $db->insert('wp_marketing_brand_assets', $base + ['title' => 'Logo <nuevo>', 'asset_code' => 'BR-001', 'category' => 'branding', 'status' => 'implemented', 'creation_date' => '2026-08-10', 'brand_compliance' => 90, 'reach_count' => 100, 'leads_count' => 2, 'storage_path' => 'storage/branding-assets/2026/08/logo.png', 'original_name' => 'logo.png', 'mime_type' => 'image/png']);
+    $db->insert('wp_marketing_brand_assets', $base + ['title' => 'Plantilla feria', 'category' => 'campaign', 'status' => 'in_review', 'creation_date' => '2026-08-12', 'brand_compliance' => 70, 'campaign_name' => 'Feria vivienda', 'storage_path' => 'storage/branding-assets/2026/08/feria.psd', 'original_name' => 'feria.psd', 'mime_type' => 'image/vnd.adobe.photoshop']);
+    $db->insert('wp_marketing_brand_assets', ['title' => 'Pieza vieja', 'category' => 'web', 'status' => 'designed', 'creation_date' => '2026-01-05', 'channels_json' => '["web"]', 'active' => 0, 'storage_path' => 'storage/branding-assets/2026/08/falta.pdf', 'original_name' => 'falta.pdf', 'mime_type' => 'application/pdf', 'file_size' => 10, 'created_at' => '2026-01-05 09:00:00', 'updated_at' => '2026-01-05 09:00:00']);
+    $db->insert('wp_marketing_brand_asset_posts', ['asset_id' => 1, 'social_post_id' => 1, 'created_at' => '2026-08-29 09:00:00']);
   }
 
   /**

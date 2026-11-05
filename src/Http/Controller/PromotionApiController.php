@@ -8,6 +8,8 @@ use SCM\Commercial\CommercialAccessPolicy;
 use SCM\Commercial\Promotion\Analytics\TrackerAnalyticsConfig;
 use SCM\Commercial\Promotion\Analytics\TrackerAnalyticsFilters;
 use SCM\Commercial\Promotion\Analytics\TrackerAnalyticsRepository;
+use SCM\Commercial\Promotion\Pieces\BrandAssetFiles;
+use SCM\Commercial\Promotion\Pieces\BrandAssetService;
 use SCM\Commercial\Promotion\Pop\PopInventoryService;
 use SCM\Commercial\Promotion\Social\SocialSyncRunner;
 use SCM\Core\Auth;
@@ -23,7 +25,8 @@ use SCM\Views\Promotion\AnalyticsView;
  * salen con promocion_ver_ip: sin el permiso, Registros los lee únicamente para reconocer robots y visitas internas y nunca
  * los devuelve (TrackerAnalyticsRepository::logRow); Actividad de portales ni siquiera los lee.
  * Material POP: crear, editar, ajustar, entregar y sincronizar piden pop_gestionar; archivar, reactivar y anular piden
- * pop_anular; el precio solo se guarda con pop_ver_costos.
+ * pop_anular; el precio solo se guarda con pop_ver_costos. Banco de piezas: subir, editar y vincular piden piezas_gestionar;
+ * archivar y restaurar, piezas_archivar.
  */
 final class PromotionApiController
 {
@@ -164,6 +167,74 @@ final class PromotionApiController
       JsonResponse::error($exception->getMessage(), 422);
     }
     JsonResponse::success(['message' => 'Cuenta desconectada. Las estadísticas guardadas se conservan.']);
+  }
+
+  /** Crear o editar una pieza; el arte final llega en asset_file. @param array<string,mixed> $input */
+  public function pieceSave(array $input): never
+  {
+    $this->pieceGuard($input, 'piezas_gestionar');
+    $file = is_array($_FILES['asset_file'] ?? null) ? $_FILES['asset_file'] : [];
+    $this->piece(function (BrandAssetService $service) use ($input, $file): array {
+      $service->save($input, $file, (int) $this->employee());
+      return ['message' => (int) ($input['id'] ?? 0) > 0 ? 'Pieza actualizada.' : 'Pieza guardada en el banco.'];
+    });
+  }
+
+  /** Archivar (active=0) o restaurar (active=1) con confirmación: el archivo y sus vínculos se conservan. @param array<string,mixed> $input */
+  public function pieceActive(array $input): never
+  {
+    $this->pieceGuard($input, 'piezas_archivar');
+    $this->confirmed($input);
+    $active = filter_var($input['active'] ?? false, FILTER_VALIDATE_BOOLEAN);
+    $this->piece(function (BrandAssetService $service) use ($input, $active): array {
+      $service->setActive((int) ($input['id'] ?? 0), $active, (int) $this->employee());
+      return ['message' => $active ? 'Pieza restaurada.' : 'Pieza archivada. Puedes restaurarla después.'];
+    });
+  }
+
+  /** Publicaciones de Meta para la ventana de vincular. @param array<string,mixed> $input */
+  public function piecePosts(array $input): never
+  {
+    $this->pieceGuard($input, 'piezas_gestionar');
+    $this->piece(static fn(BrandAssetService $service): array => ['posts' => $service->socialPosts()]);
+  }
+
+  /** post_ids: lista JSON con todas las publicaciones de la pieza; reemplaza las anteriores. @param array<string,mixed> $input */
+  public function pieceLinks(array $input): never
+  {
+    $this->pieceGuard($input, 'piezas_gestionar');
+    $ids = json_decode((string) ($input['post_ids'] ?? '[]'), true);
+    $this->piece(function (BrandAssetService $service) use ($input, $ids): array {
+      $count = $service->replacePostLinks((int) ($input['id'] ?? 0), is_array($ids) ? array_values($ids) : [], (int) $this->employee());
+      return ['message' => $count === 0 ? 'La pieza quedó sin publicaciones vinculadas.' : ($count === 1 ? '1 publicación vinculada.' : $count . ' publicaciones vinculadas.')];
+    });
+  }
+
+  /** @param array<string,mixed> $input */
+  private function pieceGuard(array $input, string $action): void
+  {
+    $this->guard($input, 'banco_piezas', 'Banco de piezas');
+    if (!$this->policy->canAct($action)) {
+      JsonResponse::error('No tienes permiso para esta acción del Banco de piezas.', 403);
+    }
+  }
+
+  /** @param callable(BrandAssetService):array<string,mixed> $operation */
+  private function piece(callable $operation): never
+  {
+    $service = new BrandAssetService($this->db, BrandAssetFiles::runtime());
+    if (!$service->available()) {
+      JsonResponse::error('Las tablas del Banco de piezas no están disponibles.', 409);
+    }
+    try {
+      $data = $operation($service);
+    } catch (\InvalidArgumentException $exception) {
+      JsonResponse::error($exception->getMessage(), 422);
+    } catch (\Throwable $exception) {
+      error_log('[commercial-pieces] ' . $exception->getMessage());
+      JsonResponse::error('No se pudo guardar el cambio en el Banco de piezas. Intenta de nuevo.', 500);
+    }
+    JsonResponse::success($data);
   }
 
   /** @param array<string,mixed> $input */
