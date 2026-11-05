@@ -1,0 +1,13 @@
+# Desde internet solo se sirve public/. El resto del proyecto (código, configuración, logs y archivos subidos) queda
+# fuera: los archivos se entregan con permisos o enlace firmado desde public/ (file.php). La raíz abre el panel.
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule ^$ public/ [L]
+  RewriteRule ^(?!public(?:/|$)) - [F,L]
+</IfModule>
+
+<IfModule !mod_rewrite.c>
+  Require all denied
+</IfModule>

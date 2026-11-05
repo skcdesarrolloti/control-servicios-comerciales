@@ -1,0 +1,8 @@
+# Segunda barrera: nada de storage/ se sirve directo aunque falle la regla de la raíz.
+Options -Indexes
+Require all denied
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule ^ - [F,L]
+</IfModule>
