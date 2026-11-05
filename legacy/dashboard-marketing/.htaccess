@@ -1,0 +1,7 @@
+Options -MultiViews
+RewriteEngine On
+
+# Los correos ya enviados tienen el píxel en /dashboard-marketing/dashboard-marketing/?action=track-email.
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.php [QSA,L]

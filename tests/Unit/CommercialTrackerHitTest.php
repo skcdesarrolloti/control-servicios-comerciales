@@ -97,6 +97,9 @@ final class CommercialTrackerHitTest extends TestCase
     $stub = (string) file_get_contents($root . '/legacy/dashboard-marketing/public/index.php');
     self::assertStringContainsString("require \$panel . '/tracker-hit.php';", $stub);
     self::assertStringContainsString("require \$panel . '/track-email.php';", $stub);
+    // El fragmento de WPCode envía a /dashboard-marketing/?action=... y el píxel viejo trae la carpeta repetida.
+    self::assertStringContainsString("require __DIR__ . '/public/index.php';", (string) file_get_contents($root . '/legacy/dashboard-marketing/index.php'));
+    self::assertStringContainsString('RewriteRule ^ index.php [QSA,L]', (string) file_get_contents($root . '/legacy/dashboard-marketing/.htaccess'));
     // Los correos del panel anterior traen tokens de 32 caracteres hexadecimales.
     $this->db->pdo()->exec('CREATE TABLE wp_jet_cct_email_tracking (_ID INTEGER PRIMARY KEY, tracking_token TEXT, opened_at TEXT, last_opened_at TEXT, open_count INTEGER, last_ip TEXT, last_user_agent TEXT)');
     $this->db->insert('wp_jet_cct_email_tracking', ['tracking_token' => str_repeat('ab', 16), 'open_count' => 0]);
