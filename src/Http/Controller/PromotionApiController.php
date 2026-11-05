@@ -11,6 +11,7 @@ use SCM\Commercial\Promotion\Analytics\TrackerAnalyticsRepository;
 use SCM\Commercial\Promotion\Pieces\BrandAssetFiles;
 use SCM\Commercial\Promotion\Pieces\BrandAssetService;
 use SCM\Commercial\Promotion\Pop\PopInventoryService;
+use SCM\Commercial\Promotion\Social\SocialStatsRepository;
 use SCM\Commercial\Promotion\Social\SocialSyncRunner;
 use SCM\Core\Auth;
 use SCM\Core\Csrf;
@@ -136,14 +137,15 @@ final class PromotionApiController
     });
   }
 
-  /** Trae los últimos días de la red de la pestaña; el historial se recarga por línea de comandos. @param array<string,mixed> $input */
+  /** Trae el rango que se está viendo (o los últimos días si no llega) de la red de la pestaña. @param array<string,mixed> $input */
   public function socialSync(array $input): never
   {
     $this->socialGuard($input);
     $network = (string) ($input['network'] ?? '');
     @set_time_limit(280);
     try {
-      $result = $this->socialRunner()->run($network, date('Y-m-d', strtotime('-' . SocialSyncRunner::DEFAULT_DAYS . ' days')), date('Y-m-d'));
+      [$from, $to] = $this->socialRange($input);
+      $result = $this->socialRunner()->run($network, $from, $to);
     } catch (\InvalidArgumentException $exception) {
       JsonResponse::error($exception->getMessage(), 422);
     } catch (\RuntimeException $exception) {
@@ -235,6 +237,25 @@ final class PromotionApiController
       JsonResponse::error('No se pudo guardar el cambio en el Banco de piezas. Intenta de nuevo.', 500);
     }
     JsonResponse::success($data);
+  }
+
+  /** @param array<string,mixed> $input @return array{0:string,1:string} */
+  private function socialRange(array $input): array
+  {
+    $date = static function ($value): string {
+      $text = is_scalar($value) ? trim((string) $value) : '';
+      $parsed = \DateTimeImmutable::createFromFormat('!Y-m-d', $text);
+      return $parsed instanceof \DateTimeImmutable && $parsed->format('Y-m-d') === $text ? $text : '';
+    };
+    $from = $date($input['from'] ?? '');
+    $to = $date($input['to'] ?? '');
+    if ($from === '' || $to === '') {
+      return [date('Y-m-d', strtotime('-' . SocialSyncRunner::DEFAULT_DAYS . ' days')), date('Y-m-d')];
+    }
+    if ($from > $to || (new \DateTimeImmutable($from))->diff(new \DateTimeImmutable($to))->days >= SocialStatsRepository::MAX_DAYS) {
+      throw new \InvalidArgumentException('Elige un rango válido de máximo 2 años para sincronizar.');
+    }
+    return [$from, $to];
   }
 
   /** @param array<string,mixed> $input */

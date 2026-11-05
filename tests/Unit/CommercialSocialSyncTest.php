@@ -153,7 +153,9 @@ final class CommercialSocialSyncTest extends TestCase
     self::assertStringContainsString('Conectar cuenta', $off);
     self::assertStringNotContainsString('data-social-disconnect="youtube"', $off);
     $viewer = $page('7', ['pr_red' => 'youtube']);
-    self::assertStringNotContainsString('data-social-', $viewer);
+    foreach (['data-social-sync', 'data-social-connect', 'data-social-disconnect', 'data-social-dialog'] as $action) {
+      self::assertStringNotContainsString($action, $viewer);
+    }
 
     $_SESSION['social_flash'] = ['type' => 'error', 'message' => 'Google no autorizó <la conexión>'];
     CommercialPromotionDatabase::login('6', '101', 'Coordinación', ['social_flash' => $_SESSION['social_flash']]);
@@ -185,6 +187,9 @@ final class CommercialSocialSyncTest extends TestCase
     $failed = self::endpoint('13', '101', 'commercial_social_sync', ['network' => 'tiktok']);
     self::assertSame([502, 'Conecta primero la cuenta de TikTok.'], [$failed['status'], $failed['json']['data']['message']]);
     self::assertSame(422, self::endpoint('13', '101', 'commercial_social_sync', ['network' => 'linkedin'])['status']);
+    self::assertSame(422, self::endpoint('13', '101', 'commercial_social_sync', ['network' => 'instagram', 'from' => '2026-09-02', 'to' => '2026-09-01'])['status'], 'Rango al revés.');
+    self::assertSame(422, self::endpoint('13', '101', 'commercial_social_sync', ['network' => 'instagram', 'from' => '2020-01-01', 'to' => '2026-09-01'])['status'], 'Más de 2 años.');
+    self::assertSame(200, self::endpoint('13', '101', 'commercial_social_sync', ['network' => 'instagram', 'from' => '2026-09-01', 'to' => '2026-09-30'])['status']);
 
     $unconfirmed = self::endpoint('13', '101', 'commercial_social_disconnect', ['network' => 'youtube']);
     self::assertSame([422, 'Confirma la acción marcando la casilla.'], [$unconfirmed['status'], $unconfirmed['json']['data']['message']]);

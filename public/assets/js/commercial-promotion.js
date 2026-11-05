@@ -401,7 +401,7 @@
       var label = sync.innerHTML;
       sync.disabled = true;
       sync.textContent = "Sincronizando… puede tardar unos minutos";
-      request("commercial_social_sync", { network: sync.getAttribute("data-social-sync") }).then(function (data) {
+      request("commercial_social_sync", { network: sync.getAttribute("data-social-sync"), from: sync.getAttribute("data-from") || "", to: sync.getAttribute("data-to") || "" }).then(function (data) {
         var warnings = data.warnings || [];
         notify(warnings.length ? "warning" : "success", [data.message].concat(warnings).join(" "));
         navigate("");
@@ -428,8 +428,58 @@
       dialog.showModal();
       return;
     }
+    var detail = target.closest("[data-social-detail]");
+    if (detail) {
+      event.preventDefault();
+      openSocialDetail(detail);
+      return;
+    }
     if (target.closest("[data-social-close]")) closeDialog(target.closest("dialog"));
   });
+
+  // Adaptación del modal de detalle de dashboard-marketing public/assets/social.js. Todo entra como texto.
+  function metricBoxes(box, rows) {
+    box.innerHTML = "";
+    rows.forEach(function (row) {
+      var item = document.createElement("div");
+      var label = document.createElement("dt");
+      var value = document.createElement("dd");
+      label.textContent = row[0];
+      value.textContent = row[1];
+      if (row[2]) item.title = row[2];
+      item.appendChild(label);
+      item.appendChild(value);
+      box.appendChild(item);
+    });
+  }
+
+  function openSocialDetail(button) {
+    var data = {};
+    try { data = JSON.parse(button.getAttribute("data-social-detail") || "{}") || {}; } catch (_error) { data = {}; }
+    var dialog = document.querySelector("[data-social-detail-dialog]");
+    var text = function (selector, value) {
+      var node = dialog.querySelector(selector);
+      node.textContent = value || "";
+      node.hidden = !value;
+    };
+    dialog.querySelector("[data-social-detail-title]").textContent = data.title || "Detalle";
+    text("[data-social-detail-subtitle]", data.subtitle);
+    text("[data-social-detail-description]", data.description);
+    text("[data-social-detail-notice]", data.notice);
+    var image = dialog.querySelector("[data-social-detail-image]");
+    image.hidden = !data.thumbnail;
+    if (data.thumbnail) image.src = data.thumbnail;
+    else image.removeAttribute("src");
+    metricBoxes(dialog.querySelector("[data-social-detail-metrics]"), data.metrics || []);
+    metricBoxes(dialog.querySelector("[data-social-detail-actions]"), data.actions || []);
+    dialog.querySelector("[data-social-detail-actions-box]").hidden = !(data.actions || []).length;
+    var link = dialog.querySelector("[data-social-detail-link]");
+    link.hidden = !data.link;
+    link.textContent = data.linkLabel || "Ver";
+    if (data.link) link.href = data.link;
+    else link.removeAttribute("href");
+    dialog.showModal();
+  }
 
   document.addEventListener("submit", function (event) {
     var form = event.target.closest && event.target.closest("form[data-social-disconnect-form]");

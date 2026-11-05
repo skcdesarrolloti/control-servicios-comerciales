@@ -614,16 +614,35 @@ function daysBetween(from, to) {
       const socialWatch = watch(social);
       await social.goto(FIXTURE + '?cargo=13&tab=redes_sociales');
       await social.locator('.cpr-stats').waitFor();
+      // Instagram: comparación, listas por mes y detalle de publicación.
+      assert.ok((await social.locator('.cpr-stats').innerText()).includes('Tasa de interacción'));
+      assert.equal(await social.locator('.cpr-social-charts [data-cpr-chart]').count(), 2);
+      await social.locator('[data-social-months] details').first().locator('[data-social-detail]').first().click();
+      const postDetail = social.locator('[data-social-detail-dialog]');
+      await postDetail.waitFor({ state: 'visible' });
+      assert.ok((await postDetail.innerText()).includes('Interacciones'));
+      await postDetail.locator('[data-social-close]').click();
       assert.ok((await social.locator('.cpr-filters__hint').innerText()).includes('28/09/2026'));
       assert.ok((await social.locator('.cpr-stats').innerText()).includes('1.751'));
       await social.locator('.cpr-tab', { hasText: 'Publicidad en Meta' }).click();
       await social.waitForFunction(() => document.body.innerText.includes('Inversión'));
+      // Detalle de campaña con sus acciones, en una ventana interna.
+      await social.locator('[data-social-campaigns] [data-social-detail]').first().click();
+      const adDetail = social.locator('[data-social-detail-dialog]');
+      await adDetail.waitFor({ state: 'visible' });
+      assert.ok((await adDetail.innerText()).includes('Acciones registradas'));
+      assert.ok((await adDetail.innerText()).includes('Clics en enlace'));
+      await adDetail.locator('[data-social-close]').click();
+      assert.equal(await social.locator('[data-social-ads] [data-social-detail]').count(), 1);
       await social.locator('.cpr-tab', { hasText: 'YouTube' }).click();
       await social.waitForFunction(() => document.body.innerText.includes('Recorrido casa'));
       await social.locator('[name="pr_desde"]').fill('2026-08-05');
       await social.locator('.cpr-filters button[type=submit]').click();
       await social.waitForFunction(() => /Vistas\s*150/.test(document.querySelector('.cpr-stats').innerText));
       assert.ok(!(await social.content()).includes('SECRETO'));
+      await social.locator('[data-social-discovery]').waitFor();
+      assert.ok((await social.locator('[data-social-formats]').innerText()).includes('Shorts'));
+      assert.ok(!(await social.locator('.cpr').first().innerText()).includes('Video del canal viejo'));
       // Sincronizar (el fixture usa redes falsas), reconectar y la confirmación de desconectar.
       await social.locator('[data-social-sync="youtube"]').click();
       await social.waitForFunction(() => document.body.innerText.includes('Sincronización terminada.'));

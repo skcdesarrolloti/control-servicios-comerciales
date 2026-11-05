@@ -133,19 +133,20 @@ final class CommercialPromotionDatabase
     }
     $pdo = $db->pdo();
     $pdo->exec('CREATE TABLE wp_marketing_social_accounts (_ID INTEGER PRIMARY KEY, platform TEXT, account_name TEXT, account_id TEXT, username TEXT, connected INTEGER, last_sync TEXT)');
-    $pdo->exec('CREATE TABLE wp_marketing_social_daily_stats (_ID INTEGER PRIMARY KEY, metric_date TEXT, platform TEXT, followers INTEGER, reach INTEGER, impressions INTEGER, profile_views INTEGER, website_clicks INTEGER, likes INTEGER, comments INTEGER, shares INTEGER, saves INTEGER)');
-    $pdo->exec('CREATE TABLE wp_marketing_social_posts (_ID INTEGER PRIMARY KEY, post_date TEXT, platform TEXT, content_type TEXT, title TEXT, permalink TEXT, reach INTEGER, impressions INTEGER, likes INTEGER, comments INTEGER, shares INTEGER, saves INTEGER)');
-    $pdo->exec('CREATE TABLE wp_marketing_social_ads_stats (_ID INTEGER PRIMARY KEY, period_start TEXT, metric_date TEXT, level TEXT, external_id TEXT, name TEXT, status TEXT, objective TEXT, spend REAL, impressions INTEGER, reach INTEGER, clicks INTEGER, link_clicks INTEGER, ctr REAL, cpc REAL, cpm REAL)');
+    $pdo->exec('CREATE TABLE wp_marketing_social_daily_stats (_ID INTEGER PRIMARY KEY, metric_date TEXT, platform TEXT, followers INTEGER, reach INTEGER, impressions INTEGER, profile_views INTEGER, website_clicks INTEGER, likes INTEGER, comments INTEGER, shares INTEGER, saves INTEGER, content_count INTEGER DEFAULT 0)');
+    $pdo->exec("CREATE TABLE wp_marketing_social_posts (_ID INTEGER PRIMARY KEY, post_date TEXT, post_time TEXT DEFAULT '', platform TEXT, external_id TEXT DEFAULT '', content_type TEXT, title TEXT, permalink TEXT, thumbnail_url TEXT DEFAULT '', reach INTEGER DEFAULT 0, impressions INTEGER DEFAULT 0, likes INTEGER DEFAULT 0, comments INTEGER DEFAULT 0, shares INTEGER DEFAULT 0, saves INTEGER DEFAULT 0, metrics_json TEXT, source TEXT DEFAULT 'meta')");
+    $pdo->exec('CREATE TABLE wp_marketing_social_ads_stats (_ID INTEGER PRIMARY KEY, period_start TEXT, metric_date TEXT, level TEXT, external_id TEXT, name TEXT, status TEXT, objective TEXT, spend REAL, impressions INTEGER, reach INTEGER, clicks INTEGER, link_clicks INTEGER, ctr REAL, cpc REAL, cpm REAL, frequency REAL, actions_json TEXT, thumbnail_url TEXT)');
     $pdo->exec('CREATE TABLE wp_marketing_social_audience (_ID INTEGER PRIMARY KEY, snapshot_date TEXT, platform TEXT, breakdown TEXT, label TEXT, value INTEGER)');
-    $pdo->exec('CREATE TABLE wp_marketing_youtube_connections (_ID INTEGER PRIMARY KEY, channel_title TEXT, channel_handle TEXT, subscriber_count INTEGER, view_count INTEGER, video_count INTEGER, access_token_enc TEXT, connected INTEGER, last_sync TEXT, last_error TEXT)');
-    $pdo->exec('CREATE TABLE wp_marketing_youtube_daily_stats (_ID INTEGER PRIMARY KEY, metric_date TEXT, views INTEGER, watch_minutes REAL, likes INTEGER, comments INTEGER, shares INTEGER, subscribers_gained INTEGER, subscribers_lost INTEGER)');
-    $pdo->exec('CREATE TABLE wp_marketing_youtube_videos (_ID INTEGER PRIMARY KEY, title TEXT, published_at TEXT, permalink TEXT, content_type TEXT, views INTEGER, watch_minutes REAL, likes INTEGER, comments INTEGER)');
-    $pdo->exec('CREATE TABLE wp_marketing_tiktok_connections (_ID INTEGER PRIMARY KEY, display_name TEXT, username TEXT, follower_count INTEGER, likes_count INTEGER, video_count INTEGER, access_token_enc TEXT, connected INTEGER, last_sync TEXT, last_error TEXT)');
-    $pdo->exec('CREATE TABLE wp_marketing_tiktok_videos (_ID INTEGER PRIMARY KEY, title TEXT, published_at TEXT, permalink TEXT, views INTEGER, likes INTEGER, comments INTEGER, shares INTEGER)');
+    $pdo->exec('CREATE TABLE wp_marketing_youtube_connections (_ID INTEGER PRIMARY KEY, channel_id TEXT, thumbnail_url TEXT, channel_title TEXT, channel_handle TEXT, subscriber_count INTEGER, view_count INTEGER, video_count INTEGER, access_token_enc TEXT, connected INTEGER, last_sync TEXT, last_error TEXT)');
+    $pdo->exec('CREATE TABLE wp_marketing_youtube_daily_stats (_ID INTEGER PRIMARY KEY, channel_id TEXT, metric_date TEXT, views INTEGER, engaged_views INTEGER DEFAULT 0, average_view_duration REAL DEFAULT 0, average_view_percentage REAL DEFAULT 0, videos_published INTEGER DEFAULT 0, watch_minutes REAL, likes INTEGER, comments INTEGER, shares INTEGER, subscribers_gained INTEGER, subscribers_lost INTEGER)');
+    $pdo->exec('CREATE TABLE wp_marketing_youtube_videos (_ID INTEGER PRIMARY KEY, channel_id TEXT, title TEXT, description TEXT, published_at TEXT, permalink TEXT, thumbnail_url TEXT, content_type TEXT, duration_seconds INTEGER DEFAULT 0, public_views INTEGER DEFAULT 0, public_likes INTEGER DEFAULT 0, public_comments INTEGER DEFAULT 0, views INTEGER, engaged_views INTEGER DEFAULT 0, watch_minutes REAL, average_view_duration REAL DEFAULT 0, average_view_percentage REAL DEFAULT 0, likes INTEGER, comments INTEGER, shares INTEGER DEFAULT 0, subscribers_gained INTEGER DEFAULT 0, subscribers_lost INTEGER DEFAULT 0, analytics_from TEXT, analytics_to TEXT)');
+    $pdo->exec('CREATE TABLE wp_marketing_youtube_breakdowns (_ID INTEGER PRIMARY KEY, channel_id TEXT, period_from TEXT, period_to TEXT, breakdown_type TEXT, label TEXT, value REAL, watch_minutes REAL)');
+    $pdo->exec('CREATE TABLE wp_marketing_tiktok_connections (_ID INTEGER PRIMARY KEY, open_id TEXT, avatar_url TEXT, display_name TEXT, username TEXT, follower_count INTEGER, likes_count INTEGER, video_count INTEGER, access_token_enc TEXT, connected INTEGER, last_sync TEXT, last_error TEXT)');
+    $pdo->exec('CREATE TABLE wp_marketing_tiktok_videos (_ID INTEGER PRIMARY KEY, open_id TEXT, title TEXT, description TEXT, published_at TEXT, permalink TEXT, cover_url TEXT, duration_seconds INTEGER DEFAULT 0, views INTEGER, likes INTEGER, comments INTEGER, shares INTEGER)');
     $db->insert('wp_marketing_social_accounts', ['platform' => 'instagram', 'account_name' => 'SK&C Sucasa', 'username' => 'scinmobiliaria', 'connected' => 1, 'last_sync' => '2026-09-28 11:15:19']);
     // Instagram: datos hasta el 28 de septiembre (la sincronización va atrasada).
     foreach (['2026-09-26' => [1700, 100], '2026-09-27' => [1720, 200], '2026-09-28' => [1751, 300], '2026-05-01' => [1500, 999]] as $day => [$followers, $reach]) {
-      $db->insert('wp_marketing_social_daily_stats', ['metric_date' => $day, 'platform' => 'instagram', 'followers' => $followers, 'reach' => $reach, 'impressions' => 10, 'profile_views' => 5, 'website_clicks' => 2, 'likes' => 3, 'comments' => 1, 'shares' => 0, 'saves' => 1]);
+      $db->insert('wp_marketing_social_daily_stats', ['metric_date' => $day, 'platform' => 'instagram', 'followers' => $followers, 'reach' => $reach, 'impressions' => 10, 'profile_views' => 5, 'website_clicks' => 2, 'likes' => 3, 'comments' => 1, 'shares' => 0, 'saves' => 1, 'content_count' => 1]);
     }
     $db->insert('wp_marketing_social_posts', ['post_date' => '2026-09-27', 'platform' => 'instagram', 'content_type' => 'REEL', 'title' => 'Apartamento <b>en</b> Laureles', 'permalink' => 'https://instagram.com/p/1', 'reach' => 500, 'likes' => 20, 'comments' => 2, 'shares' => 1, 'saves' => 3]);
     $db->insert('wp_marketing_social_posts', ['post_date' => '2026-09-26', 'platform' => 'instagram', 'title' => 'Enlace raro', 'permalink' => 'javascript:alert(1)', 'reach' => 50, 'likes' => 1, 'comments' => 0, 'shares' => 0, 'saves' => 0]);
@@ -158,20 +159,29 @@ final class CommercialPromotionDatabase
       $db->insert('wp_marketing_social_ads_stats', ['period_start' => $day, 'metric_date' => $day, 'level' => 'account_daily', 'name' => 'SKC', 'spend' => $spend, 'impressions' => $impressions, 'reach' => $impressions - 100, 'clicks' => $clicks, 'link_clicks' => $clicks]);
     }
     foreach ([['2026-07-11', '2026-07-11', 100], ['2025-01-01', '2026-08-06', 9527], ['2026-08-06', '2026-08-06', 50]] as [$since, $date, $impressions]) {
-      $db->insert('wp_marketing_social_ads_stats', ['period_start' => $since, 'metric_date' => $date, 'level' => 'campaign', 'external_id' => 'C1', 'name' => '20 años construyendo', 'status' => 'ACTIVE', 'objective' => 'ENGAGEMENT', 'spend' => 44867, 'impressions' => $impressions, 'clicks' => 202, 'ctr' => 2.12, 'cpc' => 222.1, 'cpm' => 4709.6]);
+      $db->insert('wp_marketing_social_ads_stats', ['frequency' => 1.5, 'actions_json' => '[{"action_type":"link_click","value":"90"},{"action_type":"lead","value":"3"}]', 'period_start' => $since, 'metric_date' => $date, 'level' => 'campaign', 'external_id' => 'C1', 'name' => '20 años construyendo', 'status' => 'ACTIVE', 'objective' => 'ENGAGEMENT', 'spend' => 44867, 'impressions' => $impressions, 'clicks' => 202, 'ctr' => 2.12, 'cpc' => 222.1, 'cpm' => 4709.6]);
     }
-    $db->insert('wp_marketing_youtube_connections', ['channel_title' => 'SKC SuCasa', 'channel_handle' => '@skcsucasa', 'subscriber_count' => 320, 'view_count' => 50000, 'video_count' => 90, 'access_token_enc' => 'SECRETO-YT', 'connected' => 1, 'last_sync' => '2026-08-05 22:00:00']);
+    // Una foto de cuenta posterior sin actividad (la sincronización diaria) no debe borrar lo acumulado, y un anuncio.
+    $db->insert('wp_marketing_social_ads_stats', ['period_start' => '2026-10-01', 'metric_date' => '2026-11-02', 'level' => 'account', 'spend' => 0, 'impressions' => 0, 'reach' => 0, 'clicks' => 0, 'link_clicks' => 0]);
+    $db->insert('wp_marketing_social_ads_stats', ['period_start' => '2025-01-01', 'metric_date' => '2026-08-06', 'level' => 'account', 'spend' => 44867, 'impressions' => 9527, 'reach' => 7000, 'clicks' => 202, 'link_clicks' => 150]);
+    $db->insert('wp_marketing_social_ads_stats', ['period_start' => '2025-01-01', 'metric_date' => '2026-08-06', 'level' => 'ad', 'name' => 'Anuncio feria', 'status' => 'PAUSED', 'spend' => 44867, 'impressions' => 9527, 'reach' => 7000, 'clicks' => 202, 'link_clicks' => 150, 'ctr' => 2.12, 'cpc' => 222.1, 'cpm' => 4709.6, 'frequency' => 1.36, 'thumbnail_url' => 'https://cdn.example/ad.jpg']);
+    $db->insert('wp_marketing_youtube_connections', ['channel_id' => 'VIEJO', 'channel_title' => 'Canal viejo', 'connected' => 0, 'access_token_enc' => 'SECRETO-YT']);
+    $db->insert('wp_marketing_youtube_daily_stats', ['channel_id' => 'VIEJO', 'metric_date' => '2026-08-05', 'views' => 5000, 'watch_minutes' => 999, 'likes' => 0, 'comments' => 0, 'shares' => 0, 'subscribers_gained' => 0, 'subscribers_lost' => 0]);
+    $db->insert('wp_marketing_youtube_videos', ['channel_id' => 'VIEJO', 'title' => 'Video del canal viejo', 'published_at' => '2026-08-02 10:00:00', 'permalink' => 'https://youtube.com/watch?v=2', 'views' => 8000, 'watch_minutes' => 1, 'likes' => 0, 'comments' => 0]);
+    foreach ([['creator_content_type', 'SHORTS', 700, 90], ['traffic_source', 'YT_SEARCH', 400, 10], ['search_term', 'casas medellin', 30, 2], ['device', 'MOBILE', 600, 20], ['subscribed_status', 'UNSUBSCRIBED', 500, 40], ['country', 'CO', 650, 30]] as [$type, $label, $value, $minutes]) {
+      $db->insert('wp_marketing_youtube_breakdowns', ['channel_id' => 'UC1', 'period_from' => '2026-07-01', 'period_to' => '2026-08-05', 'breakdown_type' => $type, 'label' => $label, 'value' => $value, 'watch_minutes' => $minutes]);
+    }
+    $db->insert('wp_marketing_youtube_connections', ['channel_id' => 'UC1', 'channel_title' => 'SKC SuCasa', 'channel_handle' => '@skcsucasa', 'subscriber_count' => 320, 'view_count' => 50000, 'video_count' => 90, 'access_token_enc' => 'SECRETO-YT', 'connected' => 1, 'last_sync' => '2026-08-05 22:00:00']);
     foreach (['2026-08-04' => 100, '2026-08-05' => 150] as $day => $views) {
-      $db->insert('wp_marketing_youtube_daily_stats', ['metric_date' => $day, 'views' => $views, 'watch_minutes' => 120.5, 'likes' => 5, 'comments' => 1, 'shares' => 0, 'subscribers_gained' => 3, 'subscribers_lost' => 1]);
+      $db->insert('wp_marketing_youtube_daily_stats', ['channel_id' => 'UC1', 'metric_date' => $day, 'views' => $views, 'engaged_views' => 40, 'average_view_duration' => 75, 'average_view_percentage' => 50, 'videos_published' => 1, 'watch_minutes' => 120.5, 'likes' => 5, 'comments' => 1, 'shares' => 0, 'subscribers_gained' => 3, 'subscribers_lost' => 1]);
     }
-    $db->insert('wp_marketing_youtube_videos', ['title' => 'Recorrido casa', 'published_at' => '2026-08-01 10:00:00', 'permalink' => 'https://youtube.com/watch?v=1', 'content_type' => 'short', 'views' => 900, 'watch_minutes' => 40, 'likes' => 9, 'comments' => 1]);
-    $db->insert('wp_marketing_tiktok_connections', ['display_name' => 'SKC', 'username' => 'skc', 'follower_count' => 80, 'likes_count' => 500, 'video_count' => 37, 'access_token_enc' => 'SECRETO-TT', 'connected' => 1, 'last_sync' => '2026-09-23 08:00:00', 'last_error' => 'Token vencido']);
-    $db->insert('wp_marketing_tiktok_videos', ['title' => 'Tip de arriendo', 'published_at' => '2026-09-20 09:00:00', 'permalink' => 'https://tiktok.com/@skc/video/1', 'views' => 700, 'likes' => 30, 'comments' => 4, 'shares' => 2]);
+    $db->insert('wp_marketing_youtube_videos', ['channel_id' => 'UC1', 'duration_seconds' => 95, 'analytics_from' => '2026-07-01', 'analytics_to' => '2026-08-05', 'public_views' => 1200, 'title' => 'Recorrido casa', 'published_at' => '2026-08-01 10:00:00', 'permalink' => 'https://youtube.com/watch?v=1', 'content_type' => 'short', 'views' => 900, 'watch_minutes' => 40, 'likes' => 9, 'comments' => 1]);
+    $db->insert('wp_marketing_tiktok_connections', ['open_id' => 'TT1', 'display_name' => 'SKC', 'username' => 'skc', 'follower_count' => 80, 'likes_count' => 500, 'video_count' => 37, 'access_token_enc' => 'SECRETO-TT', 'connected' => 1, 'last_sync' => '2026-09-23 08:00:00', 'last_error' => 'Token vencido']);
+    $db->insert('wp_marketing_tiktok_videos', ['open_id' => 'TT1', 'duration_seconds' => 42, 'title' => 'Tip de arriendo', 'published_at' => '2026-09-20 09:00:00', 'permalink' => 'https://tiktok.com/@skc/video/1', 'views' => 700, 'likes' => 30, 'comments' => 4, 'shares' => 2]);
   }
 
   /**
    * Banco de piezas: tres piezas (una archivada y una con publicaciones vinculadas) sobre las publicaciones de social().
-   * marketing_social_posts gana las columnas que usa el vínculo con Meta.
    */
   public static function pieces(Database $db): void
   {
@@ -180,9 +190,6 @@ final class CommercialPromotionDatabase
       return;
     }
     $pdo = $db->pdo();
-    foreach (['post_time TEXT', 'external_id TEXT', 'thumbnail_url TEXT', 'metrics_json TEXT', "source TEXT DEFAULT 'meta'"] as $column) {
-      $pdo->exec('ALTER TABLE wp_marketing_social_posts ADD COLUMN ' . $column);
-    }
     $pdo->exec("UPDATE wp_marketing_social_posts SET external_id = 'ext-' || _ID, metrics_json = '{\"views\":900,\"post_clicks\":7}', source = 'meta'");
     $db->insert('wp_marketing_social_posts', ['post_date' => '2026-09-20', 'platform' => 'facebook', 'title' => 'Post demo', 'external_id' => 'demo-1', 'source' => 'demo', 'reach' => 1]);
     $db->insert('wp_marketing_social_posts', ['post_date' => '2026-09-19', 'platform' => 'facebook', 'title' => 'Feria de vivienda', 'external_id' => 'ext-fb', 'source' => 'meta', 'reach' => 40, 'likes' => 2, 'comments' => 0, 'shares' => 0, 'saves' => 0]);
