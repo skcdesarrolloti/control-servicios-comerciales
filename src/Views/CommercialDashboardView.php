@@ -4968,7 +4968,7 @@ final class CommercialDashboardView
     'Precaptación' => ['precaptacion_crear', 'precaptacion_editar', 'precaptacion_ticket', 'precaptacion_catalogos'],
     'Inmuebles y avisos' => ['ingresar_inmueble', 'registrar_aviso', 'editar_actor'],
     'Herramientas' => ['mercado_vista_completa', 'aseo_vista_interna', 'plan_estrategico_editar'],
-    'Promoción' => ['promocion_ver_ip', 'pop_gestionar', 'pop_anular', 'pop_ver_costos', 'redes_ver_inversion'],
+    'Promoción' => ['promocion_ver_ip', 'pop_gestionar', 'pop_anular', 'pop_ver_costos', 'redes_ver_inversion', 'redes_sincronizar'],
   ];
 
   /** @param array<int,string> $employeeCargoIds */

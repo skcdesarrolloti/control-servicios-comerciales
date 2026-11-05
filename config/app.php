@@ -59,6 +59,31 @@ return [
   'auto_login_secret' => $env('AUTO_LOGIN_SECRET', ''),
   'auto_login_ttl' => max(60, (int) $env('AUTO_LOGIN_TTL', '300')),
 
+  // Redes sociales: las mismas variables de dashboard-marketing. Las direcciones de retorno siguen siendo las registradas
+  // en Google y TikTok; legacy/dashboard-marketing las reenvía a public/social-callback.php.
+  'meta' => [
+    'graph_version' => $env('META_GRAPH_VERSION', 'v25.0'),
+    'access_token' => $env('META_ACCESS_TOKEN', ''),
+    'instagram_user_id' => $env('META_IG_USER_ID', ''),
+    'facebook_page_id' => $env('META_FB_PAGE_ID', ''),
+    'facebook_page_access_token' => $env('META_FB_PAGE_ACCESS_TOKEN', ''),
+  ],
+  'youtube' => [
+    'client_id' => $env('GOOGLE_YOUTUBE_CLIENT_ID', ''),
+    'client_secret' => $env('GOOGLE_YOUTUBE_CLIENT_SECRET', ''),
+    'redirect_uri' => $env('GOOGLE_YOUTUBE_REDIRECT_URI', 'https://sucasainmobiliaria.com.co/dashboard-marketing/youtube/callback'),
+    'channel_id' => $env('GOOGLE_YOUTUBE_CHANNEL_ID', ''),
+    'channel_name' => $env('GOOGLE_YOUTUBE_CHANNEL_NAME', ''),
+    'token_key' => $env('GOOGLE_YOUTUBE_TOKEN_KEY', ''),
+  ],
+  'tiktok' => [
+    'client_key' => $env('TIKTOK_CLIENT_KEY', ''),
+    'client_secret' => $env('TIKTOK_CLIENT_SECRET', ''),
+    'redirect_uri' => $env('TIKTOK_REDIRECT_URI', 'https://sucasainmobiliaria.com.co/dashboard-marketing/tiktok/callback'),
+    'scopes' => $env('TIKTOK_SCOPES', 'user.info.basic,video.list'),
+    'token_key' => $env('TIKTOK_TOKEN_KEY', ''),
+  ],
+
   'upload_max_bytes' => (int) $env('UPLOAD_MAX_BYTES', '10485760'),
   'wordpress_upload_path' => $env('WORDPRESS_UPLOAD_PATH', ''),
   'wordpress_upload_url' => $env('WORDPRESS_UPLOAD_URL', ''),

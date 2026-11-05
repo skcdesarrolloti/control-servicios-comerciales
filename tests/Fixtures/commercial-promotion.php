@@ -78,7 +78,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     ]);
   }
   $controller = new SCM\Http\Controller\CommercialApiController($db, $settings, $csrf, $config);
-  $router = new SCM\Http\Api\CommercialActionRouter($controller, static fn(): SCM\Http\Controller\PromotionApiController => new SCM\Http\Controller\PromotionApiController($db, $settings, $csrf, $config));
+  $router = new SCM\Http\Api\CommercialActionRouter($controller, static fn(): SCM\Http\Controller\PromotionApiController => new SCM\Http\Controller\PromotionApiController($db, $settings, $csrf, $config, CommercialPromotionDatabase::fakeSocialSyncers()));
   if (!$router->dispatch((string) ($_POST['action'] ?? ''), $_POST)) {
     SCM\Http\Response\JsonResponse::error('Acción desconocida.', 400);
   }

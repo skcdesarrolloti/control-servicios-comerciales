@@ -169,6 +169,17 @@ final class CommercialPromotionDatabase
     $db->insert('wp_marketing_tiktok_videos', ['title' => 'Tip de arriendo', 'published_at' => '2026-09-20 09:00:00', 'permalink' => 'https://tiktok.com/@skc/video/1', 'views' => 700, 'likes' => 30, 'comments' => 4, 'shares' => 2]);
   }
 
+  /**
+   * Reemplazos de la sincronización para los fixtures: nunca se llama a Meta, Google ni TikTok.
+   * @return array<string,\Closure(string,string):array<string,mixed>>
+   */
+  public static function fakeSocialSyncers(): array
+  {
+    $ok = static fn(string $from, string $to): array => ['daily' => 1, 'warnings' => []];
+    return ['instagram' => static fn(string $from, string $to): array => ['daily' => 3, 'warnings' => ['Instagram entregó solo 30 días.']], 'facebook' => $ok, 'publicidad' => $ok, 'youtube' => $ok,
+      'tiktok' => static function (string $from, string $to): array { throw new \RuntimeException('Conecta primero la cuenta de TikTok.'); }];
+  }
+
   /** @param array<string,string> $session */
   public static function login(string $cargo, string $employee, string $name = 'Funcionario de prueba', array $session = []): void
   {

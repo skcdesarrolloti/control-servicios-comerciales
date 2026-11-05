@@ -21,7 +21,7 @@ function watch(page) {
   const logRequests = [];
   page.on('pageerror', error => errors.push(error.message));
   // Los 403/422 que provoca la propia prueba (permisos y validación por POST) no son errores de la página.
-  page.on('console', message => { if (message.type() === 'error' && (message.location().url || '').includes('127.0.0.1') && !/Failed to load resource: .*status of (403|422)/.test(message.text())) errors.push('console: ' + message.text()); });
+  page.on('console', message => { if (message.type() === 'error' && (message.location().url || '').includes('127.0.0.1') && !/Failed to load resource: .*status of (403|422|502)/.test(message.text())) errors.push('console: ' + message.text()); });
   page.on('response', response => { if (response.url().includes('127.0.0.1') && response.status() >= 400 && response.request().method() === 'GET') errors.push('http ' + response.status() + ' ' + response.url()); });
   page.on('request', request => { if ((request.postData() || '').includes('commercial_promo_analytics_logs')) logRequests.push(request); });
   return { errors, logRequests };
@@ -522,6 +522,21 @@ function daysBetween(from, to) {
       await social.locator('.cpr-filters button[type=submit]').click();
       await social.waitForFunction(() => /Vistas\s*150/.test(document.querySelector('.cpr-stats').innerText));
       assert.ok(!(await social.content()).includes('SECRETO'));
+      // Sincronizar (el fixture usa redes falsas), reconectar y la confirmación de desconectar.
+      await social.locator('[data-social-sync="youtube"]').click();
+      await social.waitForFunction(() => document.body.innerText.includes('Sincronización terminada.'));
+      await social.locator('.swal2-confirm').click();
+      await social.locator('[data-social-sync="youtube"]').waitFor();
+      assert.equal(await social.locator('[data-social-connect]').innerText(), 'Reconectar');
+      await social.locator('[data-social-disconnect]').click();
+      await social.locator('[data-social-dialog]').waitFor({ state: 'visible' });
+      await social.locator('[data-social-close]').first().click();
+      await social.locator('.cpr-tab', { hasText: 'TikTok' }).click();
+      await social.locator('[data-social-sync="tiktok"]').click();
+      await social.waitForFunction(() => document.body.innerText.includes('Conecta primero la cuenta de TikTok.'));
+      await social.locator('.swal2-confirm').click();
+      await social.locator('.cpr-tab', { hasText: 'YouTube' }).click();
+      await social.locator('[data-social-sync="youtube"]').waitFor();
       await social.setViewportSize({ width: 390, height: 844 });
       assert.equal(await noHorizontalScroll(social), true);
       assert.deepEqual(socialWatch.errors, []);

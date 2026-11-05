@@ -9,9 +9,9 @@ use SCM\Commercial\Promotion\Social\SocialStatsRepository;
 use SCM\Core\Database;
 
 /**
- * Promoción › Redes sociales (solo consulta). Adaptación de dashboard-marketing views/social-stats.php con el diseño de
- * Promoción: una pestaña por red, rango de fechas con botón Aplicar, indicadores, gráfico diario, publicaciones o videos
- * destacados y audiencia. La inversión en publicidad solo sale con redes_ver_inversion.
+ * Promoción › Redes sociales. Adaptación de dashboard-marketing views/social-stats.php con el diseño de Promoción: una
+ * pestaña por red, rango de fechas con botón Aplicar, indicadores, gráfico diario, publicaciones o videos destacados y
+ * audiencia. La inversión en publicidad solo sale con redes_ver_inversion; sincronizar y conectar piden redes_sincronizar.
  */
 final class SocialView
 {
@@ -24,7 +24,35 @@ final class SocialView
     $repository = new SocialStatsRepository($db);
     $filters = $repository->filters($input, $today ?? date('Y-m-d'));
     $spend = $policy->canAct('redes_ver_inversion');
-    return ['filters' => $filters, 'can_spend' => $spend, 'data' => $repository->summary($filters, $spend)];
+    // Aviso que deja public/social-callback.php al volver de conectar una cuenta.
+    $flash = is_array($_SESSION['social_flash'] ?? null) ? $_SESSION['social_flash'] : [];
+    unset($_SESSION['social_flash']);
+    return ['filters' => $filters, 'can_spend' => $spend, 'can_sync' => $policy->canAct('redes_sincronizar'), 'flash' => $flash, 'data' => $repository->summary($filters, $spend)];
+  }
+
+  /** Sincronizar y, en YouTube y TikTok, conectar o desconectar la cuenta. @param array<string,mixed> $context */
+  private static function syncActions(array $context, string $baseUrl): string
+  {
+    if (empty($context['can_sync'])) {
+      return '';
+    }
+    $network = $context['filters']['network'];
+    $e = static fn($value): string => PromotionUi::e($value);
+    $html = '<button type="button" class="cpr-primary" data-social-sync="' . $e($network) . '"><span class="material-symbols-outlined" aria-hidden="true">sync</span>Sincronizar ahora</button>';
+    if (in_array($network, ['youtube', 'tiktok'], true)) {
+      $connected = ($context['data']['account']['name'] ?? '') !== '';
+      $url = rtrim($baseUrl, '/') . '/social-callback.php?network=' . $network . '&start=1';
+      $html = '<button type="button" class="cpr-ghost" data-social-connect="' . $e($url) . '">' . ($connected ? 'Reconectar' : 'Conectar cuenta') . '</button>'
+        . ($connected ? '<button type="button" class="cpr-ghost is-danger" data-social-disconnect="' . $e($network) . '">Desconectar</button>' : '') . $html;
+    }
+    return '<div class="cpr-toolbar__actions">' . $html . '</div>';
+  }
+
+  private static function disconnectDialog(): string
+  {
+    return '<dialog class="cpr-dialog" data-social-dialog><form method="dialog" data-social-disconnect-form><div class="cpr-dialog__head"><h2>Desconectar cuenta</h2><button type="button" class="cpr-ghost is-small" data-social-close>Cerrar</button></div>'
+      . '<input type="hidden" name="network"><label class="cpr-check is-wide"><input type="checkbox" name="confirm" value="1" required><span>Entiendo que esta red deja de sincronizarse hasta conectarla otra vez. Las estadísticas guardadas se conservan.</span></label>'
+      . '<p class="cpr-alert is-error" data-social-error hidden></p><div class="cpr-dialog__foot"><button type="button" class="cpr-ghost" data-social-close>Cancelar</button><button type="submit" class="cpr-primary is-danger">Desconectar</button></div></form></dialog>';
   }
 
   /** @param array<string,mixed> $context */
@@ -40,7 +68,13 @@ final class SocialView
       $active = $key === $network;
       $tabs .= '<a class="cpr-tab' . ($active ? ' is-active' : '') . '" data-cpr-nav href="' . PromotionUi::e(PromotionUi::url($baseUrl, ['tab' => 'redes_sociales', 'pr_red' => $key])) . '"' . ($active ? ' aria-current="page"' : '') . '>' . PromotionUi::e($label) . '</a>';
     }
-    $html .= '<div class="cpr-toolbar"><nav class="cpr-tabs" aria-label="Redes">' . $tabs . '</nav></div>';
+    if (!empty($context['flash']['message'])) {
+      $html .= '<p class="cpr-alert' . (($context['flash']['type'] ?? '') === 'error' ? ' is-error' : '') . '">' . PromotionUi::e($context['flash']['message']) . '</p>';
+    }
+    $html .= '<div class="cpr-toolbar"><nav class="cpr-tabs" aria-label="Redes">' . $tabs . '</nav>' . self::syncActions($context, $baseUrl) . '</div>';
+    if (!empty($context['can_sync'])) {
+      $html .= self::disconnectDialog();
+    }
     $html .= '<form class="cpr-card cpr-filters" data-cpr-filters data-tab="redes_sociales" action="' . PromotionUi::e(PromotionUi::url($baseUrl, ['tab' => 'redes_sociales'])) . '"><input type="hidden" name="pr_red" value="' . PromotionUi::e($network) . '">'
       . '<div class="cpr-filters__grid is-wide">' . self::date('pr_desde', 'Desde', $filters['from']) . self::date('pr_hasta', 'Hasta', $filters['to']) . '</div>'
       . '<div class="cpr-filters__actions"><a class="cpr-ghost" data-cpr-nav href="' . PromotionUi::e(PromotionUi::url($baseUrl, ['tab' => 'redes_sociales', 'pr_red' => $network])) . '">Últimos 90 días con datos</a>'

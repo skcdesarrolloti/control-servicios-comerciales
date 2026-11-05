@@ -21,4 +21,10 @@ if ($action === 'track-email') {
   require $panel . '/track-email.php';
   exit;
 }
+// Google y TikTok tienen registrada esta dirección de retorno: se conserva para no cambiarla en sus consolas.
+if (preg_match('#/(youtube|tiktok)/callback/?$#', (string) parse_url((string) ($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_PATH), $match) === 1) {
+  $query = (string) ($_SERVER['QUERY_STRING'] ?? '');
+  header('Location: /control-servicios-comerciales/public/social-callback.php?network=' . $match[1] . ($query !== '' ? '&' . $query : ''), true, 302);
+  exit;
+}
 header('Location: /control-servicios-comerciales/public/index.php', true, 301);

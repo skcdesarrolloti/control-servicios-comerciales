@@ -82,7 +82,7 @@ final class CommercialMaterialPopTest extends TestCase
       self::assertContains($action, CommercialAccessPolicy::OPT_IN_ACTIONS);
     }
     $groups = (new \ReflectionClassConstant(\SCM\Views\CommercialDashboardView::class, 'PERMISSION_ACTION_GROUPS'))->getValue();
-    self::assertSame(['promocion_ver_ip', 'pop_gestionar', 'pop_anular', 'pop_ver_costos', 'redes_ver_inversion'], $groups['Promoción']);
+    self::assertSame(['promocion_ver_ip', 'pop_gestionar', 'pop_anular', 'pop_ver_costos', 'redes_ver_inversion', 'redes_sincronizar'], $groups['Promoción']);
     self::assertSame(['tab' => 'promocion', 'promocion_sub' => 'material_pop'], CommercialAccessPolicy::normalizeTabGroup(['tab' => 'material_pop']));
     foreach (['commercial_pop_product_save', 'commercial_pop_stock_adjust', 'commercial_pop_product_active', 'commercial_pop_delivery_create', 'commercial_pop_delivery_cancel', 'commercial_pop_sync'] as $action) {
       self::assertArrayHasKey($action, CommercialActionRouter::PROMOTION_ACTIONS);

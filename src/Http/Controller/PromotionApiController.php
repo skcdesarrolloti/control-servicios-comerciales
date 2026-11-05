@@ -9,6 +9,7 @@ use SCM\Commercial\Promotion\Analytics\TrackerAnalyticsConfig;
 use SCM\Commercial\Promotion\Analytics\TrackerAnalyticsFilters;
 use SCM\Commercial\Promotion\Analytics\TrackerAnalyticsRepository;
 use SCM\Commercial\Promotion\Pop\PopInventoryService;
+use SCM\Commercial\Promotion\Social\SocialSyncRunner;
 use SCM\Core\Auth;
 use SCM\Core\Csrf;
 use SCM\Core\Database;
@@ -30,10 +31,19 @@ final class PromotionApiController
   private Settings $settings;
   private Csrf $csrf;
   private CommercialAccessPolicy $policy;
+  /** @var array<string,mixed> */
+  private array $config;
+  /** @var array<string,\Closure(string,string):array<string,mixed>> */
+  private array $socialSyncers;
 
-  /** @param array<string,mixed> $config */
-  public function __construct(Database $db, Settings $settings, Csrf $csrf, array $config)
+  /**
+   * @param array<string,mixed> $config
+   * @param array<string,\Closure(string,string):array<string,mixed>> $socialSyncers Solo para las pruebas: no salen a internet.
+   */
+  public function __construct(Database $db, Settings $settings, Csrf $csrf, array $config, array $socialSyncers = [])
   {
+    $this->config = $config;
+    $this->socialSyncers = $socialSyncers;
     $this->db = $db;
     $this->settings = $settings;
     $this->csrf = $csrf;
@@ -121,6 +131,54 @@ final class PromotionApiController
       return array_sum($summary) === 0 ? 'El Club PPH ya estaba al día.'
         : 'Club PPH sincronizado: ' . $summary['products_created'] . ' productos nuevos, ' . $summary['products_updated'] . ' actualizados y ' . $summary['deliveries_imported'] . ' entregas importadas.';
     });
+  }
+
+  /** Trae los últimos días de la red de la pestaña; el historial se recarga por línea de comandos. @param array<string,mixed> $input */
+  public function socialSync(array $input): never
+  {
+    $this->socialGuard($input);
+    $network = (string) ($input['network'] ?? '');
+    @set_time_limit(280);
+    try {
+      $result = $this->socialRunner()->run($network, date('Y-m-d', strtotime('-' . SocialSyncRunner::DEFAULT_DAYS . ' days')), date('Y-m-d'));
+    } catch (\InvalidArgumentException $exception) {
+      JsonResponse::error($exception->getMessage(), 422);
+    } catch (\RuntimeException $exception) {
+      JsonResponse::error($exception->getMessage(), 409);
+    }
+    $item = $result['results'][$network];
+    if (!$item['ok']) {
+      JsonResponse::error($item['message'], 502);
+    }
+    JsonResponse::success(['message' => 'Sincronización terminada.', 'warnings' => $item['warnings']]);
+  }
+
+  /** @param array<string,mixed> $input */
+  public function socialDisconnect(array $input): never
+  {
+    $this->socialGuard($input);
+    $this->confirmed($input);
+    try {
+      $this->socialRunner()->disconnect((string) ($input['network'] ?? ''));
+    } catch (\InvalidArgumentException $exception) {
+      JsonResponse::error($exception->getMessage(), 422);
+    }
+    JsonResponse::success(['message' => 'Cuenta desconectada. Las estadísticas guardadas se conservan.']);
+  }
+
+  /** @param array<string,mixed> $input */
+  private function socialGuard(array $input): void
+  {
+    $this->guard($input, 'redes_sociales', 'Redes sociales');
+    if (!$this->policy->canAct('redes_sincronizar')) {
+      JsonResponse::error('No tienes permiso para sincronizar las redes sociales.', 403);
+    }
+  }
+
+  private function socialRunner(): SocialSyncRunner
+  {
+    $directory = defined('SCM_STORAGE_PATH') ? (string) constant('SCM_STORAGE_PATH') . '/cache' : sys_get_temp_dir();
+    return new SocialSyncRunner($this->db, $this->config, $directory . '/social-sync.lock', $this->socialSyncers);
   }
 
   /** @param callable(PopInventoryService):string $operation */

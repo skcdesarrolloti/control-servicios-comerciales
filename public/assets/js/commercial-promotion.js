@@ -390,4 +390,60 @@
       submit.disabled = false;
     }
   });
+
+  // ── Redes sociales: sincronizar y conectar ────────────────────────────────
+  document.addEventListener("click", function (event) {
+    var target = event.target;
+    if (!target || !target.closest) return;
+    var sync = target.closest("[data-social-sync]");
+    if (sync) {
+      event.preventDefault();
+      var label = sync.innerHTML;
+      sync.disabled = true;
+      sync.textContent = "Sincronizando… puede tardar unos minutos";
+      request("commercial_social_sync", { network: sync.getAttribute("data-social-sync") }).then(function (data) {
+        var warnings = data.warnings || [];
+        notify(warnings.length ? "warning" : "success", [data.message].concat(warnings).join(" "));
+        navigate("");
+      }).catch(function (error) {
+        notify("error", error.message);
+        sync.disabled = false;
+        sync.innerHTML = label;
+      });
+      return;
+    }
+    var connect = target.closest("[data-social-connect]");
+    if (connect) {
+      event.preventDefault();
+      window.location.href = connect.getAttribute("data-social-connect") + "&nonce=" + encodeURIComponent(runtime.nonce || "");
+      return;
+    }
+    var disconnect = target.closest("[data-social-disconnect]");
+    if (disconnect) {
+      event.preventDefault();
+      var dialog = document.querySelector("[data-social-dialog]");
+      dialog.querySelector("form").reset();
+      dialog.querySelector('[name="network"]').value = disconnect.getAttribute("data-social-disconnect");
+      dialog.querySelector("[data-social-error]").hidden = true;
+      dialog.showModal();
+      return;
+    }
+    if (target.closest("[data-social-close]")) closeDialog(target.closest("dialog"));
+  });
+
+  document.addEventListener("submit", function (event) {
+    var form = event.target.closest && event.target.closest("form[data-social-disconnect-form]");
+    if (!form) return;
+    event.preventDefault();
+    if (!form.reportValidity()) return;
+    request("commercial_social_disconnect", { network: form.querySelector('[name="network"]').value, confirm: "1" }).then(function (data) {
+      closeDialog(form.closest("dialog"));
+      notify("success", data.message);
+      navigate("");
+    }).catch(function (error) {
+      var box = form.querySelector("[data-social-error]");
+      box.textContent = error.message;
+      box.hidden = false;
+    });
+  });
 })();

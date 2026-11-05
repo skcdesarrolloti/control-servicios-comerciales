@@ -31,7 +31,7 @@ $config = ['base_url' => SCM_BASE_URL, 'dashboard_admin_cargos' => ['13']];
 $controller = new SCM\Http\Controller\CommercialApiController($db, $settings, $csrf, $config);
 // La última línea de la salida es el código HTTP que respondió el endpoint.
 register_shutdown_function(static function (): void { echo PHP_EOL . (int) http_response_code(); });
-$router = new SCM\Http\Api\CommercialActionRouter($controller, static fn(): SCM\Http\Controller\PromotionApiController => new SCM\Http\Controller\PromotionApiController($db, $settings, $csrf, $config));
+$router = new SCM\Http\Api\CommercialActionRouter($controller, static fn(): SCM\Http\Controller\PromotionApiController => new SCM\Http\Controller\PromotionApiController($db, $settings, $csrf, $config, CommercialPromotionDatabase::fakeSocialSyncers()));
 if (!$router->dispatch((string) ($argv[3] ?? ''), $input)) {
   echo json_encode(['success' => false, 'data' => ['message' => 'Acción desconocida.']]);
 }

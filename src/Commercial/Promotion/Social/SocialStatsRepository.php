@@ -7,9 +7,9 @@ namespace SCM\Commercial\Promotion\Social;
 use SCM\Core\Database;
 
 /**
- * Promoción › Redes sociales (solo consulta). Lee las tablas que llena la sincronización de dashboard-marketing
- * (app/SocialStatsRepository.php, YouTubeRepository.php y TikTokRepository.php): marketing_social_* (Instagram,
- * Facebook, publicidad de Meta y audiencia), marketing_youtube_* y marketing_tiktok_*. Nunca lee los tokens de conexión.
+ * Consultas de Promoción › Redes sociales. Lee las tablas que llena la sincronización (Social\Sync, SocialSyncRunner):
+ * marketing_social_* (Instagram, Facebook, publicidad de Meta y audiencia), marketing_youtube_* y marketing_tiktok_*.
+ * Nunca lee los tokens de conexión.
  * La inversión en publicidad (gasto, CPC, CPM) solo sale con $withSpend (permiso redes_ver_inversion).
  */
 final class SocialStatsRepository
