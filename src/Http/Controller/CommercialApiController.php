@@ -136,13 +136,11 @@ final class CommercialApiController
       $propertiesRepo = new CommercialPropertiesRepository($this->db);
       $canSeeAll = $this->policy->canSeeAll('inmuebles');
       $propFilters = $this->propertyFilters($input, !$canSeeAll);
-      $propCounts = $propertiesRepo->summaryCounts($propFilters, $canSeeAll);
       $propResult = $propertiesRepo->search($propFilters, $canSeeAll, (int) ($propFilters['page'] ?? 1), 24);
       $propOptions = $propertiesRepo->filterOptions();
       $html = CommercialDashboardView::renderPropertiesPage(
         $propResult,
         $propFilters,
-        $propCounts,
         $propOptions,
         $this->policy,
         $this->baseUrl

@@ -35,7 +35,6 @@ final class CommercialDashboardView
     $overdueCount = (int) ($homeDashboard['sla_summary']['atrasados'] ?? 0);
     $propertyResult = is_array($data['property_result'] ?? null) ? $data['property_result'] : ['rows' => [], 'total' => 0, 'pagination' => []];
     $propertyFilters = is_array($data['property_filters'] ?? null) ? $data['property_filters'] : [];
-    $propertySummaryCounts = is_array($data['property_summary_counts'] ?? null) ? $data['property_summary_counts'] : [];
     $propertyOptions = is_array($data['property_options'] ?? null) ? $data['property_options'] : [];
 
     $userName = trim(Auth::user());
@@ -660,7 +659,7 @@ final class CommercialDashboardView
           } elseif ($bucket === 'calendario') {
             echo self::renderCalendarPage($runtime['config'] ?? [], $calendarEmployees, $subtab, $policy, $baseUrl);
           } elseif ($bucket === 'inmuebles') {
-            echo self::renderPropertiesPage($propertyResult, $propertyFilters, $propertySummaryCounts, $propertyOptions, $policy, $baseUrl);
+            echo self::renderPropertiesPage($propertyResult, $propertyFilters, $propertyOptions, $policy, $baseUrl);
           } elseif ($bucket === 'precaptacion') {
             echo self::renderPrecaptacion($baseUrl, $_GET);
           } elseif ($bucket === 'anadir_aviso') {
@@ -760,7 +759,6 @@ final class CommercialDashboardView
     $activeClasses = 'bg-primary-container text-on-surface font-semibold rounded-lg shadow-sm';
     $inactiveClasses = 'text-on-surface-variant hover:text-on-surface rounded-lg transition-colors whitespace-nowrap';
 
-    $canManage = $policy instanceof CommercialAccessPolicy && $policy->canManage();
     $canSeeAll = $policy instanceof CommercialAccessPolicy && $policy->canSeeAll('inmuebles');
 
     $openCount = (int) ($tabCounts['abiertos'] ?? 0);
@@ -1005,7 +1003,7 @@ final class CommercialDashboardView
         </div>
       <?php endif; ?>
 
-      <!-- Dropdown Inmuebles (Públicos, Pendientes por publicar, No públicos, Destacados, Solicitudes, Cupos, Mis inmuebles) -->
+      <!-- Dropdown Inmuebles (Públicos, Pendientes por publicar, No públicos, Destacados, Solicitudes, Mis inmuebles) -->
       <?php if (in_array('inmuebles', $views, true)): ?>
         <div class="relative group/nav" data-commercial-dropdown="inmuebles">
           <button type="button" class="flex items-center gap-space-xs px-2 xl:px-3 py-space-xs font-label-md text-label-md <?php echo $bucket === 'inmuebles' ? ($activeClasses . ' active') : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-tab="inmuebles" data-commercial-dropdown-trigger="inmuebles" aria-expanded="false">
@@ -1059,15 +1057,6 @@ final class CommercialDashboardView
               </span>
               <span class="font-label-sm text-[11px] bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full font-semibold">Cola</span>
             </a>
-            <?php endif; ?>
-            <?php if ($canManage): ?>
-              <a class="flex items-center justify-between px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="inmuebles" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'inmuebles', 'property_subtab' => 'cupos'])); ?>">
-                <span class="flex items-center gap-2">
-                  <span class="material-symbols-outlined text-[18px] text-teal-600">pie_chart</span>
-                  <span>Cupos por funcionario</span>
-                </span>
-                <span class="font-label-sm text-[11px] bg-teal-100 text-teal-800 px-2 py-0.5 rounded-full font-semibold">Cupos</span>
-              </a>
             <?php endif; ?>
             <div class="my-1 border-t border-surface-container"></div>
             <?php if (!$policy instanceof CommercialAccessPolicy || $policy->canSubview('inmuebles', 'mis_inmuebles')): ?>
@@ -1216,6 +1205,13 @@ final class CommercialDashboardView
         <?php endif; ?>
         <?php foreach ($views as $mobileView): ?>
           <?php if ($mobileView === 'mis_tickets') continue; ?>
+          <?php if ($mobileView === 'inmuebles'): ?>
+            <?php foreach (self::propertyViews($policy instanceof CommercialAccessPolicy && $policy->canSeeAll('inmuebles')) as $propertyKey => $propertyView): ?>
+              <?php if ($propertyKey === 'mis_inmuebles' || ($policy instanceof CommercialAccessPolicy && !$policy->canSubview('inmuebles', $propertyKey))) continue; ?>
+              <a class="block px-3 py-3 text-sm rounded-xl hover:bg-surface-container-low" data-commercial-tab="inmuebles" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'inmuebles', 'property_subtab' => $propertyKey])); ?>"><?php echo esc_html($propertyView['label']); ?></a>
+            <?php endforeach; ?>
+            <?php continue; ?>
+          <?php endif; ?>
           <?php if (isset(CommercialAccessPolicy::TAB_GROUPS[$mobileView])): ?>
             <?php foreach (CommercialAccessPolicy::SUBVIEWS[$mobileView] as $toolKey => $toolLabel): ?>
               <?php if (!$policy instanceof CommercialAccessPolicy || $policy->canSubview($mobileView, $toolKey)): ?>
@@ -3364,14 +3360,12 @@ final class CommercialDashboardView
    *
    * @param array<string,mixed> $result
    * @param array<string,mixed> $filters
-   * @param array<string,mixed> $summaryCounts
    * @param array<string,mixed> $options
    * @param mixed $policy
    */
   public static function renderPropertiesPage(
     array $result,
     array $filters,
-    array $summaryCounts,
     array $options,
     $policy,
     string $baseUrl
@@ -3386,59 +3380,8 @@ final class CommercialDashboardView
     }
 
     $canSeeAll = $policy instanceof CommercialAccessPolicy && $policy->canSeeAll('inmuebles');
-    $canManage = $policy instanceof CommercialAccessPolicy && $policy->canManage();
-    $publicCount = (int) ($summaryCounts['publicos'] ?? 0);
-    $pendingCount = (int) ($summaryCounts['pendientes'] ?? 0);
-    $nonPublicCount = (int) ($summaryCounts['no_publicos'] ?? 0);
-    $destacadosCount = (int) ($summaryCounts['destacados'] ?? 0);
-    $myRequestsCount = (int) ($summaryCounts['mis_solicitudes'] ?? 0);
-    $myCount = (int) ($summaryCounts['mis_inmuebles'] ?? 0);
-    $totalCount = (int) ($summaryCounts['total'] ?? ($publicCount + $pendingCount + $nonPublicCount));
-
-    $subtabs = [
-      'publicos' => [
-        'label' => 'Inmuebles públicos',
-        'icon' => 'public',
-        'count' => $publicCount,
-        'badge' => 'Portal',
-        'desc' => 'Activos en portal web',
-      ],
-      'pendientes' => [
-        'label' => 'Pendientes por publicar',
-        'icon' => 'pending_actions',
-        'count' => $pendingCount,
-        'badge' => 'Borrador',
-        'desc' => 'En borrador o por publicar',
-      ],
-      'no_publicos' => [
-        'label' => 'Inmuebles no públicos',
-        'icon' => 'inventory_2',
-        'count' => $nonPublicCount,
-        'badge' => 'Histórico',
-        'desc' => 'Arrendados, vendidos o inactivos',
-      ],
-      'destacados' => [
-        'label' => $canSeeAll ? 'Inmuebles destacados' : 'Mis inmuebles destacados',
-        'icon' => 'star',
-        'count' => $destacadosCount,
-        'badge' => 'Portales',
-        'desc' => $canSeeAll ? 'Destacados y promocionados en portales' : 'Mis inmuebles destacados en portales',
-      ],
-      'mis_solicitudes' => [
-        'label' => $canSeeAll ? 'Solicitudes por destacar' : 'Mis solicitudes por destacar',
-        'icon' => 'assignment_turned_in',
-        'count' => $myRequestsCount,
-        'badge' => 'Cola',
-        'desc' => $canSeeAll ? 'Solicitudes de destacado en portales' : 'Mis solicitudes de destacado en portales',
-      ],
-      'mis_inmuebles' => [
-        'label' => 'Mis inmuebles',
-        'icon' => 'person_pin',
-        'count' => $myCount,
-        'badge' => 'Personal',
-        'desc' => 'Asignados a mi gestión',
-      ],
-    ];
+    $view = self::propertyViews($canSeeAll)[$currentSubtab];
+    $canFilterEmployee = $canSeeAll && $currentSubtab !== 'mis_inmuebles';
 
     $selectedTipo = trim((string) ($filters['tipo_inmueble'] ?? ''));
     $selectedNegocio = trim((string) ($filters['tipo_negocio'] ?? ''));
@@ -3462,156 +3405,32 @@ final class CommercialDashboardView
 
     ob_start();
 ?>
-    <section class="w-full px-margin py-6 space-y-6" id="commercial-properties-panel" data-commercial-properties-panel>
-      <!-- Encabezado del Módulo de Inmuebles -->
+    <section class="w-full px-margin py-6 space-y-6" id="commercial-properties-panel" data-commercial-properties-panel data-commercial-property-view="<?php echo esc_attr($currentSubtab); ?>">
+      <!-- Encabezado de la vista -->
       <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-surface-container-lowest p-6 rounded-3xl border border-surface-container shadow-xs">
         <div class="flex items-start gap-4">
           <div class="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
-            <span class="material-symbols-outlined text-[28px]">domain</span>
+            <span class="material-symbols-outlined text-[28px]" aria-hidden="true"><?php echo esc_html($view['icon']); ?></span>
           </div>
           <div>
             <div class="flex items-center gap-2.5 flex-wrap">
-              <h1 class="text-xl sm:text-2xl font-bold text-on-surface">Gestión de Portafolio de Inmuebles</h1>
+              <h1 class="text-xl sm:text-2xl font-bold text-on-surface"><?php echo esc_html($view['label']); ?></h1>
+              <?php if ($currentSubtab !== 'mis_solicitudes'): ?>
               <span class="px-3 py-0.5 rounded-full text-xs font-semibold bg-primary-container text-on-surface">
-                <?php echo esc_html(number_format($total)); ?> inmuebles filtrados
+                <?php echo esc_html(number_format($total)); ?> inmuebles
               </span>
+              <?php endif; ?>
             </div>
-            <p class="text-sm text-secondary mt-1 max-w-3xl">
-              Consulta integral del portafolio inmobiliario: inmuebles públicos, trámites pendientes, inventario cerrado, gestión de destacados en portales y cupos de funcionarios.
-            </p>
+            <p class="text-sm text-secondary mt-1 max-w-3xl"><?php echo esc_html($view['desc']); ?></p>
           </div>
         </div>
 
-        <!-- Acceso Rápido / Acciones -->
-        <div class="flex items-center gap-2 self-start lg:self-center shrink-0">
-          <a href="https://sucasainmobiliaria.com.co/inmuebles/" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-surface-container-low hover:bg-surface-container text-on-surface text-xs font-semibold transition-all border border-outline-variant/40 shadow-xs cursor-pointer">
-            <span class="material-symbols-outlined text-[17px]">open_in_new</span>
-            <span>Ver Portal Web</span>
-          </a>
-        </div>
-      </div>
-
-      <!-- Tarjetas Resumen KPI del Portafolio (7 Tarjetas Responsivas) -->
-      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-7 gap-3">
-        <!-- Públicos -->
-        <?php if (!$policy instanceof CommercialAccessPolicy || $policy->canSubview('inmuebles', 'publicos')): ?>
-        <a href="<?php echo esc_url(self::url($baseUrl, array_merge($filters, ['tab' => 'inmuebles', 'property_subtab' => 'publicos', 'page' => 1]))); ?>" data-commercial-tab="inmuebles" class="p-4 rounded-2xl border transition-all duration-200 flex flex-col justify-between cursor-pointer <?php echo $currentSubtab === 'publicos' ? 'bg-emerald-500/10 border-emerald-500 shadow-sm ring-1 ring-emerald-500/30' : 'bg-surface-container-lowest border-surface-container hover:border-emerald-400 hover:shadow-xs'; ?>">
-          <div class="flex items-center justify-between">
-            <span class="text-xs font-semibold text-secondary uppercase tracking-wider">Públicos</span>
-            <span class="material-symbols-outlined text-[20px] text-emerald-600">public</span>
-          </div>
-          <div class="mt-2.5">
-            <span class="text-2xl font-bold text-on-surface"><?php echo esc_html(number_format($publicCount)); ?></span>
-            <span class="block text-[11px] text-emerald-700 font-medium">En portal web</span>
-          </div>
+        <?php if ($currentSubtab === 'publicos'): ?>
+        <a href="https://sucasainmobiliaria.com.co/inmuebles/" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-surface-container-low hover:bg-surface-container text-on-surface text-xs font-semibold transition-all self-start lg:self-center shrink-0">
+          <span class="material-symbols-outlined text-[17px]">open_in_new</span>
+          <span>Ver Portal Web</span>
         </a>
         <?php endif; ?>
-
-        <!-- Pendientes por publicar -->
-        <?php if (!$policy instanceof CommercialAccessPolicy || $policy->canSubview('inmuebles', 'pendientes')): ?>
-        <a href="<?php echo esc_url(self::url($baseUrl, array_merge($filters, ['tab' => 'inmuebles', 'property_subtab' => 'pendientes', 'page' => 1]))); ?>" data-commercial-tab="inmuebles" class="p-4 rounded-2xl border transition-all duration-200 flex flex-col justify-between cursor-pointer <?php echo $currentSubtab === 'pendientes' ? 'bg-amber-500/10 border-amber-500 shadow-sm ring-1 ring-amber-500/30' : 'bg-surface-container-lowest border-surface-container hover:border-amber-400 hover:shadow-xs'; ?>">
-          <div class="flex items-center justify-between">
-            <span class="text-xs font-semibold text-secondary uppercase tracking-wider">Por Publicar</span>
-            <span class="material-symbols-outlined text-[20px] text-amber-600">pending_actions</span>
-          </div>
-          <div class="mt-2.5">
-            <span class="text-2xl font-bold text-on-surface"><?php echo esc_html(number_format($pendingCount)); ?></span>
-            <span class="block text-[11px] text-amber-700 font-medium">Borrador y revisión</span>
-          </div>
-        </a>
-        <?php endif; ?>
-
-        <!-- No públicos -->
-        <?php if (!$policy instanceof CommercialAccessPolicy || $policy->canSubview('inmuebles', 'no_publicos')): ?>
-        <a href="<?php echo esc_url(self::url($baseUrl, array_merge($filters, ['tab' => 'inmuebles', 'property_subtab' => 'no_publicos', 'page' => 1]))); ?>" data-commercial-tab="inmuebles" class="p-4 rounded-2xl border transition-all duration-200 flex flex-col justify-between cursor-pointer <?php echo $currentSubtab === 'no_publicos' ? 'bg-slate-500/10 border-slate-600 shadow-sm ring-1 ring-slate-500/30' : 'bg-surface-container-lowest border-surface-container hover:border-slate-400 hover:shadow-xs'; ?>">
-          <div class="flex items-center justify-between">
-            <span class="text-xs font-semibold text-secondary uppercase tracking-wider">No Públicos</span>
-            <span class="material-symbols-outlined text-[20px] text-slate-600">inventory_2</span>
-          </div>
-          <div class="mt-2.5">
-            <span class="text-2xl font-bold text-on-surface"><?php echo esc_html(number_format($nonPublicCount)); ?></span>
-            <span class="block text-[11px] text-slate-600 font-medium">Arrendados / Vendidos</span>
-          </div>
-        </a>
-        <?php endif; ?>
-
-        <!-- Destacados -->
-        <?php if (!$policy instanceof CommercialAccessPolicy || $policy->canSubview('inmuebles', 'destacados')): ?>
-        <a href="<?php echo esc_url(self::url($baseUrl, array_merge($filters, ['tab' => 'inmuebles', 'property_subtab' => 'destacados', 'page' => 1]))); ?>" data-commercial-tab="inmuebles" class="p-4 rounded-2xl border transition-all duration-200 flex flex-col justify-between cursor-pointer <?php echo $currentSubtab === 'destacados' ? 'bg-amber-500/10 border-amber-500 shadow-sm ring-1 ring-amber-500/30' : 'bg-surface-container-lowest border-surface-container hover:border-amber-400 hover:shadow-xs'; ?>">
-          <div class="flex items-center justify-between">
-            <span class="text-xs font-semibold text-amber-700 uppercase tracking-wider"><?php echo $canSeeAll ? 'Destacados' : 'Mis Destacados'; ?></span>
-            <span class="material-symbols-outlined text-[20px] text-amber-500">star</span>
-          </div>
-          <div class="mt-2.5">
-            <span class="text-2xl font-bold text-on-surface"><?php echo esc_html(number_format($destacadosCount)); ?></span>
-            <span class="block text-[11px] text-amber-700 font-medium"><?php echo $canSeeAll ? 'Activos en portales' : 'Mis activos en portales'; ?></span>
-          </div>
-        </a>
-        <?php endif; ?>
-
-        <!-- Solicitudes por Destacar -->
-        <?php if (!$policy instanceof CommercialAccessPolicy || $policy->canSubview('inmuebles', 'mis_solicitudes')): ?>
-        <a href="<?php echo esc_url(self::url($baseUrl, array_merge($filters, ['tab' => 'inmuebles', 'property_subtab' => 'mis_solicitudes', 'page' => 1]))); ?>" data-commercial-tab="inmuebles" class="p-4 rounded-2xl border transition-all duration-200 flex flex-col justify-between cursor-pointer <?php echo $currentSubtab === 'mis_solicitudes' ? 'bg-indigo-500/10 border-indigo-500 shadow-sm ring-1 ring-indigo-500/30' : 'bg-surface-container-lowest border-surface-container hover:border-indigo-400 hover:shadow-xs'; ?>">
-          <div class="flex items-center justify-between">
-            <span class="text-xs font-semibold text-indigo-700 uppercase tracking-wider"><?php echo $canSeeAll ? 'Solicitudes' : 'Mis Solicitudes'; ?></span>
-            <span class="material-symbols-outlined text-[20px] text-indigo-600">assignment_turned_in</span>
-          </div>
-          <div class="mt-2.5">
-            <span class="text-2xl font-bold text-on-surface"><?php echo esc_html(number_format($myRequestsCount)); ?></span>
-            <span class="block text-[11px] text-indigo-700 font-medium">Por destacar</span>
-          </div>
-        </a>
-        <?php endif; ?>
-
-        <!-- Mis Inmuebles -->
-        <?php if (!$policy instanceof CommercialAccessPolicy || $policy->canSubview('inmuebles', 'mis_inmuebles')): ?>
-        <a href="<?php echo esc_url(self::url($baseUrl, array_merge($filters, ['tab' => 'inmuebles', 'property_subtab' => 'mis_inmuebles', 'page' => 1]))); ?>" data-commercial-tab="inmuebles" class="p-4 rounded-2xl border transition-all duration-200 flex flex-col justify-between cursor-pointer <?php echo $currentSubtab === 'mis_inmuebles' ? 'bg-primary/10 border-primary shadow-sm ring-1 ring-primary/30' : 'bg-surface-container-lowest border-surface-container hover:border-primary/50 hover:shadow-xs'; ?>">
-          <div class="flex items-center justify-between">
-            <span class="text-xs font-semibold text-primary uppercase tracking-wider">Mis Inmuebles</span>
-            <span class="material-symbols-outlined text-[20px] text-primary">person_pin</span>
-          </div>
-          <div class="mt-2.5">
-            <span class="text-2xl font-bold text-primary"><?php echo esc_html(number_format($myCount)); ?></span>
-            <span class="block text-[11px] text-secondary font-medium">Asignados a mi gestión</span>
-          </div>
-        </a>
-        <?php endif; ?>
-
-        <!-- Total General -->
-        <div class="p-4 rounded-2xl border border-surface-container bg-surface-container-low flex flex-col justify-between">
-          <div class="flex items-center justify-between">
-            <span class="text-xs font-semibold text-secondary uppercase tracking-wider">Total</span>
-            <span class="material-symbols-outlined text-[20px] text-secondary">analytics</span>
-          </div>
-          <div class="mt-2.5">
-            <span class="text-2xl font-bold text-on-surface"><?php echo esc_html(number_format($totalCount)); ?></span>
-            <span class="block text-[11px] text-secondary font-medium">Total inventario</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Barra de Pestañas / Sub-tabs de Inmuebles -->
-      <div class="flex items-center gap-2 border-b border-surface-container pb-2 overflow-x-auto">
-        <?php foreach ($subtabs as $stKey => $stData): ?>
-          <?php if ($policy instanceof CommercialAccessPolicy && !$policy->canSubview('inmuebles', $stKey)) continue; ?>
-          <?php
-            $isActive = $currentSubtab === $stKey;
-            $subtabUrl = self::url($baseUrl, array_merge($filters, [
-              'tab' => 'inmuebles',
-              'property_subtab' => $stKey,
-              'page' => 1,
-            ]));
-          ?>
-          <a href="<?php echo esc_url($subtabUrl); ?>" data-commercial-tab="inmuebles" data-commercial-property-subtab="<?php echo esc_attr($stKey); ?>" class="flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap cursor-pointer select-none <?php echo $isActive ? 'bg-primary text-white font-semibold shadow-xs' : 'bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface border border-outline-variant/30'; ?>">
-            <span class="material-symbols-outlined text-[18px]"><?php echo esc_html($stData['icon']); ?></span>
-            <span><?php echo esc_html($stData['label']); ?></span>
-            <?php if ($stData['count'] !== null): ?>
-              <span class="ml-1 px-2 py-0.5 rounded-full text-xs font-semibold <?php echo $isActive ? 'bg-white/20 text-white' : 'bg-surface-container text-on-surface'; ?>">
-                <?php echo esc_html(number_format((int) $stData['count'])); ?>
-              </span>
-            <?php endif; ?>
-          </a>
-        <?php endforeach; ?>
       </div>
 
       <?php if ($currentSubtab === 'mis_solicitudes'): ?>
@@ -3669,14 +3488,18 @@ final class CommercialDashboardView
             <!-- Filtro Destacado / Promoción -->
             <div>
               <select name="destacado" class="w-full px-3 py-2 rounded-xl border border-outline-variant/40 bg-surface-container-low text-on-surface text-xs focus:bg-white focus:border-primary transition-all">
-                <option value="">Todos los destacados</option>
+                <option value=""><?php echo $currentSubtab === 'destacados' ? 'Todos los portales' : 'Todos los destacados'; ?></option>
+                <?php if ($currentSubtab !== 'destacados'): ?>
                 <option value="destacados" <?php echo $selectedDestacado === 'destacados' ? 'selected' : ''; ?>>Solo destacados (cualquier portal)</option>
+                <?php endif; ?>
                 <option value="premium" <?php echo $selectedDestacado === 'premium' ? 'selected' : ''; ?>>Solo Promoción Premium</option>
                 <option value="portal_mercado_libre" <?php echo $selectedDestacado === 'portal_mercado_libre' ? 'selected' : ''; ?>>Mercado Libre</option>
                 <option value="portal_ciencuadras" <?php echo $selectedDestacado === 'portal_ciencuadras' ? 'selected' : ''; ?>>CienCuadras</option>
                 <option value="portal_finca_raiz" <?php echo $selectedDestacado === 'portal_finca_raiz' ? 'selected' : ''; ?>>Finca Raíz</option>
                 <option value="portal_proppit" <?php echo $selectedDestacado === 'portal_proppit' ? 'selected' : ''; ?>>Proppit</option>
+                <?php if ($currentSubtab !== 'destacados'): ?>
                 <option value="no_destacados" <?php echo $selectedDestacado === 'no_destacados' ? 'selected' : ''; ?>>Sin destacar</option>
+                <?php endif; ?>
               </select>
             </div>
 
@@ -3718,8 +3541,8 @@ final class CommercialDashboardView
               </div>
             <?php endif; ?>
 
-            <!-- Funcionario Asignado (visible para administradores o filtro personal) -->
-            <?php if ($canSeeAll): ?>
+            <!-- Funcionario Asignado: solo en las vistas de todo el equipo; Mis inmuebles ya es de la persona -->
+            <?php if ($canFilterEmployee): ?>
               <div>
                 <select name="id_funcionario" class="w-full px-3 py-2 rounded-xl border border-outline-variant/40 bg-surface-container-low text-on-surface text-xs focus:bg-white focus:border-primary transition-all">
                   <option value="">Todos los funcionarios</option>
@@ -3749,10 +3572,6 @@ final class CommercialDashboardView
         <div class="space-y-4">
           <div class="flex items-center justify-between text-xs text-secondary font-medium px-1">
             <span>Mostrando <strong><?php echo esc_html((string) count($rows)); ?></strong> de <strong><?php echo esc_html(number_format($total)); ?></strong> inmuebles</span>
-            <span class="flex items-center gap-1 text-[11px]">
-              <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-              <span>Sub-pestaña actual: <strong><?php echo esc_html($subtabs[$currentSubtab]['label'] ?? $currentSubtab); ?></strong></span>
-            </span>
           </div>
 
           <?php if ($rows === []): ?>
@@ -3785,6 +3604,22 @@ final class CommercialDashboardView
     </section>
 <?php
     return (string) ob_get_clean();
+  }
+
+  /**
+   * Las vistas de Inmuebles (CommercialAccessPolicy::SUBVIEWS['inmuebles']): cada una con su título y descripción.
+   * @return array<string,array{label:string,icon:string,desc:string}>
+   */
+  private static function propertyViews(bool $canSeeAll): array
+  {
+    return [
+      'publicos' => ['label' => 'Inmuebles públicos', 'icon' => 'public', 'desc' => 'Los inmuebles activos en el portal web.'],
+      'pendientes' => ['label' => 'Pendientes por publicar', 'icon' => 'pending_actions', 'desc' => 'Inmuebles en borrador o en revisión, antes de salir al portal.'],
+      'no_publicos' => ['label' => 'Inmuebles no públicos', 'icon' => 'inventory_2', 'desc' => 'Inmuebles arrendados, vendidos o inactivos.'],
+      'destacados' => ['label' => $canSeeAll ? 'Inmuebles destacados' : 'Mis inmuebles destacados', 'icon' => 'star', 'desc' => $canSeeAll ? 'Inmuebles destacados y promocionados en los portales.' : 'Tus inmuebles destacados y promocionados en los portales.'],
+      'mis_solicitudes' => ['label' => $canSeeAll ? 'Solicitudes por destacar' : 'Mis solicitudes por destacar', 'icon' => 'assignment_turned_in', 'desc' => 'Cupos de destacados por portal y seguimiento de las solicitudes.'],
+      'mis_inmuebles' => ['label' => 'Mis inmuebles', 'icon' => 'person_pin', 'desc' => 'Todos los inmuebles asignados a tu gestión, en cualquier estado.'],
+    ];
   }
 
   /**

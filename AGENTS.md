@@ -13,6 +13,7 @@
   - su configuración como sección del menú **Configuración**, guardando los valores compartidos en las mismas filas que usa el panel inmobiliario;
   - pruebas PHPUnit (cálculo, permisos y vista).
 - Mis tareas y **Mi portafolio** muestran solo lo de la persona, también a los administradores: `canSeeAll('mis_tickets')` siempre es falso y las pantallas compartidas se limitan con `?portafolio=1` (`seesTeam`), que solo puede reducir lo visible. Las vistas con todo el equipo siguen en sus pestañas normales.
+- Cada subpestaña de Inmuebles es su propia vista (`propertyViews`): título, descripción y filtros propios, sin tarjetas ni pestañas globales. Se navega desde el menú Inmuebles y el móvil lista las mismas entradas.
 - Las notificaciones nuevas deben ser configurables cuando aplique y encolarse mediante `shared-notifications`; evitar envíos directos o destinatarios quemados en código.
 - En los modales del panel, preferir popups internos y conservar el contexto de la tarea; evitar abrir pestañas nuevas si la acción puede resolverse dentro de la app.
 - En registros CCT creados o modificados por funcionarios, `cct_author_id` debe guardar el `id_empleado` real de `wp_jet_cct_funcionarios`, no el `_ID` interno de la sesión.

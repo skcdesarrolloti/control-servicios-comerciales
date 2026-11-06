@@ -116,7 +116,7 @@ final class CommercialAccessPolicyTest extends TestCase
   {
     $policy = $this->policy(['views' => ['inmuebles'], 'subviews' => ['inmuebles' => ['pendientes']]]);
     $html = CommercialDashboardView::renderPropertiesPage(
-      ['rows' => [], 'total' => 0, 'pagination' => []], ['property_subtab' => 'pendientes'], [], [], $policy, ''
+      ['rows' => [], 'total' => 0, 'pagination' => []], ['property_subtab' => 'pendientes'], [], $policy, ''
     );
     self::assertStringContainsString('property_subtab=pendientes', $html);
     self::assertStringNotContainsString('property_subtab=publicos', $html);

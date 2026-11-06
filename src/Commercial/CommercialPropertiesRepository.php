@@ -169,75 +169,6 @@ final class CommercialPropertiesRepository
    * @param array<string,mixed> $filters
    * @return array{publicos:int,pendientes:int,no_publicos:int,destacados:int,solicitudes:int,mis_inmuebles:int,total:int}
    */
-  public function summaryCounts(array $filters = [], bool $canSeeAll = true): array
-  {
-    $table = $this->db->table('jet_cct_inmuebles');
-
-    // Base filters ignoring subtab and specific status
-    $baseFilters = $filters;
-    unset($baseFilters['property_subtab'], $baseFilters['estado']);
-
-    [$where, $args] = $this->buildWhereClauses($baseFilters, $canSeeAll, true);
-    $whereSql = $where !== [] ? (' AND ' . implode(' AND ', $where)) : '';
-
-    $publicIn = implode(',', array_fill(0, count(self::STATUSES_PUBLIC), '?'));
-    $pendingIn = implode(',', array_fill(0, count(self::STATUSES_PENDING), '?'));
-    $nonPublicIn = implode(',', array_fill(0, count(self::STATUSES_NON_PUBLIC), '?'));
-
-    $allArgs = array_merge(self::STATUSES_PUBLIC, self::STATUSES_PENDING, self::STATUSES_NON_PUBLIC, $args);
-
-    $sql = "SELECT 
-              SUM(CASE WHEN TRIM(i.`estado`) IN ({$publicIn}) THEN 1 ELSE 0 END) AS publicos,
-              SUM(CASE WHEN TRIM(i.`estado`) IN ({$pendingIn}) THEN 1 ELSE 0 END) AS pendientes,
-              SUM(CASE WHEN TRIM(i.`estado`) IN ({$nonPublicIn}) THEN 1 ELSE 0 END) AS no_publicos,
-              SUM(CASE WHEN (i.`destacado` = 'Si' OR i.`promocion_premium` = 'Si' OR i.`mercado_libre_destacado` = 'Si' OR i.`ciencuadras_destacado` = 'Si' OR i.`ciencuadras_ascendido` = 'Si' OR i.`finca_raiz_silver` = 'Si' OR i.`finca_raiz_gold` = 'Si' OR i.`finca_raiz_black` = 'Si' OR i.`proppit_promocionado` = 'Si') THEN 1 ELSE 0 END) AS destacados,
-              COUNT(*) AS total
-            FROM `{$table}` i
-            WHERE 1=1 {$whereSql}";
-
-    $row = $this->db->getRow($sql, $allArgs);
-
-    // Calculate mis_inmuebles count & user pending requests count
-    $myCount = $this->countMyProperties();
-    $currentEmployeeId = trim(Auth::employeeId());
-    $myRequestsCount = $this->countUserPendingRequests($currentEmployeeId);
-
-    $destacadosCount = (int) ($row['destacados'] ?? 0);
-    if (!$canSeeAll) {
-      [$myWhere, $myArgs] = $this->buildMyScopeClauses();
-      if ($myWhere !== '') {
-        $destacadosCount = (int) $this->db->getVar("SELECT COUNT(*) FROM `{$table}` i WHERE (i.`destacado` = 'Si' OR i.`promocion_premium` = 'Si' OR i.`mercado_libre_destacado` = 'Si' OR i.`ciencuadras_destacado` = 'Si' OR i.`ciencuadras_ascendido` = 'Si' OR i.`finca_raiz_silver` = 'Si' OR i.`finca_raiz_gold` = 'Si' OR i.`finca_raiz_black` = 'Si' OR i.`proppit_promocionado` = 'Si') AND ({$myWhere})", $myArgs);
-      } else {
-        $destacadosCount = 0;
-      }
-    }
-
-    return [
-      'publicos' => (int) ($row['publicos'] ?? 0),
-      'pendientes' => (int) ($row['pendientes'] ?? 0),
-      'no_publicos' => (int) ($row['no_publicos'] ?? 0),
-      'destacados' => $destacadosCount,
-      'mis_solicitudes' => $myRequestsCount,
-      'mis_inmuebles' => $myCount,
-      'total' => (int) ($row['total'] ?? 0),
-    ];
-  }
-
-  /**
-   * Count properties assigned to the current authenticated user.
-   */
-  public function countMyProperties(): int
-  {
-    $table = $this->db->table('jet_cct_inmuebles');
-    [$myWhere, $myArgs] = $this->buildMyScopeClauses();
-    if ($myWhere === '') {
-      return 0;
-    }
-
-    $sql = "SELECT COUNT(*) FROM `{$table}` i WHERE {$myWhere}";
-    return (int) $this->db->getVar($sql, $myArgs);
-  }
-
   /**
    * Retrieve distinct filter dropdown options.
    *
@@ -651,7 +582,8 @@ final class CommercialPropertiesRepository
     }
 
     $funcionarioId = trim((string) ($filters['id_funcionario'] ?? ''));
-    if ($funcionarioId !== '') {
+    // Mis inmuebles ya es de la persona: un funcionario en la dirección no debe vaciar la vista.
+    if ($funcionarioId !== '' && $subtab !== 'mis_inmuebles') {
       $where[] = 'TRIM(i.`id_funcionario`) = ?';
       $args[] = $funcionarioId;
     }
@@ -717,22 +649,6 @@ final class CommercialPropertiesRepository
     try {
       return (int) $this->db->getVar("SELECT COUNT(*) FROM `{$table}` WHERE estado = 'pendiente'");
     } catch (\Throwable $e) {
-      return 0;
-    }
-  }
-
-  /**
-   * Pending highlight requests count for a specific employee.
-   */
-  public function countUserPendingRequests(string $employeeId): int
-  {
-    if ($employeeId === '') {
-      return 0;
-    }
-    $table = $this->db->table('skc_destacado_solicitudes');
-    try {
-      return (int) $this->db->getVar("SELECT COUNT(*) FROM `{$table}` WHERE solicitado_por_id = ? AND estado = 'pendiente'", [$employeeId]);
-    } catch (\Throwable) {
       return 0;
     }
   }

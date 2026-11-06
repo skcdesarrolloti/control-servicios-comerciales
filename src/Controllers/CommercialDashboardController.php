@@ -75,7 +75,6 @@ final class CommercialDashboardController
     $canSeeAll = $policy->canSeeAll('inmuebles');
     $propertiesRepository = new CommercialPropertiesRepository($this->db);
     $propertyFilters = $this->propertyFilters($input, !$canSeeAll);
-    $propertySummaryCounts = $propertiesRepository->summaryCounts($propertyFilters, $canSeeAll);
     $propertyResult = $bucket === 'inmuebles'
       ? $propertiesRepository->search($propertyFilters, $canSeeAll, (int) ($propertyFilters['page'] ?? 1), 24)
       : ['rows' => [], 'total' => 0, 'pagination' => []];
@@ -130,7 +129,6 @@ final class CommercialDashboardController
       'recent_count' => $recentCount,
       'property_result' => $propertyResult,
       'property_filters' => $propertyFilters,
-      'property_summary_counts' => $propertySummaryCounts,
       'property_options' => $propertyOptions,
       'runtime' => $runtime,
       'base_url' => (string) SCM_BASE_URL,
