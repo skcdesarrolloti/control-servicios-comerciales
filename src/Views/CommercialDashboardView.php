@@ -1251,8 +1251,8 @@ final class CommercialDashboardView
       ['tab' => 'inmuebles', 'label' => 'Mis inmuebles', 'icon' => 'person_pin', 'params' => ['property_subtab' => 'mis_inmuebles']],
       ['tab' => 'precaptacion', 'label' => 'Mis precaptaciones', 'icon' => 'add_home_work', 'params' => ['portafolio' => '1']],
       // Ayudas de control: abren solo lo que pide acción. El subtítulo sale sobre la primera que el cargo pueda abrir.
-      ['tab' => 'actualizaciones', 'label' => 'Mis actualizaciones', 'icon' => 'published_with_changes', 'params' => ['portafolio' => '1', 'estado_actualizacion' => 'Pendientes'], 'pending' => true],
-      ['tab' => 'avisos', 'label' => 'Mis avisos en fachada', 'icon' => 'signpost', 'params' => ['portafolio' => '1', 'estado_aviso' => 'Pendientes'], 'pending' => true],
+      ['tab' => 'actualizaciones', 'label' => 'Inmuebles por vencer', 'icon' => 'published_with_changes', 'params' => ['portafolio' => '1', 'estado_actualizacion' => 'Pendientes'], 'pending' => true],
+      ['tab' => 'avisos', 'label' => 'Avisos pendientes', 'icon' => 'signpost', 'params' => ['portafolio' => '1', 'estado_aviso' => 'Pendientes'], 'pending' => true],
     ];
     $links = array_values(array_filter($links, static function (array $link) use ($views, $policy): bool {
       if (!in_array($link['tab'], $views, true)) {
@@ -2782,7 +2782,7 @@ final class CommercialDashboardView
       ? 'Control completo de inmuebles públicos que están al día, en alerta o vencidos por actualización.'
       : 'Control completo de avisos nuevos, retoques y rutas operativas por barrio o ruta.';
     if ($isPortfolio) {
-      $pageTitle = $isUpdates ? 'Mis actualizaciones' : 'Mis avisos en fachada';
+      $pageTitle = $isUpdates ? 'Inmuebles por vencer' : 'Avisos pendientes';
       $pageDescription = $isUpdates
         ? 'Tus inmuebles con la actualización vencida o por vencer. Cambia el estado para ver también los que están al día.'
         : 'Los retoques y avisos que tienes pendientes. Cambia el estado para ver también los que están al día.';

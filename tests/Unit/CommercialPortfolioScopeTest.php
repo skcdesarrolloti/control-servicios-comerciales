@@ -58,6 +58,72 @@ final class CommercialPortfolioScopeTest extends TestCase
     return [$db, $policy];
   }
 
+  /**
+   * Inmuebles que parecen del administrador 999 (_ID 3) sin serlo: uno de otra persona cuyo id_empleado es 3 (igual al
+   * _ID del administrador) y otro reasignado que conserva su nombre en `funcionario`.
+   * @return array{0:Database,1:CommercialAccessPolicy}
+   */
+  private function adminWithLookalikeProperties(): array
+  {
+    [$db, $policy] = CommercialNotificationsFixture::make(true);
+    $pdo = $db->pdo();
+    $pdo->exec("INSERT INTO wp_jet_cct_funcionarios VALUES (4,'3','Tercera persona','Consultora','9','3000000000','tercera@example.test','Si')");
+    foreach (['funcionario', 'estado', 'codigo', 'tipo_negocio', 'tipo_inmueble', 'barrio', 'direccion', 'ciudad', 'ruta', 'destinacion', 'fecha_actualizacion', 'fecha_publicacion', 'cct_created', 'cct_modified', 'desea_aviso', 'presenta_aviso', 'fecha_retoque', 'fecha_aviso', 'fecha_captacion'] as $column) {
+      $pdo->exec("ALTER TABLE wp_jet_cct_inmuebles ADD COLUMN `{$column}` TEXT");
+      $pdo->prepare('INSERT INTO information_schema.COLUMNS VALUES (?,?,?)')->execute(['fixture', 'wp_jet_cct_inmuebles', $column]);
+    }
+    $pdo->exec('DELETE FROM wp_jet_cct_inmuebles');
+    $old = date('Y-m-d', strtotime('-300 days'));
+    foreach ([['999', 'Administrador', 'PROPIO'], ['3', 'Tercera persona', 'COLISION'], ['900', 'Administrador', 'REASIGNADO'], ['900', 'Ana Pérez', 'AJENO']] as [$employee, $name, $code]) {
+      $db->insert('wp_jet_cct_inmuebles', ['id_funcionario' => $employee, 'funcionario' => $name, 'codigo' => $code, 'estado' => 'Publico', 'tipo_negocio' => 'Arriendo', 'barrio' => 'Manga', 'desea_aviso' => 'Si', 'presenta_aviso' => 'Si', 'fecha_actualizacion' => $old, 'fecha_retoque' => $old, 'fecha_aviso' => $old, 'cct_created' => $old]);
+    }
+    return [$db, $policy];
+  }
+
+  /** @param array<int,array<string,mixed>> $rows @return array<int,string> */
+  private function codes(array $rows): array
+  {
+    $codes = array_map(static fn(array $row): string => (string) ($row['codigo'] ?? ''), $rows);
+    sort($codes);
+    return $codes;
+  }
+
+  public function testPersonalUpdatesAndSignsOnlyBringWhatIsAssignedToThePerson(): void
+  {
+    [$db] = $this->adminWithLookalikeProperties();
+    $repository = new CommercialTicketsRepository($db);
+    $filters = ['id_empleado' => '999', 'estado_actualizacion' => 'Pendientes', 'estado_aviso' => 'Pendientes'];
+
+    self::assertSame(['PROPIO'], $this->codes($repository->propertyUpdateControl($filters, false)['rows']));
+    self::assertSame(['PROPIO'], $this->codes($repository->signControl('maintenance', $filters, false)['rows']));
+  }
+
+  public function testChoosingAnEmployeeInTheTeamViewsIsAsExactAsThePersonalView(): void
+  {
+    [$db] = $this->adminWithLookalikeProperties();
+    $repository = new CommercialTicketsRepository($db);
+
+    self::assertSame(['PROPIO'], $this->codes($repository->propertyUpdateControl(['id_empleado' => '999'], true)['rows']));
+    self::assertSame(['AJENO', 'COLISION', 'PROPIO', 'REASIGNADO'], $this->codes($repository->propertyUpdateControl([], true)['rows']), 'Sin elegir funcionario, el equipo completo.');
+  }
+
+  public function testPersonalControlsShowNothingWhenThePersonCannotBeIdentified(): void
+  {
+    [$db] = $this->adminWithLookalikeProperties();
+    $_SESSION = ['scm_user_cargo' => '9'];
+    $repository = new CommercialTicketsRepository($db);
+
+    self::assertSame([], $repository->propertyUpdateControl([], false)['rows'], 'Sin saber quién es, nunca se muestra todo.');
+    self::assertSame([], $repository->signControl('maintenance', [], false)['rows']);
+  }
+
+  public function testTheSessionInternalIdIsNeverUsedAsTheEmployee(): void
+  {
+    [$db] = $this->adminWithLookalikeProperties();
+    $_SESSION = ['scm_user_id' => 3, 'scm_user' => 'Otro nombre', 'scm_user_cargo' => '11'];
+    self::assertSame('999', (new CommercialTicketsRepository($db))->currentEmployeeTicketFilter());
+  }
+
   public function testMyTasksArePersonalEvenForAdministrators(): void
   {
     [, $policy] = $this->adminWithTasks();
@@ -110,7 +176,7 @@ final class CommercialPortfolioScopeTest extends TestCase
 
     self::assertStringContainsString('data-commercial-menu-section="portafolio"', $html);
     self::assertStringContainsString('Mi portafolio', $html);
-    foreach (['Mis tareas', 'Mis inmuebles', 'Mis actualizaciones', 'Mis avisos en fachada', 'Mis precaptaciones'] as $label) {
+    foreach (['Mis tareas', 'Mis inmuebles', 'Inmuebles por vencer', 'Avisos pendientes', 'Mis precaptaciones'] as $label) {
       self::assertStringContainsString($label, $html);
     }
     foreach (['tab=actualizaciones&amp;portafolio=1', 'tab=avisos&amp;portafolio=1', 'tab=precaptacion&amp;portafolio=1', 'tab=inmuebles&amp;property_subtab=mis_inmuebles'] as $url) {
@@ -126,7 +192,7 @@ final class CommercialPortfolioScopeTest extends TestCase
     $menu = substr($html, (int) strpos($html, 'data-commercial-menu-section="portafolio"'), 7000);
 
     self::assertSame(1, substr_count($menu, 'data-commercial-portfolio-heading'));
-    $positions = array_map(static fn(string $text): int => (int) strpos($menu, $text), ['Mis precaptaciones', '>Pendientes<', 'Mis actualizaciones', 'Mis avisos en fachada']);
+    $positions = array_map(static fn(string $text): int => (int) strpos($menu, $text), ['Mis precaptaciones', '>Pendientes<', 'Inmuebles por vencer', 'Avisos pendientes']);
     $sorted = $positions;
     sort($sorted);
     self::assertSame($sorted, $positions, 'Mis precaptaciones queda fuera del subtítulo Pendientes.');
@@ -170,7 +236,7 @@ final class CommercialPortfolioScopeTest extends TestCase
     [, $policy] = $this->adminWithTasks();
     $html = CommercialDashboardView::renderTabs(['inicio', 'mis_tickets'], 'inicio', [], [], 'http://x', [], $policy);
     self::assertStringContainsString('Mis tareas', $html);
-    self::assertStringNotContainsString('Mis actualizaciones', $html);
+    self::assertStringNotContainsString('Inmuebles por vencer', $html);
     self::assertStringNotContainsString('Mis precaptaciones', $html);
     self::assertStringNotContainsString('data-commercial-menu-section="tareas"', $html);
   }
@@ -197,7 +263,7 @@ final class CommercialPortfolioScopeTest extends TestCase
   public function testPortfolioUpdatesAndSignsHideTheTeamControls(): void
   {
     [, $policy] = $this->adminWithTasks();
-    foreach (['renderPropertyUpdatesPage' => 'Mis actualizaciones', 'renderSignsPage' => 'Mis avisos en fachada'] as $method => $title) {
+    foreach (['renderPropertyUpdatesPage' => 'Inmuebles por vencer', 'renderSignsPage' => 'Avisos pendientes'] as $method => $title) {
       $mine = CommercialDashboardView::$method(['portafolio' => '1'], [['id' => '900', 'name' => 'Ana']], [], $policy);
       self::assertStringContainsString($title, $mine);
       self::assertStringContainsString('name="portafolio" value="1"', $mine, 'El filtro de la pantalla conserva el alcance personal.');

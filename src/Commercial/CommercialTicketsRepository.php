@@ -603,7 +603,12 @@ final class CommercialTicketsRepository
     }
 
     $userId = Auth::userId();
-    return $userId > 0 ? (string) $userId : '';
+    if ($userId <= 0) {
+      return '';
+    }
+    $funcionarios = $this->db->table('jet_cct_funcionarios');
+    $real = trim((string) $this->db->getVar("SELECT TRIM(COALESCE(`id_empleado`, '')) FROM `{$funcionarios}` WHERE `_ID` = ? LIMIT 1", [$userId]));
+    return $real !== '' ? $real : (string) $userId;
   }
 
   public function ticketMatchesEmployeeFilter(int $ticketPk, string $employeeFilter): bool
@@ -1213,6 +1218,9 @@ final class CommercialTicketsRepository
     $employee = trim((string) ($filters['id_empleado'] ?? ''));
     if (!$canSeeAll) {
       $employee = $this->currentEmployeeTicketFilter();
+      if ($employee === '') {
+        return []; // Sin saber quién es la persona no hay "lo suyo": nunca se muestra todo.
+      }
     }
     if ($employee !== '') {
       [$employeeWhere, $employeeArgs] = $this->propertyEmployeeWhere(['id_empleado' => $employee], 'i');
@@ -1398,51 +1406,9 @@ final class CommercialTicketsRepository
   /** @param array<string,mixed> $filters @return array{0:array<int,string>,1:array<int,mixed>} */
   private function propertyEmployeeWhere(array $filters, string $alias): array
   {
-    $employee = trim((string) ($filters['id_empleado'] ?? ''));
-    if ($employee === '') {
-      return [[], []];
-    }
-
-    $ids = array_values(array_unique(array_filter(array_map('trim', explode(',', $employee)), static fn(string $id): bool => $id !== '')));
-    if ($ids === []) {
-      return [[], []];
-    }
-
-    $properties = $this->db->table('jet_cct_inmuebles');
-    $funcionarios = $this->db->table('jet_cct_funcionarios');
-    $inList = implode(',', array_fill(0, count($ids), '?'));
-    $pieces = [];
-    $args = [];
-
-    if ($this->schema->columnExists($properties, 'id_funcionario')) {
-      $pieces[] = "TRIM(COALESCE({$alias}.`id_funcionario`, '')) IN ({$inList})";
-      array_push($args, ...$ids);
-    }
-
-    if ($this->schema->tableExists($funcionarios)) {
-      $employeeFilterColumn = $this->schema->columnExists($funcionarios, 'id_empleado') ? 'id_empleado' : ($this->schema->columnExists($funcionarios, '_ID') ? '_ID' : '');
-      $matchParts = [];
-      if ($this->schema->columnExists($funcionarios, '_ID') && $this->schema->columnExists($properties, 'id_funcionario')) {
-        $matchParts[] = "CAST(fe.`_ID` AS CHAR) = TRIM(COALESCE({$alias}.`id_funcionario`, ''))";
-      }
-      if ($this->schema->columnExists($funcionarios, 'nombre') && $this->schema->columnExists($properties, 'funcionario')) {
-        $matchParts[] = "TRIM(COALESCE(fe.`nombre`, '')) = TRIM(COALESCE({$alias}.`funcionario`, ''))";
-      }
-      if ($employeeFilterColumn !== '' && $matchParts !== []) {
-        $pieces[] = "EXISTS (
-          SELECT 1 FROM `{$funcionarios}` fe
-           WHERE TRIM(COALESCE(fe.`{$employeeFilterColumn}`, '')) IN ({$inList})
-             AND (" . implode(' OR ', $matchParts) . ')
-        )';
-        array_push($args, ...$ids);
-      }
-    }
-
-    if ($pieces === []) {
-      return [[], []];
-    }
-
-    return [['(' . implode(' OR ', $pieces) . ')'], $args];
+    // `id_funcionario` guarda el id_empleado: el mismo criterio exacto de Mis inmuebles. Comparar además con el _ID
+    // interno o con el nombre traía inmuebles de otras personas (ver CommercialPortfolioScopeTest).
+    return $this->employeeWhereForAlias($filters, $alias, ['id_funcionario']);
   }
 
   /** @param array<string,mixed> $row @return array<string,mixed> */
