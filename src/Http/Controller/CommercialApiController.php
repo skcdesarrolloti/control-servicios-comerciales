@@ -232,6 +232,19 @@ final class CommercialApiController
     }
   }
 
+  /** Configuración › Banner y revista: la imagen llega en banner_image. @param array<string,mixed> $input */
+  public function settingsBanner(array $input): never
+  {
+    $this->verify($input);
+    try {
+      JsonResponse::success(['message' => 'Banner guardado.', 'url' => $this->settingsService()->saveBannerUpload(new \SCM\Commercial\Promotion\Pop\PopFiles())]);
+    } catch (\InvalidArgumentException $exception) {
+      JsonResponse::error($exception->getMessage(), 422);
+    } catch (\RuntimeException $exception) {
+      JsonResponse::error($exception->getMessage(), 403);
+    }
+  }
+
   private function settingsService(): \SCM\Commercial\CommercialSettingsService
   {
     return new \SCM\Commercial\CommercialSettingsService($this->db, $this->settings, $this->policy, $this->config);

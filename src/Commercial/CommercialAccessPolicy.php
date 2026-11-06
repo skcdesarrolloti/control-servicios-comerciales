@@ -57,12 +57,13 @@ final class CommercialAccessPolicy
     'piezas_gestionar' => 'Banco de piezas: subir y editar piezas y vincular publicaciones',
     'piezas_archivar' => 'Banco de piezas: archivar y restaurar piezas',
     'campanas_enviar' => 'Campañas: crear, enviar, pausar, reanudar, reintentar y cancelar envíos masivos',
+    'campanas_eliminar' => 'Campañas: eliminar campañas terminadas o canceladas con su historial (además de enviar)',
     'plantillas_editar' => 'Plantillas de correo: crear, editar, duplicar y archivar',
     'plan_estrategico_editar' => 'Plan estratégico: crear, editar y eliminar objetivos, metas, tareas y campañas',
   ];
 
   /** Acciones que un cargo sin configurar no recibe por defecto: hay que marcarlas. */
-  public const OPT_IN_ACTIONS = ['editar_actor', 'mercado_vista_completa', 'aseo_vista_interna', 'promocion_ver_ip', 'plan_estrategico_editar', 'pop_gestionar', 'pop_anular', 'pop_ver_costos', 'redes_ver_inversion', 'redes_sincronizar', 'piezas_gestionar', 'piezas_archivar', 'campanas_enviar', 'plantillas_editar'];
+  public const OPT_IN_ACTIONS = ['editar_actor', 'mercado_vista_completa', 'aseo_vista_interna', 'promocion_ver_ip', 'plan_estrategico_editar', 'pop_gestionar', 'pop_anular', 'pop_ver_costos', 'redes_ver_inversion', 'redes_sincronizar', 'piezas_gestionar', 'piezas_archivar', 'campanas_enviar', 'campanas_eliminar', 'plantillas_editar'];
 
   /**
    * Vistas que un cargo sin configurar no recibe por defecto: hay que marcarlas en Permisos. Los cargos con acceso total

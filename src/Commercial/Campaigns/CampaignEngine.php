@@ -197,7 +197,6 @@ final class CampaignEngine
       $last = '';
       $actorIds = [];
       $now = gmdate('Y-m-d H:i:s');
-      $hasGda = $this->schema->columnExists(self::QUEUE, 'gda_campaign_tag');
       foreach ($plan['send'] as $item) {
         $recipient = $item['recipient'];
         $token = bin2hex(random_bytes(16));
@@ -225,9 +224,6 @@ final class CampaignEngine
           'created_at' => $now, 'updated_at' => $now, 'created_by' => self::PROJECT_CODE,
           'dedupe_key' => implode(':', [self::PROJECT_CODE, 'campaign', md5($spec['name']), $spec['channel'], $recipient['tipo_actor'], (int) $recipient['_ID']]),
         ];
-        if ($hasGda) {
-          $row += ['gda_campaign_tag' => $spec['name'], 'gda_tipo_actor' => $recipient['tipo_actor'], 'gda_id_actor' => (int) $recipient['_ID'], 'gda_id_funcionario' => (int) $employee];
-        }
         $this->db->insert(self::QUEUE, $row);
         $queueId = (int) $this->db->lastInsertId();
         if ($spec['channel'] === 'email' && $this->schema->tableExists($this->tracking)) {
@@ -423,6 +419,69 @@ final class CampaignEngine
     $this->requireCampaign($tag);
     $this->db->update($this->config, ['status' => 'cancelled', 'cct_modified' => $this->localNow(), 'updated_at' => gmdate('Y-m-d H:i:s')], ['campaign_tag' => $tag]);
     return $this->updateQueue($tag, "`status` IN ('pending', 'paused')", ['status' => 'cancelled', 'last_error' => 'Campaña cancelada desde el panel comercial.']);
+  }
+
+  /**
+   * Cambia el nombre en todas partes, como dashboard-marketing CampaignRepository::rename. gda_campaign_tag es una columna
+   * calculada de meta_json: lo que se escribe es el JSON. El historial y los mensajes en cola siguen con la campaña.
+   */
+  public function rename(string $tag, string $new): string
+  {
+    $this->requireCampaign($tag);
+    $new = preg_replace('/\s+/u', ' ', trim($new)) ?? '';
+    if ($new === '' || mb_strlen($new, 'UTF-8') > 120) {
+      throw new \InvalidArgumentException('Escribe el nombre nuevo (máximo 120 caracteres).');
+    }
+    if ($new === $tag) {
+      throw new \InvalidArgumentException('La campaña ya tiene ese nombre.');
+    }
+    if ($this->db->getVar("SELECT 1 FROM `{$this->config}` WHERE campaign_tag = ? LIMIT 1", [$new]) || $this->db->getVar('SELECT 1 FROM `' . self::QUEUE . '` WHERE `gda_campaign_tag` = ? LIMIT 1', [$new])) {
+      throw new \InvalidArgumentException('Ya existe una campaña con ese nombre.');
+    }
+    $pdo = $this->db->pdo();
+    $pdo->beginTransaction();
+    try {
+      foreach ([$this->config, $this->db->table('jet_cct_campaign_batches'), $this->db->table('jet_cct_campaign_exclusions'), $this->db->table('jet_cct_email_tracking')] as $table) {
+        if ($this->schema->tableExists($table)) {
+          $this->db->update($table, ['campaign_tag' => $new], ['campaign_tag' => $tag]);
+        }
+      }
+      $pdo->prepare('UPDATE `' . self::QUEUE . "` SET `meta_json` = JSON_SET(`meta_json`, '$.gda.campaign_tag', ?) WHERE `gda_campaign_tag` = ? AND `project_code` IN (?, ?)")->execute([$new, $tag, self::PROJECT_CODE, self::LEGACY_PROJECT]);
+      $pdo->commit();
+    } catch (\Throwable $exception) {
+      $pdo->rollBack();
+      throw $exception;
+    }
+    return $new;
+  }
+
+  /**
+   * Elimina la campaña y sus mensajes, como dashboard-marketing CampaignEngine::delete. Con mensajes por salir no se puede: hay
+   * que cancelarla primero, para que un borrado nunca corte un envío en curso. @return int mensajes borrados
+   */
+  public function delete(string $tag): int
+  {
+    $this->requireCampaign($tag);
+    $active = (int) $this->db->getVar('SELECT COUNT(*) FROM `' . self::QUEUE . "` WHERE `gda_campaign_tag` = ? AND `project_code` IN (?, ?) AND `status` NOT IN ('sent', 'failed', 'cancelled')", [$tag, self::PROJECT_CODE, self::LEGACY_PROJECT]);
+    if ($active > 0) {
+      throw new \InvalidArgumentException('La campaña tiene mensajes por salir. Cancela lo pendiente antes de eliminarla.');
+    }
+    $pdo = $this->db->pdo();
+    $pdo->beginTransaction();
+    try {
+      $statement = $pdo->prepare('DELETE FROM `' . self::QUEUE . '` WHERE `gda_campaign_tag` = ? AND `project_code` IN (?, ?)');
+      $statement->execute([$tag, self::PROJECT_CODE, self::LEGACY_PROJECT]);
+      foreach ([$this->config, $this->db->table('jet_cct_campaign_batches'), $this->db->table('jet_cct_campaign_exclusions')] as $table) {
+        if ($this->schema->tableExists($table)) {
+          $this->db->delete($table, ['campaign_tag' => $tag]);
+        }
+      }
+      $pdo->commit();
+    } catch (\Throwable $exception) {
+      $pdo->rollBack();
+      throw $exception;
+    }
+    return $statement->rowCount();
   }
 
   /** Excluye a una persona de la campaña (y cancela su mensaje si aún no salió). */

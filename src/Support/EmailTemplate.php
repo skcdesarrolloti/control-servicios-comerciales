@@ -11,7 +11,7 @@ final class EmailTemplate
     $quoteUrl = trim((string)($vars['cotizacion_url'] ?? ''));
     $bannerUrl = trim((string)($vars['banner_url'] ?? ''));
     if ($bannerUrl === '' && function_exists('system_image')) {
-      $bannerUrl = (string)system_image('banner_sitio_web', 'https://sucasainmobiliaria.com.co/wp-content/uploads/2026/06/banner-sitio-web.png');
+      $bannerUrl = (string)system_image('banner_sitio_web', system_image('banner', 'https://sucasainmobiliaria.com.co/wp-content/uploads/2026/06/banner-sitio-web.png'));
     }
     if ($bannerUrl === '') {
       $bannerUrl = 'https://sucasainmobiliaria.com.co/wp-content/uploads/2026/06/banner-sitio-web.png';

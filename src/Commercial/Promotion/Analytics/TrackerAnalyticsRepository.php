@@ -195,6 +195,35 @@ final class TrackerAnalyticsRepository
     ], $rows);
   }
 
+  /**
+   * Cruces por campaña de dashboard-marketing (Campaña + canal, Inmuebles por campaña y Ubicación por campaña), leídos de los
+   * resúmenes. Sin "Sin campaña" ni "Vista de inmueble", que son las visitas normales del sitio y taparían las campañas.
+   * @return array{channels:list<array<string,mixed>>,objects:list<array<string,mixed>>,locations:list<array<string,mixed>>}
+   */
+  public function campaignBreakdowns(TrackerAnalyticsFilters $filters, int $limit = 15): array
+  {
+    if (!$this->ready()) {
+      return ['channels' => [], 'objects' => [], 'locations' => []];
+    }
+    [$where, $args] = $this->where($filters, true);
+    $pseudo = array_keys(TrackerSchema::PSEUDO_CAMPAIGNS);
+    $where .= ' AND `camp_slug` NOT IN (' . implode(', ', array_fill(0, count($pseudo), '?')) . ')';
+    $args = array_merge($args, $pseudo);
+    $names = $this->campaignNames();
+    $name = static fn(string $slug): string => $names[$slug] ?? $slug;
+    $uniques = [];
+    foreach ($this->db->getResults('SELECT `camp_slug`, `utm_source`, `utm_medium`, COUNT(DISTINCT `visitor_hash`) AS visitors FROM `' . TrackerSchema::visitors($this->db) . "` WHERE {$where} GROUP BY `camp_slug`, `utm_source`, `utm_medium`", $args) as $row) {
+      $uniques[$row['camp_slug'] . "\0" . $row['utm_source'] . "\0" . $row['utm_medium']] = (int) $row['visitors'];
+    }
+    $channels = array_map(static fn(array $row): array => ['campaign' => $name((string) $row['camp_slug']), 'source' => (string) $row['utm_source'], 'medium' => (string) $row['utm_medium'], 'hits' => (int) $row['hits'],
+      'unique_visitors' => $uniques[$row['camp_slug'] . "\0" . $row['utm_source'] . "\0" . $row['utm_medium']] ?? 0],
+      $this->db->getResults('SELECT `camp_slug`, `utm_source`, `utm_medium`, SUM(`hits`) AS hits FROM `' . TrackerSchema::daily($this->db) . "` WHERE {$where} GROUP BY `camp_slug`, `utm_source`, `utm_medium` ORDER BY hits DESC, `camp_slug` ASC LIMIT {$limit}", $args));
+    $top = fn(string $dim): array => $this->db->getResults("SELECT `camp_slug`, MAX(`value`) AS label, COALESCE(MAX(CASE WHEN `detail` <> '' AND `detail` NOT LIKE 'http%' THEN `detail` END), MAX(`detail`)) AS detail, SUM(`hits`) AS hits FROM `" . TrackerSchema::top($this->db) . "`
+      WHERE `dim` = ? AND {$where} GROUP BY `camp_slug`, `value_hash` ORDER BY hits DESC, label ASC LIMIT {$limit}", array_merge([$dim], $args));
+    $map = static fn(array $row): array => ['campaign' => $name((string) $row['camp_slug']), 'label' => (string) $row['label'], 'detail' => (string) $row['detail'], 'hits' => (int) $row['hits']];
+    return ['channels' => $channels, 'objects' => array_map($map, $top('object')), 'locations' => array_map($map, $top('city'))];
+  }
+
   /** Detalle de una fila de la lista de medios: vacío si es de la lista o 'Sin medio (directo)'. */
   private static function medioDetail(MedioResolver $resolver, string $medio): string
   {

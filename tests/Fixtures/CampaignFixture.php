@@ -57,7 +57,7 @@ final class CampaignFixture
       $pdo->exec("CREATE TABLE `{$table}` ({$definition})");
       self::register($db, $table);
     }
-    foreach (['gda_campaign_tag TEXT', 'gda_tipo_actor TEXT', 'gda_id_actor INTEGER', 'gda_id_funcionario INTEGER', 'next_attempt_at TEXT', 'locked_at TEXT', 'locked_by TEXT'] as $column) {
+    foreach (["gda_campaign_tag TEXT GENERATED ALWAYS AS (json_extract(meta_json, '$.gda.campaign_tag')) VIRTUAL", "gda_tipo_actor TEXT GENERATED ALWAYS AS (json_extract(meta_json, '$.gda.tipo_actor')) VIRTUAL", "gda_id_actor INTEGER GENERATED ALWAYS AS (json_extract(meta_json, '$.gda.id_actor')) VIRTUAL", "gda_id_funcionario INTEGER GENERATED ALWAYS AS (json_extract(meta_json, '$.gda.id_funcionario')) VIRTUAL", 'next_attempt_at TEXT', 'locked_at TEXT', 'locked_by TEXT'] as $column) {
       $pdo->exec("ALTER TABLE skc_notification_queue ADD COLUMN {$column}");
     }
     self::register($db, 'skc_notification_queue');
@@ -90,7 +90,7 @@ final class CampaignFixture
     if (!$db->getVar('SELECT 1 FROM information_schema.TABLES WHERE TABLE_NAME = ?', [$table])) {
       $pdo->prepare('INSERT INTO information_schema.TABLES VALUES (?,?)')->execute(['fixture', $table]);
     }
-    foreach ($pdo->query("PRAGMA table_info(`{$table}`)")->fetchAll(\PDO::FETCH_ASSOC) as $column) {
+    foreach ($pdo->query("PRAGMA table_xinfo(`{$table}`)")->fetchAll(\PDO::FETCH_ASSOC) as $column) {
       $pdo->prepare('INSERT INTO information_schema.COLUMNS VALUES (?,?,?)')->execute(['fixture', $table, $column['name']]);
     }
   }

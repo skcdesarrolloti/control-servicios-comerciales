@@ -107,12 +107,15 @@ final class CampaignApiController
     $this->respond(fn(): array => ['campaign' => $this->engine()->detail(trim((string) ($input['tag'] ?? '')))]);
   }
 
-  /** Pausar, reanudar, reintentar fallidos, cancelar o excluir. @param array<string,mixed> $input */
+  /** Pausar, reanudar, reintentar fallidos, cancelar, excluir, renombrar o eliminar. @param array<string,mixed> $input */
   public function control(array $input): never
   {
     $this->guard($input, 'campanas', 'campanas_enviar');
     $operation = (string) ($input['operation'] ?? '');
-    if (in_array($operation, ['cancel', 'exclude'], true)) {
+    if ($operation === 'delete' && !$this->policy->canAct('campanas_eliminar')) {
+      JsonResponse::error('No tienes permiso para eliminar campañas.', 403);
+    }
+    if (in_array($operation, ['cancel', 'exclude', 'delete'], true)) {
       $this->confirmed($input);
     }
     $this->respond(function () use ($input, $operation): array {
@@ -124,6 +127,8 @@ final class CampaignApiController
         'resume' => 'Campaña reanudada: ' . $count($engine->setPaused($tag, false)) . ' mensajes vuelven a la cola.',
         'retry' => $count($engine->retryFailed($tag)) . ' mensajes fallidos vuelven a intentarse.',
         'cancel' => 'Campaña cancelada: ' . $count($engine->cancel($tag)) . ' mensajes no se enviarán.',
+        'rename' => 'Campaña renombrada a "' . $engine->rename($tag, (string) ($input['new_tag'] ?? '')) . '".',
+        'delete' => 'Campaña eliminada con ' . $count($engine->delete($tag)) . ' mensajes de su historial.',
         'exclude' => (function () use ($engine, $tag, $input): string {
           $engine->exclude($tag, (string) ($input['type'] ?? ''), (int) ($input['actor'] ?? 0), (string) ($input['reason'] ?? ''), $this->employee());
           return 'La persona quedó excluida de esta campaña.';

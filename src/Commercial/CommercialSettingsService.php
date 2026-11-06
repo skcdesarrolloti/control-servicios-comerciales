@@ -13,6 +13,9 @@ use SCM\Commercial\Promotion\Pop\PopConfig;
 use SCM\Commercial\Strategy\StrategicPlanRepository;
 use SCM\Commercial\Tools\CleaningSettings;
 use SCM\Commercial\Tools\UtmCatalog;
+use SCM\Commercial\Promotion\Analytics\TrackerRollupBusy;
+use SCM\Commercial\Promotion\Analytics\VisitorHasher;
+use SCM\Commercial\Promotion\Pop\PopFiles;
 use SCM\Core\Auth;
 use SCM\Core\Database;
 use SCM\Core\Settings;
@@ -49,7 +52,7 @@ final class CommercialSettingsService
     'factor_prestacional' => ['Factor prestacional', 0, 0, 100],
   ];
 
-  public const SECTIONS = ['calendario', 'tiempos', 'avisos', 'actualizaciones', 'destacados', 'aseo', 'utm', 'medios', 'analitica', 'plan', 'material_pop'];
+  public const SECTIONS = ['calendario', 'tiempos', 'avisos', 'actualizaciones', 'destacados', 'aseo', 'utm', 'medios', 'analitica', 'plan', 'material_pop', 'banner_revista'];
 
   /** Operaciones de la sección "medios" (todas guardan, salvo preview, que solo cuenta). */
   public const MEDIOS_OPS = ['add', 'rename', 'toggle', 'merge', 'aliases', 'alias_raw', 'rewrite_raw', 'preview'];
@@ -115,10 +118,11 @@ final class CommercialSettingsService
       // Solo las listas de medios, fuentes y campañas del Generador UTM.
       'utm' => UtmCatalog::read($this->settings),
       'medios' => $this->mediosSettings($section === 'medios'),
-      'analitica' => $this->analyticsSettings(),
+      'analitica' => $this->analyticsSettings($section === 'analitica'),
       // Catálogos del Plan estratégico con su uso: solo al abrir esa sección.
       'plan' => $section === 'plan' ? (new StrategicPlanRepository($this->db))->catalogSettings() : [],
       'material_pop' => $section === 'material_pop' ? $this->popSettings() : [],
+      'banner_revista' => $section === 'banner_revista' ? ['banner' => (string) $this->systemValue('banner'), 'link_revista' => (string) $this->systemValue('link_revista')] : [],
     ];
   }
 
@@ -236,7 +240,7 @@ final class CommercialSettingsService
    * Configuración › Analítica web y el estado de los resúmenes (solo lectura).
    * @return array<string,mixed>
    */
-  private function analyticsSettings(): array
+  private function analyticsSettings(bool $withCampaigns = false): array
   {
     $config = TrackerAnalyticsConfig::read($this->settings);
     try {
@@ -245,7 +249,16 @@ final class CommercialSettingsService
       // Sin la tabla del tracker (o sin acceso a ella) la sección se puede editar igual.
       $status = TrackerRollup::state($this->db) + ['pending' => null, 'schema_ready' => false];
     }
-    return $config + ['max_retention_days' => TrackerAnalyticsConfig::MAX_RETENTION_DAYS, 'status' => $status];
+    $campaigns = [];
+    if ($withCampaigns) {
+      try {
+        $names = array_keys(TrackerSchema::PSEUDO_CAMPAIGNS);
+        $campaigns = $this->db->getResults('SELECT `camp_slug` AS slug, SUM(`hits`) AS hits FROM `' . TrackerSchema::daily($this->db) . '` WHERE `camp_slug` NOT IN (' . implode(', ', array_fill(0, count($names), '?')) . ') GROUP BY `camp_slug` ORDER BY `camp_slug`', $names);
+      } catch (\Throwable) {
+        // Sin resúmenes todavía no hay nada que unificar.
+      }
+    }
+    return $config + ['max_retention_days' => TrackerAnalyticsConfig::MAX_RETENTION_DAYS, 'status' => $status, 'campaigns' => $campaigns];
   }
 
   /**
@@ -285,7 +298,22 @@ final class CommercialSettingsService
         }
         PopConfig::save($this->settings, $data, Auth::userId());
         return 'Configuración de Material POP guardada.';
+      case 'banner_revista':
+        foreach (['banner_url' => 'La imagen del banner', 'link_revista' => 'El link de la revista'] as $key => $label) {
+          $url = trim((string) ($data[$key] ?? ''));
+          if ($url !== '' && (filter_var($url, FILTER_VALIDATE_URL) === false || !str_starts_with(strtolower($url), 'https://'))) {
+            throw new \InvalidArgumentException($label . ' debe ser una dirección https válida.');
+          }
+        }
+        if (trim((string) ($data['banner_url'] ?? '')) !== '') {
+          $this->saveBanner(trim((string) $data['banner_url']));
+        }
+        $this->saveSystemValue('link_revista', trim((string) ($data['link_revista'] ?? '')));
+        return 'Banner y link de la revista guardados.';
       case 'analitica':
+        if (($data['op'] ?? '') === 'merge_campaign') {
+          return $this->mergeCampaign((string) ($data['from'] ?? ''), (string) ($data['to'] ?? ''));
+        }
         $before = TrackerAnalyticsConfig::read($this->settings);
         $saved = TrackerAnalyticsConfig::save($this->settings, $data, Auth::userId());
         if ($saved['internal_ips'] !== $before['internal_ips'] || $saved['own_domains'] !== $before['own_domains']) {
@@ -498,6 +526,40 @@ final class CommercialSettingsService
       $this->saveSystemValue($key, (string) $value);
     }
     return 'Cupos de destacados guardados.';
+  }
+
+  /** Guarda la imagen subida como banner: la reduce el almacenamiento del panel y queda con enlace firmado. */
+  public function saveBannerUpload(PopFiles $files): string
+  {
+    $this->authorize();
+    $urls = $files->store('banner_image', 1);
+    if ($urls === []) {
+      throw new \InvalidArgumentException('Elige la imagen del banner.');
+    }
+    $this->saveBanner($urls[0]);
+    return $urls[0];
+  }
+
+  /** La misma fila `banner` que usaba dashboard-marketing; `imagen` guarda la misma dirección, como allá. */
+  private function saveBanner(string $url): void
+  {
+    $this->saveSystemValue('banner', $url);
+    $table = $this->db->table('jet_cct_confi_sistema');
+    $image = $this->existingColumns($table, ['imagen' => $url]);
+    if ($image !== []) {
+      $this->db->update($table, $image, ['funcion' => 'banner']);
+    }
+  }
+
+  private function mergeCampaign(string $from, string $to): string
+  {
+    $secret = defined('SCM_APP_SECRET') ? (string) constant('SCM_APP_SECRET') : '';
+    try {
+      $result = (new TrackerRollup($this->db, $this->settings, new VisitorHasher($secret)))->mergeCampaign($from, $to);
+    } catch (TrackerRollupBusy) {
+      throw new \InvalidArgumentException('Los resúmenes se están actualizando. Intenta de nuevo en unos minutos.');
+    }
+    return number_format($result['updated'], 0, ',', '.') . ' visitas pasaron de "' . $result['from'] . '" a "' . $result['to'] . '".';
   }
 
   private function authorize(): void

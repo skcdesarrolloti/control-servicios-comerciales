@@ -39,6 +39,7 @@ if (!is_dir($output)) {
   mkdir($output, 0777, true);
 }
 $db = CommercialPromotionDatabase::create('sqlite:' . $output . '/commercial-promotion.sqlite');
+CommercialPromotionDatabase::systemConfigSchema($db);
 // Configuración › Calculadora de aseo lee sus tablas de wp_options (commercial_settings_load trae todas las secciones).
 $db->pdo()->exec('CREATE TABLE IF NOT EXISTS wp_options (option_id INTEGER PRIMARY KEY AUTOINCREMENT, option_name TEXT, option_value TEXT, autoload TEXT)');
 $settings = CommercialPromotionDatabase::settings($db);

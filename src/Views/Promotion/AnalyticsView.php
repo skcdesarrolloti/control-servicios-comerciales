@@ -79,6 +79,7 @@ final class AnalyticsView
       foreach (array_keys(self::LISTS) as $list) {
         $context['lists'][$list] = $repository->top($list, $filters, 10);
       }
+      $context['cross'] = $repository->campaignBreakdowns($filters);
       $context['options'] = $repository->options($today);
     } catch (\Throwable $exception) {
       error_log('[commercial-promotion-analytics] ' . $exception->getMessage());
@@ -142,7 +143,7 @@ final class AnalyticsView
     foreach (self::LISTS as $list => [$title, $column, $withUnique]) {
       $html .= self::listCard($list, $title, $column, $withUnique, $context['lists'][$list] ?? []);
     }
-    $html .= '</div>';
+    $html .= '</div>' . self::audienceCard($kpis) . self::crossCards($context['cross'] ?? []);
     $html .= '<p class="cpr-note"><span class="material-symbols-outlined" aria-hidden="true">info</span>El seguimiento de clics no se está registrando: el tracker del sitio solo guarda vistas de página, por eso no hay sección de eventos.</p>';
     $html .= self::logsSection($context, $applied);
     return $html;
@@ -269,6 +270,43 @@ final class AnalyticsView
       'objects' => '<span class="cpr-cell-main' . (str_starts_with($row['detail'], 'http') ? ' cpr-url' : '') . '" title="' . $e($row['detail']) . '">' . $e($row['detail'] !== '' ? self::shortUrl($row['detail']) : 'Inmueble ' . $row['label']) . '</span><span class="cpr-cell-sub">ID ' . $e($row['label']) . '</span>',
       default => '<span class="cpr-cell-main">' . $e($row['label']) . '</span>',
     };
+  }
+
+  /**
+   * Composición de la audiencia y calidad del tráfico de dashboard-marketing: registrados contra visitantes y cuántas visitas
+   * hace cada persona. Sin "Interacciones", porque el sitio no registra clics.
+   * @param array<string,mixed> $kpis
+   */
+  private static function audienceCard(array $kpis): string
+  {
+    $visits = max(0, (int) $kpis['visits']);
+    if ($visits === 0) {
+      return '';
+    }
+    $registered = (int) $kpis['registered_visits'];
+    $unique = (int) $kpis['unique_visitors'];
+    $bar = static function (string $label, string $value, float $share): string {
+      return '<div class="cpr-piece-bar"><span>' . PromotionUi::e($label) . '</span><strong>' . PromotionUi::e($value) . '</strong><i style="--bar:' . round(min(100, $share), 1) . '%" aria-hidden="true"></i></div>';
+    };
+    $repeat = $unique > 0 ? $visits / $unique : 0.0;
+    return '<div class="cpr-social-charts" data-cpr-audience><section class="cpr-card"><div class="cpr-card__head"><div><h2>Composición de la audiencia</h2><p>Visitas de usuarios registrados contra visitantes</p></div></div>'
+      . $bar('Registrados', PromotionUi::number($registered) . ' · ' . PromotionUi::percent($registered * 100 / $visits), $registered * 100 / $visits)
+      . $bar('Visitantes', PromotionUi::number($visits - $registered) . ' · ' . PromotionUi::percent(($visits - $registered) * 100 / $visits), ($visits - $registered) * 100 / $visits) . '</section>'
+      . '<section class="cpr-card"><div class="cpr-card__head"><div><h2>Calidad del tráfico</h2><p>' . PromotionUi::e(number_format($repeat, 1, ',', '.')) . ' visitas por persona</p></div></div>'
+      . $bar('Visitas', PromotionUi::number($visits), 100) . $bar('Personas únicas', PromotionUi::number($unique) . ' · ' . PromotionUi::percent($unique * 100 / $visits), $unique * 100 / $visits) . '</section></div>';
+  }
+
+  /** @param array{channels?:list<array<string,mixed>>,objects?:list<array<string,mixed>>,locations?:list<array<string,mixed>>} $cross */
+  private static function crossCards(array $cross): string
+  {
+    $e = static fn($value): string => PromotionUi::e($value);
+    $main = static fn($value): string => '<span class="cpr-cell-main">' . PromotionUi::e($value) . '</span>';
+    $note = 'Los 15 primeros, sin las visitas normales del sitio';
+    return '<div class="cpr-grid" data-cpr-cross>'
+      . PromotionUi::tableCard('Campaña y canal', $note, [['Campaña'], ['Fuente'], ['Medio'], ['Visitas', true], ['Únicos', true]], array_map(static fn(array $row): array => [$main($row['campaign']), $e($row['source']), $e($row['medium']), $e(PromotionUi::number($row['hits'])), $e(PromotionUi::number($row['unique_visitors']))], $cross['channels'] ?? []), 'Sin visitas de campañas en el rango.')
+      . PromotionUi::tableCard('Inmuebles por campaña', $note, [['Campaña'], ['Inmueble'], ['Vistas', true]], array_map(static fn(array $row): array => [$main($row['campaign']), '<span class="cpr-url" title="' . $e($row['detail']) . '">' . $e($row['detail'] !== '' ? self::shortUrl($row['detail']) : 'ID ' . $row['label']) . '</span>', $e(PromotionUi::number($row['hits']))], $cross['objects'] ?? []), 'Sin inmuebles vistos desde campañas en el rango.')
+      . PromotionUi::tableCard('Ubicación por campaña', $note, [['Campaña'], ['Ciudad'], ['País'], ['Visitas', true]], array_map(static fn(array $row): array => [$main($row['campaign']), $e($row['label']), $e($row['detail'] !== '' ? $row['detail'] : 'Sin país'), $e(PromotionUi::number($row['hits']))], $cross['locations'] ?? []), 'Sin visitas de campañas en el rango.')
+      . '</div>';
   }
 
   /** La URL sin esquema ni "www.", para que quepa en la tabla (el título conserva la completa). */

@@ -466,7 +466,8 @@
           '<details class="mt-2 text-[11px] text-slate-500"><summary class="cursor-pointer">Nota para sistemas</summary>Recalcular: <code>php bin/tracker-rollup.php --rebuild-from=AAAA-MM-DD</code>. Borrar visitas crudas según los días de arriba: <code>php bin/tracker-rollup.php --purge</code>.</details>' +
           "</section></form>";
       },
-      bind: function (popup) {
+      bind: function (popup, settings) {
+        bindMergeCampaigns(popup, settings);
         var form = popup.querySelector("[data-analytics-config]");
         var days = form.querySelector('[name="raw_retention_days"]');
         // Si deja de ser una reducción, la confirmación ya no aplica: se oculta y se desmarca.
@@ -529,7 +530,106 @@
         return { categories: categories, alert_enabled: enabled, alert_employees: employees, api_enabled: api };
       },
     },
+    // Banner y link de la revista, en las mismas filas de jet_cct_confi_sistema que usaba dashboard-marketing (views/settings.php).
+    banner_revista: {
+      title: "Banner y revista",
+      html: function (settings) {
+        return '<form data-config-form class="text-left space-y-4"><section><h4 class="text-sm font-bold text-slate-800 mb-1">Imagen del banner</h4>' +
+          intro("Es la imagen superior de los correos. Si subes una imagen nueva, se guarda de una vez y se reduce para que el correo no pese.") +
+          '<img class="w-full max-h-40 object-contain rounded-xl border border-slate-200 mb-2' + (settings.banner ? "" : " hidden") + '" src="' + esc(settings.banner) + '" alt="Banner actual" data-banner-preview>' +
+          '<input class="w-full text-sm mb-1" type="file" accept="image/jpeg,image/png,image/webp" data-banner-file>' +
+          '<p class="hidden text-sm mb-2" data-banner-status></p>' +
+          '<label class="block"><span class="block text-xs font-semibold text-slate-700 mb-1">Dirección de la imagen</span><input class="w-full px-2 py-1.5 rounded-lg border border-slate-300 text-sm" name="banner_url" value="' + esc(settings.banner) + '" placeholder="https://..."></label></section>' +
+          '<section><h4 class="text-sm font-bold text-slate-800 mb-1">Link de la revista</h4>' + intro("Edición de la revista que se enlaza desde los correos.") +
+          '<input class="w-full px-2 py-1.5 rounded-lg border border-slate-300 text-sm" name="link_revista" value="' + esc(settings.link_revista) + '" placeholder="https://..."></section></form>';
+      },
+      bind: function (popup) {
+        var input = popup.querySelector("[data-banner-file]");
+        var status = popup.querySelector("[data-banner-status]");
+        input.addEventListener("change", function () {
+          if (!input.files.length) return;
+          status.textContent = "Subiendo imagen…";
+          status.className = "text-sm mb-2 text-slate-600";
+          input.disabled = true;
+          request("commercial_settings_banner", { banner_image: input.files[0] }).then(function (data) {
+            popup.querySelector('[name="banner_url"]').value = data.url;
+            var preview = popup.querySelector("[data-banner-preview]");
+            preview.src = data.url;
+            preview.classList.remove("hidden");
+            status.textContent = data.message;
+            status.className = "text-sm mb-2 text-emerald-800";
+          }).catch(function (error) {
+            status.textContent = error.message;
+            status.className = "text-sm mb-2 text-red-700";
+          }).finally(function () { input.disabled = false; input.value = ""; });
+        });
+      },
+      collect: function (form) {
+        return { banner_url: form.querySelector('[name="banner_url"]').value.trim(), link_revista: form.querySelector('[name="link_revista"]').value.trim() };
+      },
+    },
   };
+
+  // Configuración › Analítica web › Unificar campañas (dashboard-marketing views/analytics.php): corrige nombres en el historial.
+  // Pide un segundo clic porque no se puede deshacer desde aquí.
+  function bindMergeCampaigns(popup, settings) {
+    var form = popup.querySelector("[data-config-form]");
+    var campaigns = settings.campaigns || [];
+    if (!form || !campaigns.length) return;
+    form.insertAdjacentHTML("beforeend", '<section class="text-left mt-4" data-merge-campaign><h4 class="text-sm font-bold text-slate-800 mb-1">Unificar campañas</h4>' +
+      intro("Corrige nombres mal escritos: las visitas de la campaña de origen pasan a la de destino, también en los resúmenes. No se puede deshacer desde aquí.") +
+      '<div class="grid grid-cols-1 sm:grid-cols-2 gap-2"><label class="block"><span class="block text-xs font-semibold text-slate-700 mb-1">Campaña con el nombre mal escrito</span><select class="w-full px-2 py-1.5 rounded-lg border border-slate-300 text-sm" data-merge-from><option value="">Selecciona una campaña</option>' +
+      campaigns.map(function (row) { return '<option value="' + esc(row.slug) + '">' + esc(row.slug) + " (" + Number(row.hits).toLocaleString("es-CO") + " visitas)</option>"; }).join("") + "</select></label>" +
+      '<label class="block"><span class="block text-xs font-semibold text-slate-700 mb-1">Nombre correcto</span><input class="w-full px-2 py-1.5 rounded-lg border border-slate-300 text-sm" maxlength="120" list="scm-merge-campaigns" data-merge-to placeholder="Una campaña existente o un nombre nuevo"><datalist id="scm-merge-campaigns">' +
+      campaigns.map(function (row) { return '<option value="' + esc(row.slug) + '"></option>'; }).join("") + "</datalist></label></div>" +
+      '<p class="hidden mt-2 px-3 py-2 rounded-xl border border-red-200 bg-red-50 text-sm text-red-900" data-merge-warning></p>' +
+      '<p class="hidden mt-2 text-sm" data-merge-result></p>' +
+      '<button type="button" class="mt-2 px-3 py-1 rounded-lg bg-slate-100 text-xs font-semibold" data-merge-run>Unificar</button></section>');
+    var box = popup.querySelector("[data-merge-campaign]");
+    var from = box.querySelector("[data-merge-from]");
+    var to = box.querySelector("[data-merge-to]");
+    var button = box.querySelector("[data-merge-run]");
+    var warning = box.querySelector("[data-merge-warning]");
+    var result = box.querySelector("[data-merge-result]");
+    var armed = false;
+    var disarm = function () {
+      armed = false;
+      warning.classList.add("hidden");
+      button.textContent = "Unificar";
+    };
+    from.addEventListener("change", disarm);
+    to.addEventListener("input", disarm);
+    button.addEventListener("click", function () {
+      var source = from.value;
+      var target = to.value.trim();
+      result.classList.add("hidden");
+      if (!source || !target) {
+        result.textContent = "Elige la campaña y escribe el nombre correcto.";
+        result.className = "mt-2 text-sm text-red-700";
+        return;
+      }
+      if (!armed) {
+        armed = true;
+        warning.textContent = 'Todas las visitas de "' + source + '" quedarán en "' + target + '".';
+        warning.classList.remove("hidden");
+        button.textContent = "Sí, unificar";
+        return;
+      }
+      button.disabled = true;
+      request("commercial_settings_save", { section: "analitica", payload: JSON.stringify({ op: "merge_campaign", from: source, to: target }) }).then(function (data) {
+        result.textContent = data.message;
+        result.className = "mt-2 text-sm text-emerald-800";
+        var option = Array.prototype.find.call(from.options, function (item) { return item.value === source; });
+        if (option) option.remove();
+        to.value = "";
+        disarm();
+      }).catch(function (error) {
+        result.textContent = error.message;
+        result.className = "mt-2 text-sm text-red-700";
+        disarm();
+      }).finally(function () { button.disabled = false; });
+    });
+  }
 
   // ── Configuración › Material POP › API para formularios ─────────────────
   // El token completo solo se ve justo después de generarlo (el servidor guarda su hash). Generar otro deja sin servicio

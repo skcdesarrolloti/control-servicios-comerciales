@@ -54,11 +54,11 @@ final class CommercialCampaignsTest extends TestCase
     self::assertSame(['enviar_notificaciones' => 'Enviar notificaciones', 'campanas' => 'Campañas', 'plantillas_correo' => 'Plantillas de correo'], CommercialAccessPolicy::SUBVIEWS['notificaciones']);
     self::assertSame('notif_sub', CommercialAccessPolicy::TAB_GROUPS['notificaciones']);
     self::assertSame(['tab' => 'notificaciones', 'notif_sub' => 'campanas'], CommercialAccessPolicy::normalizeTabGroup(['tab' => 'campanas']));
-    foreach (['campanas_enviar', 'plantillas_editar'] as $action) {
+    foreach (['campanas_enviar', 'campanas_eliminar', 'plantillas_editar'] as $action) {
       self::assertContains($action, CommercialAccessPolicy::OPT_IN_ACTIONS);
     }
     $groups = (new \ReflectionClassConstant(\SCM\Views\CommercialDashboardView::class, 'PERMISSION_ACTION_GROUPS'))->getValue();
-    self::assertSame(['enviar_notificacion', 'eliminar_notificacion', 'campanas_enviar', 'plantillas_editar'], $groups['Notificaciones']);
+    self::assertSame(['enviar_notificacion', 'eliminar_notificacion', 'campanas_enviar', 'campanas_eliminar', 'plantillas_editar'], $groups['Notificaciones']);
     foreach (['commercial_campaign_preview', 'commercial_campaign_send', 'commercial_campaign_test', 'commercial_campaign_detail', 'commercial_campaign_control', 'commercial_template_get', 'commercial_template_save'] as $action) {
       self::assertArrayHasKey($action, CommercialActionRouter::CAMPAIGN_ACTIONS);
     }
@@ -150,11 +150,11 @@ final class CommercialCampaignsTest extends TestCase
     self::assertSame(5, $again['totals']['already'], 'También Laura repetida: su correo ya la recibió.');
 
     // Quien la recibió desde el panel anterior (tipo "clientes", proyecto gestor-actores) tampoco la vuelve a recibir.
-    $db->insert('skc_notification_queue', ['project_code' => CampaignEngine::LEGACY_PROJECT, 'channel' => 'email', 'status' => 'sent', 'gda_campaign_tag' => 'Edición vieja', 'gda_tipo_actor' => 'clientes', 'gda_id_actor' => 100, 'created_at' => '2026-07-01 10:00:00']);
+    $db->insert('skc_notification_queue', ['project_code' => CampaignEngine::LEGACY_PROJECT, 'channel' => 'email', 'status' => 'sent', 'meta_json' => json_encode(['gda' => ['campaign_tag' => 'Edición vieja', 'tipo_actor' => 'clientes', 'id_actor' => 100]]), 'created_at' => '2026-07-01 10:00:00']);
     $legacy = $engine->preview($engine->spec(self::input(['name' => 'Edición vieja'])));
     self::assertSame(1, $legacy['totals']['already']);
     // El panel anterior guardaba "propietarios" (todos): cuenta para la lista completa y para activos o no activos.
-    $db->insert('skc_notification_queue', ['project_code' => CampaignEngine::LEGACY_PROJECT, 'channel' => 'email', 'status' => 'sent', 'destination' => 'otro@example.test', 'gda_campaign_tag' => 'Edición vieja', 'gda_tipo_actor' => 'propietarios', 'gda_id_actor' => 10, 'created_at' => '2026-07-01 10:00:00']);
+    $db->insert('skc_notification_queue', ['project_code' => CampaignEngine::LEGACY_PROJECT, 'channel' => 'email', 'status' => 'sent', 'destination' => 'otro@example.test', 'meta_json' => json_encode(['gda' => ['campaign_tag' => 'Edición vieja', 'tipo_actor' => 'propietarios', 'id_actor' => 10]]), 'created_at' => '2026-07-01 10:00:00']);
     $owners = $engine->preview($engine->spec(self::input(['name' => 'Edición vieja', 'segments' => json_encode([['type' => 'propietarios_todos']])])));
     self::assertSame([6, 1], [$owners['totals']['total'], $owners['totals']['already']]);
   }

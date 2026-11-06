@@ -59,6 +59,22 @@ async function toast(page, text) {
     await toast(page, 'excluida de esta campaña');
     await page.locator('[data-camp-list]').waitFor();
 
+    // Renombrar (el fixture se recrea en cada petición: que el historial siga a la campaña lo cubre CommercialMarketingClosureTest).
+    await page.locator('[data-camp-detail="Revista octubre"]').click();
+    await detail.locator('[data-camp-op="rename"]').click();
+    const rename = page.locator('[data-camp-dialog="rename"]');
+    await rename.waitFor({ state: 'visible' });
+    assert.equal(await rename.locator('[name="new_tag"]').inputValue(), 'Revista octubre');
+    await rename.locator('[name="new_tag"]').fill('Revista octubre');
+    await rename.locator('button[type=submit]').click();
+    await rename.locator('[data-camp-error]', { hasText: 'ya tiene ese nombre' }).waitFor();
+    await rename.locator('[name="new_tag"]').fill('Revista otoño');
+    await rename.locator('button[type=submit]').click();
+    await toast(page, 'Campaña renombrada a "Revista otoño"');
+    await page.locator('[data-camp-row="Revista octubre"]').waitFor();
+    // Eliminar exige la confirmación en el servidor.
+    assert.equal((await post(page, { action: 'commercial_campaign_control', tag: 'Revista octubre', operation: 'delete' })).status, 422);
+
     // Nueva campaña: calcular, vista previa y programar.
     await page.locator('[data-camp-open="new"]').click();
     const dialog = page.locator('[data-camp-dialog="new"]');

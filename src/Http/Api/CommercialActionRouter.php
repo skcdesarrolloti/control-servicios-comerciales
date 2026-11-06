@@ -121,6 +121,7 @@ final class CommercialActionRouter
       'commercial_calendar_cita_notify' => 'calendarCitaNotify',
       'commercial_settings_load' => 'settingsLoad',
       'commercial_settings_save' => 'settingsSave',
+      'commercial_settings_banner' => 'settingsBanner',
       'commercial_notifications_recipients' => 'notificationRecipients',
       'commercial_notifications_send' => 'sendNotifications',
       'commercial_notifications_queue' => 'notificationQueue',

@@ -522,6 +522,60 @@ final class TrackerRollup
   }
 
   /**
+   * Unifica una campaña mal escrita en otra. Copia de dashboard-marketing AnalyticsRepository::mergeCampaign (visitas crudas y
+   * catálogo jet_cct_tracker_camps), que aquí también mueve los resúmenes: si no, las cifras seguirían con el nombre viejo.
+   * Las filas se borran antes de sumarlas al destino porque en MariaDB "Feria" y "feria" son la misma llave.
+   * @return array{from:string,to:string,updated:int}
+   */
+  public function mergeCampaign(string $from, string $to): array
+  {
+    $from = trim($from);
+    $to = trim((string) preg_replace('/\s+/u', ' ', $to));
+    if ($from === '' || $to === '') {
+      throw new \InvalidArgumentException('Elige la campaña que se va a unificar y escribe el nombre correcto.');
+    }
+    if ($from === $to) {
+      throw new \InvalidArgumentException('La campaña de origen y la de destino son la misma.');
+    }
+    if (mb_strlen($to, 'UTF-8') > 120) {
+      throw new \InvalidArgumentException('El nombre correcto admite máximo 120 caracteres.');
+    }
+    if (isset(TrackerSchema::PSEUDO_CAMPAIGNS[$from])) {
+      throw new \InvalidArgumentException('"' . TrackerSchema::PSEUDO_CAMPAIGNS[$from] . '" no es una campaña: el sistema la asigna solo y no se puede unificar.');
+    }
+    return $this->locked(function () use ($from, $to): array {
+      TrackerSchema::ensure($this->db, $this->settings);
+      return $this->transaction(function () use ($from, $to): array {
+        $raw = TrackerSchema::raw($this->db);
+        $updated = (int) $this->db->getVar("SELECT COUNT(*) FROM `{$raw}` WHERE `camp_slug` = ?", [$from]);
+        $stored = (int) $this->db->getVar('SELECT COUNT(*) FROM `' . TrackerSchema::daily($this->db) . '` WHERE `camp_slug` = ?', [$from]);
+        if ($updated === 0 && $stored === 0) {
+          throw new \InvalidArgumentException('Esa campaña no tiene visitas para unificar.');
+        }
+        $this->db->pdo()->prepare("UPDATE `{$raw}` SET `camp_slug` = ? WHERE `camp_slug` = ?")->execute([$to, $from]);
+        foreach ([
+          [TrackerSchema::daily($this->db), ['fecha', 'camp_slug', 'utm_source', 'utm_medium', 'registered', 'bot', 'internal'], [], ['medio']],
+          [TrackerSchema::top($this->db), ['dim', 'fecha', 'camp_slug', 'utm_source', 'utm_medium', 'value_hash', 'bot', 'internal'], ['value', 'detail'], ['medio']],
+          [TrackerSchema::visitors($this->db), ['fecha', 'visitor_hash', 'camp_slug', 'utm_source', 'utm_medium', 'bot', 'internal'], [], ['medio']],
+        ] as [$table, $keys, $latest, $replace]) {
+          $rows = array_map(static fn(array $row): array => ['camp_slug' => $to] + $row, $this->db->getResults("SELECT * FROM `{$table}` WHERE `camp_slug` = ?", [$from]));
+          $this->db->delete($table, ['camp_slug' => $from]);
+          $this->upsert($table, $keys, $rows, $latest, $replace);
+        }
+        $catalog = $this->db->table('jet_cct_tracker_camps');
+        $source = (int) ($this->db->getVar("SELECT `_ID` FROM `{$catalog}` WHERE `slug` = ? LIMIT 1", [$from]) ?? 0);
+        $target = (int) ($this->db->getVar("SELECT `_ID` FROM `{$catalog}` WHERE `slug` = ? LIMIT 1", [$to]) ?? 0);
+        if ($source > 0 && $target > 0 && $source !== $target) {
+          $this->db->delete($catalog, ['_ID' => $source]);
+        } elseif ($source > 0) {
+          $this->db->update($catalog, ['slug' => $to, 'nombre' => ucfirst(str_replace(['-', '_'], ' ', $to))], ['_ID' => $source]);
+        }
+        return ['from' => $from, 'to' => $to, 'updated' => $updated];
+      });
+    });
+  }
+
+  /**
    * Suma un lote y lo escribe con upsert. Devuelve cuántas filas contaron.
    * @param list<array<string,mixed>> $rows
    */

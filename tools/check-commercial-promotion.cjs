@@ -506,6 +506,54 @@ function daysBetween(from, to) {
       await popContext.close();
     }
 
+    // ── Analítica y Configuración: cruces por campaña, unificar campañas, banner y revista ─────────────────────
+    const closureContext = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+    try {
+      const closure = await closureContext.newPage();
+      const closureWatch = watch(closure);
+      await closure.goto(FIXTURE + '?cargo=13&tab=analitica_web');
+      await closure.locator('[data-cpr-cross]').waitFor();
+      assert.ok((await closure.locator('[data-cpr-cross]').innerText()).includes('Campaña y canal'));
+      assert.equal(await closure.locator('[data-cpr-audience] .cpr-card').count(), 2);
+      assert.equal(await noHorizontalScroll(closure), true);
+
+      await closure.locator('#commercial-config-trigger').click();
+      await closure.locator('[data-commercial-config-action="analitica"]').click();
+      const merge = closure.locator('[data-merge-campaign]');
+      await merge.waitFor();
+      await merge.locator('[data-merge-from]').selectOption('feria-vivienda');
+      await merge.locator('[data-merge-to]').fill('promo-octubre');
+      await merge.locator('[data-merge-run]').click();
+      await merge.locator('[data-merge-warning]', { hasText: 'quedarán en "promo-octubre"' }).waitFor();
+      assert.equal(await merge.locator('[data-merge-from] option[value="feria-vivienda"]').count(), 1, 'El primer clic solo avisa.');
+      await merge.locator('[data-merge-run]').click();
+      await merge.locator('[data-merge-result]', { hasText: 'visitas pasaron de' }).waitFor();
+      assert.equal(await merge.locator('[data-merge-from] option[value="feria-vivienda"]').count(), 0);
+      await closure.locator('.swal2-cancel').click();
+      await closure.locator('.swal2-popup').waitFor({ state: 'detached' });
+
+      await closure.locator('#commercial-config-trigger').click();
+      await closure.locator('[data-commercial-config-action="banner_revista"]').click();
+      const banner = closure.locator('.swal2-popup [data-config-form]');
+      await banner.waitFor();
+      await banner.locator('[name="banner_url"]').fill('http://inseguro.test/a.png');
+      await closure.locator('.swal2-confirm').click();
+      await closure.locator('.swal2-validation-message', { hasText: 'https' }).waitFor();
+      await banner.locator('[name="banner_url"]').fill('https://example.test/banner.png');
+      await banner.locator('[name="link_revista"]').fill('https://example.test/revista');
+      await closure.locator('.swal2-confirm').click();
+      await closure.waitForFunction(() => document.body.innerText.includes('Banner y link de la revista guardados.'));
+      await closure.locator('.swal2-confirm').click();
+      await closure.locator('#commercial-config-trigger').click();
+      await closure.locator('[data-commercial-config-action="banner_revista"]').click();
+      await banner.waitFor();
+      assert.equal(await banner.locator('[name="link_revista"]').inputValue(), 'https://example.test/revista');
+      await closure.locator('.swal2-cancel').click();
+      assert.deepEqual(closureWatch.errors, []);
+    } finally {
+      await closureContext.close();
+    }
+
     // ── Banco de piezas (13): subir, ver, editar, vincular y archivar; 7 solo consulta ─────────────────────────
     const pieceContext = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
     // El archivo real exige sesión de public/: aquí se responde con una imagen mínima.

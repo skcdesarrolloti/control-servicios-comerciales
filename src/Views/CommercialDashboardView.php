@@ -523,6 +523,7 @@ final class CommercialDashboardView
                       ['medios', 'alt_route', 'Medios', 'Lista única: registros, formularios, UTM y analítica'],
                       ['analitica', 'monitoring', 'Analítica web', 'IPs internas, robots y retención de visitas'],
                       ['material_pop', 'inventory_2', 'Material POP', 'Categorías y alerta de stock bajo'],
+                      ['banner_revista', 'image', 'Banner y revista', 'Imagen de los correos y link de la revista'],
                     ];
                   ?>
                   <?php foreach ($configItems as [$configKey, $configIcon, $configLabel, $configHint]): ?>
@@ -4965,7 +4966,7 @@ final class CommercialDashboardView
   /** Acciones de la configuración de accesos, agrupadas por módulo. Toda acción de CommercialAccessPolicy::ACTIONS va en un grupo. */
   private const PERMISSION_ACTION_GROUPS = [
     'Tareas' => ['ver_ticket', 'responder', 'agregar_nota', 'seguimiento', 'postergar', 'activar', 'cerrar', 'cambiar_estado', 'reasignar'],
-    'Notificaciones' => ['enviar_notificacion', 'eliminar_notificacion', 'campanas_enviar', 'plantillas_editar'],
+    'Notificaciones' => ['enviar_notificacion', 'eliminar_notificacion', 'campanas_enviar', 'campanas_eliminar', 'plantillas_editar'],
     'Precaptación' => ['precaptacion_crear', 'precaptacion_editar', 'precaptacion_ticket', 'precaptacion_catalogos'],
     'Inmuebles y avisos' => ['ingresar_inmueble', 'registrar_aviso', 'editar_actor'],
     'Herramientas' => ['mercado_vista_completa', 'aseo_vista_interna', 'plan_estrategico_editar'],

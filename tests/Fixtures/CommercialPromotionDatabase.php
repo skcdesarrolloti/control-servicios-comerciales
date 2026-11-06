@@ -180,6 +180,24 @@ final class CommercialPromotionDatabase
     $db->insert('wp_marketing_tiktok_videos', ['open_id' => 'TT1', 'duration_seconds' => 42, 'title' => 'Tip de arriendo', 'published_at' => '2026-09-20 09:00:00', 'permalink' => 'https://tiktok.com/@skc/video/1', 'views' => 700, 'likes' => 30, 'comments' => 4, 'shares' => 2]);
   }
 
+  /** Simula information_schema para la tabla de configuración, con la columna imagen de producción (Banner y revista). */
+  public static function systemConfigSchema(Database $db): void
+  {
+    $pdo = $db->pdo();
+    $table = 'wp_jet_cct_confi_sistema';
+    $pdo->sqliteCreateFunction('DATABASE', static fn(): string => 'fixture');
+    if (!in_array('imagen', array_column($pdo->query("PRAGMA table_info(`{$table}`)")->fetchAll(\PDO::FETCH_ASSOC), 'name'), true)) {
+      $pdo->exec("ALTER TABLE `{$table}` ADD COLUMN imagen TEXT");
+    }
+    $pdo->exec("ATTACH DATABASE ':memory:' AS information_schema");
+    $pdo->exec('CREATE TABLE information_schema.TABLES (TABLE_SCHEMA TEXT, TABLE_NAME TEXT)');
+    $pdo->exec('CREATE TABLE information_schema.COLUMNS (TABLE_SCHEMA TEXT, TABLE_NAME TEXT, COLUMN_NAME TEXT)');
+    $pdo->prepare('INSERT INTO information_schema.TABLES VALUES (?, ?)')->execute(['fixture', $table]);
+    foreach ($pdo->query("PRAGMA table_info(`{$table}`)")->fetchAll(\PDO::FETCH_ASSOC) as $column) {
+      $pdo->prepare('INSERT INTO information_schema.COLUMNS VALUES (?, ?, ?)')->execute(['fixture', $table, $column['name']]);
+    }
+  }
+
   /**
    * Banco de piezas: tres piezas (una archivada y una con publicaciones vinculadas) sobre las publicaciones de social().
    */

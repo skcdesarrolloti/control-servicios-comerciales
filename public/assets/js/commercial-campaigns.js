@@ -216,6 +216,8 @@
       else if (campaign.status !== "cancelled" && campaign.pending > 0) actions += '<button type="button" class="cpr-ghost is-small" data-camp-op="pause">Pausar</button>';
       if (campaign.failed > 0 && campaign.status !== "cancelled") actions += '<button type="button" class="cpr-ghost is-small" data-camp-op="retry">Reintentar fallidos</button>';
       if (campaign.pending > 0) actions += '<button type="button" class="cpr-ghost is-small is-danger" data-camp-op="cancel">Cancelar lo pendiente</button>';
+      actions += '<button type="button" class="cpr-ghost is-small" data-camp-op="rename">Renombrar</button>';
+      if (dialog.getAttribute("data-can-delete") === "1" && !(campaign.pending > 0)) actions += '<button type="button" class="cpr-ghost is-small is-danger" data-camp-op="delete">Eliminar</button>';
     }
     dialog.querySelector("[data-camp-detail-title]").textContent = campaign.tag;
     dialog.querySelector("[data-camp-detail-body]").innerHTML =
@@ -247,11 +249,14 @@
       var result = await post("commercial_campaign_control", fields(Object.assign({ tag: tag, operation: operation }, extra || {})));
       notify("success", result.message);
       close(document.querySelector('[data-camp-dialog="confirm"]'));
+      close(document.querySelector('[data-camp-dialog="rename"]'));
       close(detail);
       navigate("");
     } catch (error) {
       var confirm = document.querySelector('[data-camp-dialog="confirm"]');
-      if (confirm && confirm.open) fail(confirm, error.message);
+      var rename = document.querySelector('[data-camp-dialog="rename"]');
+      if (rename && rename.open) fail(rename, error.message);
+      else if (confirm && confirm.open) fail(confirm, error.message);
       else notify("error", error.message);
     }
   }
@@ -331,17 +336,27 @@
     var op = target.closest("[data-camp-op]");
     if (op) {
       var operation = op.getAttribute("data-camp-op");
-      if (operation === "cancel" || operation === "exclude") {
+      if (operation === "rename") {
+        var rename = document.querySelector('[data-camp-dialog="rename"]');
+        rename.querySelector("form").reset();
+        rename.querySelector('[name="new_tag"]').value = document.querySelector('[data-camp-dialog="detail"]').getAttribute("data-tag") || "";
+        open(rename);
+        return;
+      }
+      if (operation === "cancel" || operation === "exclude" || operation === "delete") {
         var confirm = document.querySelector('[data-camp-dialog="confirm"]');
+        var tagName = document.querySelector('[data-camp-dialog="detail"]').getAttribute("data-tag") || "";
+        var texts = {
+          cancel: ["Cancelar lo pendiente", tagName, "Entiendo que los mensajes que faltan no se enviarán. Los enviados no cambian y quedan en el historial."],
+          exclude: ["Excluir de la campaña", op.getAttribute("data-name") || "", "Entiendo que esta persona no recibirá esta campaña, tampoco si se vuelve a enviar."],
+          delete: ["Eliminar campaña", tagName, "Entiendo que la campaña y el historial de sus mensajes se borran definitivamente. No se puede deshacer."],
+        }[operation];
         confirm.querySelector("form").reset();
-        var exclude = operation === "exclude";
-        confirm.querySelector("[data-camp-confirm-title]").textContent = exclude ? "Excluir de la campaña" : "Cancelar lo pendiente";
-        confirm.querySelector("[data-camp-confirm-lead]").textContent = exclude ? (op.getAttribute("data-name") || "") : document.querySelector('[data-camp-dialog="detail"]').getAttribute("data-tag");
-        confirm.querySelector("[data-camp-confirm-reason]").hidden = !exclude;
-        confirm.querySelector("[data-camp-confirm-text]").textContent = exclude
-          ? "Entiendo que esta persona no recibirá esta campaña, tampoco si se vuelve a enviar."
-          : "Entiendo que los mensajes que faltan no se enviarán. Los enviados no cambian y quedan en el historial.";
-        pendingControl = exclude ? { operation: "exclude", extra: { type: op.getAttribute("data-type"), actor: op.getAttribute("data-actor") } } : { operation: "cancel", extra: {} };
+        confirm.querySelector("[data-camp-confirm-title]").textContent = texts[0];
+        confirm.querySelector("[data-camp-confirm-lead]").textContent = texts[1];
+        confirm.querySelector("[data-camp-confirm-reason]").hidden = operation !== "exclude";
+        confirm.querySelector("[data-camp-confirm-text]").textContent = texts[2];
+        pendingControl = operation === "exclude" ? { operation: "exclude", extra: { type: op.getAttribute("data-type"), actor: op.getAttribute("data-actor") } } : { operation: operation, extra: {} };
         open(confirm);
         return;
       }
@@ -384,6 +399,11 @@
   document.addEventListener("submit", function (event) {
     var form = event.target;
     if (form.matches && form.matches("[data-camp-form]")) { event.preventDefault(); return; }
+    if (form.matches && form.matches("[data-camp-rename-form]")) {
+      event.preventDefault();
+      if (form.reportValidity()) control("rename", { new_tag: form.querySelector('[name="new_tag"]').value });
+      return;
+    }
     if (form.matches && form.matches("[data-camp-confirm-form]")) {
       event.preventDefault();
       if (!form.reportValidity() || !pendingControl) return;
