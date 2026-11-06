@@ -231,6 +231,37 @@ final class CommercialPortfolioScopeTest extends TestCase
     self::assertStringContainsString('data-mode="maintenance"', $signs);
   }
 
+  public function testTitlesSayWhetherTheScreenIsTheTeamOrThePerson(): void
+  {
+    [, $policy] = $this->adminWithTasks();
+    $views = array_keys(CommercialAccessPolicy::VIEWS);
+    $menu = CommercialDashboardView::renderTabs($views, 'inicio', [], [], 'http://x', [], $policy);
+    self::assertStringContainsString('<span>Actualizaciones del equipo</span></div>', $menu);
+    self::assertStringContainsString('<span>Avisos en fachada del equipo</span></div>', $menu);
+    $mobile = substr($menu, (int) strpos($menu, 'data-commercial-dropdown-menu="mobile"'));
+    self::assertStringContainsString('>Actualizaciones del equipo</a>', $mobile);
+    self::assertStringContainsString('>Avisos en fachada del equipo</a>', $mobile);
+
+    $h1 = static fn(string $html): string => preg_match('#<h1[^>]*>([^<]+)#u', $html, $match) ? $match[1] : '';
+    self::assertSame('Actualizaciones del equipo', $h1(CommercialDashboardView::renderPropertyUpdatesPage([], [], [], $policy)));
+    self::assertSame('Avisos en fachada del equipo', $h1(CommercialDashboardView::renderSignsPage([], [], [], $policy)));
+    self::assertSame('Inmuebles por vencer', $h1(CommercialDashboardView::renderPropertyUpdatesPage(['portafolio' => '1'], [], [], $policy)));
+    self::assertSame('Avisos pendientes', $h1(CommercialDashboardView::renderSignsPage(['portafolio' => '1'], [], [], $policy)));
+
+    $onPortfolio = CommercialDashboardView::renderTabs($views, 'actualizaciones', ['portafolio' => '1'], [], 'http://x', [], $policy);
+    self::assertMatchesRegularExpression('#aria-label="Abrir navegación comercial">.*?<span>Inmuebles por vencer</span>#su', $onPortfolio, 'El botón móvil dice dónde está la persona.');
+  }
+
+  public function testACargoThatOnlySeesItsOwnDoesNotReadTeamTitles(): void
+  {
+    [, $policy] = $this->adminWithTasks();
+    $_SESSION['scm_user_cargo'] = '9';
+    $menu = CommercialDashboardView::renderTabs(['actualizaciones', 'avisos'], 'inicio', [], [], 'http://x', [], $policy);
+    self::assertStringContainsString('<span>Actualizaciones de inmuebles</span></div>', $menu);
+    self::assertStringContainsString('<span>Avisos en fachada</span></div>', $menu);
+    self::assertStringNotContainsString('del equipo', $menu);
+  }
+
   public function testMenuOnlyOffersThePortfolioEntriesTheCargoCanOpen(): void
   {
     [, $policy] = $this->adminWithTasks();

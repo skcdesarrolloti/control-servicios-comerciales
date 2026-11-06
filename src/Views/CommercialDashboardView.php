@@ -869,7 +869,7 @@ final class CommercialDashboardView
               <?php endif; ?>
             <?php endif; ?>
             <?php if (in_array('actualizaciones', $views, true)): ?>
-              <div class="flex items-center gap-1.5 px-3 pt-2 pb-1 font-label-sm text-[11px] uppercase font-semibold text-secondary"><span class="material-symbols-outlined text-[15px]" aria-hidden="true">published_with_changes</span><span>Actualizaciones de inmuebles</span></div>
+              <div class="flex items-center gap-1.5 px-3 pt-2 pb-1 font-label-sm text-[11px] uppercase font-semibold text-secondary"><span class="material-symbols-outlined text-[15px]" aria-hidden="true">published_with_changes</span><span><?php echo esc_html(self::controlTitle('actualizaciones', $policy)); ?></span></div>
               <a class="flex items-center justify-between px-space-md py-space-sm font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="actualizaciones" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'actualizaciones', 'estado_actualizacion' => 'OK'])); ?>">
                 <span>Al Día</span>
                 <span class="font-label-sm text-label-sm bg-surface-container px-space-xs py-0.5 rounded text-on-surface">Activo</span>
@@ -884,7 +884,7 @@ final class CommercialDashboardView
               </a>
             <?php endif; ?>
             <?php if (in_array('avisos', $views, true)): ?>
-              <div class="flex items-center gap-1.5 px-3 pt-2 pb-1 font-label-sm text-[11px] uppercase font-semibold text-secondary"><span class="material-symbols-outlined text-[15px]" aria-hidden="true">signpost</span><span>Avisos en fachada</span></div>
+              <div class="flex items-center gap-1.5 px-3 pt-2 pb-1 font-label-sm text-[11px] uppercase font-semibold text-secondary"><span class="material-symbols-outlined text-[15px]" aria-hidden="true">signpost</span><span><?php echo esc_html(self::controlTitle('avisos', $policy)); ?></span></div>
               <a class="flex items-center justify-between px-space-md py-space-sm font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="avisos" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'avisos', 'estado_aviso' => 'Vencido'])); ?>">
                 <span>Retoques Vencidos</span>
                 <span class="font-label-sm text-label-sm bg-error-container text-on-error-container px-space-xs py-0.5 rounded font-semibold">Vencidos</span>
@@ -1198,7 +1198,7 @@ final class CommercialDashboardView
     <div class="relative group/nav lg:hidden" data-commercial-dropdown="mobile">
       <button type="button" class="flex items-center gap-2 min-h-[44px] text-sm font-medium text-on-surface" data-commercial-dropdown-trigger="mobile" aria-expanded="false" aria-label="Abrir navegación comercial">
         <span class="material-symbols-outlined text-[20px]" aria-hidden="true">menu</span>
-        <span><?php echo esc_html(CommercialAccessPolicy::VIEWS[$bucket] ?? 'Navegación'); ?></span>
+        <span><?php echo esc_html(in_array($bucket, ['actualizaciones', 'avisos'], true) ? self::controlTitle($bucket, $policy, $filters) : (CommercialAccessPolicy::VIEWS[$bucket] ?? 'Navegación')); ?></span>
         <span class="material-symbols-outlined text-[18px]" aria-hidden="true">expand_more</span>
       </button>
       <nav class="absolute left-0 top-full hidden bg-white border border-slate-200 rounded-2xl shadow-modal p-2 w-72 max-w-[85vw] max-h-[75vh] overflow-y-auto z-50" data-commercial-dropdown-menu="mobile" aria-label="Navegación móvil">
@@ -1229,13 +1229,31 @@ final class CommercialDashboardView
             <?php endforeach; ?>
             <?php continue; ?>
           <?php endif; ?>
-          <a class="block px-3 py-3 text-sm rounded-xl hover:bg-surface-container-low <?php echo $mobileView === $bucket ? 'bg-primary-container font-semibold' : ''; ?>" data-commercial-tab="<?php echo esc_attr($mobileView); ?>" href="<?php echo esc_url(self::url($baseUrl, ['tab' => $mobileView])); ?>"><?php echo esc_html(CommercialAccessPolicy::VIEWS[$mobileView]); ?></a>
+          <a class="block px-3 py-3 text-sm rounded-xl hover:bg-surface-container-low <?php echo $mobileView === $bucket ? 'bg-primary-container font-semibold' : ''; ?>" data-commercial-tab="<?php echo esc_attr($mobileView); ?>" href="<?php echo esc_url(self::url($baseUrl, ['tab' => $mobileView])); ?>"><?php echo esc_html(in_array($mobileView, ['actualizaciones', 'avisos'], true) ? self::controlTitle($mobileView, $policy) : CommercialAccessPolicy::VIEWS[$mobileView]); ?></a>
         <?php endforeach; ?>
       </nav>
     </div>
     </div>
 <?php
     return (string) ob_get_clean();
+  }
+
+  /**
+   * Título de Actualizaciones y Avisos según lo que muestran: lo de la persona (Mi portafolio), todo el equipo, o solo
+   * lo suyo para el cargo que no ve al equipo, que las conoce por su nombre de siempre.
+   * @param mixed $policy
+   * @param array<string,mixed> $input
+   */
+  private static function controlTitle(string $view, $policy, array $input = []): string
+  {
+    $isUpdates = $view === 'actualizaciones';
+    if ((string) ($input['portafolio'] ?? '') === '1') {
+      return $isUpdates ? 'Inmuebles por vencer' : 'Avisos pendientes';
+    }
+    if ($policy instanceof CommercialAccessPolicy && $policy->canSeeAll($view)) {
+      return $isUpdates ? 'Actualizaciones del equipo' : 'Avisos en fachada del equipo';
+    }
+    return $isUpdates ? 'Actualizaciones de inmuebles' : 'Avisos en fachada';
   }
 
   /**
@@ -2777,12 +2795,11 @@ final class CommercialDashboardView
     $selectedSignState = trim((string) ($filters['estado_aviso'] ?? ''));
     $isUpdates = ($activePanel === 'updates');
     $signMode = in_array($selectedSignState, ['Atrasado', 'A Tiempo'], true) ? 'new' : 'maintenance';
-    $pageTitle = $isUpdates ? 'Actualizaciones de Inmuebles' : 'Avisos en Fachada';
+    $pageTitle = self::controlTitle($isUpdates ? 'actualizaciones' : 'avisos', $policy, $filters);
     $pageDescription = $isUpdates
       ? 'Control completo de inmuebles públicos que están al día, en alerta o vencidos por actualización.'
       : 'Control completo de avisos nuevos, retoques y rutas operativas por barrio o ruta.';
     if ($isPortfolio) {
-      $pageTitle = $isUpdates ? 'Inmuebles por vencer' : 'Avisos pendientes';
       $pageDescription = $isUpdates
         ? 'Tus inmuebles con la actualización vencida o por vencer. Cambia el estado para ver también los que están al día.'
         : 'Los retoques y avisos que tienes pendientes. Cambia el estado para ver también los que están al día.';
