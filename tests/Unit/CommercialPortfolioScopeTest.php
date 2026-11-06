@@ -119,6 +119,52 @@ final class CommercialPortfolioScopeTest extends TestCase
     self::assertStringNotContainsString('<span>Mis Tareas</span>', $html, 'Mis tareas ya no se repite en Gestión de tareas.');
   }
 
+  public function testUpdatesAndSignsGoUnderPendingAndOpenOnlyWhatIsPending(): void
+  {
+    [, $policy] = $this->adminWithTasks();
+    $html = CommercialDashboardView::renderTabs(array_keys(CommercialAccessPolicy::VIEWS), 'inicio', [], [], 'http://x', [], $policy);
+    $menu = substr($html, (int) strpos($html, 'data-commercial-menu-section="portafolio"'), 7000);
+
+    self::assertSame(1, substr_count($menu, 'data-commercial-portfolio-heading'));
+    $positions = array_map(static fn(string $text): int => (int) strpos($menu, $text), ['Mis precaptaciones', '>Pendientes<', 'Mis actualizaciones', 'Mis avisos en fachada']);
+    $sorted = $positions;
+    sort($sorted);
+    self::assertSame($sorted, $positions, 'Mis precaptaciones queda fuera del subtítulo Pendientes.');
+
+    $decoded = html_entity_decode($html);
+    self::assertStringContainsString('tab=actualizaciones&portafolio=1&estado_actualizacion=Pendientes', $decoded);
+    self::assertStringContainsString('tab=avisos&portafolio=1&estado_aviso=Pendientes', $decoded);
+  }
+
+  public function testPendingHeadingFollowsWhatTheCargoCanOpen(): void
+  {
+    [, $policy] = $this->adminWithTasks();
+    $onlySigns = CommercialDashboardView::renderTabs(['avisos'], 'inicio', [], [], 'http://x', [], $policy);
+    self::assertStringContainsString('data-commercial-portfolio-heading>Pendientes<', $onlySigns);
+    $onlyTasks = CommercialDashboardView::renderTabs(['mis_tickets'], 'inicio', [], [], 'http://x', [], $policy);
+    self::assertStringNotContainsString('data-commercial-portfolio-heading', $onlyTasks);
+  }
+
+  public function testPendingFilterKeepsWhatNeedsActionOnly(): void
+  {
+    $matches = new \ReflectionMethod(CommercialTicketsRepository::class, 'matchesControlState');
+    foreach (['Vencido' => true, 'Alerta' => true, 'Atrasado' => true, 'OK' => false, 'A Tiempo' => false] as $label => $expected) {
+      self::assertSame($expected, $matches->invoke(null, 'Pendientes', $label), $label);
+    }
+    self::assertTrue($matches->invoke(null, '', 'OK'), 'Sin filtro entra todo.');
+    self::assertFalse($matches->invoke(null, 'Vencido', 'Alerta'), 'Los estados exactos siguen igual.');
+  }
+
+  public function testPendingOptionIsSelectedInBothControlPages(): void
+  {
+    [, $policy] = $this->adminWithTasks();
+    $updates = CommercialDashboardView::renderPropertyUpdatesPage(['portafolio' => '1', 'estado_actualizacion' => 'Pendientes'], [], [], $policy);
+    self::assertMatchesRegularExpression('#value="Pendientes"[^>]*selected#', $updates);
+    $signs = CommercialDashboardView::renderSignsPage(['portafolio' => '1', 'estado_aviso' => 'Pendientes'], [], [], $policy);
+    self::assertMatchesRegularExpression('#value="Pendientes"[^>]*selected#', $signs);
+    self::assertStringContainsString('data-mode="maintenance"', $signs);
+  }
+
   public function testMenuOnlyOffersThePortfolioEntriesTheCargoCanOpen(): void
   {
     [, $policy] = $this->adminWithTasks();

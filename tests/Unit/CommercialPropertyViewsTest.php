@@ -136,7 +136,7 @@ final class CommercialPropertyViewsTest extends TestCase
 
   public function testEveryMenuCountIsWhatItsViewOpens(): void
   {
-    [$db, $policy] = $this->inventory();
+    [$db] = $this->inventory();
     $repository = new CommercialPropertiesRepository($db);
     $where = new \ReflectionMethod(CommercialPropertiesRepository::class, 'buildWhereClauses');
     $viewTotal = static function (string $subtab, bool $canSeeAll) use ($db, $repository, $where): int {
@@ -190,6 +190,49 @@ final class CommercialPropertyViewsTest extends TestCase
 
     $html = CommercialDashboardView::renderTabs(array_keys(CommercialAccessPolicy::VIEWS), 'inicio', [], [], 'http://x', [], $policy);
     self::assertStringContainsString('>Portal</span>', $html);
+  }
+
+  public function testMyStatusCountsAreOnlyMineFromPublicToClosed(): void
+  {
+    [$db] = $this->inventory();
+    $db->insert('wp_jet_cct_inmuebles', ['id_funcionario' => '999', 'estado' => 'Publico', 'destacado' => 'No']);
+    $db->insert('wp_jet_cct_inmuebles', ['id_funcionario' => '999', 'estado' => ' Vendido ', 'destacado' => 'No']);
+    $repository = new CommercialPropertiesRepository($db);
+    $expected = ['Publico' => 2, 'En borrador' => 1, 'Arrendado' => 1, 'Vendido' => 1];
+
+    self::assertSame($expected, $repository->myStatusCounts([], true));
+    self::assertSame($expected, $repository->myStatusCounts([], false), 'Es de la persona para cualquier cargo.');
+    self::assertSame($expected, $repository->myStatusCounts(['estado' => 'Arrendado'], true), 'El estado elegido no cambia los conteos de las pestañas.');
+  }
+
+  public function testMyPropertiesAreSeparatedByStatus(): void
+  {
+    [, $policy] = CommercialNotificationsFixture::make(true);
+    $counts = ['Publico' => 1, 'En cierre' => 1];
+    $page = static fn(array $filters): string => CommercialDashboardView::renderPropertiesPage(['rows' => [], 'total' => 2, 'status_counts' => $counts, 'pagination' => []], ['property_subtab' => 'mis_inmuebles'] + $filters, [], $policy, 'http://x');
+
+    $all = $page([]);
+    self::assertStringContainsString('data-commercial-property-states', $all);
+    foreach (['Todos', 'Público', 'En cierre'] as $label) {
+      self::assertStringContainsString('<span>' . $label . '</span>', $all);
+    }
+    self::assertStringContainsString('estado=En+cierre', html_entity_decode($all));
+    self::assertMatchesRegularExpression('#aria-current="true"[^>]*>\s*<span>Todos</span>#u', $all);
+    self::assertStringNotContainsString('type="hidden" name="estado"', $all);
+    $states = substr($all, (int) strpos($all, 'data-commercial-property-states'), 1500);
+    self::assertStringNotContainsString('data-commercial-tab', $states, 'setActiveTab pisaría el aria-current de las pestañas de estado.');
+
+    $closing = $page(['estado' => 'En cierre']);
+    self::assertMatchesRegularExpression('#aria-current="true"[^>]*>\s*<span>En cierre</span>#u', $closing);
+    self::assertStringContainsString('type="hidden" name="estado" value="En cierre"', $closing, 'Filtrar no pierde la pestaña de estado.');
+  }
+
+  public function testOnlyMyPropertiesAreSeparatedByStatus(): void
+  {
+    [, $policy] = CommercialNotificationsFixture::make(true);
+    $html = CommercialDashboardView::renderPropertiesPage(['rows' => [], 'total' => 2, 'status_counts' => ['Publico' => 2], 'pagination' => []], ['property_subtab' => 'publicos'], [], $policy, 'http://x');
+    self::assertStringNotContainsString('data-commercial-property-states', $html);
+    self::assertStringNotContainsString('data-commercial-property-states', $this->page('mis_inmuebles', $policy), 'Sin inmuebles no hay pestañas vacías.');
   }
 
   public function testMenuHasNoLinkToAViewThatDoesNotExist(): void

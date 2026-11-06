@@ -836,6 +836,9 @@ final class CommercialDashboardView
               <div class="flex items-center gap-1.5 px-3 pt-2 pb-1 font-label-sm text-[11px] uppercase font-semibold text-secondary"><span class="material-symbols-outlined text-[15px]" aria-hidden="true">folder_shared</span><span>Mi portafolio</span></div>
               <div class="p-1 space-y-0.5">
                 <?php foreach ($portfolioLinks as $portfolioLink): ?>
+                <?php if (!empty($portfolioLink['heading'])): ?>
+                <div class="px-3 pt-2 pb-0.5 text-[11px] font-semibold text-secondary" data-commercial-portfolio-heading><?php echo esc_html($portfolioLink['heading']); ?></div>
+                <?php endif; ?>
                 <a class="flex items-center justify-between px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="<?php echo esc_attr($portfolioLink['tab']); ?>" href="<?php echo esc_url(self::url($baseUrl, ['tab' => $portfolioLink['tab']] + $portfolioLink['params'])); ?>">
                   <span class="flex items-center gap-2">
                     <span class="material-symbols-outlined text-[18px] text-tertiary" aria-hidden="true"><?php echo esc_html($portfolioLink['icon']); ?></span>
@@ -1202,6 +1205,9 @@ final class CommercialDashboardView
         <?php if ($portfolioLinks !== []): ?>
           <div class="px-3 pt-2 pb-1 text-[11px] uppercase font-semibold text-secondary">Mi portafolio</div>
           <?php foreach ($portfolioLinks as $portfolioLink): ?>
+            <?php if (!empty($portfolioLink['heading'])): ?>
+              <div class="px-3 pt-2 pb-0.5 text-[11px] font-semibold text-secondary"><?php echo esc_html($portfolioLink['heading']); ?></div>
+            <?php endif; ?>
             <a class="block px-3 py-3 text-sm rounded-xl hover:bg-surface-container-low <?php echo $portfolioLink['tab'] === 'mis_tickets' && $bucket === 'mis_tickets' ? 'bg-primary-container font-semibold' : ''; ?>" data-commercial-tab="<?php echo esc_attr($portfolioLink['tab']); ?>" href="<?php echo esc_url(self::url($baseUrl, ['tab' => $portfolioLink['tab']] + $portfolioLink['params'])); ?>"><?php echo esc_html($portfolioLink['label']); ?></a>
           <?php endforeach; ?>
           <div class="my-1 border-t border-surface-container"></div>
@@ -1236,23 +1242,31 @@ final class CommercialDashboardView
    * Entradas de Mi portafolio: las mismas pantallas limitadas a la persona, también para quien ve todo el equipo.
    * @param array<int,string> $views
    * @param mixed $policy
-   * @return array<int,array{tab:string,label:string,icon:string,params:array<string,string>}>
+   * @return array<int,array{tab:string,label:string,icon:string,params:array<string,string>,pending?:bool,heading?:string}>
    */
   private static function portfolioLinks(array $views, $policy): array
   {
     $links = [
       ['tab' => 'mis_tickets', 'label' => 'Mis tareas', 'icon' => 'assignment_ind', 'params' => []],
       ['tab' => 'inmuebles', 'label' => 'Mis inmuebles', 'icon' => 'person_pin', 'params' => ['property_subtab' => 'mis_inmuebles']],
-      ['tab' => 'actualizaciones', 'label' => 'Mis actualizaciones', 'icon' => 'published_with_changes', 'params' => ['portafolio' => '1']],
-      ['tab' => 'avisos', 'label' => 'Mis avisos en fachada', 'icon' => 'signpost', 'params' => ['portafolio' => '1']],
       ['tab' => 'precaptacion', 'label' => 'Mis precaptaciones', 'icon' => 'add_home_work', 'params' => ['portafolio' => '1']],
+      // Ayudas de control: abren solo lo que pide acción. El subtítulo sale sobre la primera que el cargo pueda abrir.
+      ['tab' => 'actualizaciones', 'label' => 'Mis actualizaciones', 'icon' => 'published_with_changes', 'params' => ['portafolio' => '1', 'estado_actualizacion' => 'Pendientes'], 'pending' => true],
+      ['tab' => 'avisos', 'label' => 'Mis avisos en fachada', 'icon' => 'signpost', 'params' => ['portafolio' => '1', 'estado_aviso' => 'Pendientes'], 'pending' => true],
     ];
-    return array_values(array_filter($links, static function (array $link) use ($views, $policy): bool {
+    $links = array_values(array_filter($links, static function (array $link) use ($views, $policy): bool {
       if (!in_array($link['tab'], $views, true)) {
         return false;
       }
       return $link['tab'] !== 'inmuebles' || !$policy instanceof CommercialAccessPolicy || $policy->canSubview('inmuebles', 'mis_inmuebles');
     }));
+    foreach ($links as $index => $link) {
+      if (!empty($link['pending'])) {
+        $links[$index]['heading'] = 'Pendientes';
+        break;
+      }
+    }
+    return $links;
   }
 
   /** @param array<string,mixed> $dashboard @param array<string,mixed> $filters */
@@ -2770,8 +2784,8 @@ final class CommercialDashboardView
     if ($isPortfolio) {
       $pageTitle = $isUpdates ? 'Mis actualizaciones' : 'Mis avisos en fachada';
       $pageDescription = $isUpdates
-        ? 'Tus inmuebles públicos que están al día, en alerta o vencidos por actualización.'
-        : 'Los avisos y retoques de tus inmuebles.';
+        ? 'Tus inmuebles con la actualización vencida o por vencer. Cambia el estado para ver también los que están al día.'
+        : 'Los retoques y avisos que tienes pendientes. Cambia el estado para ver también los que están al día.';
     }
 
     ob_start();
@@ -2832,6 +2846,7 @@ final class CommercialDashboardView
                 <label class="block font-label-sm text-label-sm text-secondary font-medium">Estado</label>
                 <select name="estado_actualizacion" class="w-full px-3 py-2 bg-surface-container-low rounded-xl font-body-sm outline-none">
                   <option value="">Todos</option>
+                  <option value="Pendientes"<?php selected($selectedUpdateState, 'Pendientes'); ?>>Pendientes</option>
                   <option value="Vencido"<?php selected($selectedUpdateState, 'Vencido'); ?>>Vencidos</option>
                   <option value="Alerta"<?php selected($selectedUpdateState, 'Alerta'); ?>>Alerta</option>
                   <option value="OK"<?php selected($selectedUpdateState, 'OK'); ?>>Al día</option>
@@ -2909,6 +2924,7 @@ final class CommercialDashboardView
                 <label class="block font-label-sm text-label-sm text-secondary font-medium">Estado</label>
                 <select name="estado_aviso" class="w-full px-3 py-2 bg-surface-container-low rounded-xl font-body-sm outline-none">
                   <option value="">Todos</option>
+                  <option value="Pendientes"<?php selected($selectedSignState, 'Pendientes'); ?>>Pendientes</option>
                   <option value="Vencido"<?php selected($selectedSignState, 'Vencido'); ?>>Vencido</option>
                   <option value="Alerta"<?php selected($selectedSignState, 'Alerta'); ?>>Alerta</option>
                   <option value="OK"<?php selected($selectedSignState, 'OK'); ?>>Al día</option>
@@ -3385,6 +3401,7 @@ final class CommercialDashboardView
     $canSeeAll = $policy instanceof CommercialAccessPolicy && $policy->canSeeAll('inmuebles');
     $view = self::propertyViews($canSeeAll)[$currentSubtab];
     $canFilterEmployee = $canSeeAll && $currentSubtab !== 'mis_inmuebles';
+    $statusCounts = $currentSubtab === 'mis_inmuebles' && is_array($result['status_counts'] ?? null) ? $result['status_counts'] : [];
 
     $selectedTipo = trim((string) ($filters['tipo_inmueble'] ?? ''));
     $selectedNegocio = trim((string) ($filters['tipo_negocio'] ?? ''));
@@ -3436,6 +3453,19 @@ final class CommercialDashboardView
         <?php endif; ?>
       </div>
 
+      <?php if ($statusCounts !== []): ?>
+        <!-- Mis inmuebles por estado -->
+        <nav class="bg-surface-container-lowest p-space-sm rounded-2xl shadow-sm flex flex-wrap items-center gap-2" aria-label="Mis inmuebles por estado" data-commercial-property-states>
+          <?php foreach (['' => array_sum($statusCounts)] + array_diff_key($statusCounts, ['' => 0]) as $statusKey => $statusTotal): ?>
+            <?php $statusKey = (string) $statusKey; $isStatusActive = $selectedEstado === $statusKey; ?>
+            <a href="<?php echo esc_url(self::url($baseUrl, array_merge($filters, ['tab' => 'inmuebles', 'property_subtab' => 'mis_inmuebles', 'estado' => $statusKey, 'page' => 1]))); ?>" data-commercial-filter-link <?php echo $isStatusActive ? 'aria-current="true"' : ''; ?> class="flex items-center gap-2 px-space-md py-2 rounded-xl font-label-md text-label-md transition-all cursor-pointer <?php echo $isStatusActive ? 'bg-inverse-surface text-on-secondary shadow-sm' : 'bg-surface-container hover:bg-surface-container-high text-on-surface'; ?>">
+              <span><?php echo esc_html($statusKey === '' ? 'Todos' : ($statusKey === 'Publico' ? 'Público' : $statusKey)); ?></span>
+              <span class="px-2 py-0.5 rounded-full text-label-sm <?php echo $isStatusActive ? 'bg-primary-container text-on-surface font-bold' : 'bg-surface-container-lowest text-secondary'; ?>"><?php echo esc_html(number_format((int) $statusTotal)); ?></span>
+            </a>
+          <?php endforeach; ?>
+        </nav>
+      <?php endif; ?>
+
       <?php if ($currentSubtab === 'mis_solicitudes'): ?>
         <?php echo self::renderUserHighlightRequests($options, $baseUrl, $policy); ?>
       <?php else: ?>
@@ -3444,6 +3474,7 @@ final class CommercialDashboardView
           <input type="hidden" name="tab" value="inmuebles">
           <input type="hidden" name="property_subtab" value="<?php echo esc_attr($currentSubtab); ?>" data-commercial-property-subtab-input>
           <input type="hidden" name="page" value="1" data-commercial-property-page-input>
+          <?php if ($currentSubtab === 'mis_inmuebles' && $selectedEstado !== ''): ?><input type="hidden" name="estado" value="<?php echo esc_attr($selectedEstado); ?>"><?php endif; ?>
 
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-3">
             <!-- Búsqueda libre -->

@@ -708,7 +708,7 @@ final class CommercialTicketsRepository
       $status = (string) ($state['status'] ?? 'ok');
       $label = $status === 'vencido' ? 'Vencido' : ($status === 'alerta' ? 'Alerta' : 'OK');
       $stats[$status] = ($stats[$status] ?? 0) + 1;
-      if ($wantedState !== '' && $wantedState !== $label) {
+      if (!self::matchesControlState($wantedState, $label)) {
         continue;
       }
       $final[] = $this->normalizePropertyControlRow($row, $label, $state);
@@ -742,13 +742,22 @@ final class CommercialTicketsRepository
       } elseif ($label === 'Aviso nuevo al día') {
         $label = 'A Tiempo';
       }
-      if ($wantedState !== '' && $wantedState !== $label) {
+      if (!self::matchesControlState($wantedState, $label)) {
         continue;
       }
       $final[] = $this->normalizePropertyControlRow($row, $label, $state);
     }
 
     return ['rows' => $final, 'total' => count($final), 'mode' => $mode];
+  }
+
+  /** "Pendientes" es todo lo que pide acción: lo vencido, lo que está por vencer y lo atrasado. */
+  private static function matchesControlState(string $wanted, string $label): bool
+  {
+    if ($wanted === 'Pendientes') {
+      return !in_array($label, ['OK', 'A Tiempo'], true);
+    }
+    return $wanted === '' || $wanted === $label;
   }
 
   /** @param array<int,string> $cargoIds @return array<int,array<string,string>> */

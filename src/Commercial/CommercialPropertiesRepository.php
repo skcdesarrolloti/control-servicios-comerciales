@@ -90,6 +90,7 @@ final class CommercialPropertiesRepository
    * @return array{
    *   rows: array<int,array<string,mixed>>,
    *   total: int,
+   *   status_counts: array<string,int>,
    *   pagination: array{page:int,per_page:int,total_pages:int,total_items:int,from:int,to:int}
    * }
    */
@@ -105,6 +106,7 @@ final class CommercialPropertiesRepository
     [$where, $args] = $this->buildWhereClauses($filters, $canSeeAll);
 
     $whereSql = $where !== [] ? ('WHERE ' . implode(' AND ', $where)) : '';
+    $statusCounts = ($filters['property_subtab'] ?? '') === 'mis_inmuebles' ? $this->myStatusCounts($filters, $canSeeAll) : [];
 
     // Total count
     $totalSql = "SELECT COUNT(*) FROM `{$table}` i {$whereSql}";
@@ -114,6 +116,7 @@ final class CommercialPropertiesRepository
       return [
         'rows' => [],
         'total' => 0,
+        'status_counts' => $statusCounts,
         'pagination' => [
           'page' => $page,
           'per_page' => $perPage,
@@ -155,6 +158,7 @@ final class CommercialPropertiesRepository
     return [
       'rows' => $rows,
       'total' => $total,
+      'status_counts' => $statusCounts,
       'pagination' => [
         'page' => $page,
         'per_page' => $perPage,
@@ -164,6 +168,31 @@ final class CommercialPropertiesRepository
         'to' => $to,
       ],
     ];
+  }
+
+  /**
+   * Mis inmuebles por estado, con los filtros de la vista salvo el propio estado. Va de lo público a lo cerrado, y
+   * solo trae los estados que la persona tiene.
+   *
+   * @param array<string,mixed> $filters
+   * @return array<string,int>
+   */
+  public function myStatusCounts(array $filters, bool $canSeeAll): array
+  {
+    unset($filters['estado']);
+    $filters['property_subtab'] = 'mis_inmuebles';
+    [$where, $args] = $this->buildWhereClauses($filters, $canSeeAll);
+    $table = $this->db->table('jet_cct_inmuebles');
+    $rows = $this->db->getResults(
+      "SELECT TRIM(COALESCE(i.`estado`, '')) AS estado, COUNT(*) AS total FROM `{$table}` i"
+      . ($where !== [] ? ' WHERE ' . implode(' AND ', $where) : '')
+      . " GROUP BY TRIM(COALESCE(i.`estado`, ''))",
+      $args
+    );
+    $counts = array_column($rows, 'total', 'estado');
+    $known = array_flip(array_merge(self::STATUSES_PUBLIC, self::STATUSES_PENDING, self::STATUSES_NON_PUBLIC));
+    uksort($counts, static fn($a, $b): int => [$known[$a] ?? PHP_INT_MAX, (string) $a] <=> [$known[$b] ?? PHP_INT_MAX, (string) $b]);
+    return array_map('intval', $counts);
   }
 
   /**

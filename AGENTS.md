@@ -12,7 +12,7 @@
   - endpoints en `CommercialActionRouter` que validen `canSubview`/`canView`/`canAct` y no envíen al navegador datos que el cargo no puede ver;
   - su configuración como sección del menú **Configuración**, guardando los valores compartidos en las mismas filas que usa el panel inmobiliario;
   - pruebas PHPUnit (cálculo, permisos y vista).
-- Mis tareas y **Mi portafolio** muestran solo lo de la persona, también a los administradores: `canSeeAll('mis_tickets')` siempre es falso y las pantallas compartidas se limitan con `?portafolio=1` (`seesTeam`), que solo puede reducir lo visible. Las vistas con todo el equipo siguen en sus pestañas normales.
+- Mis tareas y **Mi portafolio** muestran solo lo de la persona, también a los administradores: `canSeeAll('mis_tickets')` siempre es falso y las pantallas compartidas se limitan con `?portafolio=1` (`seesTeam`), que solo puede reducir lo visible. Las vistas con todo el equipo siguen en sus pestañas normales. Mis actualizaciones y Mis avisos van bajo el subtítulo **Pendientes** y abren con ese filtro: si una entrada dice pendientes, no debe abrir también lo que está al día.
 - Cada subpestaña de Inmuebles es su propia vista (`propertyViews`): título, descripción y filtros propios, sin tarjetas ni pestañas globales. Se navega desde el menú Inmuebles, que muestra el conteo de cada vista (`menuCounts`), y el móvil lista las mismas entradas.
 - Las notificaciones nuevas deben ser configurables cuando aplique y encolarse mediante `shared-notifications`; evitar envíos directos o destinatarios quemados en código.
 - En los modales del panel, preferir popups internos y conservar el contexto de la tarea; evitar abrir pestañas nuevas si la acción puede resolverse dentro de la app.
