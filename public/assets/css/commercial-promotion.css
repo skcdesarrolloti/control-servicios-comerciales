@@ -444,3 +444,19 @@
   .cpr-social-row__metric { min-width:0; flex:1 1 30%; text-align:left }
 }
 .cpr-stats + .cpr-note { margin-top:18px }
+
+/* Envíos masivos: asistente de tres pasos */
+.cpr-camp-steps { display:flex; gap:8px; margin:0 0 16px; padding:0; list-style:none; counter-reset:none }
+.cpr-camp-steps li { display:flex; flex:1; gap:8px; align-items:center; min-width:0; padding:8px 10px; border-radius:12px; background:var(--cpr-sky); font-size:12.5px; font-weight:600; color:var(--cpr-muted) }
+.cpr-camp-steps li span { display:flex; flex:0 0 22px; align-items:center; justify-content:center; width:22px; height:22px; border-radius:999px; background:#fff; font-size:11.5px; font-weight:700; color:var(--cpr-blue) }
+.cpr-camp-steps li.is-current { background:var(--cpr-blue); color:#fff }
+.cpr-camp-steps li.is-done { color:var(--cpr-blue) }
+.cpr-dialog [data-camp-step][data-off] { display:none }
+.cpr-camp-final { display:inline-flex; flex-wrap:wrap; gap:10px; justify-content:flex-end }
+.cpr-camp-final[hidden] { display:none }
+.cpr-dialog [data-camp-back][hidden],
+.cpr-dialog [data-camp-next][hidden] { display:none }
+.cpr-dialog [data-camp-step="3"] .cpr-camp-preview { margin-top:16px }
+@media (max-width:640px) {
+  .cpr-camp-steps li { flex-direction:column; gap:4px; text-align:center; font-size:11.5px }
+}

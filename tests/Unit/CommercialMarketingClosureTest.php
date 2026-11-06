@@ -6,15 +6,18 @@ namespace Tests\Unit;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use SCM\Commercial\Campaigns\CampaignEngine;
 use SCM\Commercial\CommercialAccessPolicy;
 use SCM\Commercial\CommercialSettingsService;
 use SCM\Commercial\Promotion\Analytics\TrackerAnalyticsConfig;
 use SCM\Commercial\Promotion\Analytics\TrackerAnalyticsFilters;
 use SCM\Commercial\Promotion\Analytics\TrackerAnalyticsRepository;
 use SCM\Commercial\Promotion\Pop\PopFiles;
+use SCM\Commercial\Tools\UtmCatalog;
 use SCM\Core\Database;
 use SCM\Core\Settings;
 use SCM\Http\Api\CommercialActionRouter;
+use SCM\Http\Controller\CampaignApiController;
 use SCM\Views\Campaigns\CampaignsView;
 use SCM\Views\Promotion\AnalyticsView;
 use Tests\Fixtures\CampaignFixture;
@@ -24,7 +27,7 @@ use Tests\Fixtures\CommercialTrackerDatabase;
 require_once dirname(__DIR__) . '/Fixtures/CommercialPromotionDatabase.php';
 require_once dirname(__DIR__) . '/Fixtures/CampaignFixture.php';
 
-/** Lo último que faltaba de dashboard-marketing: unificar campañas, cruces de Analítica, renombrar y eliminar campañas, banner y revista. */
+/** Lo último de dashboard-marketing y Envíos masivos: unificar campañas, cruces de Analítica, envíos agrupados por campaña, banner y revista. */
 final class CommercialMarketingClosureTest extends TestCase
 {
   private const TODAY = '2026-11-03';
@@ -283,6 +286,119 @@ final class CommercialMarketingClosureTest extends TestCase
   public function testTheEmailBannerFallsBackToTheEditableRow(): void
   {
     self::assertStringContainsString("system_image('banner_sitio_web', system_image('banner',", (string) file_get_contents(dirname(__DIR__, 2) . '/src/Support/EmailTemplate.php'));
+  }
+
+  public function testASendWithoutItsOwnNameIsCalledLikeItsCampaign(): void
+  {
+    [, , $engine] = CampaignFixture::make(true);
+    $spec = $engine->spec(array_diff_key(self::campaign(['campaign_label' => '  Revista   Esencia diciembre ']), ['name' => true]));
+    self::assertSame(['Revista Esencia diciembre', 'revista_esencia_diciembre', 'Revista Esencia diciembre'], [$spec['name'], $spec['utm_campaign'], $spec['campaign_label']]);
+    $chosen = $engine->spec(array_diff_key(self::campaign(['campaign_label' => 'Feria', 'utm_campaign' => 'feria-2026']), ['name' => true]));
+    self::assertSame('feria-2026', $chosen['utm_campaign'], 'La elegida conserva su nombre en los enlaces.');
+    foreach ([['campaign_label' => ''], ['campaign_label' => 'General'], ['campaign_label' => str_repeat('a', 61)], ['utm_campaign' => 'con espacio', 'campaign_label' => 'X']] as $bad) {
+      try {
+        $engine->spec(array_diff_key($bad + self::campaign(), ['name' => true]));
+        self::fail('Debía rechazarse: ' . json_encode($bad));
+      } catch (\InvalidArgumentException $exception) {
+        self::assertNotSame('', $exception->getMessage());
+      }
+    }
+  }
+
+  public function testTheListsOfACampaignNeverReceiveItTwice(): void
+  {
+    [$db, , $engine] = CampaignFixture::make(true);
+    $base = ['name' => '', 'campaign_label' => 'Revista diciembre'];
+    $first = $engine->send($engine->spec(self::campaign($base + ['segments' => json_encode([['type' => 'clientes', 'q' => '']])])), '999', 'Administrador');
+    self::assertGreaterThan(0, $first['queued']);
+    $second = $engine->spec(self::campaign($base + ['segments' => json_encode([['type' => 'clientes', 'q' => ''], ['type' => 'suscriptores', 'q' => '']])]));
+    self::assertGreaterThanOrEqual($first['queued'], $engine->preview($second)['totals']['already'], 'Quien ya la recibió no se repite.');
+    $engine->send($second, '999', 'Administrador');
+    self::assertSame(['Revista diciembre'], array_column($engine->list(), 'tag'), 'Es un solo envío con sus dos listas.');
+    self::assertSame(['send' => 1, 'sends' => 1], ['send' => count($engine->campaigns()['groups']), 'sends' => $engine->campaigns()['groups'][0]['sends']]);
+    self::assertGreaterThan(0, (int) $db->getVar("SELECT COUNT(*) FROM skc_notification_queue WHERE gda_tipo_actor = 'suscriptores'"));
+  }
+
+  public function testThePreviewSaysWhenTheSendWouldEnd(): void
+  {
+    [, , $engine] = CampaignFixture::make(true);
+    $schedule = $engine->preview($engine->spec(self::campaign(['batch_size' => '1', 'batch_interval_minutes' => '30'])))['schedule'];
+    self::assertNotNull($schedule);
+    self::assertGreaterThan($schedule['first_at'], $schedule['last_at']);
+    $none = $engine->preview($engine->spec(self::campaign(['segments' => json_encode([['type' => 'clientes', 'q' => 'nadie-se-llama-asi']])])));
+    self::assertNull($none['schedule']);
+  }
+
+  public function testACampaignReportAddsUpItsSendsAndOldSendsCanBeAssigned(): void
+  {
+    [$db, , $engine] = CampaignFixture::make(true);
+    $engine->send($engine->spec(self::campaign(['name' => 'Revista clientes', 'campaign_label' => 'Revista junio', 'utm_campaign' => 'revista-junio', 'segments' => json_encode([['type' => 'clientes', 'q' => '']])])), '999', 'Administrador');
+    // Envío del panel anterior: sin configuración de campaña.
+    $db->insert('skc_notification_queue', ['project_code' => CampaignEngine::LEGACY_PROJECT, 'channel' => 'email', 'status' => 'sent', 'destination' => 'viejo@example.test', 'message_html' => '<a href="x">viejo</a>', 'meta_json' => json_encode(['gda' => ['campaign_tag' => 'RV ESENCIA PROPIETARIOS', 'tipo_actor' => 'propietarios', 'id_actor' => 7]]), 'created_at' => '2026-07-01 10:00:00', 'updated_at' => '2026-07-01 10:00:00']);
+    $before = $engine->campaigns();
+    self::assertSame(1, $before['unassigned']);
+    self::assertSame(['revista-junio'], array_column($before['groups'], 'slug'));
+    $sent = (int) $before['groups'][0]['total'];
+    $html = (string) $db->getVar("SELECT message_html FROM skc_notification_queue WHERE destination = 'viejo@example.test'");
+
+    $engine->assignCampaign('RV ESENCIA PROPIETARIOS', 'revista-junio', 'Revista junio');
+    $report = $engine->campaignReport('revista-junio');
+    self::assertSame([2, $sent + 1, 'Revista junio'], [$report['sends'], $report['total'], $report['label']]);
+    self::assertSame(['Revista clientes', 'RV ESENCIA PROPIETARIOS'], array_column($report['sends_list'], 'tag'));
+    self::assertArrayNotHasKey('meta', $report['sends_list'][0], 'El informe no lleva el contenido de los mensajes.');
+    self::assertSame(0, $engine->campaigns()['unassigned']);
+    self::assertTrue($engine->detail('RV ESENCIA PROPIETARIOS')['legacy'], 'Sigue marcado como del panel anterior.');
+    self::assertSame($html, $db->getVar("SELECT message_html FROM skc_notification_queue WHERE destination = 'viejo@example.test'"), 'Los mensajes enviados no cambian.');
+
+    // Cambiarla por una nueva: el nombre del enlace se arma solo.
+    $engine->assignCampaign('RV ESENCIA PROPIETARIOS', '', 'Revista Especial');
+    self::assertContains('revista_especial', array_column($engine->campaigns()['groups'], 'slug'));
+    foreach ([['', ''], ['general', '']] as [$slug, $label]) {
+      try {
+        $engine->assignCampaign('RV ESENCIA PROPIETARIOS', $slug, $label);
+        self::fail('Debía rechazarse.');
+      } catch (\InvalidArgumentException $exception) {
+        self::assertNotSame('', $exception->getMessage());
+      }
+    }
+    $this->expectException(\InvalidArgumentException::class);
+    $engine->campaignReport('no-existe');
+  }
+
+  public function testCampaignOptionsJoinTheCatalogTheSendsAndTheWebCampaigns(): void
+  {
+    [$db, , $engine] = CampaignFixture::make(true);
+    $engine->send($engine->spec(self::campaign(['campaign_label' => 'Revista junio'])), '999', 'Administrador');
+    $db->pdo()->exec('CREATE TABLE wp_jet_cct_tracker_camps (_ID INTEGER PRIMARY KEY AUTOINCREMENT, slug TEXT, nombre TEXT)');
+    foreach ([['esencia-junio', 'Esencia-junio'], ['general', 'General'], ['120252011830540070', 'Anuncio'], ['Con Espacios', 'Con espacios']] as [$slug, $name]) {
+      $db->insert('wp_jet_cct_tracker_camps', ['slug' => $slug, 'nombre' => $name]);
+    }
+    $options = $engine->campaignOptions([['label' => 'Feria de vivienda', 'value' => 'feria']]);
+    self::assertSame(['esencia-junio' => 'Esencia junio', 'feria' => 'Feria de vivienda', 'revista_junio' => 'Revista junio'], $options);
+  }
+
+  public function testANewCampaignAlsoReachesTheUtmGenerator(): void
+  {
+    $config = ['base_url' => 'http://127.0.0.1/public', 'dashboard_admin_cargos' => ['13']];
+    $controller = new CampaignApiController($this->db, $this->settings, new \SCM\Core\Csrf(str_repeat('x', 40)), $config);
+    $remember = new \ReflectionMethod($controller, 'rememberCampaign');
+    $remember->invoke($controller, 'revista-junio', 'Revista junio');
+    $remember->invoke($controller, 'revista-junio', 'Otro nombre');
+    $remember->invoke($controller, '', 'Sin enlace');
+    self::assertSame([['label' => 'Revista junio', 'value' => 'revista-junio']], UtmCatalog::read($this->settings)['campanas']);
+  }
+
+  public function testTheScreenSeparatesCampaignsFromSends(): void
+  {
+    [$db, $admin, $engine] = CampaignFixture::make(true);
+    $engine->send($engine->spec(self::campaign(['campaign_label' => 'Revista junio'])), '999', 'Administrador');
+    $html = CampaignsView::page('campanas', [], $admin, $db, new Settings($db, true, 'control_servicios_comerciales_config'), '/public');
+    foreach (['Envíos masivos', 'data-camp-group="revista_junio"', 'data-camp-report="revista_junio"', 'Nuevo envío', 'data-camp-step="3"', 'data-camp-dialog="assign"', '+ Campaña nueva', 'Programar envío'] as $text) {
+      self::assertStringContainsString($text, $html);
+    }
+    self::assertStringNotContainsString('name="name"', $html, 'El envío ya no pide un nombre libre.');
+    self::assertSame('Envíos masivos', CommercialAccessPolicy::SUBVIEWS['notificaciones']['campanas']);
+    self::assertSame('report', CommercialActionRouter::CAMPAIGN_ACTIONS['commercial_campaign_report']);
   }
 
   /** @param array<string,mixed> $overrides @return array<string,mixed> */

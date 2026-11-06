@@ -4953,7 +4953,7 @@ final class CommercialDashboardView
   /** Ícono y ayuda de cada subpestaña de Notificaciones en el menú de escritorio. */
   private const NOTIFICATION_MENU = [
     'enviar_notificaciones' => ['send', 'WhatsApp, correo o SMS a contactos puntuales'],
-    'campanas' => ['campaign', 'Envíos masivos por lotes con su informe'],
+    'campanas' => ['campaign', 'A listas completas, por lotes y con informe por campaña'],
     'plantillas_correo' => ['draft', 'Correos diseñados para las campañas'],
   ];
 

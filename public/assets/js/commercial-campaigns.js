@@ -1,6 +1,6 @@
 (function () {
   "use strict";
-  // Notificaciones › Campañas y Plantillas de correo (adaptación de dashboard-marketing views/campaigns.php y
+  // Notificaciones › Envíos masivos y Plantillas de correo (adaptación de dashboard-marketing views/campaigns.php y
   // template-editor.php). Todo pasa en ventanas internas (<dialog>) y por AJAX (commercial_campaign_*,
   // commercial_template_*); al guardar se vuelve a cargar la sección sin salir del panel. Los eventos se delegan en
   // document porque la pestaña llega por AJAX.
@@ -76,8 +76,41 @@
     if (box) { box.textContent = message; box.hidden = false; box.scrollIntoView({ block: "nearest" }); } else notify("error", message);
   }
 
-  // ── Nueva campaña ─────────────────────────────────────────────────────────
+  // ── Asistente del nuevo envío ─────────────────────────────────────────────────────────
   function campaignForm() { return document.querySelector("[data-camp-form]"); }
+
+  // Los pasos se ocultan con data-off y no con hidden: payload() ignora lo que está dentro de [hidden].
+  function goStep(form, step) {
+    form.setAttribute("data-current-step", String(step));
+    form.querySelectorAll("[data-camp-step]").forEach(function (node) {
+      if (Number(node.getAttribute("data-camp-step")) === step) node.removeAttribute("data-off");
+      else node.setAttribute("data-off", "");
+    });
+    form.querySelectorAll("[data-camp-step-tab]").forEach(function (node) {
+      var number = Number(node.getAttribute("data-camp-step-tab"));
+      node.classList.toggle("is-current", number === step);
+      node.classList.toggle("is-done", number < step);
+    });
+    form.querySelector("[data-camp-back]").hidden = step === 1;
+    form.querySelector("[data-camp-next]").hidden = step === 3;
+    form.querySelector("[data-camp-final]").hidden = step !== 3;
+  }
+
+  // Campaña elegida o nueva: el slug lo arma el servidor cuando es nueva.
+  function campaignChoice(form) {
+    var select = form.querySelector("[data-camp-choice]");
+    var value = select.value;
+    if (value === "__new") return { slug: "", label: form.querySelector('[name="campaign_new"]').value.trim() };
+    return { slug: value, label: value ? select.options[select.selectedIndex].textContent : "" };
+  }
+
+  function stepProblem(form, step) {
+    if (step === 1) {
+      if (!campaignChoice(form).label) return "Elige la campaña del envío o crea una nueva.";
+      if (!form.querySelector("[data-camp-segment-on]:checked")) return "Elige al menos una lista.";
+    }
+    return "";
+  }
 
   function syncChannel(form) {
     var channel = form.querySelector("[data-camp-channel]").value;
@@ -100,7 +133,10 @@
     node.textContent = channel === "sms" ? (text.length + 24) + " de 160 caracteres con el prefijo (sin reemplazar variables)." : (channel === "whatsapp" ? text.length + " de 700 caracteres." : "");
   }
 
+  // Cualquier cambio deja sin valor el cálculo anterior, también el que siga en camino: una respuesta vieja nunca habilita el envío.
   function invalidate(form) {
+    form.__calculation = (form.__calculation || 0) + 1;
+    form.querySelector("[data-camp-preview]").hidden = true;
     form.querySelector('[data-camp-action="send"]').disabled = true;
     form.querySelector("[data-camp-confirm]").hidden = true;
     form.querySelector('[name="confirm"]').checked = false;
@@ -113,10 +149,13 @@
       if (on.checked) segments.push({ type: on.value, q: row.querySelector("[data-camp-segment-q]").value.trim() });
     });
     var data = new FormData();
-    ["name", "channel", "category", "template_id", "subject", "message", "batch_size", "batch_interval_minutes", "max_per_day", "utm_campaign"].forEach(function (name) {
+    ["channel", "category", "template_id", "subject", "message", "batch_size", "batch_interval_minutes", "max_per_day"].forEach(function (name) {
       var field = form.querySelector('[name="' + name + '"]');
       if (field && !field.closest("[hidden]")) data.set(name, field.value.trim());
     });
+    var campaign = campaignChoice(form);
+    data.set("utm_campaign", campaign.slug);
+    data.set("campaign_label", campaign.label);
     data.set("segments", JSON.stringify(segments));
     return data;
   }
@@ -141,7 +180,8 @@
     var unknown = (result.unknown_variables || []).length
       ? '<p class="cpr-alert">Estas variables no existen en la lista y quedarán tal cual: ' + esc(result.unknown_variables.map(function (name) { return "{{" + name + "}}"; }).join(", ")) + ".</p>" : "";
     box.innerHTML = '<h3>Destinatarios</h3><div class="cpr-table-wrap"><table class="cpr-table"><thead><tr><th>Lista</th><th class="is-num">En la lista</th><th class="is-num">Reciben</th><th>Se saltan</th></tr></thead><tbody>' + rows +
-      '</tbody><tfoot><tr><td><strong>Total</strong></td><td class="is-num">' + number(totals.total) + '</td><td class="is-num"><strong>' + number(totals.send) + "</strong></td><td></td></tr></tfoot></table></div>" + unknown + sampleHtml;
+      '</tbody><tfoot><tr><td><strong>Total</strong></td><td class="is-num">' + number(totals.total) + '</td><td class="is-num"><strong>' + number(totals.send) + "</strong></td><td></td></tr></tfoot></table></div>" +
+      (result.schedule ? '<p class="cpr-note" data-camp-schedule><span class="material-symbols-outlined" aria-hidden="true">schedule</span><span>Empezaría el <strong>' + esc(utcStamp(result.schedule.first_at)) + "</strong> y terminaría cerca del <strong>" + esc(utcStamp(result.schedule.last_at)) + "</strong>.</span></p>" : "") + unknown + sampleHtml;
     box.hidden = false;
     var frame = box.querySelector("[data-camp-sample-frame]");
     if (frame && sample) frame.srcdoc = sample.html;
@@ -162,13 +202,14 @@
     var dialog = form.closest("dialog");
     if (action === "send" && !form.querySelector('[name="confirm"]').checked) { fail(dialog, "Marca la casilla para confirmar el envío."); return; }
     var data = payload(form);
+    var calculation = form.__calculation;
     if (action === "send") data.set("confirm", "1");
     button.disabled = true;
     dialog.setAttribute("aria-busy", "true");
     try {
       var result = await post({ preview: "commercial_campaign_preview", test: "commercial_campaign_test", send: "commercial_campaign_send" }[action], data);
       dialog.querySelector("[data-camp-error]").hidden = true;
-      if (action === "preview") renderPreview(form, result);
+      if (action === "preview") { if (calculation === form.__calculation) renderPreview(form, result); }
       else if (action === "test") notify("success", result.message);
       else {
         close(dialog);
@@ -181,6 +222,32 @@
       dialog.removeAttribute("aria-busy");
       if (action !== "send") button.disabled = false;
       else button.disabled = form.querySelector("[data-camp-confirm]").hidden;
+    }
+  }
+
+  // ── Informe de la campaña: suma todos sus envíos ──────────────────────────
+  async function loadReport(slug) {
+    var dialog = document.querySelector('[data-camp-dialog="report"]');
+    var body = dialog.querySelector("[data-camp-report-body]");
+    body.innerHTML = '<p class="cpr-empty">Cargando informe…</p>';
+    open(dialog);
+    try {
+      var report = (await post("commercial_campaign_report", fields({ slug: slug }))).report;
+      dialog.querySelector("[data-camp-report-title]").textContent = report.label;
+      var stats = [
+        ["Envíos", number(report.sends)], ["Enviados", number(report.sent) + " de " + number(report.total)], ["Fallidos", number(report.failed)], ["En cola", number(report.pending)],
+        ["Correos abiertos", report.tracked > 0 ? number(report.opened) + " de " + number(report.tracked) + " (" + Math.round(report.opened * 100 / report.tracked) + " %)" : "—"],
+      ];
+      if (report.visits) stats.push(["Visitas al sitio", number(report.visits.hits) + " (" + number(report.visits.visitors) + " personas)"]);
+      var sends = (report.sends_list || []).map(function (row) {
+        return "<tr><td>" + esc(row.tag) + '</td><td class="is-num">' + number(row.sent) + " / " + number(row.total) + '</td><td class="is-num">' + (row.tracked > 0 ? Math.round(row.opened * 100 / row.tracked) + " %" : "—") + '</td><td><button type="button" class="cpr-ghost is-small" data-camp-detail="' + esc(row.tag) + '">Ver envío</button></td></tr>';
+      }).join("");
+      var properties = (report.properties || []).map(function (row) { return "<tr><td>" + esc(row.ref) + '</td><td class="is-num">' + number(row.hits) + "</td></tr>"; }).join("");
+      body.innerHTML = '<dl class="cpr-camp-stats" data-camp-report-stats>' + stats.map(function (item) { return "<div><dt>" + esc(item[0]) + "</dt><dd>" + esc(item[1]) + "</dd></div>"; }).join("") + "</dl>" +
+        '<h3>Envíos de la campaña</h3><div class="cpr-table-wrap"><table class="cpr-table"><thead><tr><th>Envío</th><th class="is-num">Enviados</th><th class="is-num">Abiertos</th><th><span class="sr-only">Acción</span></th></tr></thead><tbody>' + sends + "</tbody></table></div>" +
+        (properties ? '<h3>Inmuebles más vistos desde esta campaña</h3><div class="cpr-table-wrap"><table class="cpr-table"><thead><tr><th>Inmueble</th><th class="is-num">Vistas</th></tr></thead><tbody>' + properties + "</tbody></table></div>" : "");
+    } catch (error) {
+      body.innerHTML = '<p class="cpr-alert is-error">' + esc(error.message) + "</p>";
     }
   }
 
@@ -216,6 +283,7 @@
       else if (campaign.status !== "cancelled" && campaign.pending > 0) actions += '<button type="button" class="cpr-ghost is-small" data-camp-op="pause">Pausar</button>';
       if (campaign.failed > 0 && campaign.status !== "cancelled") actions += '<button type="button" class="cpr-ghost is-small" data-camp-op="retry">Reintentar fallidos</button>';
       if (campaign.pending > 0) actions += '<button type="button" class="cpr-ghost is-small is-danger" data-camp-op="cancel">Cancelar lo pendiente</button>';
+      actions += '<button type="button" class="cpr-ghost is-small" data-camp-op="assign">' + (meta.utm_campaign ? "Cambiar campaña" : "Asignar a una campaña") + "</button>";
       actions += '<button type="button" class="cpr-ghost is-small" data-camp-op="rename">Renombrar</button>';
       if (dialog.getAttribute("data-can-delete") === "1" && !(campaign.pending > 0)) actions += '<button type="button" class="cpr-ghost is-small is-danger" data-camp-op="delete">Eliminar</button>';
     }
@@ -250,12 +318,16 @@
       notify("success", result.message);
       close(document.querySelector('[data-camp-dialog="confirm"]'));
       close(document.querySelector('[data-camp-dialog="rename"]'));
+      close(document.querySelector('[data-camp-dialog="assign"]'));
+      close(document.querySelector('[data-camp-dialog="report"]'));
       close(detail);
       navigate("");
     } catch (error) {
       var confirm = document.querySelector('[data-camp-dialog="confirm"]');
       var rename = document.querySelector('[data-camp-dialog="rename"]');
-      if (rename && rename.open) fail(rename, error.message);
+      var assign = document.querySelector('[data-camp-dialog="assign"]');
+      if (assign && assign.open) fail(assign, error.message);
+      else if (rename && rename.open) fail(rename, error.message);
       else if (confirm && confirm.open) fail(confirm, error.message);
       else notify("error", error.message);
     }
@@ -307,6 +379,11 @@
     }
   }
 
+  document.addEventListener("change", function (event) {
+    var select = event.target;
+    if (select && select.matches && select.matches("[data-camp-choice]")) select.closest("form").querySelector("[data-camp-new]").hidden = select.value !== "__new";
+  });
+
   // ── Eventos ───────────────────────────────────────────────────────────────
   document.addEventListener("click", function (event) {
     var target = event.target;
@@ -324,11 +401,32 @@
       form.reset();
       form.querySelectorAll("[data-camp-segment-q]").forEach(function (input) { input.disabled = true; });
       form.querySelector("[data-camp-preview]").hidden = true;
+      form.querySelector("[data-camp-new]").hidden = true;
       invalidate(form);
       syncChannel(form);
+      goStep(form, 1);
       open(form.closest("dialog"));
       return;
     }
+    if (target.closest("[data-camp-back]")) {
+      var backForm = target.closest("form");
+      backForm.querySelector("[data-camp-error]").hidden = true;
+      goStep(backForm, Number(backForm.getAttribute("data-current-step")) - 1);
+      return;
+    }
+    if (target.closest("[data-camp-next]")) {
+      var nextForm = target.closest("form");
+      var current = Number(nextForm.getAttribute("data-current-step"));
+      var problem = stepProblem(nextForm, current);
+      if (problem) { fail(nextForm.closest("dialog"), problem); return; }
+      nextForm.querySelector("[data-camp-error]").hidden = true;
+      goStep(nextForm, current + 1);
+      // Al llegar al último paso ya se ve a cuántos llega y cuándo termina.
+      if (current + 1 === 3) campaignAction(nextForm, "preview", nextForm.querySelector('[data-camp-action="preview"]'));
+      return;
+    }
+    var report = target.closest("[data-camp-report]");
+    if (report) { loadReport(report.getAttribute("data-camp-report")); return; }
     var action = target.closest("[data-camp-action]");
     if (action) { campaignAction(action.closest("form"), action.getAttribute("data-camp-action"), action); return; }
     var detail = target.closest("[data-camp-detail]");
@@ -336,6 +434,13 @@
     var op = target.closest("[data-camp-op]");
     if (op) {
       var operation = op.getAttribute("data-camp-op");
+      if (operation === "assign") {
+        var assign = document.querySelector('[data-camp-dialog="assign"]');
+        assign.querySelector("form").reset();
+        assign.querySelector("[data-camp-new]").hidden = true;
+        open(assign);
+        return;
+      }
       if (operation === "rename") {
         var rename = document.querySelector('[data-camp-dialog="rename"]');
         rename.querySelector("form").reset();
@@ -349,7 +454,7 @@
         var texts = {
           cancel: ["Cancelar lo pendiente", tagName, "Entiendo que los mensajes que faltan no se enviarán. Los enviados no cambian y quedan en el historial."],
           exclude: ["Excluir de la campaña", op.getAttribute("data-name") || "", "Entiendo que esta persona no recibirá esta campaña, tampoco si se vuelve a enviar."],
-          delete: ["Eliminar campaña", tagName, "Entiendo que la campaña y el historial de sus mensajes se borran definitivamente. No se puede deshacer."],
+          delete: ["Eliminar envío", tagName, "Entiendo que el envío y el historial de sus mensajes se borran definitivamente. No se puede deshacer."],
         }[operation];
         confirm.querySelector("form").reset();
         confirm.querySelector("[data-camp-confirm-title]").textContent = texts[0];
@@ -399,6 +504,13 @@
   document.addEventListener("submit", function (event) {
     var form = event.target;
     if (form.matches && form.matches("[data-camp-form]")) { event.preventDefault(); return; }
+    if (form.matches && form.matches("[data-camp-assign-form]")) {
+      event.preventDefault();
+      var chosen = campaignChoice(form);
+      if (!chosen.label) { fail(form.closest("dialog"), "Elige la campaña o escribe el nombre de la nueva."); return; }
+      control("assign", { slug: chosen.slug, label: chosen.label });
+      return;
+    }
     if (form.matches && form.matches("[data-camp-rename-form]")) {
       event.preventDefault();
       if (form.reportValidity()) control("rename", { new_tag: form.querySelector('[name="new_tag"]').value });

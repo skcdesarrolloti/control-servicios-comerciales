@@ -70,23 +70,48 @@ async function toast(page, text) {
     await rename.locator('[data-camp-error]', { hasText: 'ya tiene ese nombre' }).waitFor();
     await rename.locator('[name="new_tag"]').fill('Revista otoño');
     await rename.locator('button[type=submit]').click();
-    await toast(page, 'Campaña renombrada a "Revista otoño"');
+    await toast(page, 'Envío renombrado a "Revista otoño"');
     await page.locator('[data-camp-row="Revista octubre"]').waitFor();
     // Eliminar exige la confirmación en el servidor.
     assert.equal((await post(page, { action: 'commercial_campaign_control', tag: 'Revista octubre', operation: 'delete' })).status, 422);
 
-    // Nueva campaña: calcular, vista previa y programar.
+    // Asignar el envío a una campaña y ver el informe que suma sus envíos.
+    assert.equal(await page.locator('[data-commercial-dropdown-menu="notificaciones"] a', { hasText: 'Envíos masivos' }).count(), 1);
+    await page.locator('[data-camp-detail="Revista octubre"]').click();
+    await detail.locator('[data-camp-op="assign"]').click();
+    const assign = page.locator('[data-camp-dialog="assign"]');
+    await assign.waitFor({ state: 'visible' });
+    await assign.locator('button[type=submit]').click();
+    await assign.locator('[data-camp-error]', { hasText: 'Elige la campaña' }).waitFor();
+    await assign.locator('[data-camp-choice]').selectOption('__new');
+    await assign.locator('[name="campaign_new"]').fill('Revista Esencia diciembre');
+    await assign.locator('button[type=submit]').click();
+    await toast(page, 'Envío asignado a la campaña.');
+    await page.locator('[data-camp-list]').waitFor();
+    assert.equal((await post(page, { action: 'commercial_campaign_report', slug: 'no-existe' })).status, 422);
+
+    // Nuevo envío: el asistente de tres pasos.
     await page.locator('[data-camp-open="new"]').click();
     const dialog = page.locator('[data-camp-dialog="new"]');
     await dialog.waitFor({ state: 'visible' });
-    await dialog.locator('[name="name"]').fill('Boletín noviembre');
-    await dialog.locator('[name="subject"]').fill('Hola {{nombre}}');
-    await dialog.locator('[name="message"]').fill('Novedades de {{ciudad}}.');
+    // Paso 1: sin campaña ni lista no avanza.
+    await dialog.locator('[data-camp-next]').click();
+    await dialog.locator('[data-camp-error]', { hasText: 'Elige la campaña' }).waitFor();
+    await dialog.locator('[data-camp-choice]').selectOption('__new');
+    await dialog.locator('[name="campaign_new"]').fill('Boletín noviembre');
+    await dialog.locator('[data-camp-next]').click();
+    await dialog.locator('[data-camp-error]', { hasText: 'al menos una lista' }).waitFor();
     await dialog.locator('[data-camp-segment-on][value="clientes"]').check();
     await dialog.locator('[data-camp-segment-on][value="suscriptores"]').check();
-    assert.equal(await dialog.locator('[data-camp-action="send"]').isDisabled(), true);
-    await dialog.locator('[data-camp-action="preview"]').click();
+    await dialog.locator('[data-camp-next]').click();
+    // Paso 2: el mensaje.
+    await dialog.locator('[name="subject"]').fill('Hola {{nombre}}');
+    await dialog.locator('[name="message"]').fill('Novedades de {{ciudad}}.');
+    assert.equal(await dialog.locator('[data-camp-action="send"]').isVisible(), false);
+    await dialog.locator('[data-camp-next]').click();
+    // Paso 3: calcula solo y dice cuándo termina.
     await dialog.locator('[data-camp-preview] table').waitFor();
+    await dialog.locator('[data-camp-schedule]', { hasText: 'terminaría cerca del' }).waitFor();
     const previewText = await dialog.locator('[data-camp-preview]').innerText();
     assert.ok(previewText.includes('Clientes') && previewText.includes('Suscriptores'), previewText);
     assert.ok(previewText.includes('Así lo recibe Laura Gómez'));
@@ -95,7 +120,11 @@ async function toast(page, text) {
     await dialog.locator('[data-camp-action="test"]').click();
     await toast(page, 'Prueba enviada a admin@example.test');
     // Cambiar algo después de calcular obliga a calcular otra vez.
+    await dialog.locator('[data-camp-back]').click();
     await dialog.locator('[name="message"]').fill('Novedades de {{ciudad}}!');
+    await dialog.locator('[data-camp-next]').click();
+    await dialog.locator('[data-camp-preview] table').waitFor();
+    await dialog.locator('[name="batch_size"]').fill('150');
     assert.equal(await dialog.locator('[data-camp-action="send"]').isDisabled(), true);
     await dialog.locator('[data-camp-action="preview"]').click();
     await dialog.locator('[data-camp-confirm]').waitFor({ state: 'visible' });
@@ -104,11 +133,15 @@ async function toast(page, text) {
     await dialog.locator('[data-camp-confirm] input').check();
     await dialog.locator('[data-camp-action="send"]').click();
     await dialog.waitFor({ state: 'hidden' });
-    await toast(page, 'Campaña programada');
+    await toast(page, 'Envío programado');
 
     // SMS: sin asunto ni plantilla y con contador.
     await page.locator('[data-camp-open="new"]').click();
     await dialog.locator('[data-camp-channel]').selectOption('sms');
+    await dialog.locator('[data-camp-choice]').selectOption('__new');
+    await dialog.locator('[name="campaign_new"]').fill('Aviso SMS');
+    await dialog.locator('[data-camp-segment-on][value="clientes"]').check();
+    await dialog.locator('[data-camp-next]').click();
     assert.equal(await dialog.locator('[name="subject"]').isVisible(), false);
     await dialog.locator('[name="message"]').fill('Hola {{nombre}}');
     assert.ok((await dialog.locator('[data-camp-counter]').innerText()).includes('de 160'));

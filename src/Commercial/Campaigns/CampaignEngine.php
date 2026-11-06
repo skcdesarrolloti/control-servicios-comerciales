@@ -6,6 +6,7 @@ namespace SCM\Commercial\Campaigns;
 
 use SCM\Commercial\CommercialSmsMessage;
 use SCM\Commercial\Promotion\Analytics\TrackerSchema;
+use SCM\Commercial\Tools\UtmLinkBuilder;
 use SCM\Core\Database;
 use SCM\Support\SchemaInspector;
 
@@ -71,9 +72,15 @@ final class CampaignEngine
    */
   public function spec(array $input, ?CampaignTemplates $templates = null): array
   {
+    // Un envío pertenece a una campaña: sin nombre propio se llama como ella, y así sus listas no reciben el mensaje dos veces.
+    $label = preg_replace('/\s+/u', ' ', trim(strip_tags((string) ($input['campaign_label'] ?? '')))) ?? '';
+    if (mb_strlen($label, 'UTF-8') > 60) {
+      throw new \InvalidArgumentException('El nombre de la campaña admite hasta 60 caracteres.');
+    }
     $name = preg_replace('/\s+/u', ' ', trim((string) ($input['name'] ?? ''))) ?? '';
+    $name = $name !== '' ? $name : $label;
     if ($name === '' || mb_strlen($name, 'UTF-8') > 120) {
-      throw new \InvalidArgumentException('Escribe el nombre de la campaña (máximo 120 caracteres).');
+      throw new \InvalidArgumentException('Elige la campaña del envío (máximo 120 caracteres).');
     }
     $channel = (string) ($input['channel'] ?? '');
     if (!isset(self::CHANNELS[$channel])) {
@@ -142,15 +149,31 @@ final class CampaignEngine
       }
       $pace[$key] = $value;
     }
-    $utm = strtolower(trim((string) ($input['utm_campaign'] ?? '')));
-    if ($utm !== '' && preg_match('/^[a-z0-9][a-z0-9_-]{0,79}$/', $utm) !== 1) {
-      throw new \InvalidArgumentException('La campaña UTM no es válida.');
-    }
+    $utm = self::campaignSlug((string) ($input['utm_campaign'] ?? ''), $label);
     return [
       'name' => $name, 'channel' => $channel, 'category' => $category, 'subject' => $subject, 'message' => $message,
       'template' => $template, 'template_id' => $template !== null ? (int) $template['id'] : 0, 'segments' => array_values($clean),
-      'pace' => $pace, 'utm_campaign' => $utm,
+      'pace' => $pace, 'utm_campaign' => $utm, 'campaign_label' => $label,
     ];
+  }
+
+  public static function slugFor(string $slug, string $label): string
+  {
+    return self::campaignSlug($slug, $label);
+  }
+
+  /** Nombre de la campaña en los enlaces: el elegido o el que sale de su nombre, siempre con el mismo formato. */
+  private static function campaignSlug(string $slug, string $label): string
+  {
+    $slug = strtolower(trim($slug));
+    $slug = $slug !== '' ? $slug : substr(UtmLinkBuilder::slug($label), 0, 80);
+    if ($slug !== '' && preg_match('/^[a-z0-9][a-z0-9_-]{0,79}$/', $slug) !== 1) {
+      throw new \InvalidArgumentException('La campaña no es válida.');
+    }
+    if (in_array($slug, UtmLinkBuilder::RESERVED_CAMPAIGNS, true)) {
+      throw new \InvalidArgumentException('Ese nombre lo usa el sistema: elige otro para la campaña.');
+    }
+    return $slug;
   }
 
   // ── Vista previa y envío ────────────────────────────────────────────────
@@ -172,7 +195,9 @@ final class CampaignEngine
       $unknown = CampaignMessage::unknownVariables($source, $item['recipient']);
       break;
     }
-    return ['segments' => $plan['segments'], 'totals' => $plan['totals'], 'sample' => $sample, 'unknown_variables' => $unknown];
+    $send = (int) $plan['totals']['send'];
+    $schedule = $send > 0 ? ['first_at' => $this->scheduledAt($spec['pace'], 0), 'last_at' => $this->scheduledAt($spec['pace'], $send - 1)] : null;
+    return ['segments' => $plan['segments'], 'totals' => $plan['totals'], 'sample' => $sample, 'unknown_variables' => $unknown, 'schedule' => $schedule];
   }
 
   /**
@@ -608,6 +633,119 @@ final class CampaignEngine
     return ['campaign' => $campaign, 'hits' => $hits, 'visitors' => $visitors];
   }
 
+  // ── Campañas: agrupan envíos ────────────────────────────────────────
+
+  /** Nombre visible de una campaña a partir de su slug. */
+  private static function prettyCampaign(string $slug): string
+  {
+    return ucfirst(str_replace(['-', '_'], ' ', $slug));
+  }
+
+  /**
+   * Campañas que se pueden elegir: las del Generador UTM, las que ya tienen envíos y las que traen visitas al sitio.
+   * @param list<array{label:string,value:string}> $catalog
+   * @return array<string,string> slug => nombre
+   */
+  public function campaignOptions(array $catalog): array
+  {
+    $options = [];
+    foreach ($catalog as $row) {
+      $options[$row['value']] = $row['label'];
+    }
+    foreach ($this->list() as $row) {
+      $slug = (string) ($row['meta']['utm_campaign'] ?? '');
+      if ($slug !== '') {
+        $options[$slug] ??= (string) (($row['meta']['campaign_label'] ?? '') ?: self::prettyCampaign($slug));
+      }
+    }
+    try {
+      foreach ($this->db->getResults('SELECT `slug`, `nombre` FROM `' . $this->db->table('jet_cct_tracker_camps') . '`') as $row) {
+        $slug = (string) $row['slug'];
+        if (preg_match('/^[a-z0-9][a-z0-9_-]{0,79}$/', $slug) === 1 && preg_match('/[a-z]/', $slug) === 1 && !in_array($slug, UtmLinkBuilder::RESERVED_CAMPAIGNS, true)) {
+          $options[$slug] ??= trim((string) $row['nombre']) !== '' ? str_replace(['-', '_'], ' ', (string) $row['nombre']) : self::prettyCampaign($slug);
+        }
+      }
+    } catch (\Throwable) {
+      // Sin el catálogo de visitas quedan las demás.
+    }
+    uasort($options, static fn(string $a, string $b): int => strcasecmp($a, $b));
+    return $options;
+  }
+
+  /**
+   * Envíos agrupados por campaña. Los que no tienen campaña se cuentan aparte: se asignan desde su informe.
+   * @return array{groups:list<array<string,mixed>>,unassigned:int}
+   */
+  public function campaigns(): array
+  {
+    $groups = [];
+    $unassigned = 0;
+    foreach ($this->list() as $row) {
+      $slug = (string) ($row['meta']['utm_campaign'] ?? '');
+      if ($slug === '') {
+        $unassigned++;
+        continue;
+      }
+      $groups[$slug] ??= ['slug' => $slug, 'label' => (string) (($row['meta']['campaign_label'] ?? '') ?: self::prettyCampaign($slug)), 'sends' => 0, 'total' => 0, 'sent' => 0, 'failed' => 0, 'pending' => 0, 'opened' => 0, 'tracked' => 0, 'last_at' => ''];
+      $groups[$slug]['sends']++;
+      foreach (['total', 'sent', 'failed', 'pending', 'opened', 'tracked'] as $key) {
+        $groups[$slug][$key] += (int) $row[$key];
+      }
+      $groups[$slug]['last_at'] = max($groups[$slug]['last_at'], (string) $row['last_at']);
+    }
+    $list = array_values($groups);
+    usort($list, static fn(array $a, array $b): int => strcmp($b['last_at'], $a['last_at']));
+    return ['groups' => $list, 'unassigned' => $unassigned];
+  }
+
+  /**
+   * Informe único de una campaña: suma sus envíos y agrega las visitas al sitio y los inmuebles vistos desde sus enlaces.
+   * @return array<string,mixed>
+   */
+  public function campaignReport(string $slug): array
+  {
+    foreach ($this->campaigns()['groups'] as $group) {
+      if ($group['slug'] === $slug) {
+        $sends = array_values(array_filter($this->list(), static fn(array $row): bool => (string) ($row['meta']['utm_campaign'] ?? '') === $slug));
+        $sends = array_map(static fn(array $row): array => array_diff_key($row, ['meta' => true]), $sends);
+        return $group + ['sends_list' => $sends, 'visits' => $this->visits($slug), 'properties' => $this->campaignProperties($slug)];
+      }
+    }
+    throw new \InvalidArgumentException('La campaña no existe.');
+  }
+
+  /** Inmuebles más vistos desde esa campaña (resúmenes de la Analítica web). @return list<array{ref:string,hits:int}> */
+  private function campaignProperties(string $slug): array
+  {
+    try {
+      $rows = $this->db->getResults("SELECT MAX(`value`) AS id, COALESCE(MAX(CASE WHEN `detail` <> '' AND `detail` NOT LIKE 'http%' THEN `detail` END), MAX(`detail`)) AS detail, SUM(`hits`) AS hits FROM `" . TrackerSchema::top($this->db) . "`
+        WHERE `dim` = 'object' AND `camp_slug` = ? AND `bot` = 0 AND `internal` = 0 GROUP BY `value_hash` ORDER BY hits DESC LIMIT 5", [$slug]);
+    } catch (\Throwable) {
+      return [];
+    }
+    return array_map(static fn(array $row): array => ['ref' => (string) ($row['detail'] ?: 'ID ' . $row['id']), 'hits' => (int) $row['hits']], $rows);
+  }
+
+  /**
+   * Asigna un envío ya hecho a una campaña, o lo saca de ella. Solo cambia la configuración del envío: los mensajes ya
+   * enviados no se tocan y conservan sus enlaces.
+   */
+  public function assignCampaign(string $tag, string $slug, string $label): void
+  {
+    $this->requireCampaign($tag);
+    $label = preg_replace('/\s+/u', ' ', trim(strip_tags($label))) ?? '';
+    if (mb_strlen($label, 'UTF-8') > 60) {
+      throw new \InvalidArgumentException('El nombre de la campaña admite hasta 60 caracteres.');
+    }
+    $slug = self::campaignSlug($slug, $label);
+    if ($slug === '') {
+      throw new \InvalidArgumentException('Elige la campaña.');
+    }
+    $config = $this->db->getRow("SELECT * FROM `{$this->config}` WHERE campaign_tag = ? LIMIT 1", [$tag]) ?? [];
+    $meta = ['utm_campaign' => $slug, 'campaign_label' => $label !== '' ? $label : self::prettyCampaign($slug)] + self::meta($config);
+    $this->db->update($this->config, ['config_key' => 'campaign', 'config_value' => json_encode($meta, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR), 'cct_modified' => $this->localNow(), 'updated_at' => gmdate('Y-m-d H:i:s')], ['campaign_tag' => $tag]);
+  }
+
   // ── Internos ────────────────────────────────────────────────────────────
 
   /**
@@ -618,7 +756,7 @@ final class CampaignEngine
   private function saveConfig(array $spec, string $employee): array
   {
     $meta = ['channel' => $spec['channel'], 'category' => $spec['category'], 'subject' => $spec['subject'], 'message' => $spec['message'],
-      'template_id' => $spec['template_id'], 'segments' => $spec['segments'], 'utm_campaign' => $spec['utm_campaign']];
+      'template_id' => $spec['template_id'], 'segments' => $spec['segments'], 'utm_campaign' => $spec['utm_campaign'], 'campaign_label' => $spec['campaign_label']];
     $row = $this->db->getRow("SELECT * FROM `{$this->config}` WHERE campaign_tag = ? LIMIT 1", [$spec['name']]);
     $data = $spec['pace'] + ['config_key' => 'campaign', 'config_value' => json_encode($meta, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
       'cct_modified' => $this->localNow(), 'updated_at' => gmdate('Y-m-d H:i:s')];

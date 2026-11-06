@@ -56,8 +56,8 @@ final class CommercialAccessPolicy
     'redes_sincronizar' => 'Redes sociales: sincronizar y conectar o desconectar YouTube y TikTok',
     'piezas_gestionar' => 'Banco de piezas: subir y editar piezas y vincular publicaciones',
     'piezas_archivar' => 'Banco de piezas: archivar y restaurar piezas',
-    'campanas_enviar' => 'Campañas: crear, enviar, pausar, reanudar, reintentar y cancelar envíos masivos',
-    'campanas_eliminar' => 'Campañas: eliminar campañas terminadas o canceladas con su historial (además de enviar)',
+    'campanas_enviar' => 'Envíos masivos: crear, enviar, pausar, reanudar, reintentar y cancelar',
+    'campanas_eliminar' => 'Envíos masivos: eliminar envíos terminados o cancelados con su historial (además de enviar)',
     'plantillas_editar' => 'Plantillas de correo: crear, editar, duplicar y archivar',
     'plan_estrategico_editar' => 'Plan estratégico: crear, editar y eliminar objetivos, metas, tareas y campañas',
   ];
@@ -104,7 +104,7 @@ final class CommercialAccessPolicy
     // Notificaciones: el envío uno a uno, las campañas masivas (traídas de dashboard-marketing) y sus plantillas de correo.
     'notificaciones' => [
       'enviar_notificaciones' => 'Enviar notificaciones',
-      'campanas' => 'Campañas',
+      'campanas' => 'Envíos masivos',
       'plantillas_correo' => 'Plantillas de correo',
     ],
   ];

@@ -9,6 +9,7 @@ use SCM\Commercial\Campaigns\CampaignMessage;
 use SCM\Commercial\Campaigns\CampaignRecipients;
 use SCM\Commercial\Campaigns\CampaignTemplates;
 use SCM\Commercial\CommercialAccessPolicy;
+use SCM\Commercial\Tools\UtmCatalog;
 use SCM\Core\Auth;
 use SCM\Core\Csrf;
 use SCM\Core\Database;
@@ -23,6 +24,7 @@ use SCM\Http\Response\JsonResponse;
 final class CampaignApiController
 {
   private Database $db;
+  private Settings $settings;
   private Csrf $csrf;
   private CommercialAccessPolicy $policy;
   private string $baseUrl;
@@ -36,6 +38,7 @@ final class CampaignApiController
   public function __construct(Database $db, Settings $settings, Csrf $csrf, array $config, ?\Closure $clock = null)
   {
     $this->db = $db;
+    $this->settings = $settings;
     $this->csrf = $csrf;
     $adminCargos = is_array($config['dashboard_admin_cargos'] ?? null) ? $config['dashboard_admin_cargos'] : ['11', '12', '13', '14'];
     $this->policy = new CommercialAccessPolicy($settings, $db, $adminCargos);
@@ -60,12 +63,39 @@ final class CampaignApiController
     $this->confirmed($input);
     $this->respond(function () use ($input): array {
       $engine = $this->engine();
-      $result = $engine->send($engine->spec($input), $this->employee(), trim(Auth::user()));
+      $spec = $engine->spec($input);
+      $result = $engine->send($spec, $this->employee(), trim(Auth::user()));
+      $this->rememberCampaign((string) $spec['utm_campaign'], (string) $spec['campaign_label']);
       if ($result['queued'] === 0) {
         return $result + ['message' => 'No se programó ningún mensaje: todos los destinatarios ya la recibieron, no la aceptan o no tienen ' . (($input['channel'] ?? '') === 'email' ? 'correo' : 'celular') . '.'];
       }
-      return $result + ['message' => 'Campaña programada: ' . number_format($result['queued'], 0, ',', '.') . ' mensajes por lotes.'];
+      return $result + ['message' => 'Envío programado: ' . number_format($result['queued'], 0, ',', '.') . ' mensajes por lotes.'];
     });
+  }
+
+  /** Una campaña nueva queda también en el Generador UTM, para que los enlaces de todo el equipo usen el mismo nombre. */
+  private function rememberCampaign(string $slug, string $label): void
+  {
+    if ($slug === '' || $label === '') {
+      return;
+    }
+    try {
+      $catalog = UtmCatalog::read($this->settings);
+      if (!in_array($slug, array_column($catalog['campanas'], 'value'), true) && count($catalog['campanas']) < UtmCatalog::MAX_ITEMS) {
+        $catalog['campanas'][] = ['label' => $label, 'value' => $slug];
+        UtmCatalog::save($this->settings, $catalog, Auth::userId());
+      }
+    } catch (\Throwable $exception) {
+      // El envío ya quedó programado: no se bloquea por esto.
+      error_log('[commercial-campaigns] catálogo UTM: ' . $exception->getMessage());
+    }
+  }
+
+  /** Informe único de una campaña con todos sus envíos. @param array<string,mixed> $input */
+  public function report(array $input): never
+  {
+    $this->guard($input, 'campanas');
+    $this->respond(fn(): array => ['report' => $this->engine()->campaignReport(trim((string) ($input['slug'] ?? '')))]);
   }
 
   /** Correo de prueba a quien prepara la campaña, con los datos del primer destinatario. @param array<string,mixed> $input */
@@ -113,7 +143,7 @@ final class CampaignApiController
     $this->guard($input, 'campanas', 'campanas_enviar');
     $operation = (string) ($input['operation'] ?? '');
     if ($operation === 'delete' && !$this->policy->canAct('campanas_eliminar')) {
-      JsonResponse::error('No tienes permiso para eliminar campañas.', 403);
+      JsonResponse::error('No tienes permiso para eliminar envíos.', 403);
     }
     if (in_array($operation, ['cancel', 'exclude', 'delete'], true)) {
       $this->confirmed($input);
@@ -123,12 +153,17 @@ final class CampaignApiController
       $tag = trim((string) ($input['tag'] ?? ''));
       $count = static fn(int $n): string => number_format($n, 0, ',', '.');
       return ['message' => match ($operation) {
-        'pause' => 'Campaña en pausa: ' . $count($engine->setPaused($tag, true)) . ' mensajes esperan.',
-        'resume' => 'Campaña reanudada: ' . $count($engine->setPaused($tag, false)) . ' mensajes vuelven a la cola.',
+        'pause' => 'Envío en pausa: ' . $count($engine->setPaused($tag, true)) . ' mensajes esperan.',
+        'resume' => 'Envío reanudado: ' . $count($engine->setPaused($tag, false)) . ' mensajes vuelven a la cola.',
         'retry' => $count($engine->retryFailed($tag)) . ' mensajes fallidos vuelven a intentarse.',
-        'cancel' => 'Campaña cancelada: ' . $count($engine->cancel($tag)) . ' mensajes no se enviarán.',
-        'rename' => 'Campaña renombrada a "' . $engine->rename($tag, (string) ($input['new_tag'] ?? '')) . '".',
-        'delete' => 'Campaña eliminada con ' . $count($engine->delete($tag)) . ' mensajes de su historial.',
+        'cancel' => 'Envío cancelado: ' . $count($engine->cancel($tag)) . ' mensajes no se enviarán.',
+        'assign' => (function () use ($engine, $tag, $input): string {
+          $engine->assignCampaign($tag, (string) ($input['slug'] ?? ''), (string) ($input['label'] ?? ''));
+          $this->rememberCampaign(CampaignEngine::slugFor((string) ($input['slug'] ?? ''), (string) ($input['label'] ?? '')), (string) ($input['label'] ?? ''));
+          return 'Envío asignado a la campaña.';
+        })(),
+        'rename' => 'Envío renombrado a "' . $engine->rename($tag, (string) ($input['new_tag'] ?? '')) . '".',
+        'delete' => 'Envío eliminado con ' . $count($engine->delete($tag)) . ' mensajes de su historial.',
         'exclude' => (function () use ($engine, $tag, $input): string {
           $engine->exclude($tag, (string) ($input['type'] ?? ''), (int) ($input['actor'] ?? 0), (string) ($input['reason'] ?? ''), $this->employee());
           return 'La persona quedó excluida de esta campaña.';

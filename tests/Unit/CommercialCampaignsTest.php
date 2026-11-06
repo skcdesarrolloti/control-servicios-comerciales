@@ -51,7 +51,7 @@ final class CommercialCampaignsTest extends TestCase
 
   public function testNotificationsBecomeAGroupWithCampaignsAndTemplatesBehindOptInActions(): void
   {
-    self::assertSame(['enviar_notificaciones' => 'Enviar notificaciones', 'campanas' => 'Campañas', 'plantillas_correo' => 'Plantillas de correo'], CommercialAccessPolicy::SUBVIEWS['notificaciones']);
+    self::assertSame(['enviar_notificaciones' => 'Enviar notificaciones', 'campanas' => 'Envíos masivos', 'plantillas_correo' => 'Plantillas de correo'], CommercialAccessPolicy::SUBVIEWS['notificaciones']);
     self::assertSame('notif_sub', CommercialAccessPolicy::TAB_GROUPS['notificaciones']);
     self::assertSame(['tab' => 'notificaciones', 'notif_sub' => 'campanas'], CommercialAccessPolicy::normalizeTabGroup(['tab' => 'campanas']));
     foreach (['campanas_enviar', 'campanas_eliminar', 'plantillas_editar'] as $action) {
@@ -315,7 +315,7 @@ final class CommercialCampaignsTest extends TestCase
     $sent = self::endpoint(true, 'commercial_campaign_send', self::input(['confirm' => '1']));
     self::assertSame(200, $sent['status']);
     self::assertSame(4, $sent['json']['data']['queued']);
-    self::assertStringContainsString('Campaña programada: 4 mensajes', $sent['json']['data']['message']);
+    self::assertStringContainsString('Envío programado: 4 mensajes', $sent['json']['data']['message']);
     $invalid = self::endpoint(true, 'commercial_campaign_preview', self::input(['segments' => '[]']));
     self::assertSame(422, $invalid['status']);
     $test = self::endpoint(true, 'commercial_campaign_test', self::input());

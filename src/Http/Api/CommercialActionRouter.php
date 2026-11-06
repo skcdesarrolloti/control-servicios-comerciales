@@ -42,6 +42,7 @@ final class CommercialActionRouter
     'commercial_campaign_preview' => 'preview',
     'commercial_campaign_send' => 'send',
     'commercial_campaign_test' => 'test',
+    'commercial_campaign_report' => 'report',
     'commercial_campaign_detail' => 'detail',
     'commercial_campaign_control' => 'control',
     'commercial_template_get' => 'templateGet',
