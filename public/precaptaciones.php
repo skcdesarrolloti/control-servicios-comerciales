@@ -24,7 +24,7 @@ $nonce = \SCM\Precaptacion\Module::nonce();
 </head>
 <body data-precap-api="<?php echo esc_url(SCM_BASE_URL . '/precaptacion-api.php'); ?>" data-precap-nonce="<?php echo esc_attr($nonce); ?>">
   <?php echo \SCM\Precaptacion\FormView::render(new \SCM\Precaptacion\Repository($scmDb)); ?>
-  <?php echo \SCM\Precaptacion\LegacyPanel::render_shortcode(['modo'=>$policy->canSeeAll('precaptacion') ? 'control' : 'mis']); ?>
+  <?php echo \SCM\Precaptacion\LegacyPanel::render_shortcode(['modo'=>$policy->seesTeam('precaptacion', $_GET) ? 'control' : 'mis']); ?>
   <script src="<?php echo esc_url(SCM_BASE_URL . '/assets/js/precaptacion.js?v=' . filemtime(__DIR__ . '/assets/js/precaptacion.js')); ?>"></script>
 </body>
 </html>

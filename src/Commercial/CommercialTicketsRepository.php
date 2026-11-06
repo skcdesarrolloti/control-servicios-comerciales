@@ -304,12 +304,14 @@ final class CommercialTicketsRepository
   {
     $own = ['id_empleado' => $employeeFilter];
     $selected = ['id_empleado' => trim((string) ($filters['id_empleado'] ?? ''))];
-    $teamFilters = $bucket !== 'inicio' && $policy->canSeeAll($bucket) ? $selected : [];
+    $teamFilters = $bucket !== 'inicio' && $policy->seesTeam($bucket, $filters) ? $selected : [];
     $mine = $this->bucketCounts($own);
+    // Mis tareas abre en sus abiertas: el número del menú es lo que la persona encuentra al entrar.
+    $mine['mis_tickets'] = (int) ($mine['abiertos'] ?? 0);
     $team = null;
     $tabs = [];
     foreach ($mine as $tab => $count) {
-      if ($tab === 'mis_tickets' || !$policy->canSeeAll($tab)) {
+      if (!$policy->canSeeAll($tab)) {
         $tabs[$tab] = $count;
         continue;
       }

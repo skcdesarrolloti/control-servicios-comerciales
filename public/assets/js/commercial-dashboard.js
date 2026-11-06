@@ -601,6 +601,7 @@
       "subtab",
       "estado",
       "mis_bucket",
+      "portafolio",
       "busqueda",
       "id_empleado",
       "ticket_id",

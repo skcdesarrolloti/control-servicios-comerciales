@@ -64,7 +64,7 @@ final class CommercialDashboardController
     $filters['tab'] = $bucket;
     $currentEmployeeFilter = $repository->currentEmployeeTicketFilter($commercialEmployeeCargos);
     // Cada pestaña filtra por el funcionario actual salvo que el cargo vea todo el equipo en ella.
-    $employeeFilterLocked = !$policy->canSeeAll($bucket);
+    $employeeFilterLocked = !$policy->seesTeam($bucket, $filters);
     if ($employeeFilterLocked) {
       $filters['id_empleado'] = $currentEmployeeFilter;
     }
@@ -173,6 +173,7 @@ final class CommercialDashboardController
     return [
       'estado' => $clean('estado'),
       'mis_bucket' => $clean('mis_bucket'),
+      'portafolio' => $clean('portafolio'),
       'busqueda' => $clean('busqueda'),
       'id_empleado' => $clean('id_empleado'),
       'ticket_id' => $clean('ticket_id'),

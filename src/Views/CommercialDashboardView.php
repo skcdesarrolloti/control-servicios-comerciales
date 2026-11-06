@@ -756,6 +756,7 @@ final class CommercialDashboardView
   {
     $taskViews = ['abiertos', 'mis_tickets', 'postergados', 'cerrados'];
     $isTaskActive = in_array($bucket, $taskViews, true);
+    $portfolioLinks = self::portfolioLinks($views, $policy);
     $activeClasses = 'bg-primary-container text-on-surface font-semibold rounded-lg shadow-sm';
     $inactiveClasses = 'text-on-surface-variant hover:text-on-surface rounded-lg transition-colors whitespace-nowrap';
 
@@ -830,6 +831,24 @@ final class CommercialDashboardView
           </button>
           <div class="absolute left-0 top-full hidden group-hover/nav:block bg-surface-container-lowest shadow-[0_12px_32px_rgba(0,0,0,0.14)] rounded-2xl p-1 z-50 border border-outline-variant/30 text-on-surface" data-commercial-dropdown-menu="comerciales">
             <div class="flex flex-col md:flex-row md:items-start gap-1">
+            <?php if ($portfolioLinks !== []): ?>
+            <div class="min-w-[220px] md:border-r md:border-surface-container md:pr-1" data-commercial-menu-section="portafolio">
+              <div class="flex items-center gap-1.5 px-3 pt-2 pb-1 font-label-sm text-[11px] uppercase font-semibold text-secondary"><span class="material-symbols-outlined text-[15px]" aria-hidden="true">folder_shared</span><span>Mi portafolio</span></div>
+              <div class="p-1 space-y-0.5">
+                <?php foreach ($portfolioLinks as $portfolioLink): ?>
+                <a class="flex items-center justify-between px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="<?php echo esc_attr($portfolioLink['tab']); ?>" href="<?php echo esc_url(self::url($baseUrl, ['tab' => $portfolioLink['tab']] + $portfolioLink['params'])); ?>">
+                  <span class="flex items-center gap-2">
+                    <span class="material-symbols-outlined text-[18px] text-tertiary" aria-hidden="true"><?php echo esc_html($portfolioLink['icon']); ?></span>
+                    <span><?php echo esc_html($portfolioLink['label']); ?></span>
+                  </span>
+                  <?php if ($portfolioLink['tab'] === 'mis_tickets'): ?>
+                    <span class="font-label-sm text-label-sm bg-primary-container px-space-xs py-0.5 rounded text-on-surface font-semibold"><?php echo esc_html(number_format($myCount)); ?></span>
+                  <?php endif; ?>
+                </a>
+                <?php endforeach; ?>
+              </div>
+            </div>
+            <?php endif; ?>
             <?php if (array_intersect(['precaptacion', 'anadir_aviso', 'actualizaciones', 'avisos'], $views)): ?>
             <div class="min-w-[250px]">
             <?php if (array_intersect(['precaptacion', 'anadir_aviso'], $views)): ?>
@@ -881,7 +900,7 @@ final class CommercialDashboardView
             <?php endif; ?>
             </div>
             <?php endif; ?>
-            <?php if (array_intersect($taskViews, $views) !== []): ?>
+            <?php if (array_intersect(array_diff($taskViews, ['mis_tickets']), $views) !== []): ?>
             <div class="min-w-[280px] max-w-[340px] md:border-l first:md:border-l-0 md:border-surface-container md:pl-1 first:md:pl-0" data-commercial-menu-section="tareas">
               <div class="flex items-center gap-1.5 px-3 pt-2 pb-1 font-label-sm text-[11px] uppercase font-semibold text-secondary"><span class="material-symbols-outlined text-[15px]" aria-hidden="true">task_alt</span><span>Gestión de tareas</span></div>
             <!-- Vistas Rápidas -->
@@ -893,15 +912,6 @@ final class CommercialDashboardView
                     <span>Tareas Abiertas</span>
                   </span>
                   <span class="font-label-sm text-label-sm bg-surface-container px-space-xs py-0.5 rounded text-on-surface font-semibold"><?php echo esc_html(number_format($openCount)); ?></span>
-                </a>
-              <?php endif; ?>
-              <?php if (in_array('mis_tickets', $views, true)): ?>
-                <a class="flex items-center justify-between px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="mis_tickets" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'mis_tickets'])); ?>">
-                  <span class="flex items-center gap-2">
-                    <span class="material-symbols-outlined text-[18px] text-tertiary">assignment_ind</span>
-                    <span>Mis Tareas</span>
-                  </span>
-                  <span class="font-label-sm text-label-sm bg-primary-container px-space-xs py-0.5 rounded text-on-surface font-semibold"><?php echo esc_html(number_format($myCount)); ?></span>
                 </a>
               <?php endif; ?>
               <?php if (in_array('postergados', $views, true)): ?>
@@ -1197,7 +1207,15 @@ final class CommercialDashboardView
         <span class="material-symbols-outlined text-[18px]" aria-hidden="true">expand_more</span>
       </button>
       <nav class="absolute left-0 top-full hidden bg-white border border-slate-200 rounded-2xl shadow-modal p-2 w-72 max-w-[85vw] max-h-[75vh] overflow-y-auto z-50" data-commercial-dropdown-menu="mobile" aria-label="Navegación móvil">
+        <?php if ($portfolioLinks !== []): ?>
+          <div class="px-3 pt-2 pb-1 text-[11px] uppercase font-semibold text-secondary">Mi portafolio</div>
+          <?php foreach ($portfolioLinks as $portfolioLink): ?>
+            <a class="block px-3 py-3 text-sm rounded-xl hover:bg-surface-container-low <?php echo $portfolioLink['tab'] === 'mis_tickets' && $bucket === 'mis_tickets' ? 'bg-primary-container font-semibold' : ''; ?>" data-commercial-tab="<?php echo esc_attr($portfolioLink['tab']); ?>" href="<?php echo esc_url(self::url($baseUrl, ['tab' => $portfolioLink['tab']] + $portfolioLink['params'])); ?>"><?php echo esc_html($portfolioLink['label']); ?></a>
+          <?php endforeach; ?>
+          <div class="my-1 border-t border-surface-container"></div>
+        <?php endif; ?>
         <?php foreach ($views as $mobileView): ?>
+          <?php if ($mobileView === 'mis_tickets') continue; ?>
           <?php if (isset(CommercialAccessPolicy::TAB_GROUPS[$mobileView])): ?>
             <?php foreach (CommercialAccessPolicy::SUBVIEWS[$mobileView] as $toolKey => $toolLabel): ?>
               <?php if (!$policy instanceof CommercialAccessPolicy || $policy->canSubview($mobileView, $toolKey)): ?>
@@ -1213,6 +1231,29 @@ final class CommercialDashboardView
     </div>
 <?php
     return (string) ob_get_clean();
+  }
+
+  /**
+   * Entradas de Mi portafolio: las mismas pantallas limitadas a la persona, también para quien ve todo el equipo.
+   * @param array<int,string> $views
+   * @param mixed $policy
+   * @return array<int,array{tab:string,label:string,icon:string,params:array<string,string>}>
+   */
+  private static function portfolioLinks(array $views, $policy): array
+  {
+    $links = [
+      ['tab' => 'mis_tickets', 'label' => 'Mis tareas', 'icon' => 'assignment_ind', 'params' => []],
+      ['tab' => 'inmuebles', 'label' => 'Mis inmuebles', 'icon' => 'person_pin', 'params' => ['property_subtab' => 'mis_inmuebles']],
+      ['tab' => 'actualizaciones', 'label' => 'Mis actualizaciones', 'icon' => 'published_with_changes', 'params' => ['portafolio' => '1']],
+      ['tab' => 'avisos', 'label' => 'Mis avisos en fachada', 'icon' => 'signpost', 'params' => ['portafolio' => '1']],
+      ['tab' => 'precaptacion', 'label' => 'Mis precaptaciones', 'icon' => 'add_home_work', 'params' => ['portafolio' => '1']],
+    ];
+    return array_values(array_filter($links, static function (array $link) use ($views, $policy): bool {
+      if (!in_array($link['tab'], $views, true)) {
+        return false;
+      }
+      return $link['tab'] !== 'inmuebles' || !$policy instanceof CommercialAccessPolicy || $policy->canSubview('inmuebles', 'mis_inmuebles');
+    }));
   }
 
   /** @param array<string,mixed> $dashboard @param array<string,mixed> $filters */
@@ -2589,6 +2630,9 @@ final class CommercialDashboardView
     array $homeDashboard = []
   ): string {
     $isMyTasks = ($bucket === 'mis_tickets');
+    if ($isMyTasks) {
+      $homeDashboard = []; // Sus indicadores salen de sus propias tareas, nunca del tablero del equipo.
+    }
     $effectiveBucket = $isMyTasks ? self::myTasksBucket($filters, (string) ($result['effective_bucket'] ?? '')) : $bucket;
     $bucketDef = CommercialStatusCatalog::buckets()[$effectiveBucket] ?? CommercialStatusCatalog::buckets()['abiertos'];
     $rows = is_array($result['rows'] ?? null) ? $result['rows'] : [];
@@ -2635,7 +2679,12 @@ final class CommercialDashboardView
               <span class="material-symbols-outlined text-[18px] text-secondary">download</span>
               <span>Exportar Vista</span>
             </button>
-            <?php if (!empty($slaSummary['atrasados'])): ?>
+            <?php if ($isMyTasks && !empty($slaSummary['atrasados'])): ?>
+              <a href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'mis_tickets', 'sla_filter' => 'atrasado'])); ?>" data-commercial-filter-link class="flex items-center gap-space-xs bg-error-container hover:bg-error/20 text-on-error-container px-space-md py-2.5 rounded-xl font-label-md text-label-md transition-all shadow-sm cursor-pointer">
+                <span class="material-symbols-outlined text-[18px]">warning</span>
+                <span>Ver mis atrasadas (<?php echo esc_html((string) $slaSummary['atrasados']); ?>)</span>
+              </a>
+            <?php elseif (!empty($slaSummary['atrasados'])): ?>
               <button type="button" class="flex items-center gap-space-xs bg-error-container hover:bg-error/20 text-on-error-container px-space-md py-2.5 rounded-xl font-label-md text-label-md transition-all shadow-sm cursor-pointer" id="btn-open-drawer">
                 <span class="material-symbols-outlined text-[18px]">warning</span>
                 <span>Auditar Atrasados (<?php echo esc_html((string) $slaSummary['atrasados']); ?>)</span>
@@ -2677,7 +2726,7 @@ final class CommercialDashboardView
       <?php echo self::renderTicketsTableSection($bucket, $rows, $pagination, $visibleTotal, $policy, $baseUrl, $filters); ?>
 
       <!-- Drawer Auditoría -->
-      <?php if (!empty($slaSummary)): ?>
+      <?php if (!empty($slaSummary) && !$isMyTasks): ?>
         <?php echo self::renderSideDrawer($slaSummary, $overdueAdvisors, $baseUrl, $filters); ?>
       <?php endif; ?>
     </div>
@@ -2700,7 +2749,8 @@ final class CommercialDashboardView
   /** @param array<string,mixed> $filters @param array<int,array<string,string>> $ticketEmployees @param array<string,mixed> $filterOptions */
   private static function renderOperationalControls(array $filters, array $ticketEmployees, array $filterOptions, $policy, string $activePanel): string
   {
-    $canSeeAll = $policy instanceof CommercialAccessPolicy && $policy->canSeeAll($activePanel === 'updates' ? 'actualizaciones' : 'avisos');
+    $canSeeAll = $policy instanceof CommercialAccessPolicy && $policy->seesTeam($activePanel === 'updates' ? 'actualizaciones' : 'avisos', $filters);
+    $isPortfolio = (string) ($filters['portafolio'] ?? '') === '1';
     $selectedEmployee = trim((string) ($filters['id_empleado'] ?? ''));
     $barrios = is_array($filterOptions['barrios'] ?? null) ? $filterOptions['barrios'] : [];
     $tipos = is_array($filterOptions['tipos_inmueble'] ?? null) ? $filterOptions['tipos_inmueble'] : [];
@@ -2718,6 +2768,12 @@ final class CommercialDashboardView
     $pageDescription = $isUpdates
       ? 'Control completo de inmuebles públicos que están al día, en alerta o vencidos por actualización.'
       : 'Control completo de avisos nuevos, retoques y rutas operativas por barrio o ruta.';
+    if ($isPortfolio) {
+      $pageTitle = $isUpdates ? 'Mis actualizaciones' : 'Mis avisos en fachada';
+      $pageDescription = $isUpdates
+        ? 'Tus inmuebles públicos que están al día, en alerta o vencidos por actualización.'
+        : 'Los avisos y retoques de tus inmuebles.';
+    }
 
     ob_start();
 ?>
@@ -2749,6 +2805,7 @@ final class CommercialDashboardView
             </div>
 
             <form class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-space-sm" data-commercial-property-control>
+              <?php if ($isPortfolio): ?><input type="hidden" name="portafolio" value="1"><?php endif; ?>
               <div class="space-y-1">
                 <label class="block font-label-sm text-label-sm text-secondary font-medium">Código</label>
                 <input type="text" name="codigo" placeholder="Ej: 90480" value="<?php echo esc_attr($selectedCode); ?>" class="w-full px-3 py-2 bg-surface-container-low rounded-xl font-body-sm outline-none border border-transparent focus:border-outline-variant">
@@ -2829,6 +2886,7 @@ final class CommercialDashboardView
             </div>
 
             <form class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-space-sm pt-2" data-commercial-sign-control data-mode="<?php echo esc_attr($signMode); ?>">
+              <?php if ($isPortfolio): ?><input type="hidden" name="portafolio" value="1"><?php endif; ?>
               <div class="space-y-1">
                 <label class="block font-label-sm text-label-sm text-secondary font-medium">Código</label>
                 <input type="text" name="codigo" placeholder="Ej: 90480" value="<?php echo esc_attr($selectedCode); ?>" class="w-full px-3 py-2 bg-surface-container-low rounded-xl font-body-sm outline-none">
@@ -5152,7 +5210,7 @@ final class CommercialDashboardView
 
   public static function renderPrecaptacion(string $baseUrl, array $input = []): string
   {
-    $query = array_intersect_key($input, array_flip(['precaptaciones_estado_contacto','precaptaciones_agenda','precaptaciones_pendientes','precaptaciones_id','abrir']));
+    $query = array_intersect_key($input, array_flip(['precaptaciones_estado_contacto','precaptaciones_agenda','precaptaciones_pendientes','precaptaciones_id','abrir','portafolio']));
     $query = array_filter($query, 'is_scalar');
     return '<section class="w-full"><iframe src="' . esc_url(rtrim($baseUrl, '/') . '/precaptaciones.php' . ($query ? '?' . http_build_query($query) : '')) . '" title="Precaptación" class="w-full border-0" style="height:calc(100vh - 145px);min-height:600px" loading="lazy"></iframe></section>';
   }

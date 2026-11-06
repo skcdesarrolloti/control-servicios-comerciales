@@ -450,7 +450,7 @@ final class CommercialApiController
       JsonResponse::error('No tienes permiso para consultar actualizaciones de inmuebles.', 403);
     }
     $filters = $this->propertyControlFilters($input);
-    $canSeeAll = $this->policy->canSeeAll('actualizaciones');
+    $canSeeAll = $this->policy->seesTeam('actualizaciones', $input);
     if (!$canSeeAll) {
       $filters['id_empleado'] = $this->tickets->currentEmployeeTicketFilter($this->commercialCargos);
     }
@@ -470,7 +470,7 @@ final class CommercialApiController
       JsonResponse::error('No tienes permiso para consultar avisos.', 403);
     }
     $filters = $this->propertyControlFilters($input);
-    $canSeeAll = $this->policy->canSeeAll('avisos');
+    $canSeeAll = $this->policy->seesTeam('avisos', $input);
     if (!$canSeeAll) {
       $filters['id_empleado'] = $this->tickets->currentEmployeeTicketFilter($this->commercialCargos);
     }
@@ -1137,7 +1137,7 @@ final class CommercialApiController
   /** @param array<string,mixed> $filters @return array<string,mixed> */
   private function scopeTicketFilters(array $filters): array
   {
-    if ($this->policy->canSeeAll((string) ($filters['tab'] ?? ''))) {
+    if ($this->policy->seesTeam((string) ($filters['tab'] ?? ''), $filters)) {
       return $filters;
     }
 
@@ -1170,6 +1170,7 @@ final class CommercialApiController
     return [
       'estado' => $clean('estado'),
       'mis_bucket' => $clean('mis_bucket'),
+      'portafolio' => $clean('portafolio'),
       'busqueda' => $clean('busqueda'),
       'id_empleado' => $clean('id_empleado'),
       'ticket_id' => $clean('ticket_id'),

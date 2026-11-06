@@ -240,6 +240,10 @@ final class CommercialAccessPolicy
   /** Si el cargo ve la información de todo el equipo en esa pestaña o solo la suya. */
   public function canSeeAll(string $view): bool
   {
+    // Mis tareas es siempre personal, también para administradores (SCOPES['mis_tickets']).
+    if ($view === 'mis_tickets') {
+      return false;
+    }
     if ($this->canManage()) {
       return true;
     }
@@ -248,6 +252,16 @@ final class CommercialAccessPolicy
     }
     $cargo = Auth::userCargo();
     return in_array($view, $this->permissions()[$cargo]['scope_all'] ?? [], true);
+  }
+
+  /**
+   * Alcance de esta petición: Mi portafolio (?portafolio=1) muestra solo lo de la persona aunque su cargo vea todo el
+   * equipo. El parámetro únicamente reduce lo visible; nunca da acceso a más.
+   * @param array<string,mixed> $input
+   */
+  public function seesTeam(string $view, array $input): bool
+  {
+    return $this->canSeeAll($view) && (string) ($input['portafolio'] ?? '') !== '1';
   }
 
   /** Abrir, editar o vincular una tarea de otro funcionario requiere ver todo el equipo en alguna pestaña de tareas. */
