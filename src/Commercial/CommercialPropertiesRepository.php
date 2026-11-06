@@ -33,6 +33,9 @@ final class CommercialPropertiesRepository
     'En proceso de cierre',
   ];
 
+  /** Un inmueble destacado en cualquier portal: la misma condición para la vista y para su conteo. */
+  private const FEATURED_SQL = "(i.`destacado` = 'Si' OR i.`promocion_premium` = 'Si' OR i.`mercado_libre_destacado` = 'Si' OR i.`ciencuadras_destacado` = 'Si' OR i.`ciencuadras_ascendido` = 'Si' OR i.`finca_raiz_silver` = 'Si' OR i.`finca_raiz_gold` = 'Si' OR i.`finca_raiz_black` = 'Si' OR i.`proppit_promocionado` = 'Si')";
+
   public const PORTALS = [
     'mercado_libre_destacados' => [
       'label' => 'Mercado Libre',
@@ -164,11 +167,46 @@ final class CommercialPropertiesRepository
   }
 
   /**
-   * KPI Counts for the subtabs.
+   * Conteos del menú Inmuebles, sin filtros: cada número es lo que su vista abre. Son un adorno del menú, así que si no
+   * se pueden calcular devuelve [] y el menú sigue funcionando con sus etiquetas.
    *
-   * @param array<string,mixed> $filters
-   * @return array{publicos:int,pendientes:int,no_publicos:int,destacados:int,solicitudes:int,mis_inmuebles:int,total:int}
+   * @return array<string,int> claves "inmuebles.<subpestaña>"
    */
+  public function menuCounts(bool $canSeeAll): array
+  {
+    $table = $this->db->table('jet_cct_inmuebles');
+    [$myWhere, $myArgs] = $this->buildMyScopeClauses();
+    $featured = $canSeeAll ? self::FEATURED_SQL : '(' . self::FEATURED_SQL . " AND {$myWhere})";
+    $publicIn = implode(',', array_fill(0, count(self::STATUSES_PUBLIC), '?'));
+    $pendingIn = implode(',', array_fill(0, count(self::STATUSES_PENDING), '?'));
+    $nonPublicIn = implode(',', array_fill(0, count(self::STATUSES_NON_PUBLIC), '?'));
+    $args = array_merge(self::STATUSES_PUBLIC, self::STATUSES_PENDING, self::STATUSES_NON_PUBLIC, $canSeeAll ? [] : $myArgs, $myArgs);
+
+    try {
+      $row = $this->db->getRow(
+        "SELECT SUM(CASE WHEN TRIM(i.`estado`) IN ({$publicIn}) THEN 1 ELSE 0 END) AS publicos,
+                SUM(CASE WHEN TRIM(i.`estado`) IN ({$pendingIn}) THEN 1 ELSE 0 END) AS pendientes,
+                SUM(CASE WHEN TRIM(i.`estado`) IN ({$nonPublicIn}) THEN 1 ELSE 0 END) AS no_publicos,
+                SUM(CASE WHEN {$featured} THEN 1 ELSE 0 END) AS destacados,
+                SUM(CASE WHEN {$myWhere} THEN 1 ELSE 0 END) AS mis_inmuebles
+           FROM `{$table}` i",
+        $args
+      );
+    } catch (\Throwable $error) {
+      error_log('[commercial-properties] No se pudieron contar los inmuebles del menú: ' . $error->getMessage());
+      return [];
+    }
+
+    return [
+      'inmuebles.publicos' => (int) ($row['publicos'] ?? 0),
+      'inmuebles.pendientes' => (int) ($row['pendientes'] ?? 0),
+      'inmuebles.no_publicos' => (int) ($row['no_publicos'] ?? 0),
+      'inmuebles.destacados' => (int) ($row['destacados'] ?? 0),
+      'inmuebles.mis_solicitudes' => $this->countUserPendingRequests(trim(Auth::employeeId())),
+      'inmuebles.mis_inmuebles' => (int) ($row['mis_inmuebles'] ?? 0),
+    ];
+  }
+
   /**
    * Retrieve distinct filter dropdown options.
    *
@@ -487,7 +525,7 @@ final class CommercialPropertiesRepository
         $where[] = "TRIM(i.`estado`) IN ({$in})";
         $args = array_merge($args, self::STATUSES_NON_PUBLIC);
       } elseif ($subtab === 'destacados') {
-        $where[] = "(i.`destacado` = 'Si' OR i.`promocion_premium` = 'Si' OR i.`mercado_libre_destacado` = 'Si' OR i.`ciencuadras_destacado` = 'Si' OR i.`ciencuadras_ascendido` = 'Si' OR i.`finca_raiz_silver` = 'Si' OR i.`finca_raiz_gold` = 'Si' OR i.`finca_raiz_black` = 'Si' OR i.`proppit_promocionado` = 'Si')";
+        $where[] = self::FEATURED_SQL;
         if (!$canSeeAll) {
           [$myWhere, $myArgs] = $this->buildMyScopeClauses();
           if ($myWhere !== '') {
@@ -559,7 +597,7 @@ final class CommercialPropertiesRepository
     $destacado = trim((string) ($filters['destacado'] ?? ''));
     if ($destacado !== '') {
       if ($destacado === 'destacados' || $destacado === 'Si') {
-        $where[] = "(i.`destacado` = 'Si' OR i.`promocion_premium` = 'Si' OR i.`mercado_libre_destacado` = 'Si' OR i.`ciencuadras_destacado` = 'Si' OR i.`ciencuadras_ascendido` = 'Si' OR i.`finca_raiz_silver` = 'Si' OR i.`finca_raiz_gold` = 'Si' OR i.`finca_raiz_black` = 'Si' OR i.`proppit_promocionado` = 'Si')";
+        $where[] = self::FEATURED_SQL;
       } elseif ($destacado === 'no_destacados' || $destacado === 'No') {
         $where[] = "(COALESCE(i.`destacado`, 'No') <> 'Si' AND COALESCE(i.`promocion_premium`, 'No') <> 'Si' AND COALESCE(i.`mercado_libre_destacado`, 'No') <> 'Si' AND COALESCE(i.`ciencuadras_destacado`, 'No') <> 'Si' AND COALESCE(i.`ciencuadras_ascendido`, 'No') <> 'Si' AND COALESCE(i.`finca_raiz_silver`, 'No') <> 'Si' AND COALESCE(i.`finca_raiz_gold`, 'No') <> 'Si' AND COALESCE(i.`finca_raiz_black`, 'No') <> 'Si' AND COALESCE(i.`proppit_promocionado`, 'No') <> 'Si')";
       } elseif ($destacado === 'premium') {
@@ -649,6 +687,22 @@ final class CommercialPropertiesRepository
     try {
       return (int) $this->db->getVar("SELECT COUNT(*) FROM `{$table}` WHERE estado = 'pendiente'");
     } catch (\Throwable $e) {
+      return 0;
+    }
+  }
+
+  /**
+   * Pending highlight requests count for a specific employee.
+   */
+  private function countUserPendingRequests(string $employeeId): int
+  {
+    if ($employeeId === '') {
+      return 0;
+    }
+    $table = $this->db->table('skc_destacado_solicitudes');
+    try {
+      return (int) $this->db->getVar("SELECT COUNT(*) FROM `{$table}` WHERE solicitado_por_id = ? AND estado = 'pendiente'", [$employeeId]);
+    } catch (\Throwable) {
       return 0;
     }
   }

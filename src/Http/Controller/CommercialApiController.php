@@ -85,6 +85,7 @@ final class CommercialApiController
     $currentEmployeeFilter = $this->tickets->currentEmployeeTicketFilter($this->commercialCargos);
     $navigation = $this->tickets->scopedNavigation($bucket, $filters, $currentEmployeeFilter, $this->policy);
     $tabCounts = $navigation['tabs'];
+    $tabCounts += $this->policy->canView('inmuebles') ? (new CommercialPropertiesRepository($this->db))->menuCounts($this->policy->canSeeAll('inmuebles')) : [];
     $html = '';
     if ($bucket === 'anadir_aviso') {
       $html = \SCM\Views\CommercialSignView::render(new \SCM\Commercial\CommercialSignService($this->db, $this->policy, $this->config), $this->policy);

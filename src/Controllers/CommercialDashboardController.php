@@ -74,6 +74,7 @@ final class CommercialDashboardController
     $homeDashboard = $repository->homeDashboard($navigation['home'], $policy);
     $canSeeAll = $policy->canSeeAll('inmuebles');
     $propertiesRepository = new CommercialPropertiesRepository($this->db);
+    $tabCounts += $policy->canView('inmuebles') ? $propertiesRepository->menuCounts($canSeeAll) : [];
     $propertyFilters = $this->propertyFilters($input, !$canSeeAll);
     $propertyResult = $bucket === 'inmuebles'
       ? $propertiesRepository->search($propertyFilters, $canSeeAll, (int) ($propertyFilters['page'] ?? 1), 24)

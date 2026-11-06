@@ -756,6 +756,8 @@ final class CommercialDashboardView
     $taskViews = ['abiertos', 'mis_tickets', 'postergados', 'cerrados'];
     $isTaskActive = in_array($bucket, $taskViews, true);
     $portfolioLinks = self::portfolioLinks($views, $policy);
+    // Sin conteo (no se pudo calcular), la entrada conserva su etiqueta.
+    $propertyBadge = static fn(string $view, string $label): string => isset($tabCounts["inmuebles.{$view}"]) ? number_format((int) $tabCounts["inmuebles.{$view}"]) : $label;
     $activeClasses = 'bg-primary-container text-on-surface font-semibold rounded-lg shadow-sm';
     $inactiveClasses = 'text-on-surface-variant hover:text-on-surface rounded-lg transition-colors whitespace-nowrap';
 
@@ -839,8 +841,9 @@ final class CommercialDashboardView
                     <span class="material-symbols-outlined text-[18px] text-tertiary" aria-hidden="true"><?php echo esc_html($portfolioLink['icon']); ?></span>
                     <span><?php echo esc_html($portfolioLink['label']); ?></span>
                   </span>
-                  <?php if ($portfolioLink['tab'] === 'mis_tickets'): ?>
-                    <span class="font-label-sm text-label-sm bg-primary-container px-space-xs py-0.5 rounded text-on-surface font-semibold"><?php echo esc_html(number_format($myCount)); ?></span>
+                  <?php $portfolioCount = $portfolioLink['tab'] === 'mis_tickets' ? $myCount : ($portfolioLink['tab'] === 'inmuebles' ? ($tabCounts['inmuebles.mis_inmuebles'] ?? null) : null); ?>
+                  <?php if ($portfolioCount !== null): ?>
+                    <span class="font-label-sm text-label-sm bg-primary-container px-space-xs py-0.5 rounded text-on-surface font-semibold"><?php echo esc_html(number_format($portfolioCount)); ?></span>
                   <?php endif; ?>
                 </a>
                 <?php endforeach; ?>
@@ -1018,7 +1021,7 @@ final class CommercialDashboardView
                 <span class="material-symbols-outlined text-[18px] text-emerald-600">public</span>
                 <span>Inmuebles públicos</span>
               </span>
-              <span class="font-label-sm text-[11px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-semibold">Portal</span>
+              <span class="font-label-sm text-[11px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-semibold"><?php echo esc_html($propertyBadge('publicos', 'Portal')); ?></span>
             </a>
             <?php endif; ?>
             <?php if (!$policy instanceof CommercialAccessPolicy || $policy->canSubview('inmuebles', 'pendientes')): ?>
@@ -1027,7 +1030,7 @@ final class CommercialDashboardView
                 <span class="material-symbols-outlined text-[18px] text-amber-600">pending_actions</span>
                 <span>Pendientes por publicar</span>
               </span>
-              <span class="font-label-sm text-[11px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-semibold">Borrador</span>
+              <span class="font-label-sm text-[11px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-semibold"><?php echo esc_html($propertyBadge('pendientes', 'Borrador')); ?></span>
             </a>
             <?php endif; ?>
             <?php if (!$policy instanceof CommercialAccessPolicy || $policy->canSubview('inmuebles', 'no_publicos')): ?>
@@ -1036,7 +1039,7 @@ final class CommercialDashboardView
                 <span class="material-symbols-outlined text-[18px] text-slate-600">inventory_2</span>
                 <span>Inmuebles no públicos</span>
               </span>
-              <span class="font-label-sm text-[11px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full font-semibold">Cerrados</span>
+              <span class="font-label-sm text-[11px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full font-semibold"><?php echo esc_html($propertyBadge('no_publicos', 'Cerrados')); ?></span>
             </a>
             <?php endif; ?>
             <div class="my-1 border-t border-surface-container"></div>
@@ -1046,7 +1049,7 @@ final class CommercialDashboardView
                 <span class="material-symbols-outlined text-[18px] text-amber-500">star</span>
                 <span><?php echo $canSeeAll ? 'Inmuebles destacados' : 'Mis inmuebles destacados'; ?></span>
               </span>
-              <span class="font-label-sm text-[11px] bg-amber-100 text-amber-900 px-2 py-0.5 rounded-full font-semibold">Portales</span>
+              <span class="font-label-sm text-[11px] bg-amber-100 text-amber-900 px-2 py-0.5 rounded-full font-semibold"><?php echo esc_html($propertyBadge('destacados', 'Portales')); ?></span>
             </a>
             <?php endif; ?>
             <?php if (!$policy instanceof CommercialAccessPolicy || $policy->canSubview('inmuebles', 'mis_solicitudes')): ?>
@@ -1055,7 +1058,7 @@ final class CommercialDashboardView
                 <span class="material-symbols-outlined text-[18px] text-indigo-600">assignment_turned_in</span>
                 <span><?php echo $canSeeAll ? 'Solicitudes por destacar' : 'Mis solicitudes por destacar'; ?></span>
               </span>
-              <span class="font-label-sm text-[11px] bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full font-semibold">Cola</span>
+              <span class="font-label-sm text-[11px] bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full font-semibold"><?php echo esc_html($propertyBadge('mis_solicitudes', 'Cola')); ?></span>
             </a>
             <?php endif; ?>
             <div class="my-1 border-t border-surface-container"></div>
@@ -1065,7 +1068,7 @@ final class CommercialDashboardView
                 <span class="material-symbols-outlined text-[18px] text-primary">person_pin</span>
                 <span class="font-semibold text-primary">Mis inmuebles</span>
               </span>
-              <span class="font-label-sm text-[11px] bg-primary-container text-on-surface px-2 py-0.5 rounded-full font-semibold">Personal</span>
+              <span class="font-label-sm text-[11px] bg-primary-container text-on-surface px-2 py-0.5 rounded-full font-semibold"><?php echo esc_html($propertyBadge('mis_inmuebles', 'Personal')); ?></span>
             </a>
             <?php endif; ?>
           </div>

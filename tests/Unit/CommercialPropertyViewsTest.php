@@ -115,6 +115,83 @@ final class CommercialPropertyViewsTest extends TestCase
     self::assertStringContainsString('>Mis inmuebles destacados</a>', substr($own, (int) strpos($own, 'data-commercial-dropdown-menu="mobile"')));
   }
 
+  /** Inventario de dos funcionarios: 999 (administrador de la sesión) y 900 (consultora). */
+  private function inventory(): array
+  {
+    [$db, $policy] = CommercialNotificationsFixture::make(true);
+    $pdo = $db->pdo();
+    foreach (['estado', 'codigo', 'promocion_premium', 'destacado', 'mercado_libre_destacado', 'ciencuadras_destacado', 'ciencuadras_ascendido', 'finca_raiz_silver', 'finca_raiz_gold', 'finca_raiz_black', 'proppit_promocionado'] as $column) {
+      $pdo->exec("ALTER TABLE wp_jet_cct_inmuebles ADD COLUMN `{$column}` TEXT");
+    }
+    $pdo->exec("DELETE FROM wp_jet_cct_inmuebles");
+    foreach ([['999', 'Publico', 'No'], ['999', 'En borrador', 'No'], ['999', 'Arrendado', 'Si'], ['900', 'Publico', 'Si'], ['900', 'Publico', 'No'], ['900', 'En borrador', 'No'], ['900', 'Arrendado', 'No']] as [$employee, $status, $featured]) {
+      $db->insert('wp_jet_cct_inmuebles', ['id_funcionario' => $employee, 'estado' => $status, 'destacado' => $featured]);
+    }
+    $pdo->exec('CREATE TABLE wp_skc_destacado_solicitudes (solicitado_por_id TEXT, estado TEXT)');
+    $db->insert('wp_skc_destacado_solicitudes', ['solicitado_por_id' => '999', 'estado' => 'pendiente']);
+    $db->insert('wp_skc_destacado_solicitudes', ['solicitado_por_id' => '999', 'estado' => 'destacado']);
+    $db->insert('wp_skc_destacado_solicitudes', ['solicitado_por_id' => '900', 'estado' => 'pendiente']);
+    return [$db, $policy];
+  }
+
+  public function testEveryMenuCountIsWhatItsViewOpens(): void
+  {
+    [$db, $policy] = $this->inventory();
+    $repository = new CommercialPropertiesRepository($db);
+    $where = new \ReflectionMethod(CommercialPropertiesRepository::class, 'buildWhereClauses');
+    $viewTotal = static function (string $subtab, bool $canSeeAll) use ($db, $repository, $where): int {
+      [$clauses, $args] = $where->invoke($repository, ['property_subtab' => $subtab], $canSeeAll);
+      return (int) $db->getVar('SELECT COUNT(*) FROM wp_jet_cct_inmuebles i' . ($clauses !== [] ? ' WHERE ' . implode(' AND ', $clauses) : ''), $args);
+    };
+
+    foreach ([['13', '999', true], ['9', '900', false]] as [$cargo, $employee, $canSeeAll]) {
+      $_SESSION['scm_user_cargo'] = $cargo;
+      $_SESSION['scm_employee_id'] = $employee;
+      $counts = $repository->menuCounts($canSeeAll);
+      foreach (['publicos', 'pendientes', 'no_publicos', 'destacados', 'mis_inmuebles'] as $subtab) {
+        self::assertSame($viewTotal($subtab, $canSeeAll), $counts["inmuebles.{$subtab}"], "{$subtab} para el empleado {$employee}");
+      }
+    }
+  }
+
+  public function testMenuCountsRespectTheScopeOfTheCargo(): void
+  {
+    [$db] = $this->inventory();
+    $repository = new CommercialPropertiesRepository($db);
+
+    $admin = $repository->menuCounts(true);
+    self::assertSame([3, 2, 2, 2, 3, 1], [$admin['inmuebles.publicos'], $admin['inmuebles.pendientes'], $admin['inmuebles.no_publicos'], $admin['inmuebles.destacados'], $admin['inmuebles.mis_inmuebles'], $admin['inmuebles.mis_solicitudes']]);
+
+    $_SESSION['scm_employee_id'] = '900';
+    $own = $repository->menuCounts(false);
+    self::assertSame(1, $own['inmuebles.destacados'], 'Sin alcance de equipo solo cuenta sus destacados.');
+    self::assertSame(4, $own['inmuebles.mis_inmuebles']);
+    self::assertSame(3, $own['inmuebles.publicos'], 'Públicos es todo el inventario para cualquier cargo.');
+  }
+
+  public function testMenuShowsTheCountsOfEachView(): void
+  {
+    [, $policy] = CommercialNotificationsFixture::make(true);
+    $counts = ['inmuebles.publicos' => 1940, 'inmuebles.pendientes' => 39, 'inmuebles.no_publicos' => 1896, 'inmuebles.destacados' => 107, 'inmuebles.mis_solicitudes' => 5, 'inmuebles.mis_inmuebles' => 2];
+    $html = CommercialDashboardView::renderTabs(array_keys(CommercialAccessPolicy::VIEWS), 'inicio', [], $counts, 'http://x', [], $policy);
+    $menu = substr($html, (int) strpos($html, 'data-commercial-dropdown-menu="inmuebles"'));
+    foreach (['1,940', '39', '1,896', '107', '5', '2'] as $count) {
+      self::assertStringContainsString('font-semibold">' . $count . '</span>', $menu);
+    }
+    self::assertStringNotContainsString('>Portal</span>', $menu);
+    $portfolio = substr($html, (int) strpos($html, 'data-commercial-menu-section="portafolio"'), 3000);
+    self::assertMatchesRegularExpression('#Mis inmuebles</span>\s*</span>\s*<span[^>]*>2</span>#u', $portfolio);
+  }
+
+  public function testMenuKeepsWorkingWhenTheCountsCannotBeCalculated(): void
+  {
+    [$db, $policy] = CommercialNotificationsFixture::make(true);
+    self::assertSame([], @(new CommercialPropertiesRepository($db))->menuCounts(true), 'La tabla no tiene las columnas: no debe tumbar el panel.');
+
+    $html = CommercialDashboardView::renderTabs(array_keys(CommercialAccessPolicy::VIEWS), 'inicio', [], [], 'http://x', [], $policy);
+    self::assertStringContainsString('>Portal</span>', $html);
+  }
+
   public function testMenuHasNoLinkToAViewThatDoesNotExist(): void
   {
     [, $policy] = CommercialNotificationsFixture::make(true);
