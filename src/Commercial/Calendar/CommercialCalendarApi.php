@@ -27,7 +27,6 @@ final class CommercialCalendarApi
   private CommercialAccessPolicy $policy;
   private CommercialCalendarService $calendar;
   private CommercialTicketsRepository $tickets;
-  private CalendarGoogleSync $google;
   private CalendarMailer $mailer;
   private CalendarCommercialReport $reports;
   /** @var array<int,string>|null */
@@ -35,13 +34,12 @@ final class CommercialCalendarApi
   private ?string $me = null;
 
   /** @param array<string,mixed> $config */
-  public function __construct(Database $db, Settings $settings, CommercialAccessPolicy $policy, array $config, ?CalendarGoogleSync $google = null, ?CalendarMailer $mailer = null)
+  public function __construct(Database $db, Settings $settings, CommercialAccessPolicy $policy, array $config, ?CalendarMailer $mailer = null)
   {
     $this->store = new CalendarStore($db);
     $this->policy = $policy;
     $this->calendar = new CommercialCalendarService($db, $settings, $policy, $config);
     $this->tickets = new CommercialTicketsRepository($db);
-    $this->google = $google ?? new CalendarGoogleSync($this->store, $config);
     $this->mailer = $mailer ?? new CalendarMailer($this->store, $this->calendar->notificationSettings(), $config);
     $this->reports = new CalendarCommercialReport($db);
   }
@@ -74,9 +72,6 @@ final class CommercialCalendarApi
       'buscar_inmuebles_reporte' => 'searchReportProperties',
       'actualizar_recordatorio' => 'updateReminder',
       'actualizar_recordatorio_estado' => 'updateReminderStatus',
-      'estado_google_oauth' => 'googleStatus',
-      'iniciar_google_oauth' => 'googleStart',
-      'desconectar_google' => 'googleDisconnect',
     ];
     if (!isset($handlers[$action])) {
       return self::fail('Acción no válida.', [], 400);
@@ -213,18 +208,12 @@ final class CommercialCalendarApi
     if ($blocked !== null) {
       return $blocked;
     }
-    $requested = self::googleRequested($input);
-    $id = $this->store->insertEvent($this->eventData($input, $employee, $start, $end, $requested));
-    $event = $this->syncNewEvent($id, $requested);
+    $id = $this->store->insertEvent($this->eventData($input, $employee, $start, $end));
     $this->mailer->newEvent(['id_empleado' => $employee, 'titulo' => (string) $input['titulo'], 'fecha_inicio' => $start, 'fecha_fin' => $end, 'ubicacion' => $input['ubicacion'] ?? '', 'id_categoria' => (int) $input['id_categoria'], 'creado_por' => $this->me(), 'notificar_funcionarios' => $input['notificar_funcionarios'] ?? []], $id);
     if ($ticket > 0) {
       $this->linkTicket($ticket, $id, $employee, $input, $start, $end);
     }
-    return self::ok('Evento #' . $id . ' creado exitosamente.', [
-      'id' => $id,
-      'google_event_id' => $event['google_event_id'] ?? null,
-      'google_pendiente' => $requested && empty($event['google_event_id']),
-    ]);
+    return self::ok('Evento #' . $id . ' creado exitosamente.', ['id' => $id]);
   }
 
   /** @param array<string,mixed> $input @return array<string,mixed> */
@@ -250,7 +239,7 @@ final class CommercialCalendarApi
       $this->assertCategory((int) $event['id_categoria']);
       $tickets[(int) ($event['id_ticket'] ?? 0)] = true;
       foreach ($employees as $employee) {
-        $rows[] = [$event + ['sincronizar_google' => $input['sincronizar_google'] ?? ''], $employee, $start, $end];
+        $rows[] = [$event, $employee, $start, $end];
       }
     }
     foreach (array_keys($tickets) as $ticket) {
@@ -263,18 +252,14 @@ final class CommercialCalendarApi
       }
     }
     $byEmployee = [];
-    $pendingGoogle = 0;
     foreach ($rows as [$event, $employee, $start, $end]) {
-      $requested = self::googleRequested($event);
-      $id = $this->store->insertEvent($this->eventData($event, $employee, $start, $end, $requested));
-      $created = $this->syncNewEvent($id, $requested);
-      $pendingGoogle += $requested && empty($created['google_event_id']) ? 1 : 0;
+      $id = $this->store->insertEvent($this->eventData($event, $employee, $start, $end));
       $byEmployee[$employee][] = ['id' => $id, 'id_empleado' => $employee, 'titulo' => (string) $event['titulo'], 'fecha_inicio' => $start, 'fecha_fin' => $end, 'id_categoria' => (int) $event['id_categoria']];
     }
     foreach ($byEmployee as $employee => $list) {
       $this->mailer->bulkEvents((string) $employee, $list);
     }
-    return self::ok('Se registraron ' . count($rows) . ' eventos exitosamente', ['google_pendientes' => $pendingGoogle]);
+    return self::ok('Se registraron ' . count($rows) . ' eventos exitosamente');
   }
 
   /** @param array<string,mixed> $input @return array<string,mixed> */
@@ -303,11 +288,9 @@ final class CommercialCalendarApi
     if ($blocked !== null) {
       return $blocked;
     }
-    $requested = self::googleRequested($input);
-    $id = $this->store->insertEvent($this->eventData($input, $employee, $start, $end, $requested));
-    $event = $this->syncNewEvent($id, $requested);
+    $id = $this->store->insertEvent($this->eventData($input, $employee, $start, $end));
     $this->mailer->newEvent(['id_empleado' => $employee, 'titulo' => (string) $input['titulo'], 'fecha_inicio' => $start, 'fecha_fin' => $end, 'ubicacion' => $input['ubicacion'] ?? '', 'id_categoria' => (int) $input['id_categoria']], $id);
-    return self::ok('Evento creado.', ['item' => $event, 'google_pendiente' => $requested && empty($event['google_event_id'])]);
+    return self::ok('Evento creado.', ['item' => $this->store->event($id)]);
   }
 
   /** @param array<string,mixed> $input @return array<string,mixed> */
@@ -328,12 +311,8 @@ final class CommercialCalendarApi
     if ($categoryId > 0) {
       $this->assertCategory($categoryId);
     }
-    $requested = self::googleRequested($input);
     $meta = is_array($input['meta'] ?? null) ? $input['meta'] : [];
     $meta['aviso_minutos_antes'] = self::noticeMinutes($input['aviso_minutos_antes'] ?? ($meta['aviso_minutos_antes'] ?? 30));
-    if ($requested) {
-      $meta['google_calendar_requested'] = true;
-    }
     $id = $this->store->insertReminder([
       'titulo' => (string) $input['titulo'],
       'mensaje' => (string) (($input['mensaje'] ?? '') ?: ($input['descripcion'] ?? '')),
@@ -349,13 +328,8 @@ final class CommercialCalendarApi
     if ($queueId !== null) {
       $this->store->setReminderQueue($id, $queueId, 'programado');
     }
-    $this->syncNewReminder($id, $requested);
     $reminder = (array) $this->store->reminder($id);
     $reminder['aviso_programado'] = $queueId !== null;
-    $reminder['google_pendiente'] = $requested && empty($reminder['google_event_id']);
-    if ($reminder['google_pendiente'] && $this->google->lastError() !== null) {
-      $reminder['google_error'] = $this->google->lastError();
-    }
     return self::ok('Recordatorio creado.', $reminder);
   }
 
@@ -375,7 +349,7 @@ final class CommercialCalendarApi
       $this->assertCategory($category);
     }
     $this->store->updateEvent($id, $title, (string) ($input['descripcion'] ?? ''), trim((string) ($input['ubicacion'] ?? '')), $category);
-    return self::ok('Evento actualizado correctamente', ['google_pendiente' => $this->syncUpdatedEvent($id) === false]);
+    return self::ok('Evento actualizado correctamente');
   }
 
   /** @param array<string,mixed> $input @return array<string,mixed> */
@@ -403,7 +377,7 @@ final class CommercialCalendarApi
         error_log('[commercial-calendar] tarea del traslado ' . $id . ': ' . $exception->getMessage());
       }
     }
-    return self::ok('Evento trasladado correctamente', ['google_pendiente' => $this->syncUpdatedEvent($id) === false]);
+    return self::ok('Evento trasladado correctamente');
   }
 
   /** @param array<string,mixed> $input @return array<string,mixed> */
@@ -430,12 +404,11 @@ final class CommercialCalendarApi
       }
       return self::ok($result['creado'] ? 'Evento finalizado y reporte comercial guardado.' : 'El evento y su reporte ya estaban registrados.', [
         'id_reporte' => $result['reporte']['_ID'] ?? null,
-        'google_pendiente' => $this->syncUpdatedEvent($id) === false,
       ]);
     }
     $this->store->completeEvent($id, $observation);
     $this->mailer->eventCompleted($event, $id);
-    return self::ok('Evento marcado como realizado', ['google_pendiente' => $this->syncUpdatedEvent($id) === false]);
+    return self::ok('Evento marcado como realizado');
   }
 
   /** @param array<string,mixed> $input @return array<string,mixed> */
@@ -491,16 +464,7 @@ final class CommercialCalendarApi
     $queueId = $this->mailer->scheduleReminder($reminder);
     $this->store->setReminderQueue($id, $queueId, $queueId !== null ? 'programado' : 'pendiente');
     $reminder = (array) $this->store->reminder($id);
-    $synced = false;
-    if (!empty($reminder['google_event_id'])) {
-      $synced = $this->safeUpdateReminder($reminder);
-    } elseif (!empty($reminder['meta']['google_calendar_requested'])) {
-      $this->syncNewReminder($id, true);
-      $reminder = (array) $this->store->reminder($id);
-      $synced = !empty($reminder['google_event_id']);
-    }
-    $wanted = !empty($reminder['meta']['google_calendar_requested']) || !empty($reminder['google_event_id']);
-    return self::ok('Recordatorio actualizado.', ['item' => $reminder, 'google_sincronizado' => $synced, 'google_pendiente' => $wanted && !$synced, 'aviso_programado' => $queueId !== null]);
+    return self::ok('Recordatorio actualizado.', ['item' => $reminder, 'aviso_programado' => $queueId !== null]);
   }
 
   /** @param array<string,mixed> $input @return array<string,mixed> */
@@ -516,67 +480,7 @@ final class CommercialCalendarApi
     $this->store->setReminderStatus($id, $status);
     $reminder = (array) $this->store->reminder($id);
     $this->mailer->cancelReminder($reminder, $status === 'enviado' ? 'Cancelado porque el recordatorio fue marcado como enviado manualmente.' : 'Cancelado manualmente desde calendario.');
-    $synced = !empty($reminder['google_event_id']) && $this->safeUpdateReminder($reminder);
-    $reminder['google_pendiente'] = !empty($reminder['google_event_id']) && !$synced;
     return self::ok($status === 'enviado' ? 'Recordatorio marcado como enviado.' : 'Recordatorio cancelado.', $reminder);
-  }
-
-  // ── Google ─────────────────────────────────────────
-
-  /** @param array<string,mixed> $input @return array<string,mixed> */
-  private function googleStatus(array $input): array
-  {
-    $employee = trim((string) ($input['id_empleado'] ?? ''));
-    if ($employee === '') {
-      return self::fail('El funcionario es obligatorio.');
-    }
-    if ($employee !== $this->me() && !in_array($employee, $this->allowedIds(), true)) {
-      throw new \DomainException('Ese funcionario no está habilitado en el calendario comercial.');
-    }
-    $status = $this->google->status($employee);
-    if ($employee !== $this->me()) {
-      unset($status['google_email'], $status['expires_at']);
-    }
-    return self::ok('Estado de Google.', $status);
-  }
-
-  /** @param array<string,mixed> $input @return array<string,mixed> */
-  private function googleStart(array $input): array
-  {
-    $employee = trim((string) ($input['id_empleado'] ?? ''));
-    if ($employee === '' || $employee !== $this->me()) {
-      throw new \DomainException('Cada funcionario conecta personalmente su cuenta de Google.');
-    }
-    $redirect = trim((string) ($input['redirect_after'] ?? ''));
-    if ($redirect !== '' && !self::sameHost($redirect)) {
-      return self::fail('La dirección de retorno de Google no es válida.');
-    }
-    try {
-      return self::ok('URL de autorización Google.', ['auth_url' => $this->google->authorizationUrl($employee, $redirect)]);
-    } catch (\RuntimeException $exception) {
-      return self::fail($exception->getMessage());
-    }
-  }
-
-  /** @param array<string,mixed> $input @return array<string,mixed> */
-  private function googleDisconnect(array $input): array
-  {
-    $employee = trim((string) ($input['id_empleado'] ?? ''));
-    if ($employee === '' || ($employee !== $this->me() && !$this->policy->canManage())) {
-      throw new \DomainException('Solo puedes desconectar tu propia cuenta de Google.');
-    }
-    $this->google->disconnect($employee);
-    return self::ok('Cuenta Google desconectada.');
-  }
-
-  /**
-   * Regreso de Google: no depende de la sesión porque el `state` de un solo uso identifica la solicitud.
-   * @return array{employee:string,redirect:string}
-   */
-  public function completeGoogle(string $code, string $state): array
-  {
-    $result = $this->google->completeAuthorization($code, $state);
-    return ['employee' => $result['id_empleado'], 'redirect' => $result['redirect_after']];
   }
 
   // ── Permisos ───────────────────────────────────────
@@ -744,12 +648,8 @@ final class CommercialCalendarApi
   }
 
   /** @param array<string,mixed> $input @return array<string,mixed> */
-  private function eventData(array $input, string $employee, string $start, string $end, bool $google): array
+  private function eventData(array $input, string $employee, string $start, string $end): array
   {
-    $meta = is_array($input['meta'] ?? null) ? $input['meta'] : [];
-    if ($google) {
-      $meta['google_calendar_requested'] = true;
-    }
     return [
       'titulo' => (string) $input['titulo'],
       'descripcion' => (string) ($input['descripcion'] ?? ''),
@@ -760,7 +660,7 @@ final class CommercialCalendarApi
       'creado_por' => $this->me(),
       'id_categoria' => (int) $input['id_categoria'],
       'id_ticket' => (int) ($input['id_ticket'] ?? 0),
-      'meta' => $meta,
+      'meta' => is_array($input['meta'] ?? null) ? $input['meta'] : [],
     ];
   }
 
@@ -793,92 +693,9 @@ final class CommercialCalendarApi
     return $requested;
   }
 
-  /** @return array<string,mixed> */
-  private function syncNewEvent(int $id, bool $requested): array
-  {
-    $event = (array) $this->store->event($id);
-    if (!$requested) {
-      return $event;
-    }
-    try {
-      $googleId = $this->google->createEvent($event);
-      if ($googleId !== null) {
-        $this->store->setEventGoogleId($id, $googleId);
-        $event['google_event_id'] = $googleId;
-      }
-    } catch (\Throwable $exception) {
-      error_log('[commercial-calendar-google] crear evento ' . $id . ': ' . $exception->getMessage());
-    }
-    return $event;
-  }
-
-  private function syncNewReminder(int $id, bool $requested): void
-  {
-    if (!$requested) {
-      return;
-    }
-    try {
-      $googleId = $this->google->createReminder((array) $this->store->reminder($id));
-      if ($googleId !== null) {
-        $this->store->setReminderGoogleId($id, $googleId);
-      }
-    } catch (\Throwable $exception) {
-      error_log('[commercial-calendar-google] crear recordatorio ' . $id . ': ' . $exception->getMessage());
-    }
-  }
-
-  /** @return bool|null null = no aplica; false = quedó pendiente en Google. */
-  private function syncUpdatedEvent(int $id): ?bool
-  {
-    $event = (array) $this->store->event($id);
-    try {
-      if (empty($event['google_event_id'])) {
-        if (empty($event['meta']['google_calendar_requested'])) {
-          return null;
-        }
-        $googleId = $this->google->createEvent($event);
-        if ($googleId === null) {
-          return false;
-        }
-        $this->store->setEventGoogleId($id, $googleId);
-        if (strtolower(trim((string) ($event['estado'] ?? ''))) !== 'si') {
-          return true;
-        }
-        $event['google_event_id'] = $googleId;
-      }
-      return $this->google->updateEvent($event);
-    } catch (\Throwable $exception) {
-      error_log('[commercial-calendar-google] actualizar evento ' . $id . ': ' . $exception->getMessage());
-      return false;
-    }
-  }
-
-  /** @param array<string,mixed> $reminder */
-  private function safeUpdateReminder(array $reminder): bool
-  {
-    try {
-      return $this->google->updateReminder($reminder);
-    } catch (\Throwable $exception) {
-      error_log('[commercial-calendar-google] actualizar recordatorio: ' . $exception->getMessage());
-      return false;
-    }
-  }
-
   private function finalizeExpiredReminders(): void
   {
-    foreach ($this->store->finalizeExpiredReminders() as $id) {
-      $reminder = $this->store->reminder($id);
-      if ($reminder !== null) {
-        $this->safeUpdateReminder($reminder);
-      }
-    }
-  }
-
-  /** @param array<string,mixed> $input */
-  private static function googleRequested(array $input): bool
-  {
-    $value = $input['sincronizar_google'] ?? ($input['google_calendar'] ?? false);
-    return is_bool($value) ? $value : in_array(strtolower(trim((string) $value)), ['1', 'true', 'si', 'sí', 'yes', 'on'], true);
+    $this->store->finalizeExpiredReminders();
   }
 
   private static function itemType(string $type): string
@@ -932,13 +749,6 @@ final class CommercialCalendarApi
   private static function plusMinutes(string $date, int $minutes): string
   {
     return (new \DateTimeImmutable($date, new \DateTimeZone(ColombiaBusinessCalendar::TIMEZONE)))->modify('+' . max(1, $minutes) . ' minutes')->format('Y-m-d H:i:s');
-  }
-
-  private static function sameHost(string $url): bool
-  {
-    $host = strtolower((string) parse_url($url, PHP_URL_HOST));
-    $own = strtolower((string) parse_url(defined('SCM_BASE_URL') ? (string) constant('SCM_BASE_URL') : '', PHP_URL_HOST));
-    return $host !== '' && $host === $own;
   }
 
   /** @param mixed $data @return array{success:bool,message:string,data:mixed} */

@@ -6,7 +6,6 @@ namespace Tests\Unit;
 
 use PDO;
 use PHPUnit\Framework\TestCase;
-use SCM\Commercial\Calendar\CalendarGoogleSync;
 use SCM\Commercial\Calendar\CalendarMailer;
 use SCM\Commercial\Calendar\CalendarStore;
 use SCM\Commercial\Calendar\CommercialCalendarApi;
@@ -37,7 +36,7 @@ final class CommercialCalendarApiTest extends TestCase
   }
 
   /** @param array<string,mixed> $permissions @param array<string,mixed> $saved */
-  private function api(string $cargo, string $employee, array $permissions = [], array $saved = [], ?CalendarGoogleSync $google = null): CommercialCalendarApi
+  private function api(string $cargo, string $employee, array $permissions = [], array $saved = []): CommercialCalendarApi
   {
     $_SESSION = ['scm_user_cargo' => $cargo, 'scm_user_id' => 7, 'scm_employee_id' => $employee, 'scm_user' => 'Prueba'];
     $pdo = new PDO('sqlite::memory:');
@@ -53,8 +52,6 @@ final class CommercialCalendarApiTest extends TestCase
       'categorias_calendario' => 'id INTEGER PRIMARY KEY AUTOINCREMENT, nombre TEXT, color TEXT, descripcion TEXT, roles_notificar TEXT',
       'calendario_actividades' => "id INTEGER PRIMARY KEY AUTOINCREMENT, titulo TEXT, descripcion TEXT, fecha_inicio TEXT, fecha_fin TEXT, id_empleado TEXT, creado_por TEXT, id_categoria INTEGER, id_ticket INTEGER, origen_app TEXT, external_ref TEXT, google_event_id TEXT, meta_json TEXT, estado TEXT DEFAULT 'No', observacion TEXT, ubicacion TEXT, fue_trasladado TEXT DEFAULT 'No'",
       'calendario_recordatorios' => "id INTEGER PRIMARY KEY AUTOINCREMENT, titulo TEXT, mensaje TEXT, recordatorio_at TEXT, canal TEXT, estado TEXT, id_empleado TEXT, creado_por TEXT, id_evento INTEGER, id_tarea INTEGER, id_ticket INTEGER, id_categoria INTEGER, notification_queue_id INTEGER, origen_app TEXT, external_ref TEXT, google_event_id TEXT, meta_json TEXT",
-      'calendario_google_accounts' => 'id_empleado TEXT PRIMARY KEY, google_email TEXT, access_token_enc TEXT, refresh_token_enc TEXT, scope TEXT, expires_at TEXT',
-      'calendario_google_oauth_states' => 'state TEXT PRIMARY KEY, id_empleado TEXT, redirect_after TEXT, expires_at TEXT',
       'registro_bloqueos' => 'id INTEGER PRIMARY KEY AUTOINCREMENT, id_empleado TEXT, cantidad_pendientes INTEGER, fecha_registro TEXT',
       'wp_jet_cct_tickets' => '_ID INTEGER PRIMARY KEY, id_ticket TEXT, estado TEXT, estado_comercial TEXT, estado_administrativo TEXT, solicitante TEXT, correo_solicitante TEXT, id_empleado TEXT, nombre_empleado TEXT, tema_ayuda TEXT, fecha_actualizacion INTEGER, cct_modified TEXT',
       'wp_jet_cct_historial_del_ticket' => '_ID INTEGER PRIMARY KEY AUTOINCREMENT, cct_status TEXT, cct_author_id TEXT, cct_created TEXT, cct_modified TEXT, id_ticket INTEGER, fecha INTEGER, nombre TEXT, correo TEXT, celular TEXT, respuesta TEXT, id_empleado TEXT, id_evento INTEGER, fue_editada TEXT',
@@ -94,7 +91,7 @@ final class CommercialCalendarApiTest extends TestCase
     $this->settings = new Settings($this->db);
     $store = new CalendarStore($this->db);
     $mailer = new CalendarMailer($store, [], [], new SharedNotificationsBridge($this->db, 'C:/no-existe'));
-    return new CommercialCalendarApi($this->db, $this->settings, new CommercialAccessPolicy($this->settings, $this->db, ['13']), ['calendar_allowed_cargos' => ['9']], $google, $mailer);
+    return new CommercialCalendarApi($this->db, $this->settings, new CommercialAccessPolicy($this->settings, $this->db, ['13']), ['calendar_allowed_cargos' => ['9']], $mailer);
   }
 
   /** @return array<string,mixed> */
@@ -102,6 +99,15 @@ final class CommercialCalendarApiTest extends TestCase
   {
     $day = date('Y-m-d', strtotime('+5 days'));
     return $overrides + ['titulo' => 'Visita', 'fecha_inicio' => $day . ' 09:00:00', 'fecha_fin' => $day . ' 10:00:00', 'id_empleado' => '100', 'id_categoria' => 3, 'ubicacion' => 'Manga'];
+  }
+
+  public function testGoogleCalendarIsNotAvailable(): void
+  {
+    $api = $this->api('9', '100', self::MINE_ONLY);
+    self::assertSame(400, $api->handle('iniciar_google_oauth', ['id_empleado' => '100'])['status']);
+    self::assertSame(400, $api->handle('estado_google_oauth', ['id_empleado' => '100'])['status']);
+    $created = $api->handle('crear_evento', self::event(['sincronizar_google' => '1']));
+    self::assertSame(['id'], array_keys($created['data']));
   }
 
   public function testRequiresCalendarPermission(): void
@@ -298,35 +304,6 @@ final class CommercialCalendarApiTest extends TestCase
     self::assertTrue($api->handle('actualizar_recordatorio_estado', ['id_recordatorio' => $id, 'estado' => 'cancelado'])['success']);
     self::assertSame('cancelado', $this->db->getVar('SELECT estado FROM calendario_recordatorios WHERE id = ?', [$id]));
     self::assertFalse($api->handle('crear_item_calendario', ['tipo_item' => 'tarea', 'titulo' => 'x', 'id_empleado' => '100'])['success']);
-  }
-
-  public function testExistingGoogleAccountsKeepWorkingWithTheSameKey(): void
-  {
-    $config = ['google_client_id' => 'id', 'google_client_secret' => 's', 'google_redirect_uri' => 'https://x/cb', 'google_token_key' => 'clave-compartida', 'google_sync_enabled' => true];
-    $this->api('9', '100', self::MINE_ONLY);
-    $store = new CalendarStore($this->db);
-    $google = new class($store, $config) extends CalendarGoogleSync {
-      /** @var array<int,array<int,string>> */
-      public array $headers = [];
-      protected function httpRequest(string $method, string $url, array $headers, array $body, bool $formEncoded): array
-      {
-        $this->headers[] = $headers;
-        return ['id' => 'google-1'];
-      }
-    };
-    // Mismo formato con el que calendario-actividades guardó el token.
-    $iv = str_repeat('a', 16);
-    $encrypted = base64_encode($iv . openssl_encrypt('token-viejo', 'AES-256-CBC', hash('sha256', 'clave-compartida', true), OPENSSL_RAW_DATA, $iv));
-    $this->db->insert('calendario_google_accounts', ['id_empleado' => '100', 'google_email' => 'ana@skc.test', 'access_token_enc' => $encrypted, 'refresh_token_enc' => $encrypted, 'expires_at' => gmdate('Y-m-d H:i:s', time() + 3600)]);
-    self::assertTrue($google->status('100')['connected']);
-    self::assertFalse($google->status('200')['connected']);
-    self::assertSame('google-1', $google->createEvent(['id' => 1, 'id_empleado' => '100', 'titulo' => 'x', 'fecha_inicio' => '2026-12-01 09:00:00', 'fecha_fin' => '2026-12-01 10:00:00']));
-    self::assertContains('Authorization: Bearer token-viejo', $google->headers[0]);
-  }
-
-  public function testOnlyTheOwnerConnectsGoogle(): void
-  {
-    self::assertSame(403, $this->api('9', '100', self::MINE_ONLY)->handle('iniciar_google_oauth', ['id_empleado' => '200'])['status']);
   }
 
   public function testSettingsManageCategoriesAndNeverDeleteOnesWithEvents(): void

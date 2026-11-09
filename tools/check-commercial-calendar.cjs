@@ -50,7 +50,6 @@ async function closeSwal(page) {
       filtrar_eventos_admin: events,
       filtrar_eventos: events.filter(row => String(row.id_ticket || '') === String(body.id_ticket || '')),
       listar_pendientes_vencidos: [{ id: 77, titulo: 'Visita sin cerrar', fecha_inicio: '2026-10-20 10:00:00', id_ticket: '1' }],
-      estado_google_oauth: { configured: true, connected: true, sync_enabled: true },
       crear_evento: { id: 900, google_pendiente: false },
       crear_item_calendario: { id: 901, aviso_programado: true, google_pendiente: false },
       obtener_tickets_funcionario: [{ _ID: '1', id_ticket: '1', solicitante: 'Laura Gómez', direccion: 'Calle 25 #20-10', estado_comercial: 'Contactado' }],
@@ -133,6 +132,7 @@ async function closeSwal(page) {
   // Formulario corto: un solo paso, con lo opcional recogido.
   assert(await page.locator('.scm-cal-kinds input').count() === 3, 'Faltan los tipos cita, evento y recordatorio');
   assert(!(await page.locator('.scm-calendar-availability-panel').count()), 'Sigue el panel lateral del formulario anterior');
+  assert(!(await page.locator('[name="sincronizar_google"]').count()) && !/google/i.test(await page.locator('.scm-calendar-create-shell').textContent()), 'El formulario sigue ofreciendo Google Calendar');
   assert(!(await page.locator('[name="descripcion"]').isVisible()), 'La descripción debe quedar en Más opciones');
   await page.locator('[data-commercial-schedule-form] [name="id_categoria"]').selectOption('26');
   assert(await page.locator('[name="titulo"]').inputValue() === 'Captación', 'El título no se completa con la categoría');
@@ -231,6 +231,7 @@ async function closeSwal(page) {
   assert(closed && closed.body.reporte && closed.body.reporte.id_inmueble === '4501' && closed.body.reporte.id_cotizacion === '9' && closed.body.reporte.transporte === 'ida_vuelta' && !('valor' in closed.body.reporte), 'El cierre no envía el reporte comercial con la opción de transporte');
 
   assert(!external.length, 'Sigue llamando a la app externa: ' + external.join(', '));
+  assert(!calls.some(call => /google/.test(call.action)), 'Sigue consultando Google Calendar');
   if (errors.length) throw new Error(errors.join('\n'));
   console.log('Calendario comercial UI: API propia, agenda, edición, Configuración y categorías, formulario corto, vencimientos, agendar desde la tarea y reporte al cerrar: OK');
   await browser.close();

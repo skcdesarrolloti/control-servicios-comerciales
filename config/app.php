@@ -48,12 +48,6 @@ return [
   'calendar_allowed_cargos' => array_values(array_filter(array_map('trim', explode(',', (string) $env('CALENDAR_ALLOWED_CARGOS', '9,10,17'))))),
   // Vacío = la API del propio panel (public/calendar-api.php).
   'calendar_api_url' => $env('CALENDAR_API_URL', ''),
-  'google_client_id' => $env('GOOGLE_CLIENT_ID', ''),
-  'google_client_secret' => $env('GOOGLE_CLIENT_SECRET', ''),
-  'google_redirect_uri' => $env('CALENDARIO_GOOGLE_REDIRECT_URI', ''),
-  'google_token_key' => $env('CALENDARIO_GOOGLE_TOKEN_KEY', ''),
-  'google_sync_enabled' => $envBool('CALENDARIO_GOOGLE_SYNC_ENABLED', false),
-  'google_calendar_id' => $env('CALENDARIO_GOOGLE_CALENDAR_ID', 'primary'),
   'reminder_template' => $env('CALENDARIO_WHATSAPP_REMINDER_TEMPLATE', 'recordatorio_calendario'),
   'reminder_template_lang' => $env('CALENDARIO_WHATSAPP_REMINDER_TEMPLATE_LANG', 'es_CO'),
   'minimax_api_key' => $env('MINIMAX_API_KEY', ''),

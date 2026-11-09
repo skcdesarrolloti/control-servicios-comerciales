@@ -192,20 +192,6 @@ final class CommercialDashboardView
       cursor: pointer;
       margin-top: 8px;
     }
-    .swal2-popup .scm-calendar-google-toggle {
-      display: flex;
-      align-items: flex-start;
-      gap: 10px;
-      background: #f8fafc;
-      border: 1px solid #e2e8f0;
-      border-radius: 12px;
-      padding: 10px 14px;
-      cursor: pointer;
-      text-align: left;
-    }
-    .swal2-popup .scm-calendar-google-toggle input {
-      margin-top: 3px;
-    }
     .swal2-popup .scm-calendar-create-shell {
       text-align: left;
     }
@@ -3195,7 +3181,7 @@ final class CommercialDashboardView
     if ($subtab === 'mine') {
       $title = 'Mi calendario';
       $kicker = 'Agenda personal';
-      $description = 'Gestiona tus citas, visitas y recordatorios comerciales con sincronización en Google Calendar.';
+      $description = 'Gestiona tus citas, visitas y recordatorios comerciales.';
       $showCreateActions = true;
       $showPendingAction = true;
       $showReportAction = true;

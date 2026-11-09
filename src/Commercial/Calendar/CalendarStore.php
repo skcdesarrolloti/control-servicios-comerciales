@@ -179,11 +179,6 @@ final class CalendarStore
     return (int) $this->db->lastInsertId();
   }
 
-  public function setEventGoogleId(int $id, ?string $googleEventId): void
-  {
-    $this->db->update(self::EVENTS, ['google_event_id' => self::optional($googleEventId)], ['id' => $id]);
-  }
-
   public function updateEvent(int $id, string $title, string $description, string $location, int $categoryId): void
   {
     $this->db->update(self::EVENTS, ['titulo' => $title, 'descripcion' => $description, 'ubicacion' => $location, 'id_categoria' => $categoryId], ['id' => $id]);
@@ -333,27 +328,13 @@ final class CalendarStore
     $this->db->update(self::REMINDERS, ['estado' => self::reminderStatus($status)], ['id' => $id]);
   }
 
-  public function setReminderGoogleId(int $id, ?string $googleEventId): void
-  {
-    $this->db->update(self::REMINDERS, ['google_event_id' => self::optional($googleEventId)], ['id' => $id]);
-  }
-
-  /**
-   * Pasa a finalizado lo que ya llegó a su hora.
-   * @return array<int,int> Recordatorios finalizados que están en Google y hay que actualizar allá.
-   */
-  public function finalizeExpiredReminders(): array
+  /** Pasa a finalizado lo que ya llegó a su hora. */
+  public function finalizeExpiredReminders(): void
   {
     $now = $this->now();
-    $ids = $this->db->getCol(
-      'SELECT `id` FROM `' . self::REMINDERS . "`
-        WHERE `estado` IN ('pendiente', 'programado') AND `recordatorio_at` <= ? AND `google_event_id` IS NOT NULL AND `google_event_id` <> ''",
-      [$now]
-    );
     $this->db->pdo()->prepare(
       'UPDATE `' . self::REMINDERS . "` SET `estado` = 'finalizado' WHERE `estado` IN ('pendiente', 'programado') AND `recordatorio_at` <= ?"
     )->execute([$now]);
-    return array_map('intval', $ids);
   }
 
   // ── Tareas vinculadas ──────────────────────────────

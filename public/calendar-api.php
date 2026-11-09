@@ -26,36 +26,6 @@ $respond = static function (array $payload): void {
 };
 $failure = static fn(string $message, int $status): array => ['success' => false, 'message' => $message, 'data' => [], 'status' => $status];
 
-// Google vuelve aquí en la ventana emergente; el `state` de un solo uso reemplaza a la sesión.
-if ($action === 'google_oauth_callback') {
-  $page = static function (string $body): void {
-    header('Content-Type: text/html; charset=utf-8');
-    header('Cache-Control: no-store');
-    echo '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Google Calendar</title></head><body style="font-family:Arial,sans-serif;padding:32px;color:#0f172a">' . $body . '</body></html>';
-    exit;
-  };
-  try {
-    $code = trim((string) ($_GET['code'] ?? ''));
-    $state = trim((string) ($_GET['state'] ?? ''));
-    if ($code === '' || $state === '') {
-      throw new \RuntimeException('Google no devolvió el código de autorización.');
-    }
-    $result = $api->completeGoogle($code, $state);
-    $query = [];
-    parse_str((string) parse_url($result['redirect'], PHP_URL_QUERY), $query);
-    $parts = parse_url($result['redirect']);
-    if (($query['scm_google_popup'] ?? '') === '1' && is_array($parts) && !empty($parts['host'])) {
-      $origin = ($parts['scheme'] ?? 'https') . '://' . $parts['host'] . (isset($parts['port']) ? ':' . $parts['port'] : '');
-      $flags = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT;
-      $page('<p>Google Calendar conectado. Puedes cerrar esta ventana.</p><script>(function(){try{if(window.opener&&!window.opener.closed){window.opener.postMessage(' . json_encode(['type' => 'scm-google-calendar-connected', 'id_empleado' => $result['employee']], $flags) . ',' . json_encode($origin, $flags) . ');window.setTimeout(function(){window.close()},100)}}catch(e){}})();</script>');
-    }
-    $page('<h1>Google conectado</h1><p>La cuenta quedó conectada al calendario de SKC SuCasa Inmobiliaria. Puedes cerrar esta ventana.</p>');
-  } catch (\Throwable $exception) {
-    error_log('[commercial-calendar-google] callback: ' . $exception->getMessage());
-    $page('<h1>No se pudo conectar Google</h1><p>' . htmlspecialchars($exception->getMessage(), ENT_QUOTES, 'UTF-8') . '</p>');
-  }
-}
-
 if (!\SCM\Core\Auth::isLoggedIn()) {
   $respond($failure('Tu sesión terminó. Vuelve a iniciar sesión.', 401));
 }

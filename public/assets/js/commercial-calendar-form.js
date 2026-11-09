@@ -200,7 +200,6 @@
       '<div class="scm-cal-chips" data-form-places>' + OFFICES.map(function (place) { return '<button type="button" data-form-place="' + esc(place) + '">' + esc(place) + "</button>"; }).join("") + "</div>" +
       "</div>" +
       '<div class="scm-cal-only-event">' + taskRow + "</div>" +
-      '<label class="scm-cal-google" data-form-google hidden><input type="checkbox" name="sincronizar_google" value="1"><span data-form-google-text></span></label>' +
       '<details class="scm-cal-more"><summary>Más opciones</summary><div class="scm-cal-more-body">' +
       field("Descripción", '<textarea class="scm-textarea" name="descripcion" rows="3">' + esc(options.description || "") + "</textarea>") +
       '<div data-form-status hidden>' + field("Estado comercial de la tarea", '<select class="scm-select" name="estado_comercial">' + statusOptionsHtml(task ? task.commercialStatus : "") + "</select>") + "</div>" +
@@ -232,36 +231,6 @@
 
   function isDone(row) {
     return String((row && row.estado) || "").toLowerCase() === "si";
-  }
-
-  function waitForGoogle(employeeId, authWindow) {
-    return new Promise(function (resolve, reject) {
-      var attempts = 0;
-      (function check() {
-        api("estado_google_oauth", { id_empleado: employeeId }).then(function (json) {
-          if (json && json.success && json.data && json.data.connected) return resolve(true);
-          if (authWindow.closed) return reject(new Error("Se cerró la autorización de Google sin conectar la cuenta."));
-          if (++attempts >= 60) return reject(new Error("No se confirmó la conexión con Google Calendar. Autoriza la cuenta y vuelve a guardar."));
-          window.setTimeout(check, 2000);
-        }).catch(reject);
-      })();
-    });
-  }
-
-  function connectGoogle(employeeId) {
-    var redirect = new URL(window.location.href);
-    redirect.searchParams.set("scm_google_popup", "1");
-    return api("iniciar_google_oauth", { id_empleado: employeeId, redirect_after: redirect.toString() }).then(function (json) {
-      var url = json && json.data ? json.data.auth_url : "";
-      if (!json || !json.success || !url) throw new Error((json && json.message) || "No se pudo iniciar la autorización de Google.");
-      var authWindow = window.open(url, "scm_google_calendar_auth", "popup=yes,width=560,height=720");
-      if (!authWindow) throw new Error("El navegador bloqueó la ventana de Google. Permite ventanas emergentes y vuelve a guardar.");
-      window.Swal.showValidationMessage("Autoriza Google Calendar en la ventana abierta. Guardaremos al confirmar la conexión.");
-      return waitForGoogle(employeeId, authWindow).then(function () {
-        try { authWindow.close(); } catch (error) { /* ya cerrada */ }
-        window.Swal.resetValidationMessage();
-      });
-    });
   }
 
   function repeatDates(day, fd) {
@@ -305,8 +274,6 @@
     } catch (error) {
       return fail(error.message);
     }
-    var googleBox = form.elements.sincronizar_google;
-    var google = !!(googleBox && googleBox.checked && !googleBox.disabled && !form.querySelector("[data-form-google]").hidden);
     var ticketId = kind === "recordatorio" ? "" : state.ticketId();
     var isCita = kind === "cita" && !!ticketId;
     var startText = timeOf(startMinutes) + ":00";
@@ -315,14 +282,12 @@
       titulo: String(fd.get("titulo") || "").trim(),
       descripcion: String(fd.get("descripcion") || ""),
       id_categoria: String(fd.get("id_categoria") || ""),
-      sincronizar_google: google ? "1" : "0",
       meta: { origen: "comercial", modulo: options.task ? "tarea" : "calendario", tipo: kind },
     };
     var category = form.elements.id_categoria.options[form.elements.id_categoria.selectedIndex].text;
     var request;
     window.Swal.resetValidationMessage();
-    var ready = google && state.googleConnect ? connectGoogle(state.googleConnect) : Promise.resolve();
-    return ready.then(function () {
+    return Promise.resolve().then(function () {
       window.Swal.showLoading();
       if (kind === "recordatorio") {
         return api("crear_item_calendario", Object.assign({}, base, {
@@ -345,7 +310,6 @@
           return api("crear_eventos", Object.assign({
             eventos: dates.map(function (date) { return Object.assign({}, eventBase, { fecha_inicio: date + " " + startText, fecha_fin: date + " " + endText }); }),
             empleados: selected,
-            sincronizar_google: google ? "1" : "",
           }, extra));
         }
         return api("crear_evento", Object.assign({}, eventBase, { fecha_inicio: day + " " + startText, fecha_fin: day + " " + endText, id_empleado: selected[0] }, extra));
@@ -359,7 +323,6 @@
     }).then(function (json) {
       if (!json || !json.success) throw new Error((json && json.message) || "No se pudo guardar.");
       json._appointments = isCita ? [{ id_ticket: ticketId, id_empleado: selected[0], categoria: category, titulo: base.titulo, ubicacion: location, fecha_inicio: day + " " + startText, fecha_fin: day + " " + endText, es_cita: "si" }] : [];
-      json._google = google;
       return json;
     }).catch(function (error) {
       window.Swal.hideLoading();
@@ -371,9 +334,6 @@
   function afterSave(json, options) {
     notify("success", json.message || "Guardado en el calendario comercial.");
     var data = json.data || {};
-    if (json._google && (data.google_pendiente || data.google_pendientes > 0)) {
-      notify("error", "Se guardó en el panel, pero quedó pendiente en Google Calendar. " + (data.google_error || ""), "Google Calendar pendiente");
-    }
     if (data.aviso_programado === false) {
       notify("warning", "El recordatorio se guardó, pero no se pudo programar el aviso.", "Aviso pendiente");
     }
@@ -490,46 +450,11 @@
       applyKind(true);
     }
 
-    function refreshGoogle() {
-      var wrap = popup.querySelector("[data-form-google]");
-      var box = els.sincronizar_google;
-      var text = popup.querySelector("[data-form-google-text]");
-      var ids = selectedEmployees(form, options);
-      state.googleConnect = "";
-      if (!ids.length) {
-        wrap.hidden = true;
-        return;
-      }
-      Promise.all(ids.map(function (id) { return api("estado_google_oauth", { id_empleado: id }); })).then(function (responses) {
-        var states = responses.map(function (json) { return (json && json.success && json.data) || {}; });
-        if (!states.every(function (row) { return row.configured && row.sync_enabled; })) {
-          wrap.hidden = true;
-          box.checked = false;
-          return;
-        }
-        wrap.hidden = false;
-        if (states.every(function (row) { return row.connected; })) {
-          box.disabled = false;
-          box.checked = true;
-          text.textContent = "Agregar también a Google Calendar";
-        } else if (ids.length === 1 && ids[0] === currentEmployeeId()) {
-          box.disabled = false;
-          box.checked = false;
-          state.googleConnect = ids[0];
-          text.textContent = "Conectar mi Google Calendar y agregar este evento";
-        } else {
-          box.disabled = true;
-          box.checked = false;
-          text.textContent = "Google Calendar no disponible: cada funcionario debe conectar su propia cuenta.";
-        }
-      }).catch(function () { wrap.hidden = true; });
-    }
-
     form.addEventListener("change", function (event) {
       var name = event.target.name;
       if (name === "kind") { applyKind(false); refreshAgenda(); }
       if (name === "id_categoria") autoTitle();
-      if (name === "id_empleado" || name === "empleados") { refreshTickets(); refreshGoogle(); refreshAgenda(); }
+      if (name === "id_empleado" || name === "empleados") { refreshTickets(); refreshAgenda(); }
       if (name === "fecha" || name === "hora_inicio" || name === "duracion") refreshAgenda();
       if (name === "id_ticket") onTicket();
       if (name === "repetir") {
@@ -544,7 +469,6 @@
     });
     applyKind(true);
     refreshTickets();
-    refreshGoogle();
     refreshAgenda();
   }
 
@@ -570,7 +494,7 @@
     }
     if (options.lockEmployee && !employee) employee = me;
     var kinds = options.multiple ? ["evento"] : (task ? ["cita", "evento"] : ["cita", "evento", "recordatorio"]);
-    var state = { kinds: kinds, kind: kinds.indexOf(options.kind) !== -1 ? options.kind : kinds[0], employee: employee, googleConnect: "", ticketId: function () { return ""; } };
+    var state = { kinds: kinds, kind: kinds.indexOf(options.kind) !== -1 ? options.kind : kinds[0], employee: employee, ticketId: function () { return ""; } };
     loadCategories().then(function (categories) {
       if (!categories.length) throw new Error("No hay categorías habilitadas para el calendario comercial. Revisa Configuración › Calendario comercial.");
       return window.Swal.fire({
@@ -707,9 +631,6 @@
         return;
       }
       notify("success", result.value.message || "Evento finalizado.");
-      if (result.value.data && result.value.data.google_pendiente) {
-        notify("error", "El evento quedó realizado aquí, pero no se pudo actualizar en Google Calendar.", "Google Calendar pendiente");
-      }
       if (typeof options.onSaved === "function") options.onSaved();
     });
   }
