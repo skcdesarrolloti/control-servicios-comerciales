@@ -695,8 +695,8 @@ final class CommercialDashboardView
 
   </div>
 
-  <script src="<?php echo esc_url($baseUrl . '/assets/js/scm-admin.js?v=' . SCM_VERSION); ?>"></script>
-  <script src="<?php echo esc_url($baseUrl . '/assets/js/admin-dashboard-runtime.js?v=' . SCM_VERSION); ?>"></script>
+  <script src="<?php echo esc_url($baseUrl . '/assets/js/scm-admin.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/scm-admin.js')); ?>"></script>
+  <script src="<?php echo esc_url($baseUrl . '/assets/js/admin-dashboard-runtime.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/admin-dashboard-runtime.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-dashboard.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-dashboard.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-settings.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-settings.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-reports.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-reports.js')); ?>"></script>
@@ -3236,10 +3236,9 @@ final class CommercialDashboardView
             <?php if ($mode === 'personal'): ?>
               <button type="button" class="inline-flex items-center h-9 px-3 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer" data-scm-calendar-open-create data-calendar-mode="single" data-calendar-kind="reminder">Recordatorio</button>
             <?php endif; ?>
-            <?php if (!empty($config['calendar_can_assign_others'])): ?>
+            <?php if ($mode !== 'personal' && !empty($config['calendar_can_assign_others'])): ?>
               <button type="button" class="inline-flex items-center h-9 px-3 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer" data-scm-calendar-open-create data-calendar-mode="multiple" title="Un mismo evento para varios funcionarios">Para varios</button>
             <?php endif; ?>
-            <button type="button" class="inline-flex items-center h-9 px-3 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer" data-scm-calendar-open-create data-calendar-mode="single" data-calendar-kind="cita">Cita con cliente</button>
             <button type="button" class="inline-flex items-center gap-1.5 h-9 pl-2.5 pr-3.5 rounded-lg bg-[#1E3C76] hover:bg-[#061D49] text-sm font-medium text-white shadow-sm transition-colors cursor-pointer" data-scm-calendar-open-create data-calendar-mode="single">
               <span class="material-symbols-outlined text-[18px]">add</span>
               <span>Nuevo evento</span>

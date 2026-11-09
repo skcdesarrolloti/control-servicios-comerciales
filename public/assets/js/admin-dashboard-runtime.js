@@ -257,6 +257,7 @@
       var calendarDueStats = null;
       var calendarDueSettings = {};
       var popupAgendaRequestId = 0;
+      var pendingActionRequestId = 0;
       var ticketCacheByEmployee = {};
       var calendarNativeCaseCache = {};
       var calendarNativeCasePromiseByTicket = {};
@@ -284,8 +285,7 @@
           method: method || (payload ? "POST" : "GET"),
           credentials: "same-origin",
         };
-        // La API del panel exige el nonce; un CALENDAR_API_URL externo no lo acepta en CORS.
-        options.headers = /calendar-api\.php/.test(calendarApiUrl) ? { "X-SCM-Nonce": nonce } : {};
+        options.headers = { "X-SCM-Nonce": nonce };
         if (payload) {
           options.headers["Content-Type"] = "application/json";
           options.body = JSON.stringify(payload);
@@ -971,7 +971,26 @@
         if (pendingEl) pendingEl.textContent = String(pending || 0);
         if (doneEl) doneEl.textContent = String(done || 0);
         if (todayEl) todayEl.textContent = String(todayCount || 0);
-        if (pendingActionCountEl) pendingActionCountEl.textContent = String(pending || 0);
+        refreshPendingActionCount();
+      }
+
+      // "Sin cerrar" cuenta lo mismo que muestra su popup: los eventos vencidos del funcionario, no los pendientes del mes.
+      function refreshPendingActionCount() {
+        if (!pendingActionCountEl) return;
+        var requestId = ++pendingActionRequestId;
+        var apply = function (total) {
+          if (requestId !== pendingActionRequestId) return;
+          pendingActionCountEl.textContent = String(total);
+          pendingActionCountEl.style.display = total > 0 ? "" : "none";
+        };
+        var employeeId = selectedEmployeeFromFilter();
+        if (!employeeId) {
+          apply(0);
+          return;
+        }
+        calendarApi("listar_pendientes_vencidos", { id_empleado: employeeId }).then(function (json) {
+          apply(json && json.success ? filterRowsByAllowedEmployees(extractRows(json.data || [])).length : 0);
+        }).catch(function () { apply(0); });
       }
 
       function dueCaseAttrsHtml(caseData) {
@@ -3979,12 +3998,12 @@
 
       function pendingEventsShellHtml(employeeName) {
         return '<div class="scm-calendar-pending-modern-shell">' +
-          '<header class="scm-calendar-pending-modern-head"><div><span class="material-symbols-outlined" aria-hidden="true">warning</span><div><h3>Eventos pendientes <em>Urgente</em></h3><p>Control de compromisos vencidos o pendientes de resoluci&oacute;n inmediata</p></div></div><button type="button" data-calendar-pending-close aria-label="Cerrar"><span class="material-symbols-outlined" aria-hidden="true">close</span></button></header>' +
+          '<header class="scm-calendar-pending-modern-head"><div><span class="material-symbols-outlined" aria-hidden="true">warning</span><div><h3>Eventos pendientes <em data-calendar-pending-only style="display:none">Urgente</em></h3><p>Control de compromisos vencidos o pendientes de resoluci&oacute;n inmediata</p></div></div><button type="button" data-calendar-pending-close aria-label="Cerrar"><span class="material-symbols-outlined" aria-hidden="true">close</span></button></header>' +
           '<section class="scm-calendar-pending-modern-body">' +
           '<div class="scm-calendar-pending-modern-officer"><span>' + escHtml(calendarInitialsFromName(employeeName)) + '</span><div><small>Funcionario asignado</small><strong>' + escHtml(employeeName) + '</strong><em>Eventos vencidos sin realizar</em></div><b data-calendar-pending-count>Validando pendientes...</b></div>' +
-          '<div class="scm-calendar-pending-modern-alert"><span class="material-symbols-outlined" aria-hidden="true">error</span><div><strong>Atenci&oacute;n requerida</strong><p>Se encontraron compromisos no concretados que superaron el plazo establecido de entrega o informe de firma.</p></div></div>' +
+          '<div class="scm-calendar-pending-modern-alert" data-calendar-pending-only style="display:none"><span class="material-symbols-outlined" aria-hidden="true">error</span><div><strong>Atenci&oacute;n requerida</strong><p>Se encontraron compromisos no concretados que superaron el plazo establecido de entrega o informe de firma.</p></div></div>' +
           '<div><h4 class="scm-calendar-pending-modern-title">Detalle de compromisos</h4><div data-calendar-pending-content><div class="scm-calendar-report-loading">Cargando pendientes...</div></div></div>' +
-          '<p class="scm-calendar-pending-modern-note">Una vez gestionados los eventos vencidos, el sistema actualizar&aacute; autom&aacute;ticamente el balance general del funcionario en el informe diario.</p>' +
+          '<p class="scm-calendar-pending-modern-note" data-calendar-pending-only style="display:none">Una vez gestionados los eventos vencidos, el sistema actualizar&aacute; autom&aacute;ticamente el balance general del funcionario en el informe diario.</p>' +
           '</section><footer class="scm-calendar-pending-modern-foot"><span><i class="material-symbols-outlined" aria-hidden="true">dashboard</i> SKC SuCasa Inmobiliaria &bull; Calendario operativo</span><button type="button" class="scm-calendar-modern-btn scm-calendar-modern-btn--orange" data-calendar-pending-close>Cerrar</button></footer>' +
           '</div>';
       }
@@ -4019,6 +4038,7 @@
                 calendarPendingRows = rows;
                 if (countBadge) countBadge.textContent = rows.length ? rows.length + " evento" + (rows.length === 1 ? "" : "s") + " requieren gestion" : "Sin eventos pendientes";
                 if (content) content.innerHTML = pendingEventRowsHtml(rows, true);
+                if (popup) popup.querySelectorAll("[data-calendar-pending-only]").forEach(function (node) { node.style.display = rows.length ? "" : "none"; });
               })
               .catch(function (err) {
                 if (content) content.innerHTML = '<div class="scm-calendar-report-empty">No se pudieron cargar los pendientes: ' + escHtml(err.message || "Error") + '</div>';

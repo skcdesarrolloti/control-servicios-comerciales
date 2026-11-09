@@ -121,11 +121,10 @@ final class CommercialCalendarService
     ];
   }
 
-  /** API propia del panel, salvo que CALENDAR_API_URL indique otra. */
+  /** La API propia del panel; ya no depende de calendario-actividades. */
   public function apiUrl(): string
   {
-    $configured = trim((string) ($this->config['calendar_api_url'] ?? ''));
-    return $configured !== '' ? $configured : rtrim((string) (defined('SCM_BASE_URL') ? SCM_BASE_URL : ''), '/') . '/calendar-api.php?action=';
+    return rtrim((string) (defined('SCM_BASE_URL') ? SCM_BASE_URL : ''), '/') . '/calendar-api.php?action=';
   }
 
   /** Categoría que se preselecciona al agendar una cita con cliente. */

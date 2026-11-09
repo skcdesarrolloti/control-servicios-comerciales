@@ -28,7 +28,7 @@ final class CommercialCalendarServiceTest extends TestCase
   }
 
   /** @param array<string,mixed> $permissions */
-  private function service(string $cargo, array $permissions = []): CommercialCalendarService
+  private function service(string $cargo, array $permissions = [], array $config = []): CommercialCalendarService
   {
     $_SESSION = ['scm_user_cargo' => $cargo, 'scm_user_id' => 7];
     $pdo = new PDO('sqlite::memory:');
@@ -40,7 +40,14 @@ final class CommercialCalendarServiceTest extends TestCase
     ], JSON_THROW_ON_ERROR)]);
     $db = new Database($pdo);
     $settings = new Settings($db);
-    return new CommercialCalendarService($db, $settings, new CommercialAccessPolicy($settings, $db, ['13']), []);
+    return new CommercialCalendarService($db, $settings, new CommercialAccessPolicy($settings, $db, ['13']), $config);
+  }
+
+  public function testAlwaysUsesThePanelsOwnApi(): void
+  {
+    $url = $this->service('13', [], ['calendar_api_url' => 'https://sucasainmobiliaria.com.co/calendario-actividades/index.php?action='])->apiUrl();
+    self::assertStringEndsWith('/calendar-api.php?action=', $url);
+    self::assertStringNotContainsString('calendario-actividades', $url);
   }
 
   public function testBusinessDaysSkipSundaysAndColombianHolidays(): void

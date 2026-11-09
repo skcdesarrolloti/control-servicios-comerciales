@@ -15,6 +15,7 @@ const categories = [
   { id: 40, nombre: 'Avalúo', color: '#f59e0b' },
   { id: 12, nombre: 'Preventiva', color: '#7c3aed' },
 ];
+let overdue = [{ id: 77, titulo: 'Visita sin cerrar', fecha_inicio: '2026-10-20 10:00:00', fecha_fin: '2026-10-20 11:00:00', id_ticket: '1', id_empleado: '999' }];
 const events = [
   { id: 501, tipo_item: 'evento', titulo: 'Visita apartamento Manga', fecha_inicio: `${today} 09:00:00`, fecha_fin: `${today} 10:00:00`, id_empleado: '999', id_categoria: 3, categoria: 'Visita comercial', color: '#2563eb', estado: 'No', ubicacion: 'Manga calle 25', id_ticket: '1' },
   { id: 502, tipo_item: 'recordatorio', titulo: 'Llamar propietario', fecha_inicio: `${today} 11:00:00`, fecha_fin: `${today} 11:00:00`, recordatorio_at: `${today} 11:00:00`, id_empleado: '999', id_categoria: 26, categoria: 'Captación', color: '#16a34a', estado: 'pendiente' },
@@ -49,7 +50,7 @@ async function closeSwal(page) {
       listar_items_calendario: events,
       filtrar_eventos_admin: events,
       filtrar_eventos: events.filter(row => String(row.id_ticket || '') === String(body.id_ticket || '')),
-      listar_pendientes_vencidos: [{ id: 77, titulo: 'Visita sin cerrar', fecha_inicio: '2026-10-20 10:00:00', id_ticket: '1' }],
+      listar_pendientes_vencidos: overdue,
       crear_evento: { id: 900, google_pendiente: false },
       crear_item_calendario: { id: 901, aviso_programado: true, google_pendiente: false },
       obtener_tickets_funcionario: [{ _ID: '1', id_ticket: '1', solicitante: 'Laura Gómez', direccion: 'Calle 25 #20-10', estado_comercial: 'Contactado' }],
@@ -130,7 +131,8 @@ async function closeSwal(page) {
   const createCategories = await page.locator('.scm-calendar-create-form [name="id_categoria"] option').allTextContents();
   assert(createCategories.join('|') === 'Selecciona categoría|Visita comercial|Captación', 'El popup de crear no respeta las categorías comerciales: ' + createCategories.join(', '));
   // Formulario corto: un solo paso, con lo opcional recogido.
-  assert(await page.locator('.scm-cal-kinds input').count() === 3, 'Faltan los tipos cita, evento y recordatorio');
+  assert(await page.locator('.scm-cal-kinds input').count() === 2, 'Crear desde el calendario solo debe ofrecer evento y recordatorio');
+  assert(await page.locator('[data-commercial-schedule-form] [name="id_empleado"]').getAttribute('type') === 'hidden', 'Mi calendario no debe pedir funcionario');
   assert(!(await page.locator('.scm-calendar-availability-panel').count()), 'Sigue el panel lateral del formulario anterior');
   assert(!(await page.locator('[name="sincronizar_google"]').count()) && !/google/i.test(await page.locator('.scm-calendar-create-shell').textContent()), 'El formulario sigue ofreciendo Google Calendar');
   assert(!(await page.locator('[name="descripcion"]').isVisible()), 'La descripción debe quedar en Más opciones');
@@ -201,6 +203,7 @@ async function closeSwal(page) {
   await page.goto(endpoint + '?tab=tarea');
   await page.locator('[data-commercial-calendar-task] [data-commercial-calendar-schedule]').click();
   await page.locator('[data-commercial-schedule-form]').waitFor();
+  assert(await page.locator('.scm-cal-kinds label:has-text("Cita con cliente") input').isChecked(), 'Desde la tarea debe abrir como cita con cliente');
   await page.locator('[data-commercial-schedule-agenda] .scm-calendar-availability-status.is-busy').waitFor();
   await page.locator('[data-commercial-schedule-form] [name="id_categoria"]').selectOption('3');
   await page.locator('.swal2-confirm').click();
@@ -211,6 +214,26 @@ async function closeSwal(page) {
   assert(created.body.estado_comercial === 'Contactado', 'La cita cambia el estado comercial de la tarea');
   assert(!('estado_administrativo' in created.body) && !('creado_por' in created.body), 'El navegador no debe decidir el estado administrativo ni el autor');
   await closeSwal(page);
+
+  // "Sin cerrar" cuenta lo mismo que su popup; sin vencidos no hay número ni alerta.
+  await page.goto(endpoint + '?tab=calendario&subtab=mine');
+  await page.waitForFunction(() => document.querySelector('[data-scm-calendar-pending-action-count]').textContent === '1');
+  assert(!(await page.locator('[data-calendar-kind="cita"]').count()), 'Cita con cliente sigue en el calendario');
+  assert(!(await page.locator('[data-calendar-mode="multiple"]').count()), 'Para varios no aplica en Mi calendario');
+  await page.locator('[data-scm-calendar-open-pending]').click();
+  await page.locator('.scm-calendar-pending-modern-shell:has-text("Visita sin cerrar")').waitFor();
+  assert(await page.locator('.scm-calendar-pending-modern-alert').isVisible(), 'Con vencidos debe mostrar la alerta');
+  await page.locator('.scm-calendar-pending-modern-foot [data-calendar-pending-close]').click();
+  overdue = [];
+  await page.goto(endpoint + '?tab=calendario&subtab=mine');
+  await page.waitForFunction(() => document.querySelector('[data-scm-calendar-pending-action-count]').style.display === 'none');
+  await page.locator('[data-scm-calendar-open-pending]').click();
+  await page.locator('.scm-calendar-pending-modern-shell:has-text("Sin compromisos vencidos")').waitFor();
+  assert(!(await page.locator('.scm-calendar-pending-modern-alert').isVisible()), 'Sin vencidos no debe decir que se encontraron compromisos');
+  assert(!(await page.locator('.scm-calendar-pending-modern-head em').isVisible()), 'Sin vencidos no debe decir Urgente');
+  await page.locator('.scm-calendar-pending-modern-foot [data-calendar-pending-close]').click();
+  await page.goto(endpoint + '?tab=calendario&subtab=team');
+  await page.locator('[data-calendar-mode="multiple"]').waitFor();
 
   // Cerrar un evento que exige reporte comercial pide inmueble y envía el reporte.
   await page.goto(endpoint + '?tab=calendario&subtab=mine');

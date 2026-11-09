@@ -493,7 +493,7 @@
       employee = me;
     }
     if (options.lockEmployee && !employee) employee = me;
-    var kinds = options.multiple ? ["evento"] : (task ? ["cita", "evento"] : ["cita", "evento", "recordatorio"]);
+    var kinds = options.multiple ? ["evento"] : (task ? ["cita", "evento"] : ["evento", "recordatorio"]);
     var state = { kinds: kinds, kind: kinds.indexOf(options.kind) !== -1 ? options.kind : kinds[0], employee: employee, ticketId: function () { return ""; } };
     loadCategories().then(function (categories) {
       if (!categories.length) throw new Error("No hay categorías habilitadas para el calendario comercial. Revisa Configuración › Calendario comercial.");

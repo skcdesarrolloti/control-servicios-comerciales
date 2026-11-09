@@ -1497,7 +1497,7 @@
       credentials: "same-origin",
     };
     var calendarUrl = calendarApiBase(root);
-    options.headers = /calendar-api\.php/.test(calendarUrl) ? { "X-SCM-Nonce": (parseRuntime(root) || {}).nonce || "" } : {};
+    options.headers = { "X-SCM-Nonce": (parseRuntime(root) || {}).nonce || "" };
     if (payload) {
       options.headers["Content-Type"] = "application/json";
       options.body = JSON.stringify(payload);

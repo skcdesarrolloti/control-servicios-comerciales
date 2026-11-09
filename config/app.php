@@ -46,8 +46,6 @@ return [
   'dashboard_admin_cargos' => array_values(array_filter(array_map('trim', explode(',', (string) $env('DASHBOARD_ADMIN_CARGOS', '11,12,13,14'))))),
   'commercial_employee_cargos' => array_values(array_filter(array_map('trim', explode(',', (string) $env('COMMERCIAL_EMPLOYEE_CARGOS', '1,6,9,10,11,12,13,14,17'))))),
   'calendar_allowed_cargos' => array_values(array_filter(array_map('trim', explode(',', (string) $env('CALENDAR_ALLOWED_CARGOS', '9,10,17'))))),
-  // Vacío = la API del propio panel (public/calendar-api.php).
-  'calendar_api_url' => $env('CALENDAR_API_URL', ''),
   'reminder_template' => $env('CALENDARIO_WHATSAPP_REMINDER_TEMPLATE', 'recordatorio_calendario'),
   'reminder_template_lang' => $env('CALENDARIO_WHATSAPP_REMINDER_TEMPLATE_LANG', 'es_CO'),
   'minimax_api_key' => $env('MINIMAX_API_KEY', ''),
