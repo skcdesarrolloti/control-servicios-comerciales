@@ -60,6 +60,7 @@ final class CommercialCalendarApi
       'filtrar_eventos_admin' => 'filterEventsAdmin',
       'filtrar_eventos' => 'filterEvents',
       'listar_pendientes_vencidos' => 'listOverdue',
+      'listar_por_cerrar' => 'listToClose',
       'obtener_tickets_funcionario' => 'employeeTickets',
       'crear_evento' => 'createEvent',
       'crear_eventos' => 'createEvents',
@@ -163,6 +164,17 @@ final class CommercialCalendarApi
     }
     [$ids, $masked] = $this->readScope($employee);
     return self::ok('Eventos pendientes vencidos', $ids === [] || $masked ? [] : $this->store->overdueEvents($employee));
+  }
+
+  /** @param array<string,mixed> $input @return array<string,mixed> */
+  private function listToClose(array $input): array
+  {
+    $employee = trim((string) ($input['id_empleado'] ?? ''));
+    if ($employee === '') {
+      return self::fail('ID de empleado requerido.');
+    }
+    [$ids, $masked] = $this->readScope($employee);
+    return self::ok('Eventos por marcar realizado', $ids === [] || $masked ? [] : $this->store->eventsToClose($employee));
   }
 
   /** @param array<string,mixed> $input @return array<string,mixed> */

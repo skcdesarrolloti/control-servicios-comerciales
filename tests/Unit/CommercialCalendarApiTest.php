@@ -208,6 +208,26 @@ final class CommercialCalendarApiTest extends TestCase
     self::assertSame(2, (int) $this->db->getVar('SELECT COUNT(*) FROM registro_bloqueos'));
   }
 
+  public function testToCloseListsOnlyEndedEventsStillInTime(): void
+  {
+    $api = $this->api('9', '100', self::MINE_ONLY);
+    $at = static fn(string $modify): string => (new \DateTimeImmutable('now', new \DateTimeZone('America/Bogota')))->modify($modify)->format('Y-m-d H:i:s');
+    $add = fn(int $id, string $title, string $end, string $status = 'No', string $employee = '100') => $this->db->insert('calendario_actividades', ['id' => $id, 'titulo' => $title, 'fecha_inicio' => $end, 'fecha_fin' => $end, 'id_empleado' => $employee, 'id_categoria' => 3, 'estado' => $status]);
+    $add(30, 'Termino hace una hora', $at('-1 hour'));
+    $add(31, 'Vencido hace tres dias', $at('-3 days'));
+    $add(32, 'Todavia no termina', $at('+1 hour'));
+    $add(33, 'Ya realizado', $at('-1 hour'), 'Si');
+    $add(34, 'De otro funcionario', $at('-1 hour'), 'No', '200');
+
+    self::assertSame(['Termino hace una hora'], array_column($api->handle('listar_por_cerrar', ['id_empleado' => '100'])['data'], 'titulo'));
+    self::assertSame(['Vencido hace tres dias'], array_column($api->handle('listar_pendientes_vencidos', ['id_empleado' => '100'])['data'], 'titulo'), 'Las dos listas no se mezclan.');
+    self::assertSame([], $api->handle('listar_por_cerrar', ['id_empleado' => '200'])['data'], 'De un compañero solo se ve ocupado o libre.');
+
+    $team = $this->api('9', '100', self::TEAM);
+    $add(34, 'De otro funcionario', $at('-1 hour'), 'No', '200');
+    self::assertSame(['De otro funcionario'], array_column($team->handle('listar_por_cerrar', ['id_empleado' => '200'])['data'], 'titulo'), 'Con permiso de equipo sí se ve.');
+  }
+
   public function testCannotChangeSomeoneElsesEvent(): void
   {
     $api = $this->api('9', '100', self::MINE_ONLY);

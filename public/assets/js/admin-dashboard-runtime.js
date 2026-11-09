@@ -3959,7 +3959,7 @@
         });
       }
 
-      function pendingEventRowsHtml(rows, modern) {
+      function pendingEventRowsHtml(rows, modern, toClose) {
         if (!rows.length) {
           return modern
             ? '<div class="scm-calendar-pending-modern-empty"><span class="material-symbols-outlined" aria-hidden="true">task_alt</span><strong>Sin compromisos vencidos</strong><p>Este funcionario no tiene eventos pendientes vencidos.</p></div>'
@@ -3984,10 +3984,11 @@
           var id = String(row.id || row._ID || row.event_id || "").trim();
           var ticket = String(row.id_ticket || "").trim();
           return '<article class="scm-calendar-pending-modern-event">' +
-            '<div class="scm-calendar-pending-modern-event-head"><div><span>' + escHtml(row.fecha_fin ? "Vence: " + formatDateTime(row.fecha_fin) : "Pendiente") + '</span>' + (ticket ? '<em>#TSK-' + escHtml(ticket) + '</em>' : "") + '</div><strong>' + escHtml(row.fecha_fin ? "Limite: " + formatDateTime(row.fecha_fin) : formatDateTime(row.fecha_inicio)) + '</strong></div>' +
+            '<div class="scm-calendar-pending-modern-event-head"><div><span>' + escHtml(toClose ? "Sin marcar" : (row.fecha_fin ? "Vence: " + formatDateTime(row.fecha_fin) : "Pendiente")) + '</span>' + (ticket ? '<em>#TSK-' + escHtml(ticket) + '</em>' : "") + '</div><strong>' + escHtml(row.fecha_fin ? (toClose ? "Termin\u00f3: " : "Limite: ") + formatDateTime(row.fecha_fin) : formatDateTime(row.fecha_inicio)) + '</strong></div>' +
             '<h4>' + escHtml(row.titulo || "Evento") + '</h4>' +
             '<p><span class="material-symbols-outlined" aria-hidden="true">location_on</span>' + escHtml(calendarDetailValue(row, ["ubicacion", "lugar", "direccion"]) || categoryNameForRow(row)) + ' <i>&bull;</i> Funcionario: ' + escHtml(employeeNameForRow(row)) + '</p>' +
             '<div class="scm-calendar-pending-modern-actions">' +
+            (id && toClose ? '<button type="button" class="scm-calendar-modern-btn scm-calendar-modern-btn--success" data-scm-calendar-complete-event data-event-id="' + escHtml(id) + '">Marcar realizado</button>' : "") +
             (id ? '<button type="button" class="scm-calendar-modern-btn scm-calendar-modern-btn--soft" data-scm-calendar-reschedule-event data-event-id="' + escHtml(id) + '">Reprogramar</button>' : "") +
             (id ? '<button type="button" class="scm-calendar-modern-btn scm-calendar-modern-btn--orange" data-scm-calendar-view-event data-event-id="' + escHtml(id) + '">Gestionar evento<span class="material-symbols-outlined" aria-hidden="true">chevron_right</span></button>' : "") +
             (ticket ? '<button type="button" class="scm-calendar-action-btn scm-calendar-action-btn--ghost" data-scm-calendar-view-ticket data-event-id="' + escHtml(id) + '" data-ticket-id="' + escHtml(ticket) + '">Ver caso</button>' : "") +
@@ -4003,6 +4004,7 @@
           '<div class="scm-calendar-pending-modern-officer"><span>' + escHtml(calendarInitialsFromName(employeeName)) + '</span><div><small>Funcionario asignado</small><strong>' + escHtml(employeeName) + '</strong><em>Eventos vencidos sin realizar</em></div><b data-calendar-pending-count>Validando pendientes...</b></div>' +
           '<div class="scm-calendar-pending-modern-alert" data-calendar-pending-only style="display:none"><span class="material-symbols-outlined" aria-hidden="true">error</span><div><strong>Atenci&oacute;n requerida</strong><p>Se encontraron compromisos no concretados que superaron el plazo establecido de entrega o informe de firma.</p></div></div>' +
           '<div><h4 class="scm-calendar-pending-modern-title">Detalle de compromisos</h4><div data-calendar-pending-content><div class="scm-calendar-report-loading">Cargando pendientes...</div></div></div>' +
+          '<div data-calendar-to-close style="display:none"><h4 class="scm-calendar-pending-modern-title">Por marcar realizado</h4><p class="scm-cal-hint">Ya pas&oacute; su hora y siguen en plazo. No cuentan como vencidos.</p><div data-calendar-to-close-list></div></div>' +
           '<p class="scm-calendar-pending-modern-note" data-calendar-pending-only style="display:none">Una vez gestionados los eventos vencidos, el sistema actualizar&aacute; autom&aacute;ticamente el balance general del funcionario en el informe diario.</p>' +
           '</section><footer class="scm-calendar-pending-modern-foot"><span><i class="material-symbols-outlined" aria-hidden="true">dashboard</i> SKC SuCasa Inmobiliaria &bull; Calendario operativo</span><button type="button" class="scm-calendar-modern-btn scm-calendar-modern-btn--orange" data-calendar-pending-close>Cerrar</button></footer>' +
           '</div>';
@@ -4031,12 +4033,22 @@
             var popup = window.Swal.getPopup();
             var content = popup ? popup.querySelector("[data-calendar-pending-content]") : null;
             var countBadge = popup ? popup.querySelector("[data-calendar-pending-count]") : null;
-            calendarApi("listar_pendientes_vencidos", { id_empleado: employeeId })
-              .then(function (json) {
+            Promise.all([
+              calendarApi("listar_pendientes_vencidos", { id_empleado: employeeId }),
+              calendarApi("listar_por_cerrar", { id_empleado: employeeId }).catch(function () { return null; }),
+            ])
+              .then(function (results) {
+                var json = results[0];
                 if (!json || !json.success) throw new Error((json && json.message) || "No se pudieron cargar pendientes.");
                 var rows = filterRowsByAllowedEmployees(extractRows(json.data || []));
-                calendarPendingRows = rows;
-                if (countBadge) countBadge.textContent = rows.length ? rows.length + " evento" + (rows.length === 1 ? "" : "s") + " requieren gestion" : "Sin eventos pendientes";
+                var toCloseRows = results[1] && results[1].success ? filterRowsByAllowedEmployees(extractRows(results[1].data || [])) : [];
+                calendarPendingRows = rows.concat(toCloseRows);
+                var toCloseWrap = popup ? popup.querySelector("[data-calendar-to-close]") : null;
+                if (toCloseWrap && toCloseRows.length) {
+                  toCloseWrap.querySelector("[data-calendar-to-close-list]").innerHTML = pendingEventRowsHtml(toCloseRows, true, true);
+                  toCloseWrap.style.display = "";
+                }
+                if (countBadge) countBadge.textContent = rows.length ? rows.length + " evento" + (rows.length === 1 ? "" : "s") + " requieren gestion" : "Sin eventos vencidos";
                 if (content) content.innerHTML = pendingEventRowsHtml(rows, true);
                 if (popup) popup.querySelectorAll("[data-calendar-pending-only]").forEach(function (node) { node.style.display = rows.length ? "" : "none"; });
               })

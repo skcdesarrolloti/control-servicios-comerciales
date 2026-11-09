@@ -224,6 +224,22 @@ final class CalendarStore
     );
   }
 
+  /**
+   * Eventos que ya pasaron su hora y faltan por marcar, todavía dentro del plazo: no son vencidos ni bloquean crear otros.
+   * @return array<int,array<string,mixed>>
+   */
+  public function eventsToClose(string $employeeId): array
+  {
+    return $this->db->getResults(
+      'SELECT e.*, c.`nombre` AS categoria, c.`color`
+         FROM `' . self::EVENTS . '` e
+         LEFT JOIN `' . self::CATEGORIES . "` c ON e.`id_categoria` = c.`id`
+        WHERE e.`id_empleado` = ? AND e.`estado` = 'No' AND e.`fecha_fin` < ? AND e.`fecha_fin` >= ?
+        ORDER BY e.`fecha_inicio` ASC",
+      [$employeeId, $this->now(), $this->blockLimit()]
+    );
+  }
+
   // ── Recordatorios ──────────────────────────────────
 
   /**

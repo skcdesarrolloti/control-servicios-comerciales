@@ -16,6 +16,7 @@ const categories = [
   { id: 12, nombre: 'Preventiva', color: '#7c3aed' },
 ];
 let overdue = [{ id: 77, titulo: 'Visita sin cerrar', fecha_inicio: '2026-10-20 10:00:00', fecha_fin: '2026-10-20 11:00:00', id_ticket: '1', id_empleado: '999' }];
+let toClose = [];
 const events = [
   { id: 501, tipo_item: 'evento', titulo: 'Visita apartamento Manga', fecha_inicio: `${today} 09:00:00`, fecha_fin: `${today} 10:00:00`, id_empleado: '999', id_categoria: 3, categoria: 'Visita comercial', color: '#2563eb', estado: 'No', ubicacion: 'Manga calle 25', id_ticket: '1' },
   { id: 502, tipo_item: 'recordatorio', titulo: 'Llamar propietario', fecha_inicio: `${today} 11:00:00`, fecha_fin: `${today} 11:00:00`, recordatorio_at: `${today} 11:00:00`, id_empleado: '999', id_categoria: 26, categoria: 'Captación', color: '#16a34a', estado: 'pendiente' },
@@ -51,6 +52,7 @@ async function closeSwal(page) {
       filtrar_eventos_admin: events,
       filtrar_eventos: events.filter(row => String(row.id_ticket || '') === String(body.id_ticket || '')),
       listar_pendientes_vencidos: overdue,
+      listar_por_cerrar: toClose,
       crear_evento: { id: 900, google_pendiente: false },
       crear_item_calendario: { id: 901, aviso_programado: true, google_pendiente: false },
       obtener_tickets_funcionario: [{ _ID: '1', id_ticket: '1', solicitante: 'Laura Gómez', direccion: 'Calle 25 #20-10', estado_comercial: 'Contactado' }],
@@ -229,6 +231,22 @@ async function closeSwal(page) {
   await page.waitForFunction(() => document.querySelector('[data-scm-calendar-pending-action-count]').style.display === 'none');
   await page.locator('[data-scm-calendar-open-pending]').click();
   await page.locator('.scm-calendar-pending-modern-shell:has-text("Sin compromisos vencidos")').waitFor();
+  assert(!(await page.locator('[data-calendar-to-close]').isVisible()), 'La sección Por marcar realizado aparece vacía');
+  await page.locator('.scm-calendar-pending-modern-foot [data-calendar-pending-close]').click();
+
+  // "Por marcar realizado" va aparte y no suma al número del botón.
+  toClose = [{ id: 78, titulo: 'Visita de esta mañana', fecha_inicio: `${today} 08:00:00`, fecha_fin: `${today} 09:00:00`, id_empleado: '999' }];
+  await page.goto(endpoint + '?tab=calendario&subtab=mine');
+  await page.waitForFunction(() => document.querySelector('[data-scm-calendar-pending-action-count]').style.display === 'none');
+  await page.locator('[data-scm-calendar-open-pending]').click();
+  await page.locator('[data-calendar-to-close]:has-text("Visita de esta mañana")').waitFor();
+  assert((await page.locator('[data-calendar-pending-content]').textContent()).includes('Sin compromisos vencidos'), 'Lo reciente se mezcló con los vencidos');
+  await page.locator('[data-calendar-to-close] [data-scm-calendar-complete-event][data-event-id="78"]').click();
+  await page.locator('.scm-calendar-complete-form').waitFor();
+  assert((await page.locator('.scm-calendar-complete-form').textContent()).includes('Visita de esta mañana'), 'Marcar realizado abre otro evento');
+  await page.locator('.scm-calendar-complete-form [data-scm-calendar-complete-cancel]').first().click();
+  await page.locator('.scm-calendar-pending-modern-shell').waitFor();
+  toClose = [];
   assert(!(await page.locator('.scm-calendar-pending-modern-alert').isVisible()), 'Sin vencidos no debe decir que se encontraron compromisos');
   assert(!(await page.locator('.scm-calendar-pending-modern-head em').isVisible()), 'Sin vencidos no debe decir Urgente');
   await page.locator('.scm-calendar-pending-modern-foot [data-calendar-pending-close]').click();
