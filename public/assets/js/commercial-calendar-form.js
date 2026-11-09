@@ -214,7 +214,7 @@
       "</div>" +
       taskRow +
       "</div>" +
-      '<details class="scm-cal-more"><summary>Más opciones</summary><div class="scm-cal-more-body">' +
+      '<div class="scm-cal-more"><strong class="scm-cal-more-title">Más opciones</strong><div class="scm-cal-more-body">' +
       field("Descripción", '<textarea class="scm-textarea" name="descripcion" rows="3">' + esc(options.description || "") + "</textarea>") +
       '<div data-form-status hidden>' + field("Estado comercial de la tarea", '<select class="scm-select" name="estado_comercial">' + statusOptionsHtml(task ? task.commercialStatus : "") + "</select>") + "</div>" +
       '<div class="scm-cal-only-repeat"><div class="scm-cal-grid">' +
@@ -223,7 +223,7 @@
       '<div class="scm-cal-chips scm-cal-days" data-form-repeat-days hidden>' + [["1", "Lun"], ["2", "Mar"], ["3", "Mié"], ["4", "Jue"], ["5", "Vie"], ["6", "Sáb"], ["0", "Dom"]].map(function (day) {
         return '<label><input type="checkbox" name="dias" value="' + day[0] + '"><span>' + day[1] + "</span></label>";
       }).join("") + "</div></div>" +
-      "</div></details></form></div>";
+      "</div></div></form></div>";
   }
 
   function selectedEmployees(form, options) {
@@ -284,7 +284,7 @@
     if (kind !== "recordatorio" && endMinutes >= 24 * 60) return fail("El evento debe terminar el mismo día.");
     var dates;
     try {
-      dates = kind === "recordatorio" || state.ticketId() ? [day] : repeatDates(day, fd);
+      dates = kind === "recordatorio" || !state.ticketId() ? repeatDates(day, fd) : [day];
     } catch (error) {
       return fail(error.message);
     }
@@ -304,14 +304,16 @@
     return Promise.resolve().then(function () {
       window.Swal.showLoading();
       if (kind === "recordatorio") {
-        return api("crear_item_calendario", Object.assign({}, base, {
+        var reminder = Object.assign({}, base, {
           tipo_item: "recordatorio",
-          recordatorio_at: day + " " + startText,
-          fecha_inicio: day + " " + startText,
           recordatorio_canal: "whatsapp",
           aviso_minutos_antes: Number(fd.get("aviso_minutos_antes") || 0),
           id_empleado: selected[0],
-        }));
+        });
+        if (dates.length > 1) {
+          return api("crear_recordatorios", Object.assign(reminder, { fechas: dates.map(function (date) { return date + " " + startText; }) }));
+        }
+        return api("crear_item_calendario", Object.assign(reminder, { recordatorio_at: day + " " + startText, fecha_inicio: day + " " + startText }));
       }
       var eventBase = Object.assign({}, base, {
         ubicacion: location,
@@ -349,7 +351,7 @@
     notify("success", json.message || "Guardado en el calendario comercial.");
     var data = json.data || {};
     if (data.aviso_programado === false) {
-      notify("warning", "El recordatorio se guardó, pero no se pudo programar el aviso.", "Aviso pendiente");
+      notify("warning", Number(data.creados || 0) > 1 ? "Los recordatorios se guardaron, pero algún aviso no se pudo programar." : "El recordatorio se guardó, pero no se pudo programar el aviso.", "Aviso pendiente");
     }
     if (json._appointments.length && typeof core.notifyCalendarAppointment === "function") {
       core.notifyCalendarAppointment(app, json._appointments).then(function (result) {
@@ -534,9 +536,11 @@
       popup.querySelector("[data-form-title]").textContent = TITLES[kind];
       popup.querySelector("[data-form-subtitle]").textContent = SUBTITLES[kind];
       form.classList.toggle("is-reminder", kind === "recordatorio");
-      form.classList.toggle("no-repeat", kind === "cita" || !!state.ticketId());
+      // El recordatorio no se vincula a tareas: la elegida antes de cambiar de tipo no le aplica.
+      var linkedTicket = kind !== "recordatorio" && !!state.ticketId();
+      form.classList.toggle("no-repeat", kind === "cita" || linkedTicket);
       if (els.ubicacion) els.ubicacion.required = kind !== "recordatorio";
-      popup.querySelector("[data-form-status]").hidden = !state.ticketId();
+      popup.querySelector("[data-form-status]").hidden = !linkedTicket;
       var hint = popup.querySelector("[data-form-ticket-hint]");
       if (hint) hint.textContent = kind === "cita" && !state.ticketId() ? "Sin tarea no se avisa al cliente." : "";
       if (kind === "cita" && (!els.id_categoria.value || !isInitial)) {

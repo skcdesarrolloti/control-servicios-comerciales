@@ -66,6 +66,7 @@ final class CommercialCalendarApi
       'crear_eventos' => 'createEvents',
       'crear_item_calendario' => 'createItem',
       'crear_recordatorio' => 'createReminder',
+      'crear_recordatorios' => 'createReminders',
       'actualizar_evento' => 'updateEvent',
       'trasladar_evento' => 'moveEvent',
       'cambiar_estado' => 'completeEvent',
@@ -343,6 +344,35 @@ final class CommercialCalendarApi
     $reminder = (array) $this->store->reminder($id);
     $reminder['aviso_programado'] = $queueId !== null;
     return self::ok('Recordatorio creado.', $reminder);
+  }
+
+  /** Recordatorio que se repite: uno por fecha, cada uno con su aviso. @param array<string,mixed> $input @return array<string,mixed> */
+  private function createReminders(array $input): array
+  {
+    $dates = is_array($input['fechas'] ?? null) ? array_values($input['fechas']) : [];
+    if ($dates === []) {
+      return self::fail('Indica las fechas del recordatorio.');
+    }
+    if (count($dates) > self::MAX_BULK_EVENTS) {
+      return self::fail('Son demasiadas fechas a la vez. El máximo es ' . self::MAX_BULK_EVENTS . ' recordatorios.');
+    }
+    $moments = [];
+    foreach ($dates as $date) {
+      $at = is_string($date) ? self::parseDate($date) : null;
+      if ($at === null) {
+        return self::fail('Hay una fecha de recordatorio inválida.');
+      }
+      $moments[] = $at;
+    }
+    $allScheduled = true;
+    foreach ($moments as $at) {
+      $created = $this->createReminder(['recordatorio_at' => $at] + $input);
+      if (empty($created['success'])) {
+        return $created;
+      }
+      $allScheduled = $allScheduled && !empty($created['data']['aviso_programado']);
+    }
+    return self::ok('Se crearon ' . count($moments) . ' recordatorios.', ['creados' => count($moments), 'aviso_programado' => $allScheduled]);
   }
 
   // ── Modificar ──────────────────────────────────────

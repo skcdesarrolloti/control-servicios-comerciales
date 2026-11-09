@@ -326,6 +326,27 @@ final class CommercialCalendarApiTest extends TestCase
     self::assertFalse($api->handle('crear_item_calendario', ['tipo_item' => 'tarea', 'titulo' => 'x', 'id_empleado' => '100'])['success']);
   }
 
+  public function testRepeatingReminderCreatesOnePerDateOrNone(): void
+  {
+    $api = $this->api('9', '100', self::MINE_ONLY);
+    $count = fn(): int => (int) $this->db->getVar('SELECT COUNT(*) FROM calendario_recordatorios');
+    $base = ['titulo' => 'Llamar', 'id_empleado' => '100', 'recordatorio_canal' => 'whatsapp', 'aviso_minutos_antes' => 15, 'descripcion' => 'Propietario'];
+    $days = array_map(static fn(int $day): string => date('Y-m-d', strtotime('+' . $day . ' days')) . ' 08:00:00', [1, 2, 3]);
+
+    $created = $api->handle('crear_recordatorios', $base + ['fechas' => $days]);
+    self::assertTrue($created['success'], $created['message']);
+    self::assertSame(3, $created['data']['creados']);
+    self::assertSame(3, $count());
+    self::assertSame($days, $this->db->getCol('SELECT recordatorio_at FROM calendario_recordatorios ORDER BY recordatorio_at'));
+    self::assertSame('Propietario', $this->db->getVar('SELECT mensaje FROM calendario_recordatorios WHERE recordatorio_at = ?', [$days[2]]));
+
+    self::assertFalse($api->handle('crear_recordatorios', $base + ['fechas' => [$days[0], 'no es fecha']])['success']);
+    self::assertFalse($api->handle('crear_recordatorios', $base + ['fechas' => []])['success']);
+    self::assertFalse($api->handle('crear_recordatorios', $base + ['fechas' => array_fill(0, 401, $days[0])])['success']);
+    self::assertFalse($api->handle('crear_recordatorios', ['id_empleado' => '200'] + $base + ['fechas' => $days])['success'], 'Sin permiso de equipo no se agenda a otro funcionario');
+    self::assertSame(3, $count());
+  }
+
   public function testSettingsManageCategoriesAndNeverDeleteOnesWithEvents(): void
   {
     $this->api('13', '300');

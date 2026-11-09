@@ -55,6 +55,7 @@ async function closeSwal(page) {
       listar_por_cerrar: toClose,
       crear_evento: { id: 900, google_pendiente: false },
       crear_item_calendario: { id: 901, aviso_programado: true, google_pendiente: false },
+      crear_recordatorios: { creados: 3, aviso_programado: true },
       obtener_tickets_funcionario: [{ _ID: '1', id_ticket: '1', solicitante: 'Laura Gómez', direccion: 'Calle 25 #20-10', estado_comercial: 'Contactado' }],
       preparar_reporte_comercial: Number(body.id_evento) === 501 ? { habilitado: true, tipos_permitidos: ['Visita', 'Otras actividades'], tipo_predeterminado: 'Visita', inmueble_obligatorio: true, valor_transporte: 4000, valor_maximo: 8000, inmuebles: [{ id: '4501', codigo: '4501', titulo: 'Apartamento Manga', direccion: 'Calle 25', id_cotizacion: '9' }] } : { habilitado: false },
       cambiar_estado: { google_pendiente: false },
@@ -137,7 +138,7 @@ async function closeSwal(page) {
   assert(await page.locator('[data-commercial-schedule-form] [name="id_empleado"]').getAttribute('type') === 'hidden', 'Mi calendario no debe pedir funcionario');
   assert(!(await page.locator('.scm-calendar-availability-panel').count()), 'Sigue el panel lateral del formulario anterior');
   assert(!(await page.locator('[name="sincronizar_google"]').count()) && !/google/i.test(await page.locator('.scm-calendar-create-shell').textContent()), 'El formulario sigue ofreciendo Google Calendar');
-  assert(!(await page.locator('[name="descripcion"]').isVisible()), 'La descripción debe quedar en Más opciones');
+  assert(await page.locator('.scm-cal-form [name="descripcion"]').isVisible() && await page.locator('.scm-cal-form [name="repetir"]').isVisible(), 'Más opciones debe verse siempre en el evento');
   await page.locator('[data-commercial-schedule-form] [name="id_categoria"]').selectOption('26');
   assert(await page.locator('[name="titulo"]').inputValue() === 'Captación', 'El título no se completa con la categoría');
   await page.locator('[data-form-place="Oficina Manga"]').click();
@@ -162,12 +163,30 @@ async function closeSwal(page) {
   assert(await page.locator('[name="id_ticket"]').inputValue() === '', 'No se puede quitar la tarea elegida');
   await page.locator('.scm-cal-kinds label:has-text("Recordatorio")').click();
   assert(!(await page.locator('[name="ubicacion"]').isVisible()) && !(await page.locator('[name="duracion"]').isVisible()) && await page.locator('[name="aviso_minutos_antes"]').isVisible(), 'El recordatorio no adapta sus campos');
+  assert(await page.locator('.scm-cal-form [name="descripcion"]').isVisible() && await page.locator('.scm-cal-form [name="repetir"]').isVisible(), 'Más opciones debe verse siempre en el recordatorio');
   await page.locator('.scm-cal-kinds label:has-text("Evento")').click();
   await page.setViewportSize({ width: 390, height: 800 });
   assert(await page.evaluate(() => { const form = document.querySelector('.scm-cal-form'); return form.scrollWidth <= form.clientWidth + 1; }), 'El formulario se desborda en móvil');
   await page.setViewportSize({ width: 1440, height: 950 });
   assert(!(await page.locator('.scm-calendar-create-shell').textContent()).includes('&'), 'El popup de crear muestra entidades HTML');
   await page.locator('.swal2-cancel').click();
+  await page.locator('.swal2-container').waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
+
+  // Un recordatorio también se repite: se crea uno por fecha.
+  await page.locator('[data-scm-calendar-open-create][data-calendar-mode="single"]:not([data-calendar-kind])').first().click();
+  await page.locator('.scm-calendar-create-form').waitFor();
+  await page.locator('.scm-cal-kinds label:has-text("Recordatorio")').click();
+  await page.locator('.scm-cal-form [name="id_categoria"]').selectOption('26');
+  await page.locator('.scm-cal-form [name="titulo"]').fill('Llamar cada día');
+  const repeatEnd = new Date(await page.locator('.scm-cal-form [name="fecha"]').inputValue() + 'T00:00:00');
+  repeatEnd.setDate(repeatEnd.getDate() + 2);
+  await page.locator('.scm-cal-form [name="repetir"]').selectOption('diario');
+  await page.locator('.scm-cal-form [name="repetir_hasta"]').fill(`${repeatEnd.getFullYear()}-${pad(repeatEnd.getMonth() + 1)}-${pad(repeatEnd.getDate())}`);
+  await page.locator('.swal2-confirm').click();
+  await page.waitForFunction(() => !document.querySelector('[data-commercial-schedule-form]'));
+  const repeatedReminder = calls.filter(call => call.action === 'crear_recordatorios').pop();
+  assert(repeatedReminder && repeatedReminder.body.fechas.length === 3 && repeatedReminder.body.titulo === 'Llamar cada día', 'El recordatorio no se repite por fecha');
+  await page.locator('.swal2-container').waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
 
   // Vencimientos comerciales calculados en el servidor.
   await page.goto(endpoint + '?tab=calendario&subtab=due');

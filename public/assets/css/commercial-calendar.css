@@ -725,7 +725,8 @@
 .scm-cal-task { display: flex; align-items: center; gap: 6px; margin: 0; padding: 7px 10px; border-radius: 10px; background: #ebf1fb; color: #1e3c76; font-size: 13px; font-weight: 600; }
 .scm-cal-task .material-symbols-outlined { font-size: 16px; }
 .scm-cal-hint { display: block; margin-top: 3px; color: #64748b; font-size: 12px; }
-.scm-cal-more summary, .scm-cal-day summary { color: #1e3c76; font-size: 13px; font-weight: 600; cursor: pointer; }
+.scm-cal-more-title { display: block; color: #1e3c76; font-size: 13px; font-weight: 600; }
+.scm-cal-day summary { color: #1e3c76; font-size: 13px; font-weight: 600; cursor: pointer; }
 .scm-cal-more-body { display: flex; flex-direction: column; gap: 12px; margin-top: 10px; }
 .scm-cal-day { margin-top: 6px; }
 .scm-cal-day ul { margin: 6px 0 0; padding: 0; list-style: none; max-height: 160px; overflow-y: auto; color: #334155; font-size: 12px; }
@@ -734,7 +735,6 @@
 .swal2-popup .scm-calendar-popup-form.scm-cal-form .scm-cal-only-reminder { display: none !important; }
 .swal2-popup .scm-calendar-popup-form.scm-cal-form.is-reminder .scm-cal-only-reminder { display: flex !important; }
 .swal2-popup .scm-calendar-popup-form.scm-cal-form.is-reminder .scm-cal-only-event,
-.swal2-popup .scm-calendar-popup-form.scm-cal-form.is-reminder .scm-cal-only-repeat,
 .swal2-popup .scm-calendar-popup-form.scm-cal-form.no-repeat .scm-cal-only-repeat { display: none !important; }
 @media (max-width: 560px) { .scm-cal-grid, .scm-cal-grid--3 { grid-template-columns: minmax(0, 1fr); } .scm-cal-shell { padding: 16px 14px 6px; } .scm-cal-kinds { width: 100%; } }
 
