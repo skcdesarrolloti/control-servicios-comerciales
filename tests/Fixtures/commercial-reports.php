@@ -33,11 +33,15 @@ foreach ([[1, '999', 8000, 'No', 'No'], [2, '999', 4000, 'No', 'No'], [3, '900',
 $db->insert('wp_jet_cct_cuentas_cobro', ['_ID' => 30, 'numero_cuenta' => 'CC-000030', 'id_empleado' => '999', 'fecha_creacion' => '2026-09-01 10:00:00', 'fecha_inicio' => '2026-08-01', 'fecha_fin' => '2026-08-31', 'total_general' => '99000', 'cantidad_reportes' => '1', 'reportes_incluidos' => '["1"]', 'fue_pagada' => 'No pagada']);
 $db->insert('wp_jet_cct_cuentas_cobro', ['_ID' => 31, 'numero_cuenta' => 'CCO-000031', 'id_empleado' => '999', 'fecha_creacion' => '2026-10-10 10:00:00', 'fecha_inicio' => '2026-10-04', 'fecha_fin' => '2026-10-04', 'total_general' => '8000', 'cantidad_reportes' => '1', 'reportes_incluidos' => '["4"]', 'fue_pagada' => 'No pagada']);
 
+$db->insert('wp_jet_cct_cuentas_cobro', ['_ID' => 32, 'numero_cuenta' => 'CCO-000032', 'id_empleado' => '999', 'fecha_creacion' => '2026-10-20 10:00:00', 'fecha_inicio' => '2026-10-04', 'fecha_fin' => '2026-10-04', 'total_general' => '4000', 'cantidad_reportes' => '1', 'reportes_incluidos' => '["5"]', 'fue_pagada' => 'Pagada']);
+
 $settings = new SCM\Core\Settings($db, false, 'control_servicios_comerciales_config');
 $csrf = new SCM\Core\Csrf(str_repeat('x', 40));
 $_SESSION['scm_csrf']['commercial_nonce'] = 'fixture';
 SCM\Core\App::init($db, new SCM\Core\Auth($db), $csrf, $settings);
-$config = ['dashboard_admin_cargos' => ['11'], 'calendar_allowed_cargos' => ['9', '11'], 'commercial_billing_enabled' => (string) ($_GET['billing'] ?? '1') === '1'];
+$settings->set(SCM\Commercial\Reports\CommercialReportsService::SETTING, ['billing_enabled' => (string) ($_GET['billing'] ?? '1') === '1', 'deadline_weekday' => 6], 3);
+$settings->refresh();
+$config = ['dashboard_admin_cargos' => ['11'], 'calendar_allowed_cargos' => ['9', '11']];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $api = new SCM\Http\Controller\CommercialApiController($db, $settings, $csrf, $config);

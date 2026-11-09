@@ -195,6 +195,22 @@
         app.setAttribute("data-scm-runtime", JSON.stringify(runtime));
       },
     },
+    reportes: {
+      title: "Reportes comerciales",
+      html: function (settings) {
+        var days = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+        var selected = Number(settings.deadline_weekday);
+        return '<form data-config-form class="text-left space-y-4">' +
+          '<label class="flex items-start gap-2 text-sm text-slate-800 cursor-pointer"><input type="checkbox" name="billing_enabled" class="mt-1"' + (settings.billing_enabled ? " checked" : "") + "><span><strong>Permitir crear cuentas de cobro comerciales</strong><br>" +
+          '<small class="text-slate-500">Actívalo solo después de subir el panel inmobiliario actualizado: las dos clases de cuenta comparten tabla.</small></span></label>' +
+          '<label class="block text-sm text-slate-700"><strong>Día límite para enviar la cuenta a gerencia</strong><select name="deadline_weekday" class="mt-1 w-full px-2 py-1.5 rounded-lg border border-slate-300 text-sm">' +
+          days.map(function (day, index) { return '<option value="' + index + '"' + (index === selected ? " selected" : "") + ">" + day + "</option>"; }).join("") +
+          '</select></label><p class="text-sm text-slate-600">Cada reporte debe cobrarse a más tardar ese día de su semana. Después se puede cobrar igual, pero la cuenta queda marcada Fuera de plazo.</p></form>';
+      },
+      collect: function (form) {
+        return { billing_enabled: form.elements.billing_enabled.checked, deadline_weekday: form.elements.deadline_weekday.value };
+      },
+    },
     tiempos: {
       title: "Tiempos de atención de tareas",
       html: function (settings) {

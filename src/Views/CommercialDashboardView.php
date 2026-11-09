@@ -512,6 +512,7 @@ final class CommercialDashboardView
                     $configItems = [
                       ['permissions', 'lock', 'Permisos del panel', 'Vistas, acciones y cargos visibles'],
                       ['calendario', 'calendar_month', 'Calendario comercial', 'Categorías y funcionarios del calendario'],
+                      ['reportes', 'receipt_long', 'Reportes comerciales', 'Cuentas de cobro y día límite'],
                       ['tiempos', 'timer', 'Tiempos de atención', 'Alerta y vencimiento de tareas por tema'],
                       ['avisos', 'signpost', 'Avisos en fachada', 'Plazos de retoque, instalación y valores'],
                       ['actualizaciones', 'update', 'Actualizaciones de inmuebles', 'Plazos por tipo de negocio'],

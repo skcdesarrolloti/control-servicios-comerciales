@@ -111,6 +111,27 @@ final class CommercialReportsServiceTest extends TestCase
     self::assertCount(2, $result['employees']);
   }
 
+  public function testDeadlineIsTheNextConfiguredWeekday(): void
+  {
+    self::assertSame('2026-11-14', $this->service->deadlineFor('2026-11-09'), 'Lunes: el sábado de esa semana.');
+    self::assertSame('2026-11-14', $this->service->deadlineFor('2026-11-14'), 'El mismo sábado todavía está a tiempo.');
+    self::assertSame('2026-11-21', $this->service->deadlineFor('2026-11-15'), 'Domingo: cuenta para la semana siguiente.');
+    self::assertSame('2026-11-13', (new CommercialReportsService($this->db, 5))->deadlineFor('2026-11-09'), 'El día se puede configurar.');
+  }
+
+  public function testLateReportsCanStillBeBilledButTheAccountIsMarked(): void
+  {
+    self::assertTrue($this->service->ownReports('100', 'no_exportados')['items'][0]['fuera_plazo']);
+    self::assertTrue($this->service->createAccount('100', [1])['fuera_plazo']);
+    $today = date('Y-m-d');
+    $this->db->insert('wp_jet_cct_reportes_comerciales', ['_ID' => 9, 'fecha' => time(), 'tipo_reporte' => 'Visita', 'valor' => 4000, 'id_empleado' => '100', 'exportado' => 'No', 'fue_pagado' => 'No']);
+    self::assertFalse($this->service->ownReports('100', 'no_exportados')['items'][0]['fuera_plazo']);
+    self::assertSame($this->service->deadlineFor($today), $this->service->ownReports('100', 'no_exportados')['deadline']);
+    self::assertFalse($this->service->createAccount('100', [9])['fuera_plazo']);
+    $accounts = array_column($this->service->accounts([])['items'], 'fuera_plazo', 'id');
+    self::assertSame([3 => false, 2 => true], $accounts);
+  }
+
   public function testExcelNeutralizesFormulas(): void
   {
     $account = ['numero' => 'CCO-1', 'funcionario' => 'Ana', 'total' => 1, 'reportes' => [['id' => 1, 'fecha' => 0, 'tipo' => '=CMD()', 'id_ticket' => '', 'id_inmueble' => '', 'valor' => 1]]];

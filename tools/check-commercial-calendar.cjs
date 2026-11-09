@@ -89,7 +89,7 @@ async function closeSwal(page) {
   const configSaves = calls.length;
 
   // Las demás secciones cargan y guardan desde el mismo menú.
-  for (const [section, message] of [['tiempos', 'Tiempos de atención de tareas guardados'], ['avisos', 'Plazos y valores de avisos guardados'], ['actualizaciones', 'Plazos de actualización de inmuebles guardados'], ['destacados', 'Cupos de destacados guardados']]) {
+  for (const [section, message] of [['tiempos', 'Tiempos de atención de tareas guardados'], ['avisos', 'Plazos y valores de avisos guardados'], ['actualizaciones', 'Plazos de actualización de inmuebles guardados'], ['destacados', 'Cupos de destacados guardados'], ['reportes', 'Configuración de reportes comerciales guardada']]) {
     await page.locator('#commercial-config-trigger').click();
     await page.locator(`[data-commercial-config-action="${section}"]`).click();
     await page.locator('[data-config-form] input').first().waitFor();

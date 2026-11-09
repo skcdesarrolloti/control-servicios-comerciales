@@ -92,14 +92,20 @@
       headers.map(function (header) { return '<th class="py-2 px-3 whitespace-nowrap">' + header + "</th>"; }).join("") + '</tr></thead><tbody class="divide-y divide-slate-100">' + rows.join("") + "</tbody></table></div>";
   }
 
+  var LATE_BADGE = '<span class="ml-1 px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 text-[11px] font-semibold whitespace-nowrap">Fuera de plazo</span>';
+
+  function deadlineLabel(day) {
+    return new Date(day + "T12:00:00").toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" });
+  }
+
   function td(content, extra) {
     return '<td class="py-2 px-3 ' + (extra || "whitespace-nowrap") + '">' + content + "</td>";
   }
 
   function reportRow(item, options) {
-    return '<tr data-report-row="' + item.id + '" data-valor="' + Number(item.valor) + '">' +
+    return '<tr data-report-row="' + item.id + '" data-valor="' + Number(item.valor) + '" data-late="' + (item.fuera_plazo ? 1 : 0) + '">' +
       (options.select ? td('<input type="checkbox" data-report-check value="' + item.id + '" aria-label="Seleccionar reporte ' + item.id + '">') : "") +
-      td("#" + item.id) + td(esc(date(item.fecha))) + td(esc(item.tipo)) +
+      td("#" + item.id) + td(esc(date(item.fecha)) + (item.fuera_plazo ? LATE_BADGE : "")) + td(esc(item.tipo)) +
       (options.employee ? td(esc(item.funcionario)) : "") +
       td(item.id_ticket ? "#" + esc(item.id_ticket) : "") + td(esc(item.id_inmueble)) +
       td(options.edit ? '<input class="' + INPUT + ' w-28 text-right" inputmode="numeric" data-report-value value="' + Number(item.valor) + '" aria-label="Valor del reporte ' + item.id + '">' : money(item.valor)) +
@@ -119,7 +125,7 @@
     return items.map(function (account) {
       return "<tr>" + (select ? td(account.pagada ? "" : '<input type="checkbox" data-account-check value="' + account.id + '" aria-label="Seleccionar cuenta ' + esc(account.numero) + '">') : "") +
         td(esc(account.numero)) + td(esc(account.fecha)) + (employee ? td(esc(account.funcionario)) : "") + td(esc(account.fecha_inicio) + " a " + esc(account.fecha_fin)) + td(String(account.cantidad)) + td(money(account.total)) +
-        td(account.pagada ? '<span class="text-emerald-700 font-semibold">Pagada</span>' : '<span class="text-amber-700 font-semibold">Pendiente</span>') +
+        td((account.pagada ? '<span class="text-emerald-700 font-semibold">Pagada</span>' : '<span class="text-amber-700 font-semibold">Pendiente</span>') + (account.fuera_plazo ? LATE_BADGE : "")) +
         td('<button type="button" class="' + LINK + '" data-account-open="' + account.id + '">Ver</button> · <button type="button" class="' + LINK + '" data-account-pdf="' + account.id + '" data-numero="' + esc(account.numero) + '">PDF</button> · <button type="button" class="' + LINK + '" data-account-excel="' + account.id + '" data-numero="' + esc(account.numero) + '">Excel</button>') + "</tr>";
     });
   }
@@ -158,6 +164,7 @@
       content.innerHTML = statesHtml(["no_exportados", "en_cobro", "pagados", "cuentas"], data.counts, state) + summaryHtml(data.summary) +
         filtersHtml([{ name: "consecutivo", label: "Consecutivo" }, { name: "tipo", label: "Tipo" }, { name: "ticket", label: "Tarea" }, { name: "inmueble", label: "Inmueble" }, { name: "desde", label: "Desde", type: "date" }, { name: "hasta", label: "Hasta", type: "date" }]) +
         (canBill ? '<div class="flex items-center gap-3"><button type="button" class="' + PRIMARY + '" data-report-action="create" disabled>Crear cuenta de cobro</button><span class="text-sm text-slate-500" data-report-selection>Sin selección</span></div>' : "") +
+        (state === "no_exportados" ? '<p class="text-sm text-slate-700" data-report-deadline>Envía tu cuenta a gerencia a más tardar el <strong>' + esc(deadlineLabel(data.deadline)) + "</strong>." + (data.items.some(function (item) { return item.fuera_plazo; }) ? ' <span class="text-rose-700">Tienes reportes fuera de plazo: puedes cobrarlos, pero la cuenta quedará marcada.</span>' : "") + "</p>" : "") +
         (state === "no_exportados" && !data.billing_enabled ? '<p class="text-sm text-amber-700">Las cuentas de cobro comerciales todavía no están habilitadas.</p>' : "") +
         tableHtml((canBill ? [""] : []).concat(["Consecutivo", "Fecha", "Tipo", "Tarea", "Inmueble", "Valor", "Observación"]), data.items.map(function (item) { return reportRow(item, { select: canBill }); }), "No hay reportes en este estado.");
       restoreFilters();
@@ -221,8 +228,9 @@
       if (!boxes.length) return;
       var ids = JSON.stringify(boxes.map(function (box) { return box.value; }));
       var total = boxes.reduce(function (sum, box) { var row = box.closest("[data-report-row]"); return sum + (row ? Number(row.getAttribute("data-valor")) : 0); }, 0);
+      var late = boxes.filter(function (box) { var row = box.closest("[data-report-row]"); return row && row.getAttribute("data-late") === "1"; }).length;
       var config = {
-        create: ["Crear cuenta de cobro", "Se incluirán " + boxes.length + " reporte(s) por " + money(total) + ". Después no se podrán cambiar.", "Crear cuenta", "commercial_reports_account_create"],
+        create: ["Crear cuenta de cobro", "Se incluirán " + boxes.length + " reporte(s) por " + money(total) + ". Después no se podrán cambiar." + (late ? " " + late + " reporte(s) están fuera de plazo y la cuenta quedará marcada." : ""), "Crear cuenta", "commercial_reports_account_create"],
         pay: ["Marcar como pagados", "Se marcarán " + boxes.length + " reporte(s) como pagados por " + money(total) + ".", "Marcar pagados", "commercial_reports_pay_reports"],
         "pay-accounts": ["Pagar cuentas de cobro", "Se pagarán " + boxes.length + " cuenta(s) y todos sus reportes.", "Marcar pagadas", "commercial_reports_pay_accounts"],
       }[type];

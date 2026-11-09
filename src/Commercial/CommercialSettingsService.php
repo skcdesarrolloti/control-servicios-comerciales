@@ -7,6 +7,7 @@ namespace SCM\Commercial;
 use SCM\Commercial\Calendar\CalendarCommercialReport;
 use SCM\Commercial\Calendar\CalendarMailer;
 use SCM\Commercial\Calendar\CalendarStore;
+use SCM\Commercial\Reports\CommercialReportsService;
 use SCM\Commercial\Medios\MedioCatalog;
 use SCM\Commercial\Medios\MedioResolver;
 use SCM\Commercial\Promotion\Analytics\TrackerAnalyticsConfig;
@@ -55,7 +56,7 @@ final class CommercialSettingsService
     'factor_prestacional' => ['Factor prestacional', 0, 0, 100],
   ];
 
-  public const SECTIONS = ['calendario', 'tiempos', 'avisos', 'actualizaciones', 'destacados', 'aseo', 'utm', 'medios', 'analitica', 'plan', 'material_pop', 'banner_revista'];
+  public const SECTIONS = ['calendario', 'reportes', 'tiempos', 'avisos', 'actualizaciones', 'destacados', 'aseo', 'utm', 'medios', 'analitica', 'plan', 'material_pop', 'banner_revista'];
 
   /** Operaciones de la sección "medios" (todas guardan, salvo preview, que solo cuenta). */
   public const MEDIOS_OPS = ['add', 'rename', 'toggle', 'merge', 'aliases', 'alias_raw', 'rewrite_raw', 'preview'];
@@ -117,6 +118,7 @@ final class CommercialSettingsService
         'cargo_ids' => $calendar->calendarCargos(),
         'cargo_options' => $this->policy->cargoOptions(),
       ],
+      'reportes' => CommercialReportsService::settings($this->settings),
       'tiempos' => ['topics' => $topics],
       'avisos' => ['values' => $signs],
       'actualizaciones' => ['limits' => self::propertyUpdateLimits($this->settings)],
@@ -278,6 +280,10 @@ final class CommercialSettingsService
     switch ($section) {
       case 'calendario':
         return $this->saveCalendar($data);
+      case 'reportes':
+        $this->settings->set(CommercialReportsService::SETTING, ['billing_enabled' => !empty($data['billing_enabled']), 'deadline_weekday' => max(0, min(6, (int) ($data['deadline_weekday'] ?? CommercialReportsService::DEFAULT_DEADLINE_WEEKDAY)))], Auth::userId());
+        $this->settings->refresh();
+        return 'Configuración de reportes comerciales guardada.';
       case 'tiempos':
         return $this->saveSla($data);
       case 'avisos':

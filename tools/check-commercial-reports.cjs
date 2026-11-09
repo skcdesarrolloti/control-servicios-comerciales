@@ -23,16 +23,19 @@ function assert(condition, message) {
   assert(!(await page.locator('[data-report-row="3"]').count()), 'Mis reportes muestra reportes de otro funcionario');
   assert(!(await page.locator('[data-report-row="1"]').innerHTML()).includes('<b>'), 'La observación no se escapa');
   assert(await page.locator('[data-report-action="create"]').isDisabled(), 'Se puede crear una cuenta sin seleccionar reportes');
+  assert((await page.locator('[data-report-deadline]').textContent()).includes('sábado'), 'No muestra el día límite');
+  assert((await page.locator('[data-report-row="1"]').textContent()).includes('Fuera de plazo'), 'No marca el reporte atrasado');
   await page.locator('[data-report-row="1"] [data-report-check]').check();
   await page.locator('[data-report-row="2"] [data-report-check]').check();
   assert((await page.locator('[data-report-selection]').textContent()).includes('$12.000'), 'La selección no suma el valor');
   await page.locator('[data-report-action="create"]').click();
-  await page.locator('.swal2-popup:has-text("$12.000")').waitFor();
+  await page.locator('.swal2-popup:has-text("$12.000"):has-text("fuera de plazo")').waitFor();
   const create = saved('commercial_reports_account_create');
   await page.locator('.swal2-confirm').click();
   const created = await (await create).json();
   assert(created.success && created.data.numero.startsWith('CCO-'), 'La cuenta no quedó con número comercial: ' + JSON.stringify(created));
   assert(created.data.summary.total === 12000, 'El total no sale de la base');
+  assert(created.data.fuera_plazo === true && created.data.message.includes('fuera de plazo'), 'La cuenta atrasada no quedó marcada');
 
   // Mis cuentas abre el detalle sin mostrar la cuenta administrativa.
   await page.locator('[data-report-state="cuentas"]').click();
@@ -76,6 +79,8 @@ function assert(condition, message) {
   await page.goto(endpoint + '?sub=cuentas_cobro');
   await page.locator('[data-account-open="31"]').waitFor();
   assert(!(await page.locator('[data-account-open="30"]').count()), 'Aparece una cuenta administrativa');
+  assert((await page.locator('tr:has([data-account-open="32"])').textContent()).includes('Fuera de plazo'), 'No marca la cuenta creada después del día límite');
+  assert(!(await page.locator('tr:has([data-account-open="31"])').textContent()).includes('Fuera de plazo'), 'Marca una cuenta creada a tiempo');
   await page.locator('[data-account-check][value="31"]').check();
   await page.locator('[data-report-action="pay-accounts"]').click();
   const payAccount = saved('commercial_reports_pay_accounts');

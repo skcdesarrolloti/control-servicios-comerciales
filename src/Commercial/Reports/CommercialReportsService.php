@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SCM\Commercial\Reports;
 
 use SCM\Core\Database;
+use SCM\Core\Settings;
 
 /**
  * Reportes comerciales (wp_jet_cct_reportes_comerciales) y sus cuentas de cobro. Lógica traída de
@@ -23,12 +24,48 @@ final class CommercialReportsService
   public const PER_PAGE = 40;
   public const COMPANY_NAME = 'SOLUCIONES COMERCIALES Y CONSTRUCTIVAS S.A.S.';
   public const COMPANY_NIT = '900623242-4';
+  public const SETTING = 'commercial_reports_config';
+  /** 0 = domingo … 6 = sábado, como date('w'). */
+  public const DEFAULT_DEADLINE_WEEKDAY = 6;
 
   private Database $db;
+  private int $deadlineWeekday;
 
-  public function __construct(Database $db)
+  public function __construct(Database $db, int $deadlineWeekday = self::DEFAULT_DEADLINE_WEEKDAY)
   {
     $this->db = $db;
+    $this->deadlineWeekday = max(0, min(6, $deadlineWeekday));
+  }
+
+  /** @return array{billing_enabled:bool,deadline_weekday:int} */
+  public static function settings(Settings $settings): array
+  {
+    $saved = $settings->get(self::SETTING, []);
+    $saved = is_array($saved) ? $saved : [];
+    return [
+      'billing_enabled' => !empty($saved['billing_enabled']),
+      'deadline_weekday' => max(0, min(6, (int) ($saved['deadline_weekday'] ?? self::DEFAULT_DEADLINE_WEEKDAY))),
+    ];
+  }
+
+  /** Último día para cobrar lo de esa fecha: el primer día límite en esa fecha o después. */
+  public function deadlineFor(string $day): string
+  {
+    $date = new \DateTimeImmutable($day);
+    $gap = ($this->deadlineWeekday - (int) $date->format('w') + 7) % 7;
+    return $date->modify('+' . $gap . ' days')->format('Y-m-d');
+  }
+
+  private function isLate(string $day, string $on): bool
+  {
+    return $day !== '' && $on > $this->deadlineFor($day);
+  }
+
+  /** @param array<string,mixed> $item @return array<string,mixed> */
+  private function withDeadline(array $item): array
+  {
+    $item['fuera_plazo'] = !$item['exportado'] && !$item['pagado'] && $item['fecha'] > 0 && $this->isLate(date('Y-m-d', (int) $item['fecha']), date('Y-m-d'));
+    return $item;
   }
 
   private function reports(): string
@@ -125,10 +162,10 @@ final class CommercialReportsService
       $itemState = $item['pagado'] ? 'pagados' : ($item['exportado'] ? 'en_cobro' : 'no_exportados');
       $counts[$itemState]++;
       if ($itemState === $state && self::matches($item, $filters)) {
-        $items[] = $item;
+        $items[] = $this->withDeadline($item);
       }
     }
-    return ['items' => $items, 'summary' => self::summarize($items), 'counts' => $counts];
+    return ['items' => $items, 'summary' => self::summarize($items), 'counts' => $counts, 'deadline' => $this->deadlineFor(date('Y-m-d'))];
   }
 
   /** @return array<string,mixed> */
@@ -146,7 +183,7 @@ final class CommercialReportsService
         $employees[$item['id_empleado']] = $item['funcionario'] !== '' ? $item['funcionario'] : $item['id_empleado'];
       }
       if ($itemState === $state && self::matches($item, $filters)) {
-        $items[] = $item;
+        $items[] = $this->withDeadline($item);
       }
     }
     asort($employees);
@@ -201,7 +238,7 @@ final class CommercialReportsService
   }
 
   /** @param array<string,mixed> $row @return array<string,mixed> */
-  private static function presentAccount(array $row): array
+  private function presentAccount(array $row): array
   {
     $created = trim((string) ($row['fecha_creacion'] ?? ''));
     return [
@@ -217,6 +254,8 @@ final class CommercialReportsService
       'total' => (int) ($row['total_general'] ?? 0),
       'cantidad' => (int) ($row['cantidad_reportes'] ?? 0),
       'pagada' => self::accountPaid($row),
+      // Fuera de plazo si al crearla ya había pasado el día límite de su reporte más antiguo.
+      'fuera_plazo' => $this->isLate(trim((string) ($row['fecha_inicio'] ?? '')), substr($created, 0, 10)),
       'report_ids' => self::parseIds($row['reportes_incluidos'] ?? ''),
     ];
   }
@@ -247,7 +286,7 @@ final class CommercialReportsService
     $to = trim((string) ($filters['hasta'] ?? ''));
     $state = trim((string) ($filters['estado'] ?? ''));
     foreach ($this->db->getResults($sql . ' ORDER BY c.`_ID` DESC', $args) as $row) {
-      $account = self::presentAccount($row);
+      $account = $this->presentAccount($row);
       $result['counts']['total']++;
       $result['counts'][$account['pagada'] ? 'pagadas' : 'pendientes']++;
       $result['totals'][$account['pagada'] ? 'pagado' : 'pendiente'] += $account['total'];
@@ -272,7 +311,7 @@ final class CommercialReportsService
     if ($row === null) {
       return null;
     }
-    $account = self::presentAccount($row);
+    $account = $this->presentAccount($row);
     $account['reportes'] = [];
     if ($account['report_ids'] !== []) {
       $marks = implode(',', array_fill(0, count($account['report_ids']), '?'));
@@ -287,7 +326,7 @@ final class CommercialReportsService
    * Crea la cuenta con reportes propios, sin exportar y sin pagar. La marca de exportado se hace primero y exige que cambien
    * todas las filas, así un mismo reporte no puede quedar en dos cuentas.
    * @param array<int,int> $ids
-   * @return array{id:int,numero:string,summary:array{count:int,total:int}}
+   * @return array{id:int,numero:string,summary:array{count:int,total:int},fuera_plazo:bool}
    */
   public function createAccount(string $employeeId, array $ids): array
   {
@@ -328,7 +367,7 @@ final class CommercialReportsService
       }
       throw $error;
     }
-    return ['id' => $accountId, 'numero' => $number, 'summary' => $summary];
+    return ['id' => $accountId, 'numero' => $number, 'summary' => $summary, 'fuera_plazo' => $dates !== [] && $this->isLate(date('Y-m-d', min($dates)), date('Y-m-d'))];
   }
 
   /**

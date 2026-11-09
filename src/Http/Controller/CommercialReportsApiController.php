@@ -31,8 +31,9 @@ final class CommercialReportsApiController
     $this->csrf = $csrf;
     $adminCargos = is_array($config['dashboard_admin_cargos'] ?? null) ? $config['dashboard_admin_cargos'] : ['11', '12', '13', '14'];
     $this->policy = new CommercialAccessPolicy($settings, $db, $adminCargos);
-    $this->service = new CommercialReportsService($db);
-    $this->billingEnabled = !empty($config['commercial_billing_enabled']);
+    $reports = CommercialReportsService::settings($settings);
+    $this->service = new CommercialReportsService($db, $reports['deadline_weekday']);
+    $this->billingEnabled = $reports['billing_enabled'];
   }
 
   private function require(array $input, string $subview, string $action = ''): void
@@ -86,7 +87,7 @@ final class CommercialReportsApiController
     }
     $this->guard(function () use ($input): void {
       $result = $this->service->createAccount($this->me(), CommercialReportsService::parseIds($input['ids'] ?? ''));
-      JsonResponse::success($result + ['message' => 'Cuenta de cobro ' . $result['numero'] . ' creada.']);
+      JsonResponse::success($result + ['message' => 'Cuenta de cobro ' . $result['numero'] . ' creada.' . ($result['fuera_plazo'] ? ' Quedó marcada fuera de plazo.' : '')]);
     });
   }
 
