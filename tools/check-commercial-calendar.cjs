@@ -263,6 +263,10 @@ async function closeSwal(page) {
       await pastSlot.scrollIntoViewIfNeeded();
       await pastSlot.click();
       assert(!(await page.locator('.scm-calendar-week-quick-popover').count()), 'Un horario pasado abre la creación');
+      await page.locator('.swal2-title:has-text("Horario no disponible")').waitFor();
+      assert(await page.locator('.swal2-icon-warning').isVisible(), 'El aviso de horario pasado no se muestra como advertencia');
+      await page.locator('.swal2-confirm').click();
+      await page.locator('.swal2-container').waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
     }
     const openSlot = page.locator('[data-scm-calendar-week-grid] [data-scm-calendar-week-slot]:not(.is-past)').last();
     await openSlot.scrollIntoViewIfNeeded();

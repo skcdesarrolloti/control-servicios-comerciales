@@ -25,11 +25,12 @@
   }
 
   function scmNotify(type, message, title) {
-    var icon = type === "error" ? "error" : "success";
+    var icon = type === "error" || type === "warning" || type === "info" ? type : "success";
+    var defaultTitles = { error: "No se pudo guardar", warning: "Atención", info: "Información", success: "Guardado" };
     if (window.Swal && typeof window.Swal.fire === "function") {
       window.Swal.fire({
         icon: icon,
-        title: title || (type === "error" ? "No se pudo guardar" : "Guardado"),
+        title: title || defaultTitles[icon],
         text: message || "",
         timer: type === "error" ? undefined : 2200,
         timerProgressBar: type !== "error",

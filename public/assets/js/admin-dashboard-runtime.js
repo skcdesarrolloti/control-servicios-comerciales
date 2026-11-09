@@ -1943,7 +1943,7 @@
           if (isBeforeCreateLimit(selectedDay, Number(slot.getAttribute("data-start") || 0))) {
             weekSlotSelection = null;
             renderSelectedDay();
-            showToast("warning", window.SCMCommercialCalendarForm.createLimitMessage);
+            showToast("warning", window.SCMCommercialCalendarForm.createLimitMessage, "Horario no disponible");
             return;
           }
           weekSlotSelection = {
