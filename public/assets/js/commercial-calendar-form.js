@@ -102,11 +102,6 @@
     return minutes < limit.getHours() * 60 + limit.getMinutes();
   }
 
-  function currentTime() {
-    var now = new Date();
-    return timeOf(now.getHours() * 60 + now.getMinutes());
-  }
-
   function durationLabel(minutes) {
     if (minutes < 60) return minutes + " min";
     var hours = Math.floor(minutes / 60);
@@ -202,7 +197,7 @@
 
   function formHtml(options, categories, state) {
     var task = options.task;
-    var start = options.start || currentTime();
+    var start = options.start || "";
     var duration = options.end && minutesOf(options.end) > minutesOf(start) ? minutesOf(options.end) - minutesOf(start) : 60;
     var hasResponsible = !options.multiple && !options.lockEmployee;
     var taskRow = task
@@ -578,7 +573,7 @@
       var day = els.fecha.value;
       var kind = currentKind(form, state.kind);
       var request = ++agendaRequest;
-      if (!ids.length || !day || kind === "recordatorio") {
+      if (!ids.length || !day || !els.hora_inicio.value || kind === "recordatorio") {
         wrap.innerHTML = "";
         return;
       }

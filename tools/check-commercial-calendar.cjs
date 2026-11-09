@@ -135,10 +135,9 @@ async function closeSwal(page) {
   assert(configSaves > 0, 'No se consultaron las categorías del calendario');
   await page.locator('[data-scm-calendar-open-create][data-calendar-mode="single"]:not([data-calendar-kind])').first().click();
   await page.locator('.scm-calendar-create-form').waitFor();
-  const clockMinutes = time => Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5));
-  const nowMinutes = () => new Date().getHours() * 60 + new Date().getMinutes();
-  const openedAt = await page.locator('.scm-cal-form [name="hora_inicio"]').inputValue();
-  assert(Math.abs(clockMinutes(openedAt) - nowMinutes()) <= 2, 'El formulario no abre con la hora actual: ' + openedAt);
+  assert(await page.locator('.scm-cal-form [name="hora_inicio"]').inputValue() === '', 'La hora no debe venir llena: la coloca la persona');
+  assert(await page.locator('.scm-cal-form [name="hora_inicio"]').evaluate(input => input.required), 'La hora debe ser obligatoria');
+  assert(!(await page.locator('[data-commercial-schedule-agenda]').textContent()).trim(), 'Sin hora no se debe mostrar disponibilidad');
   const createCategories =await page.locator('.scm-calendar-create-form [name="id_categoria"] option').allTextContents();
   assert(createCategories.join('|') === 'Selecciona categoría|Visita comercial|Captación', 'El popup de crear no respeta las categorías comerciales: ' + createCategories.join(', '));
   // Formulario corto: un solo paso, con lo opcional recogido.
@@ -192,13 +191,13 @@ async function closeSwal(page) {
   await page.locator('.scm-cal-form [name="repetir_hasta"]').fill(`${repeatEnd.getFullYear()}-${pad(repeatEnd.getMonth() + 1)}-${pad(repeatEnd.getDate())}`);
   // Más de una hora atrás no se crea (de madrugada aún no hay hora suficiente para probarlo).
   if (new Date().getHours() >= 2) {
-    const currentHour = await page.locator('.scm-cal-form [name="hora_inicio"]').inputValue();
     await page.locator('.scm-cal-form [name="hora_inicio"]').fill('00:00');
     await page.locator('.swal2-confirm').click();
     await page.locator('.swal2-validation-message:has-text("una hora antes")').waitFor();
     assert(!calls.some(call => call.action === 'crear_recordatorios'), 'Se creó un recordatorio de hace más de una hora');
-    await page.locator('.scm-cal-form [name="hora_inicio"]').fill(currentHour);
   }
+  const clock = new Date();
+  await page.locator('.scm-cal-form [name="hora_inicio"]').fill(`${pad(clock.getHours())}:${pad(clock.getMinutes())}`);
   await page.locator('.swal2-confirm').click();
   await page.waitForFunction(() => !document.querySelector('[data-commercial-schedule-form]'));
   const repeatedReminder = calls.filter(call => call.action === 'crear_recordatorios').pop();
@@ -284,7 +283,7 @@ async function closeSwal(page) {
   await page.locator('[data-commercial-calendar-task] [data-commercial-calendar-schedule]').click();
   await page.locator('[data-commercial-schedule-form]').waitFor();
   assert(await page.locator('.scm-cal-kinds label:has-text("Cita con cliente") input').isChecked(), 'Desde la tarea debe abrir como cita con cliente');
-  // La simulación tiene un evento de 09:00 a 10:00 y el formulario abre con la hora actual.
+  // La simulación tiene un evento de 09:00 a 10:00 y la hora la coloca la persona.
   await page.locator('[data-commercial-schedule-form] [name="hora_inicio"]').fill('09:30');
   await page.locator('[data-commercial-schedule-agenda] .scm-calendar-availability-status.is-busy').waitFor();
   await page.locator('[data-commercial-schedule-form] [name="id_categoria"]').selectOption('3');
