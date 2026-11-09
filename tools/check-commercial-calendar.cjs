@@ -70,6 +70,10 @@ async function closeSwal(page) {
   assert(await page.locator('[data-scm-calendar-events] [data-scm-calendar-edit-event]').count() === 1, 'El evento del día no ofrece Editar');
 
   // Configuración → Calendario comercial: solo las categorías habilitadas se ofrecen al crear.
+  const addDays = await page.locator('[data-scm-calendar-add-day]').evaluateAll(nodes => nodes.map(node => node.getAttribute('data-scm-calendar-add-day')));
+  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+  const yesterdayKey = `${yesterday.getFullYear()}-${pad(yesterday.getMonth() + 1)}-${pad(yesterday.getDate())}`;
+  assert(addDays.length > 0 && addDays.every(key => key >= yesterdayKey), 'El mes ofrece crear en días ya pasados');
   assert(!(await page.locator('[data-scm-calendar-configure-categories]').count()), 'La configuración no debe quedar como botón dentro del panel');
   await page.locator('#commercial-config-trigger').click();
   await page.locator('[data-commercial-config-action="calendario"]').click();
@@ -131,7 +135,11 @@ async function closeSwal(page) {
   assert(configSaves > 0, 'No se consultaron las categorías del calendario');
   await page.locator('[data-scm-calendar-open-create][data-calendar-mode="single"]:not([data-calendar-kind])').first().click();
   await page.locator('.scm-calendar-create-form').waitFor();
-  const createCategories = await page.locator('.scm-calendar-create-form [name="id_categoria"] option').allTextContents();
+  const clockMinutes = time => Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5));
+  const nowMinutes = () => new Date().getHours() * 60 + new Date().getMinutes();
+  const openedAt = await page.locator('.scm-cal-form [name="hora_inicio"]').inputValue();
+  assert(Math.abs(clockMinutes(openedAt) - nowMinutes()) <= 2, 'El formulario no abre con la hora actual: ' + openedAt);
+  const createCategories =await page.locator('.scm-calendar-create-form [name="id_categoria"] option').allTextContents();
   assert(createCategories.join('|') === 'Selecciona categoría|Visita comercial|Captación', 'El popup de crear no respeta las categorías comerciales: ' + createCategories.join(', '));
   // Formulario corto: un solo paso, con lo opcional recogido.
   assert(await page.locator('.scm-cal-kinds input').count() === 2, 'Crear desde el calendario solo debe ofrecer evento y recordatorio');
@@ -182,6 +190,15 @@ async function closeSwal(page) {
   repeatEnd.setDate(repeatEnd.getDate() + 2);
   await page.locator('.scm-cal-form [name="repetir"]').selectOption('diario');
   await page.locator('.scm-cal-form [name="repetir_hasta"]').fill(`${repeatEnd.getFullYear()}-${pad(repeatEnd.getMonth() + 1)}-${pad(repeatEnd.getDate())}`);
+  // Más de una hora atrás no se crea (de madrugada aún no hay hora suficiente para probarlo).
+  if (new Date().getHours() >= 2) {
+    const currentHour = await page.locator('.scm-cal-form [name="hora_inicio"]').inputValue();
+    await page.locator('.scm-cal-form [name="hora_inicio"]').fill('00:00');
+    await page.locator('.swal2-confirm').click();
+    await page.locator('.swal2-validation-message:has-text("una hora antes")').waitFor();
+    assert(!calls.some(call => call.action === 'crear_recordatorios'), 'Se creó un recordatorio de hace más de una hora');
+    await page.locator('.scm-cal-form [name="hora_inicio"]').fill(currentHour);
+  }
   await page.locator('.swal2-confirm').click();
   await page.waitForFunction(() => !document.querySelector('[data-commercial-schedule-form]'));
   const repeatedReminder = calls.filter(call => call.action === 'crear_recordatorios').pop();
@@ -238,11 +255,33 @@ async function closeSwal(page) {
   await page.locator('.scm-calendar-event-detail-swal [data-scm-calendar-close]').first().click();
   await page.locator('.swal2-container').waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
 
+  // Semana y día: lo que quedó más de una hora atrás no abre la creación; lo que viene sí.
+  const assertSlotLimits = async () => {
+    const pastSlots = page.locator('[data-scm-calendar-week-grid] [data-scm-calendar-week-slot].is-past');
+    if (await pastSlots.count()) {
+      const pastSlot = pastSlots.last();
+      await pastSlot.scrollIntoViewIfNeeded();
+      await pastSlot.click();
+      assert(!(await page.locator('.scm-calendar-week-quick-popover').count()), 'Un horario pasado abre la creación');
+    }
+    const openSlot = page.locator('[data-scm-calendar-week-grid] [data-scm-calendar-week-slot]:not(.is-past)').last();
+    await openSlot.scrollIntoViewIfNeeded();
+    await openSlot.click();
+    await page.locator('.scm-calendar-week-quick-popover').waitFor();
+    await page.locator('.scm-calendar-week-quick-popover [data-week-quick-close]').click();
+  };
+  await assertSlotLimits();
+  await page.locator('[data-scm-calendar-view-mode="day"]').click();
+  await page.locator('[data-scm-calendar-week-grid].scm-calendar-time-grid--day').waitFor();
+  await assertSlotLimits();
+
   // Agendar desde la tarea conserva el estado administrativo y vincula la tarea.
   await page.goto(endpoint + '?tab=tarea');
   await page.locator('[data-commercial-calendar-task] [data-commercial-calendar-schedule]').click();
   await page.locator('[data-commercial-schedule-form]').waitFor();
   assert(await page.locator('.scm-cal-kinds label:has-text("Cita con cliente") input').isChecked(), 'Desde la tarea debe abrir como cita con cliente');
+  // La simulación tiene un evento de 09:00 a 10:00 y el formulario abre con la hora actual.
+  await page.locator('[data-commercial-schedule-form] [name="hora_inicio"]').fill('09:30');
   await page.locator('[data-commercial-schedule-agenda] .scm-calendar-availability-status.is-busy').waitFor();
   await page.locator('[data-commercial-schedule-form] [name="id_categoria"]').selectOption('3');
   await page.locator('.swal2-confirm').click();

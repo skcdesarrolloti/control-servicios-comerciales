@@ -326,6 +326,32 @@ final class CommercialCalendarApiTest extends TestCase
     self::assertFalse($api->handle('crear_item_calendario', ['tipo_item' => 'tarea', 'titulo' => 'x', 'id_empleado' => '100'])['success']);
   }
 
+  public function testNothingIsCreatedMoreThanOneHourBeforeNow(): void
+  {
+    $api = $this->api('9', '100', self::MINE_ONLY);
+    $at = static fn(string $change): string => (new \DateTimeImmutable('now', new \DateTimeZone('America/Bogota')))->modify($change)->format('Y-m-d H:i:00');
+    $event = static fn(string $start, string $end): array => self::event(['fecha_inicio' => $at($start), 'fecha_fin' => $at($end)]);
+    $reminder = ['tipo_item' => 'recordatorio', 'titulo' => 'Llamar', 'id_empleado' => '100', 'recordatorio_canal' => 'whatsapp'];
+    $eventCount = fn(): int => (int) $this->db->getVar('SELECT COUNT(*) FROM calendario_actividades');
+    $reminderCount = fn(): int => (int) $this->db->getVar('SELECT COUNT(*) FROM calendario_recordatorios');
+    $events = $eventCount();
+
+    self::assertTrue($api->handle('crear_evento', $event('-50 minutes', '+10 minutes'))['success'], 'Dentro de la hora de margen se puede crear.');
+    self::assertSame($events + 1, $eventCount());
+
+    $tooOld = $api->handle('crear_evento', $event('-70 minutes', '-10 minutes'));
+    self::assertFalse($tooOld['success']);
+    self::assertStringContainsString('una hora antes', $tooOld['message']);
+    self::assertFalse($api->handle('crear_eventos', ['eventos' => [$event('+1 day', '+25 hours'), $event('-3 days', '-71 hours')], 'empleados' => ['100']])['success']);
+    self::assertFalse($api->handle('crear_item_calendario', ['tipo_item' => 'evento'] + $event('-2 hours', '-1 hour'))['success']);
+    self::assertSame($events + 1, $eventCount(), 'Una fecha vencida en el lote no deja crear ninguna.');
+
+    self::assertFalse($api->handle('crear_item_calendario', $reminder + ['recordatorio_at' => $at('-2 hours')])['success']);
+    self::assertFalse($api->handle('crear_recordatorios', $reminder + ['fechas' => [$at('+1 day'), $at('-2 days')]])['success']);
+    self::assertSame(0, $reminderCount());
+    self::assertTrue($api->handle('crear_item_calendario', $reminder + ['recordatorio_at' => $at('-30 minutes')])['success']);
+  }
+
   public function testRepeatingReminderCreatesOnePerDateOrNone(): void
   {
     $api = $this->api('9', '100', self::MINE_ONLY);

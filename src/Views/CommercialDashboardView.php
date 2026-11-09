@@ -359,6 +359,11 @@ final class CommercialDashboardView
     .scm-calendar-time-slot:hover {
       background-color: rgba(30, 60, 118, 0.04);
     }
+    .scm-calendar-time-slot.is-past,
+    .scm-calendar-time-slot.is-past:hover {
+      background-color: rgba(148, 163, 184, 0.09);
+      cursor: not-allowed;
+    }
     .scm-calendar-time-slot.is-selecting {
       background-color: rgba(30, 60, 118, 0.14) !important;
     }

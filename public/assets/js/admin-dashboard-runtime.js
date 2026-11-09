@@ -268,6 +268,7 @@
       var weekSlotSelection = null;
       var weekQuickPopover = null;
       var WEEK_SLOT_MINUTES = 15;
+      var LAST_MINUTE_OF_DAY = 24 * 60 - 1;
       var WEEK_DEFAULT_EVENT_MINUTES = 30;
       var WEEK_DAY_START_MINUTES = 0;
       var WEEK_DAY_END_MINUTES = 24 * 60;
@@ -1213,6 +1214,12 @@
         eventsWrap.innerHTML = dayRows.length ? dayRows.map(eventCardHtml).join("") : '<p class="py-10 text-center text-sm text-slate-400">' + (isDueCalendar ? "Nada vence este día." : "No hay nada programado.") + "</p>";
       }
 
+      // El calendario comercial solo deja crear desde una hora antes de la hora actual.
+      function isBeforeCreateLimit(day, minutes) {
+        var form = window.SCMCommercialCalendarForm;
+        return !isDueCalendar && !!(form && form.isBeforeCreateLimit && form.isBeforeCreateLimit(day, minutes));
+      }
+
       function openCreateEventWithDefaults(defaults) {
         defaults = defaults || {};
         if (isDueCalendar) return;
@@ -1933,6 +1940,12 @@
           event.preventDefault();
           closeWeekQuickPopover();
           selectedDay = slot.getAttribute("data-date") || selectedDay;
+          if (isBeforeCreateLimit(selectedDay, Number(slot.getAttribute("data-start") || 0))) {
+            weekSlotSelection = null;
+            renderSelectedDay();
+            showToast("warning", window.SCMCommercialCalendarForm.createLimitMessage);
+            return;
+          }
           weekSlotSelection = {
             date: selectedDay,
             start: Number(slot.getAttribute("data-start") || 0),
@@ -1957,6 +1970,7 @@
         });
         grid.addEventListener("pointerup", function (event) {
           var selection = weekSlotSelection;
+          if (!selection) return;
           var boundary = selection && selection.dragged ? weekBoundaryFromPoint(grid, event, selection.date) : null;
           var finalSelection = boundary
             ? weekSelectionFromBoundary(boundary.date, boundary.minutes, boundary.slotEnd, selection)
@@ -2018,6 +2032,7 @@
             var key = toDateKey(date);
             var slotClasses = "scm-calendar-time-slot" + hourEnd;
             if (key === todayKey) slotClasses += " is-today";
+            if (isBeforeCreateLimit(key, minutes)) slotClasses += " is-past";
             html += '<button type="button" class="' + slotClasses + '" style="grid-row:' + slotRow + ';grid-column:' + (index + 2) + '" data-scm-calendar-week-slot data-date="' + escHtml(key) + '" data-start="' + String(minutes) + '" data-end="' + String(slotEnd) + '" aria-label="' + escHtml(calendarDayTitle(key) + " " + timeFromMinutes(minutes)) + '"></button>';
           });
         }
@@ -2106,7 +2121,7 @@
             ? "bg-[#1E3C76] text-white"
             : (isSelected ? "bg-slate-200 text-slate-900" : (isCurrentMonth ? "text-slate-700" : "text-slate-300"));
           html += '<span class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium tabular-nums ' + numberClass + '">' + String(cellDate.getDate()) + '</span>';
-          if (canCreate) {
+          if (canCreate && !isBeforeCreateLimit(key, LAST_MINUTE_OF_DAY)) {
             html += '<button type="button" class="w-6 h-6 rounded-md flex items-center justify-center text-slate-400 hover:text-slate-800 hover:bg-slate-200/70 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity cursor-pointer" data-scm-calendar-add-day="' + escHtml(key) + '" title="Nuevo evento este día" aria-label="Nuevo evento el ' + escHtml(calendarDayTitle(key)) + '"><span class="material-symbols-outlined text-[16px]">add</span></button>';
           }
           html += '</div>';
@@ -2145,7 +2160,7 @@
               selectDay(cell);
             }
           });
-          if (canCreate) {
+          if (canCreate && !isBeforeCreateLimit(cell.getAttribute("data-scm-calendar-day"), LAST_MINUTE_OF_DAY)) {
             cell.addEventListener("dblclick", function () {
               openCreateEventWithDefaults({ date: cell.getAttribute("data-scm-calendar-day") || selectedDay });
             });

@@ -22,6 +22,8 @@ use SCM\Support\ColombiaBusinessCalendar;
 final class CommercialCalendarApi
 {
   private const MAX_BULK_EVENTS = 400;
+  /** Margen para registrar algo que acaba de empezar; commercial-calendar-form.js aplica el mismo. */
+  private const CREATE_GRACE_MINUTES = 60;
 
   private CalendarStore $store;
   private CommercialAccessPolicy $policy;
@@ -213,6 +215,7 @@ final class CommercialCalendarApi
       }
     }
     [$start, $end] = self::dateRange((string) $input['fecha_inicio'], (string) $input['fecha_fin']);
+    $this->assertWithinCreateLimit($start);
     $employee = trim((string) $input['id_empleado']);
     $ticket = (int) ($input['id_ticket'] ?? 0);
     $this->assertCategory((int) $input['id_categoria']);
@@ -249,6 +252,7 @@ final class CommercialCalendarApi
         }
       }
       [$start, $end] = self::dateRange((string) $event['fecha_inicio'], (string) $event['fecha_fin']);
+      $this->assertWithinCreateLimit($start);
       $this->assertCategory((int) $event['id_categoria']);
       $tickets[(int) ($event['id_ticket'] ?? 0)] = true;
       foreach ($employees as $employee) {
@@ -291,6 +295,7 @@ final class CommercialCalendarApi
     if ($start === null) {
       return self::fail('Fecha inválida.');
     }
+    $this->assertWithinCreateLimit($start);
     if ($end === null || strtotime($end) <= strtotime($start)) {
       $end = self::plusMinutes($start, (int) ($input['duracion_minutos'] ?? 30));
     }
@@ -318,6 +323,7 @@ final class CommercialCalendarApi
     if ($at === null) {
       return self::fail('La fecha del recordatorio es obligatoria.');
     }
+    $this->assertWithinCreateLimit($at);
     $employee = trim((string) $input['id_empleado']);
     $this->assertCanAssign([$employee], 0);
     $categoryId = (int) ($input['id_categoria'] ?? 0);
@@ -362,6 +368,7 @@ final class CommercialCalendarApi
       if ($at === null) {
         return self::fail('Hay una fecha de recordatorio inválida.');
       }
+      $this->assertWithinCreateLimit($at);
       $moments[] = $at;
     }
     $allScheduled = true;
@@ -373,6 +380,16 @@ final class CommercialCalendarApi
       $allScheduled = $allScheduled && !empty($created['data']['aviso_programado']);
     }
     return self::ok('Se crearon ' . count($moments) . ' recordatorios.', ['creados' => count($moments), 'aviso_programado' => $allScheduled]);
+  }
+
+  private function assertWithinCreateLimit(string $start): void
+  {
+    $limit = (new \DateTimeImmutable($this->store->now(), new \DateTimeZone(ColombiaBusinessCalendar::TIMEZONE)))
+      ->modify('-' . self::CREATE_GRACE_MINUTES . ' minutes')
+      ->format('Y-m-d H:i:00');
+    if ($start < $limit) {
+      throw new \InvalidArgumentException('Solo se puede crear desde una hora antes de la hora actual.');
+    }
   }
 
   // ── Modificar ──────────────────────────────────────

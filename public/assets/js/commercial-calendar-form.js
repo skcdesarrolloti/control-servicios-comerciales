@@ -11,6 +11,9 @@
 
   var DURATIONS = [15, 30, 45, 60, 90, 120, 180, 240];
   var OFFICES = ["Oficina Corredor", "Oficina Manga"];
+  // El servidor aplica el mismo límite (CommercialCalendarApi::CREATE_GRACE_MINUTES).
+  var CREATE_GRACE_MINUTES = 60;
+  var CREATE_LIMIT_MESSAGE = "Solo se puede crear desde una hora antes de la hora actual.";
   var TITLES = { cita: "Nueva cita con cliente", evento: "Nuevo evento", recordatorio: "Nuevo recordatorio" };
   var SUBTITLES = {
     cita: "Queda en la agenda del responsable y avisa al cliente si está vinculada a una tarea.",
@@ -86,6 +89,22 @@
   function timeLabel(value) {
     var match = String(value || "").match(/(\d{2}):(\d{2})/);
     return match ? match[1] + ":" + match[2] : "";
+  }
+
+  function createLimit() {
+    return new Date(Date.now() - CREATE_GRACE_MINUTES * 60000);
+  }
+
+  function isBeforeCreateLimit(day, minutes) {
+    var limit = createLimit();
+    var limitDay = dateKey(limit);
+    if (day !== limitDay) return day < limitDay;
+    return minutes < limit.getHours() * 60 + limit.getMinutes();
+  }
+
+  function currentTime() {
+    var now = new Date();
+    return timeOf(now.getHours() * 60 + now.getMinutes());
   }
 
   function durationLabel(minutes) {
@@ -183,7 +202,7 @@
 
   function formHtml(options, categories, state) {
     var task = options.task;
-    var start = options.start || "09:00";
+    var start = options.start || currentTime();
     var duration = options.end && minutesOf(options.end) > minutesOf(start) ? minutesOf(options.end) - minutesOf(start) : 60;
     var hasResponsible = !options.multiple && !options.lockEmployee;
     var taskRow = task
@@ -201,7 +220,7 @@
       employeeControlHtml(options, state.employee) +
       "</div>" +
       '<div class="scm-cal-grid scm-cal-grid--3">' +
-      field("Fecha", '<input class="scm-input" type="date" name="fecha" required value="' + esc(options.date || dateKey(new Date())) + '">') +
+      field("Fecha", '<input class="scm-input" type="date" name="fecha" required min="' + esc(dateKey(createLimit())) + '" value="' + esc(options.date) + '">') +
       field("Hora", '<input class="scm-input" type="time" name="hora_inicio" required value="' + esc(start) + '">') +
       field("Duración", '<select class="scm-select" name="duracion">' + durationOptionsHtml(duration) + "</select>", "scm-cal-only-event") +
       field("Avisar", '<select class="scm-select" name="aviso_minutos_antes"><option value="0">A la hora</option><option value="15">15 min antes</option><option value="30" selected>30 min antes</option><option value="60">1 hora antes</option></select>', "scm-cal-only-reminder") +
@@ -278,6 +297,7 @@
     if (!selected.length) return fail("Selecciona quién es el responsable.");
     var day = String(fd.get("fecha") || "");
     var startMinutes = minutesOf(fd.get("hora_inicio"));
+    if (isBeforeCreateLimit(day, startMinutes)) return fail(CREATE_LIMIT_MESSAGE);
     var endMinutes = startMinutes + Number(fd.get("duracion") || 60);
     var location = String(fd.get("ubicacion") || "").trim();
     if (kind !== "recordatorio" && !location) return fail("Escribe la ubicación.");
@@ -641,6 +661,8 @@
   function open(options) {
     options = options || {};
     if (!window.Swal) return;
+    // Con un día ya pasado seleccionado, el formulario abre en hoy.
+    if (!options.date || options.date < dateKey(createLimit())) options.date = dateKey(new Date());
     if (!employees().length && !options.lockEmployee) {
       notify("error", "No hay funcionarios habilitados para el calendario comercial.");
       return;
@@ -798,5 +820,5 @@
     });
   }
 
-  window.SCMCommercialCalendarForm = { open: open, api: api, rowsFrom: rowsFrom, prepareReport: prepareReport, openReport: openReport };
+  window.SCMCommercialCalendarForm = { open: open, api: api, rowsFrom: rowsFrom, prepareReport: prepareReport, openReport: openReport, isBeforeCreateLimit: isBeforeCreateLimit, createLimitMessage: CREATE_LIMIT_MESSAGE };
 })();
