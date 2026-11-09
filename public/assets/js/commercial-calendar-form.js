@@ -140,7 +140,7 @@
 
   function employeeControlHtml(options, selected) {
     if (options.multiple) {
-      return '<fieldset class="scm-seg-field"><span>Funcionarios <b>*</b></span><div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-40 overflow-y-auto">' + employees().map(function (row) {
+      return '<fieldset class="scm-seg-field scm-cal-span"><span>Funcionarios <b>*</b></span><div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-40 overflow-y-auto">' + employees().map(function (row) {
         var id = String(row.id_empleado || "");
         return id ? '<label class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-slate-200 text-sm text-slate-800 cursor-pointer"><input type="checkbox" name="empleados" value="' + esc(id) + '"' + (id === selected ? " checked" : "") + "><span>" + esc(row.nombre || id) + "</span></label>" : "";
       }).join("") + "</div></fieldset>";
@@ -170,19 +170,31 @@
     }).join("");
   }
 
+  function ticketComboHtml() {
+    return '<div data-form-ticket>' +
+      '<label class="scm-cal-label" for="scm-cal-ticket">Tarea relacionada</label>' +
+      '<div class="scm-cal-combo" data-ticket-combo>' +
+      '<input type="hidden" name="id_ticket" value="">' +
+      '<input id="scm-cal-ticket" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="scm-cal-ticket-list" placeholder="Cargando tareas…" data-ticket-search>' +
+      '<button type="button" class="scm-cal-combo-clear" data-ticket-clear aria-label="Quitar tarea" hidden><span class="material-symbols-outlined" aria-hidden="true">close</span></button>' +
+      '<ul id="scm-cal-ticket-list" class="scm-cal-combo-list" role="listbox" data-ticket-list hidden></ul>' +
+      '</div><small class="scm-cal-hint" data-form-ticket-hint></small></div>';
+  }
+
   function formHtml(options, categories, state) {
     var task = options.task;
     var start = options.start || "09:00";
     var duration = options.end && minutesOf(options.end) > minutesOf(start) ? minutesOf(options.end) - minutesOf(start) : 60;
+    var hasResponsible = !options.multiple && !options.lockEmployee;
     var taskRow = task
-      ? '<p class="scm-cal-task"><span class="material-symbols-outlined" aria-hidden="true">link</span>Tarea #' + esc(task.ticket) + (task.requester ? " · " + esc(task.requester) : "") + "</p>"
-      : '<div data-form-ticket>' + field("Tarea relacionada", '<select class="scm-select" name="id_ticket" data-form-ticket-select><option value="">Sin tarea</option></select>') + '<small class="scm-cal-hint" data-form-ticket-hint></small></div>';
+      ? '<div><div class="scm-cal-label">Tarea relacionada</div><p class="scm-cal-task"><span class="material-symbols-outlined" aria-hidden="true">link</span>Tarea #' + esc(task.ticket) + (task.requester ? " · " + esc(task.requester) : "") + "</p></div>"
+      : ticketComboHtml();
     return '<div class="scm-calendar-create-shell scm-cal-shell">' +
       '<div class="scm-cal-head"><strong data-form-title>' + esc(TITLES[state.kind]) + '</strong><span data-form-subtitle>' + esc(SUBTITLES[state.kind]) + "</span></div>" +
       '<form class="scm-calendar-popup-form scm-calendar-create-form scm-cal-form" data-commercial-schedule-form autocomplete="off">' +
       kindSelectorHtml(state.kinds, state.kind) +
-      field("Título <b>*</b>", '<input class="scm-input" name="titulo" required maxlength="255" value="' + esc(options.title || "") + '" placeholder="Se completa con la categoría">') +
-      '<div class="scm-cal-grid">' +
+      '<div class="scm-cal-grid' + (hasResponsible ? " scm-cal-grid--team" : "") + '">' +
+      field("Título <b>*</b>", '<input class="scm-input" name="titulo" required maxlength="255" value="' + esc(options.title || "") + '" placeholder="Se completa con la categoría">', "scm-cal-title") +
       field("Categoría <b>*</b>", '<select class="scm-select" name="id_categoria" required><option value="">Selecciona categoría</option>' + categories.map(function (row) {
         return '<option value="' + esc(row.id) + '">' + esc(row.nombre) + "</option>";
       }).join("") + "</select>") +
@@ -195,11 +207,13 @@
       field("Avisar", '<select class="scm-select" name="aviso_minutos_antes"><option value="0">A la hora</option><option value="15">15 min antes</option><option value="30" selected>30 min antes</option><option value="60">1 hora antes</option></select>', "scm-cal-only-reminder") +
       "</div>" +
       '<div data-commercial-schedule-agenda aria-live="polite"></div>' +
-      '<div class="scm-cal-only-event">' +
+      '<div class="scm-cal-grid scm-cal-only-event' + (options.multiple ? " scm-cal-grid--solo" : "") + '">' +
+      "<div>" +
       field("Ubicación <b>*</b>", '<input class="scm-input" name="ubicacion" value="' + esc(task ? task.address : "") + '" placeholder="Dirección de la visita o lugar">') +
       '<div class="scm-cal-chips" data-form-places>' + OFFICES.map(function (place) { return '<button type="button" data-form-place="' + esc(place) + '">' + esc(place) + "</button>"; }).join("") + "</div>" +
       "</div>" +
-      '<div class="scm-cal-only-event">' + taskRow + "</div>" +
+      taskRow +
+      "</div>" +
       '<details class="scm-cal-more"><summary>Más opciones</summary><div class="scm-cal-more-body">' +
       field("Descripción", '<textarea class="scm-textarea" name="descripcion" rows="3">' + esc(options.description || "") + "</textarea>") +
       '<div data-form-status hidden>' + field("Estado comercial de la tarea", '<select class="scm-select" name="estado_comercial">' + statusOptionsHtml(task ? task.commercialStatus : "") + "</select>") + "</div>" +
@@ -346,12 +360,153 @@
     if (typeof options.onSaved === "function") options.onSaved(json);
   }
 
+  function normalized(value) {
+    return String(value == null ? "" : value).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  }
+
+  function ticketDetail(ticket) {
+    return [ticket.inmueble ? "Inmueble " + ticket.inmueble : "", ticket.direccion, ticket.estado_comercial].filter(Boolean).join(" · ");
+  }
+
+  /** Buscador de tareas: guarda el _ID en el campo oculto id_ticket y avisa con onChange cuando cambia. */
+  function ticketCombo(root, onChange) {
+    var MAX_ROWS = 60;
+    var PLACEHOLDER = "Buscar por número, cliente o inmueble";
+    var hidden = root.querySelector('[name="id_ticket"]');
+    var input = root.querySelector("[data-ticket-search]");
+    var list = root.querySelector("[data-ticket-list]");
+    var clear = root.querySelector("[data-ticket-clear]");
+    var scroller = root.closest(".swal2-html-container") || root;
+    var rows = [];
+    var shown = [];
+    var active = -1;
+
+    function selected() {
+      return rows.find(function (row) { return String(row._ID) === hidden.value; }) || null;
+    }
+
+    function sync() {
+      var row = selected();
+      input.value = row ? ticketLabel(row) : "";
+      clear.hidden = !row;
+    }
+
+    function close() {
+      list.hidden = true;
+      active = -1;
+      input.setAttribute("aria-expanded", "false");
+      input.removeAttribute("aria-activedescendant");
+    }
+
+    function pick(id) {
+      var changed = hidden.value !== id;
+      hidden.value = id;
+      sync();
+      close();
+      if (changed) onChange();
+    }
+
+    function highlight(index) {
+      var options = list.querySelectorAll('[role="option"]');
+      if (active >= 0 && options[active]) options[active].classList.remove("is-active");
+      active = index;
+      if (active < 0 || !options[active]) {
+        input.removeAttribute("aria-activedescendant");
+        return;
+      }
+      options[active].classList.add("is-active");
+      options[active].scrollIntoView({ block: "nearest" });
+      input.setAttribute("aria-activedescendant", options[active].id);
+    }
+
+    function place() {
+      var limit = scroller.getBoundingClientRect();
+      var box = input.getBoundingClientRect();
+      var below = limit.bottom - box.bottom;
+      var above = box.top - limit.top;
+      var up = below < 260 && above > below;
+      list.classList.toggle("is-up", up);
+      list.style.maxHeight = Math.max(120, Math.min(260, (up ? above : below) - 10)) + "px";
+    }
+
+    function render(term) {
+      var words = normalized(term).split(/\s+/).filter(Boolean);
+      var matches = rows.filter(function (row) {
+        var text = normalized([row.id_ticket, row._ID, row.solicitante, row.inmueble, row.direccion, row.asunto, row.tema_ayuda, row.estado_comercial].join(" "));
+        return words.every(function (word) { return text.indexOf(word) !== -1; });
+      });
+      shown = matches.slice(0, MAX_ROWS);
+      active = -1;
+      input.removeAttribute("aria-activedescendant");
+      var note = !rows.length ? "No hay tareas abiertas para esta persona." : (!matches.length ? "Sin resultados." : (matches.length > MAX_ROWS ? "Mostrando " + MAX_ROWS + " de " + matches.length + ". Escribe para acotar." : ""));
+      list.innerHTML = shown.map(function (row, index) {
+        var detail = ticketDetail(row);
+        return '<li id="scm-cal-ticket-' + index + '" role="option" aria-selected="' + (String(row._ID) === hidden.value) + '" data-ticket-id="' + esc(row._ID) + '"><strong>#' + esc(row.id_ticket || row._ID) + (row.solicitante ? " · " + esc(row.solicitante) : "") + "</strong>" + (detail ? "<small>" + esc(detail) + "</small>" : "") + "</li>";
+      }).join("") + (note ? '<li class="scm-cal-combo-note" role="presentation">' + esc(note) + "</li>" : "");
+      list.hidden = false;
+      input.setAttribute("aria-expanded", "true");
+      place();
+    }
+
+    input.addEventListener("focus", function () {
+      render("");
+      input.select();
+    });
+    input.addEventListener("click", function () {
+      if (list.hidden) render("");
+    });
+    input.addEventListener("input", function () { render(input.value); });
+    input.addEventListener("blur", function () {
+      if (!input.value.trim()) pick("");
+      else { sync(); close(); }
+    });
+    input.addEventListener("keydown", function (event) {
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        if (list.hidden) render("");
+        if (!shown.length) return;
+        var step = event.key === "ArrowDown" ? 1 : -1;
+        highlight(active < 0 ? (step > 0 ? 0 : shown.length - 1) : (active + step + shown.length) % shown.length);
+      } else if (event.key === "Enter") {
+        event.preventDefault();
+        if (!list.hidden && active >= 0) pick(String(shown[active]._ID));
+      } else if (event.key === "Escape" && !list.hidden) {
+        event.preventDefault();
+        event.stopPropagation();
+        sync();
+        close();
+      }
+    });
+    // Evita que el clic en la lista quite el foco antes de elegir.
+    list.addEventListener("mousedown", function (event) { event.preventDefault(); });
+    list.addEventListener("click", function (event) {
+      var option = event.target.closest("[data-ticket-id]");
+      if (option) pick(option.getAttribute("data-ticket-id"));
+    });
+    clear.addEventListener("click", function () { pick(""); });
+
+    return {
+      setRows: function (next, message) {
+        rows = next;
+        input.placeholder = message || PLACEHOLDER;
+        if (hidden.value && !selected()) pick("");
+        else sync();
+      },
+      setLoading: function () {
+        input.placeholder = "Cargando tareas…";
+      },
+    };
+  }
+
   function bindForm(popup, options, categories, state) {
     var form = popup.querySelector("[data-commercial-schedule-form]");
     var els = form.elements;
     var titleTouched = !!options.title;
     var agendaRequest = 0;
+    var ticketRequest = 0;
     var tickets = [];
+    var comboRoot = popup.querySelector("[data-ticket-combo]");
+    var combo = comboRoot ? ticketCombo(comboRoot, onTicket) : null;
 
     state.ticketId = function () {
       if (options.task) return options.task.pk;
@@ -424,21 +579,26 @@
     }
 
     function refreshTickets() {
-      var select = els.id_ticket;
-      if (!select) return;
+      if (!combo) return;
       var ids = selectedEmployees(form, options);
       var wrap = popup.querySelector("[data-form-ticket]");
+      var request = ++ticketRequest;
       wrap.hidden = options.multiple || ids.length !== 1;
-      if (wrap.hidden) return;
+      if (wrap.hidden) {
+        tickets = [];
+        combo.setRows([]);
+        return;
+      }
+      combo.setLoading();
       api("obtener_tickets_funcionario", { id_empleado: ids[0] }).then(function (json) {
+        if (request !== ticketRequest) return;
         tickets = rowsFrom(json);
-        select.innerHTML = '<option value="">Sin tarea</option>' + tickets.map(function (row) {
-          return '<option value="' + esc(row._ID) + '">' + esc(ticketLabel(row)) + "</option>";
-        }).join("");
-        if (window.jQuery && window.jQuery.fn && window.jQuery.fn.select2) {
-          window.jQuery(select).select2({ width: "100%", dropdownParent: window.jQuery(popup), placeholder: "Sin tarea", allowClear: true }).on("change", onTicket);
-        }
-      }).catch(function () { tickets = []; });
+        combo.setRows(tickets);
+      }).catch(function () {
+        if (request !== ticketRequest) return;
+        tickets = [];
+        combo.setRows([], "No se pudieron cargar las tareas");
+      });
     }
 
     function onTicket() {
@@ -456,7 +616,6 @@
       if (name === "id_categoria") autoTitle();
       if (name === "id_empleado" || name === "empleados") { refreshTickets(); refreshAgenda(); }
       if (name === "fecha" || name === "hora_inicio" || name === "duracion") refreshAgenda();
-      if (name === "id_ticket") onTicket();
       if (name === "repetir") {
         popup.querySelector("[data-form-repeat-end]").hidden = !event.target.value;
         popup.querySelector("[data-form-repeat-days]").hidden = event.target.value !== "semanal";
@@ -500,7 +659,7 @@
       return window.Swal.fire({
         title: "",
         html: formHtml(options, categories, state),
-        width: 640,
+        width: 860,
         showCloseButton: true,
         showCancelButton: true,
         confirmButtonText: "Guardar",

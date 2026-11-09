@@ -681,18 +681,41 @@
   font-weight: 800;
   line-height: 1.45; }
 /* Formulario único del calendario comercial (commercial-calendar-form.js) */
-.scm-cal-shell { text-align: left; padding: 22px 24px 8px; }
-.scm-cal-head { display: flex; flex-direction: column; gap: 2px; margin-bottom: 14px; }
-.scm-cal-head strong { color: #061d49; font-size: 18px; }
+.scm-cal-shell { text-align: left; padding: 24px 28px 16px; }
+.scm-cal-head { display: flex; flex-direction: column; gap: 2px; margin-bottom: 16px; padding-right: 36px; }
+.scm-cal-head strong { color: #061d49; font-size: 20px; }
 .scm-cal-head span { color: #64748b; font-size: 13px; }
-.scm-cal-form { display: flex; flex-direction: column; gap: 12px; }
+.scm-cal-form { display: flex; flex-direction: column; gap: 14px; }
+/* El formulario reutiliza los campos de .scm-calendar-popup-form, pero no su reparto en dos columnas. */
+.swal2-popup .scm-calendar-popup-form.scm-calendar-create-form.scm-cal-form { display: flex; flex-direction: column; gap: 14px; padding: 0 !important; background: transparent; }
+.swal2-popup .scm-calendar-popup-form.scm-cal-form textarea { min-height: 84px !important; }
 .scm-cal-form [hidden] { display: none !important; }
 .scm-cal-form .scm-seg-field > span b { color: #dc2626; }
-.scm-cal-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.scm-cal-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; align-items: start; }
 .scm-cal-grid--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.scm-cal-kinds { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; padding: 4px; border-radius: 12px; background: #e2e8f0; }
+.scm-cal-grid--solo { grid-template-columns: minmax(0, 1fr); }
+.scm-cal-grid--team > .scm-cal-title, .scm-cal-grid > .scm-cal-span { grid-column: 1 / -1; }
+.scm-cal-label { display: block; margin-bottom: 6px; color: #64748b; font-size: 11px; font-weight: 600; letter-spacing: .025em; line-height: 1.5; text-transform: uppercase; }
+.swal2-popup .scm-cal-form .scm-calendar-availability-status { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; padding: 9px 12px !important; }
+.scm-cal-combo { position: relative; }
+.swal2-popup .scm-calendar-popup-form .scm-cal-combo [data-ticket-search] { padding-right: 38px !important; text-overflow: ellipsis; }
+.scm-cal-combo-clear { position: absolute; top: 8px; right: 8px; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border: 0; border-radius: 6px; background: transparent; color: #64748b; cursor: pointer; }
+.scm-cal-combo-clear:hover { background: #e2e8f0; color: #0f2742; }
+.scm-cal-combo-clear .material-symbols-outlined { font-size: 16px; }
+.scm-cal-combo-list { position: absolute; z-index: 5; top: calc(100% + 4px); left: 0; right: 0; margin: 0; padding: 4px; max-height: 260px; overflow-y: auto; list-style: none; background: #fff; border: 1px solid #cbd5e1; border-radius: 10px; box-shadow: 0 12px 28px rgba(15, 23, 42, .18); }
+.scm-cal-combo-list.is-up { top: auto; bottom: calc(100% + 4px); }
+.scm-cal-combo-list [role="option"] { padding: 7px 9px; border-radius: 7px; cursor: pointer; }
+.scm-cal-combo-list [role="option"]:hover, .scm-cal-combo-list [role="option"].is-active { background: #ebf1fb; }
+.scm-cal-combo-list [role="option"][aria-selected="true"] strong { color: #1e3c76; }
+.scm-cal-combo-list strong { display: block; color: #0f2742; font-size: 13px; font-weight: 600; }
+.swal2-popup .scm-calendar-popup-form .scm-cal-combo-list small { margin-top: 1px; font-size: 12px; font-weight: 500; }
+.scm-cal-combo-note { padding: 7px 9px; color: #64748b; font-size: 12px; }
+.swal2-popup.scm-calendar-create-swal.scm-cal-swal .swal2-close { background: transparent !important; border-color: transparent !important; color: #64748b !important; }
+.swal2-popup.scm-calendar-create-swal.scm-cal-swal .swal2-close:hover { background: #e2e8f0 !important; color: #0f2742 !important; }
+.scm-cal-kinds { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; width: 320px; max-width: 100%; padding: 4px; border-radius: 12px; background: #e2e8f0; }
+.scm-cal-kinds label, .scm-cal-days label { position: relative; overflow: hidden; }
 .scm-cal-kinds input { position: absolute; opacity: 0; pointer-events: none; }
-.scm-cal-kinds span { display: block; padding: 7px 8px; border-radius: 9px; color: #475569; font-size: 13px; font-weight: 600; text-align: center; cursor: pointer; }
+.scm-cal-kinds span { display: block; padding: 7px 8px; border-radius: 9px; color: #475569; font-size: 13px; font-weight: 600; text-align: center; white-space: nowrap; cursor: pointer; }
 .scm-cal-kinds input:checked + span { background: #fff; color: #061d49; box-shadow: 0 1px 2px rgba(15, 23, 42, .15); }
 .scm-cal-kinds input:focus-visible + span { outline: 2px solid #1e3c76; }
 .scm-cal-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
@@ -707,10 +730,13 @@
 .scm-cal-day { margin-top: 6px; }
 .scm-cal-day ul { margin: 6px 0 0; padding: 0; list-style: none; max-height: 160px; overflow-y: auto; color: #334155; font-size: 12px; }
 .scm-cal-day em { color: #64748b; font-style: normal; }
-.scm-cal-form .scm-cal-only-reminder { display: none; }
-.scm-cal-form.is-reminder .scm-cal-only-reminder { display: flex; }
-.scm-cal-form.is-reminder .scm-cal-only-event, .scm-cal-form.is-reminder .scm-cal-only-repeat, .scm-cal-form.no-repeat .scm-cal-only-repeat { display: none; }
-@media (max-width: 560px) { .scm-cal-grid, .scm-cal-grid--3 { grid-template-columns: minmax(0, 1fr); } .scm-cal-shell { padding: 16px 14px 6px; } }
+/* Con esta especificidad ganan al display:flex !important de .scm-seg-field en los popups. */
+.swal2-popup .scm-calendar-popup-form.scm-cal-form .scm-cal-only-reminder { display: none !important; }
+.swal2-popup .scm-calendar-popup-form.scm-cal-form.is-reminder .scm-cal-only-reminder { display: flex !important; }
+.swal2-popup .scm-calendar-popup-form.scm-cal-form.is-reminder .scm-cal-only-event,
+.swal2-popup .scm-calendar-popup-form.scm-cal-form.is-reminder .scm-cal-only-repeat,
+.swal2-popup .scm-calendar-popup-form.scm-cal-form.no-repeat .scm-cal-only-repeat { display: none !important; }
+@media (max-width: 560px) { .scm-cal-grid, .scm-cal-grid--3 { grid-template-columns: minmax(0, 1fr); } .scm-cal-shell { padding: 16px 14px 6px; } .scm-cal-kinds { width: 100%; } }
 
 .swal2-popup.scm-calendar-create-swal { background: #f8fafc !important;
   border: 1px solid rgba(203, 213, 225, 0.92) !important;

@@ -142,8 +142,26 @@ async function closeSwal(page) {
   assert(await page.locator('[name="titulo"]').inputValue() === 'Captación', 'El título no se completa con la categoría');
   await page.locator('[data-form-place="Oficina Manga"]').click();
   assert(await page.locator('[name="ubicacion"]').inputValue() === 'Oficina Manga', 'El acceso rápido de oficina no llena la ubicación');
+  // Ancho: el formulario usa todo el popup y la categoría no se recorta.
+  assert((await page.locator('.scm-cal-swal').boundingBox()).width >= 840, 'El formulario no tomó el ancho nuevo');
+  assert((await page.locator('.scm-cal-form [name="id_categoria"]').boundingBox()).width >= 300, 'La categoría sigue angosta');
+  const alignedTop = async selector => Math.round((await page.locator(selector).boundingBox()).y);
+  assert(await alignedTop('.scm-cal-form [name="ubicacion"]') === await alignedTop('[data-ticket-search]'), 'Ubicación y Tarea relacionada no quedan alineadas');
+  assert(await page.locator('.scm-cal-kinds label:has-text("Recordatorio") span').evaluate(node => node.scrollWidth <= node.clientWidth), 'Se parte el texto del selector de tipo');
+  assert(!(await page.locator('[name="aviso_minutos_antes"]').isVisible()), 'Un evento no debe ofrecer Avisar: el aviso es del recordatorio');
+  // Tarea relacionada con buscador.
+  const ticketSearch = page.locator('[data-ticket-search]');
+  await page.waitForFunction(() => document.querySelector('[data-ticket-search]').placeholder.startsWith('Buscar'));
+  await ticketSearch.fill('gomez zzz');
+  assert((await page.locator('[data-ticket-list]').textContent()).includes('Sin resultados'), 'El buscador de tareas no filtra');
+  await ticketSearch.fill('laura gomez');
+  await page.locator('[data-ticket-list] [role="option"]').first().click();
+  assert(await page.locator('[name="id_ticket"]').inputValue() === '1' && (await ticketSearch.inputValue()).includes('Laura Gómez'), 'El buscador no selecciona la tarea');
+  assert(await page.locator('[data-form-status]').evaluate(node => !node.hidden), 'Al elegir tarea debe habilitarse su estado comercial');
+  await page.locator('[data-ticket-clear]').click();
+  assert(await page.locator('[name="id_ticket"]').inputValue() === '', 'No se puede quitar la tarea elegida');
   await page.locator('.scm-cal-kinds label:has-text("Recordatorio")').click();
-  assert(!(await page.locator('[name="ubicacion"]').isVisible()) && await page.locator('[name="aviso_minutos_antes"]').isVisible(), 'El recordatorio no adapta sus campos');
+  assert(!(await page.locator('[name="ubicacion"]').isVisible()) && !(await page.locator('[name="duracion"]').isVisible()) && await page.locator('[name="aviso_minutos_antes"]').isVisible(), 'El recordatorio no adapta sus campos');
   await page.locator('.scm-cal-kinds label:has-text("Evento")').click();
   await page.setViewportSize({ width: 390, height: 800 });
   assert(await page.evaluate(() => { const form = document.querySelector('.scm-cal-form'); return form.scrollWidth <= form.clientWidth + 1; }), 'El formulario se desborda en móvil');
