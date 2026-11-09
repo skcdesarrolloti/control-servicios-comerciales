@@ -605,6 +605,18 @@
     return "#" + (row.codigo || row.id) + " · " + (row.titulo || "Inmueble") + (row.direccion ? " · " + row.direccion : "");
   }
 
+  function transportQuestionHtml(base) {
+    var money = function (value) { return "$" + value.toLocaleString("es-CO"); };
+    var options = [{ value: "no", label: "No" }];
+    if (base > 0) {
+      options.push({ value: "ida", label: "Sí, un trayecto · " + money(base) });
+      options.push({ value: "ida_vuelta", label: "Sí, ida y vuelta · " + money(base * 2) });
+    }
+    return '<fieldset class="scm-seg-field"><span>¿Deseas cobrar transporte? <b>*</b></span><div class="scm-cal-chips scm-cal-days">' + options.map(function (option) {
+      return '<label><input type="radio" name="transporte" value="' + option.value + '"><span>' + esc(option.label) + "</span></label>";
+    }).join("") + "</div></fieldset>";
+  }
+
   function openReport(options) {
     var report = options.report || {};
     var known = {};
@@ -631,7 +643,7 @@
         field("Buscar inmueble", '<input class="scm-input" data-report-search placeholder="Código, título o dirección">') +
         '<small class="scm-cal-hint" data-report-status>Primero aparecen los inmuebles cotizados en la tarea.</small>' +
         field("Inmueble", '<select class="scm-select" name="id_inmueble">' + optionsHtml() + "</select>") +
-        field("Valor de transporte (máximo $" + Number(report.valor_maximo || 0).toLocaleString("es-CO") + ")", '<input class="scm-input" type="number" name="valor" min="0" step="1" max="' + esc(report.valor_maximo || 0) + '" value="0" required>') +
+        transportQuestionHtml(Number(report.valor_transporte || 0)) +
         field("Resultado de la actividad <b>*</b>", '<textarea class="scm-textarea" name="observacion" rows="3" required>Realizado</textarea>') +
         "</form></div>",
       didOpen: function () {
@@ -662,6 +674,10 @@
         if (!form.reportValidity()) return false;
         var fd = new FormData(form);
         var propertyId = String(fd.get("id_inmueble") || "");
+        if (!fd.get("transporte")) {
+          window.Swal.showValidationMessage("Indica si deseas cobrar transporte.");
+          return false;
+        }
         if ((fd.get("tipo_reporte") === "Visita" || report.inmueble_obligatorio) && !propertyId) {
           window.Swal.showValidationMessage("Debes seleccionar un inmueble.");
           return false;
@@ -672,7 +688,7 @@
           observacion: String(fd.get("observacion") || "").trim(),
           reporte: {
             tipo_reporte: String(fd.get("tipo_reporte") || ""),
-            valor: Number(fd.get("valor") || 0),
+            transporte: String(fd.get("transporte")),
             id_inmueble: propertyId,
             id_cotizacion: known[propertyId] ? known[propertyId].id_cotizacion : "",
           },

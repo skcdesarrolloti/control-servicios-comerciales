@@ -125,11 +125,7 @@ final class CalendarCommercialReport
       if (!in_array($type, self::TYPES, true)) {
         throw new \InvalidArgumentException('El tipo de reporte no es válido.');
       }
-      $value = filter_var($report['valor'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0]]);
-      $max = $this->transportValue() * 2;
-      if ($value === false || $value > $max) {
-        throw new \InvalidArgumentException('El valor debe estar entre 0 y ' . number_format($max, 0, ',', '.') . '.');
-      }
+      $value = self::transportCharge((string) ($report['transporte'] ?? ''), $this->transportValue());
       $propertyId = trim((string) ($report['id_inmueble'] ?? ''));
       if (($type === 'Visita' || $this->propertyRequired((int) $event['id_categoria'])) && $propertyId === '') {
         throw new \InvalidArgumentException('Debes seleccionar un inmueble.');
@@ -182,6 +178,21 @@ final class CalendarCommercialReport
       'reporte' => ['_ID' => $reportId, 'tipo_reporte' => $type, 'valor' => $value, 'observacion' => $observation, 'id_inmueble' => $propertyId, 'id_cotizacion' => $quoteId, 'id_evento' => (string) $eventId],
       'inmueble' => $property,
     ];
+  }
+
+  /** Lo que se cobra sale de `valor_transporte`, la misma fila del panel inmobiliario; el navegador solo elige la opción. */
+  private static function transportCharge(string $choice, int $base): int
+  {
+    if ($choice === 'no') {
+      return 0;
+    }
+    if (!in_array($choice, ['ida', 'ida_vuelta'], true)) {
+      throw new \InvalidArgumentException('Indica si deseas cobrar transporte.');
+    }
+    if ($base <= 0) {
+      throw new \InvalidArgumentException('El valor de transporte no está configurado.');
+    }
+    return $choice === 'ida' ? $base : $base * 2;
   }
 
   /** @return array<string,mixed>|null */

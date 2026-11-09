@@ -54,7 +54,7 @@ async function closeSwal(page) {
       crear_evento: { id: 900, google_pendiente: false },
       crear_item_calendario: { id: 901, aviso_programado: true, google_pendiente: false },
       obtener_tickets_funcionario: [{ _ID: '1', id_ticket: '1', solicitante: 'Laura Gómez', direccion: 'Calle 25 #20-10', estado_comercial: 'Contactado' }],
-      preparar_reporte_comercial: Number(body.id_evento) === 501 ? { habilitado: true, tipos_permitidos: ['Visita', 'Otras actividades'], tipo_predeterminado: 'Visita', inmueble_obligatorio: true, valor_maximo: 8000, inmuebles: [{ id: '4501', codigo: '4501', titulo: 'Apartamento Manga', direccion: 'Calle 25', id_cotizacion: '9' }] } : { habilitado: false },
+      preparar_reporte_comercial: Number(body.id_evento) === 501 ? { habilitado: true, tipos_permitidos: ['Visita', 'Otras actividades'], tipo_predeterminado: 'Visita', inmueble_obligatorio: true, valor_transporte: 4000, valor_maximo: 8000, inmuebles: [{ id: '4501', codigo: '4501', titulo: 'Apartamento Manga', direccion: 'Calle 25', id_cotizacion: '9' }] } : { habilitado: false },
       cambiar_estado: { google_pendiente: false },
     }[action] ?? [];
     return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ success: true, message: 'OK', data }) });
@@ -217,13 +217,18 @@ async function closeSwal(page) {
   await page.waitForFunction(() => document.querySelector('[data-scm-calendar-total]').textContent === '2');
   await page.locator('[data-scm-calendar-events] [data-scm-calendar-complete-event]').first().click();
   await page.locator('[data-commercial-report-form]').waitFor();
+  assert(await page.locator('[data-commercial-report-form] [name="transporte"]').count() === 3, 'No pregunta por el cobro de transporte');
+  assert((await page.locator('[data-commercial-report-form]').textContent()).includes('$8.000'), 'No muestra el valor configurado de transporte');
+  await page.locator('.swal2-confirm').click();
+  await page.locator('.swal2-validation-message:has-text("cobrar transporte")').waitFor();
+  await page.locator('[data-commercial-report-form] label:has-text("ida y vuelta")').click();
   await page.locator('.swal2-confirm').click();
   await page.locator('.swal2-validation-message:has-text("Debes seleccionar un inmueble")').waitFor();
   await page.locator('[data-commercial-report-form] [name="id_inmueble"]').selectOption('4501');
   await page.locator('.swal2-confirm').click();
   await page.waitForFunction(() => !document.querySelector('[data-commercial-report-form]'));
   const closed = calls.filter(call => call.action === 'cambiar_estado').pop();
-  assert(closed && closed.body.reporte && closed.body.reporte.id_inmueble === '4501' && closed.body.reporte.id_cotizacion === '9', 'El cierre no envía el reporte comercial');
+  assert(closed && closed.body.reporte && closed.body.reporte.id_inmueble === '4501' && closed.body.reporte.id_cotizacion === '9' && closed.body.reporte.transporte === 'ida_vuelta' && !('valor' in closed.body.reporte), 'El cierre no envía el reporte comercial con la opción de transporte');
 
   assert(!external.length, 'Sigue llamando a la app externa: ' + external.join(', '));
   if (errors.length) throw new Error(errors.join('\n'));

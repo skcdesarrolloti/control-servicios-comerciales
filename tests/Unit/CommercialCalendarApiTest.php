@@ -233,19 +233,46 @@ final class CommercialCalendarApiTest extends TestCase
     self::assertSame('Visita', $prepared['data']['tipo_predeterminado']);
     self::assertSame(8000, $prepared['data']['valor_maximo']);
 
-    self::assertFalse($api->handle('cambiar_estado', ['id_evento' => 10, 'observacion' => 'Listo', 'reporte' => ['tipo_reporte' => 'Visita', 'valor' => 9000, 'id_inmueble' => '4501']])['success'], 'Supera el máximo');
-    self::assertFalse($api->handle('cambiar_estado', ['id_evento' => 10, 'observacion' => 'Listo', 'reporte' => ['tipo_reporte' => 'Visita', 'valor' => 0, 'id_inmueble' => '']])['success'], 'Falta el inmueble');
+    $unanswered = $api->handle('cambiar_estado', ['id_evento' => 10, 'observacion' => 'Listo', 'reporte' => ['tipo_reporte' => 'Visita', 'id_inmueble' => '4501']]);
+    self::assertStringContainsString('cobrar transporte', $unanswered['message']);
+    self::assertFalse($api->handle('cambiar_estado', ['id_evento' => 10, 'observacion' => 'Listo', 'reporte' => ['tipo_reporte' => 'Visita', 'transporte' => 'no', 'id_inmueble' => '']])['success'], 'Falta el inmueble');
     self::assertSame('No', $this->db->getVar('SELECT estado FROM calendario_actividades WHERE id = 10'));
 
     $found = $api->handle('buscar_inmuebles_reporte', ['id_evento' => 10, 'termino' => 'Manga']);
     self::assertSame('4501', $found['data'][0]['id']);
     self::assertArrayNotHasKey('correo_propietario', $found['data'][0]);
 
-    $done = $api->handle('cambiar_estado', ['id_evento' => 10, 'observacion' => 'Visita hecha', 'reporte' => ['tipo_reporte' => 'Visita', 'valor' => 4000, 'id_inmueble' => '4501']]);
+    $done = $api->handle('cambiar_estado', ['id_evento' => 10, 'observacion' => 'Visita hecha', 'reporte' => ['tipo_reporte' => 'Visita', 'transporte' => 'ida_vuelta', 'valor' => 999999, 'id_inmueble' => '4501']]);
     self::assertTrue($done['success'], $done['message']);
     self::assertSame('Si', $this->db->getVar('SELECT estado FROM calendario_actividades WHERE id = 10'));
     self::assertSame(1, (int) $this->db->getVar("SELECT COUNT(*) FROM wp_jet_cct_reportes_comerciales WHERE id_evento = '10'"));
+    self::assertSame(8000, (int) $this->db->getVar("SELECT valor FROM wp_jet_cct_reportes_comerciales WHERE id_evento = '10'"), 'El valor sale de la configuración, no del navegador.');
     self::assertSame(1, (int) $this->db->getVar('SELECT COUNT(*) FROM wp_jet_cct_historial_del_inmueble WHERE id_inmueble = 4501'));
+  }
+
+  /** @return array<int,array{0:string,1:int}> */
+  public static function transportChoices(): array
+  {
+    return [['no', 0], ['ida', 4000], ['ida_vuelta', 8000]];
+  }
+
+  #[\PHPUnit\Framework\Attributes\DataProvider('transportChoices')]
+  public function testTransportChargeComesFromSharedConfiguration(string $choice, int $expected): void
+  {
+    $api = $this->api('9', '100', self::MINE_ONLY);
+    $this->db->insert('wp_posts', ['ID' => 4501, 'post_title' => 'Apartamento', 'post_type' => 'inmuebles', 'post_status' => 'publish']);
+    self::assertTrue($api->handle('cambiar_estado', ['id_evento' => 10, 'observacion' => 'Hecho', 'reporte' => ['tipo_reporte' => 'Visita', 'transporte' => $choice, 'id_inmueble' => '4501']])['success']);
+    self::assertSame($expected, (int) $this->db->getVar('SELECT valor FROM wp_jet_cct_reportes_comerciales'));
+  }
+
+  public function testTransportCannotBeChargedWithoutConfiguredValue(): void
+  {
+    $api = $this->api('9', '100', self::MINE_ONLY);
+    $this->db->insert('wp_posts', ['ID' => 4501, 'post_title' => 'Apartamento', 'post_type' => 'inmuebles', 'post_status' => 'publish']);
+    $this->db->update('wp_jet_cct_confi_sistema', ['valor' => '0'], ['funcion' => 'valor_transporte']);
+    $result = $api->handle('cambiar_estado', ['id_evento' => 10, 'observacion' => 'Hecho', 'reporte' => ['tipo_reporte' => 'Visita', 'transporte' => 'ida', 'id_inmueble' => '4501']]);
+    self::assertStringContainsString('no está configurado', $result['message']);
+    self::assertSame('No', $this->db->getVar('SELECT estado FROM calendario_actividades WHERE id = 10'));
   }
 
   public function testEventWithoutReportClosesNormally(): void
