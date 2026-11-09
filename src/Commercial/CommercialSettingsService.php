@@ -7,6 +7,7 @@ namespace SCM\Commercial;
 use SCM\Commercial\Calendar\CalendarCommercialReport;
 use SCM\Commercial\Calendar\CalendarMailer;
 use SCM\Commercial\Calendar\CalendarStore;
+use SCM\Commercial\Calls\CommercialCallsNotifier;
 use SCM\Commercial\Reports\CommercialReportsService;
 use SCM\Commercial\Medios\MedioCatalog;
 use SCM\Commercial\Medios\MedioResolver;
@@ -56,7 +57,7 @@ final class CommercialSettingsService
     'factor_prestacional' => ['Factor prestacional', 0, 0, 100],
   ];
 
-  public const SECTIONS = ['calendario', 'reportes', 'tiempos', 'avisos', 'actualizaciones', 'destacados', 'aseo', 'utm', 'medios', 'analitica', 'plan', 'material_pop', 'banner_revista'];
+  public const SECTIONS = ['calendario', 'reportes', 'llamadas', 'tiempos', 'avisos', 'actualizaciones', 'destacados', 'aseo', 'utm', 'medios', 'analitica', 'plan', 'material_pop', 'banner_revista'];
 
   /** Operaciones de la sección "medios" (todas guardan, salvo preview, que solo cuenta). */
   public const MEDIOS_OPS = ['add', 'rename', 'toggle', 'merge', 'aliases', 'alias_raw', 'rewrite_raw', 'preview'];
@@ -119,6 +120,7 @@ final class CommercialSettingsService
         'cargo_options' => $this->policy->cargoOptions(),
       ],
       'reportes' => CommercialReportsService::settings($this->settings),
+      'llamadas' => CommercialCallsNotifier::settings($this->settings),
       'tiempos' => ['topics' => $topics],
       'avisos' => ['values' => $signs],
       'actualizaciones' => ['limits' => self::propertyUpdateLimits($this->settings)],
@@ -284,6 +286,8 @@ final class CommercialSettingsService
         $this->settings->set(CommercialReportsService::SETTING, ['billing_enabled' => !empty($data['billing_enabled']), 'deadline_weekday' => max(0, min(6, (int) ($data['deadline_weekday'] ?? CommercialReportsService::DEFAULT_DEADLINE_WEEKDAY)))], Auth::userId());
         $this->settings->refresh();
         return 'Configuración de reportes comerciales guardada.';
+      case 'llamadas':
+        return $this->saveCallNotifications($data);
       case 'tiempos':
         return $this->saveSla($data);
       case 'avisos':
@@ -589,6 +593,26 @@ final class CommercialSettingsService
   }
 
   /** @param array<string,mixed> $data */
+  /** @param array<string,mixed> $data */
+  private function saveCallNotifications(array $data): string
+  {
+    $emails = [];
+    foreach (preg_split('/[\s,;]+/', trim((string) ($data['admin_emails'] ?? ''))) ?: [] as $email) {
+      if ($email === '') {
+        continue;
+      }
+      if (filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+        throw new \InvalidArgumentException('"' . $email . '" no es un correo válido.');
+      }
+      $emails[strtolower($email)] = $email;
+    }
+    $this->settings->set(CommercialCallsNotifier::SETTING, [
+      'asignado' => !empty($data['asignado']), 'solicitante' => !empty($data['solicitante']), 'administradores' => !empty($data['administradores']), 'admin_emails' => array_values($emails),
+    ], Auth::userId());
+    $this->settings->refresh();
+    return 'Configuración de llamadas guardada.';
+  }
+
   private function savePropertyUpdates(array $data): string
   {
     $limits = is_array($data['limits'] ?? null) ? $data['limits'] : [];

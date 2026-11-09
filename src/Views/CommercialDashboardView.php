@@ -455,6 +455,7 @@ final class CommercialDashboardView
   </style>
   <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/tailwind.css?v=' . filemtime(SCM_PUBLIC_PATH . '/assets/css/tailwind.css')); ?>">
   <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/commercial-calendar.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/commercial-calendar.css')); ?>">
+  <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/commercial-calls.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/commercial-calls.css')); ?>">
   <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/commercial-signs.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/commercial-signs.css')); ?>">
   <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/commercial-tools.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/commercial-tools.css')); ?>">
   <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/commercial-property-entry.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/commercial-property-entry.css')); ?>">
@@ -504,6 +505,7 @@ final class CommercialDashboardView
                       ['permissions', 'lock', 'Permisos del panel', 'Vistas, acciones y cargos visibles'],
                       ['calendario', 'calendar_month', 'Calendario comercial', 'Categorías y funcionarios del calendario'],
                       ['reportes', 'receipt_long', 'Reportes comerciales', 'Cuentas de cobro y día límite'],
+                      ['llamadas', 'call', 'Llamadas', 'Correos al crear la tarea de una llamada'],
                       ['tiempos', 'timer', 'Tiempos de atención', 'Alerta y vencimiento de tareas por tema'],
                       ['avisos', 'signpost', 'Avisos en fachada', 'Plazos de retoque, instalación y valores'],
                       ['actualizaciones', 'update', 'Actualizaciones de inmuebles', 'Plazos por tipo de negocio'],
@@ -654,6 +656,8 @@ final class CommercialDashboardView
             echo self::renderCalendarPage($runtime['config'] ?? [], $calendarEmployees, $subtab, $policy, $baseUrl);
           } elseif ($bucket === 'inmuebles') {
             echo self::renderPropertiesPage($propertyResult, $propertyFilters, $propertyOptions, $policy, $baseUrl);
+          } elseif ($bucket === 'llamadas') {
+            echo (string) ($data['calls_html'] ?? '');
           } elseif ($bucket === 'precaptacion') {
             echo self::renderPrecaptacion($baseUrl, $_GET);
           } elseif ($bucket === 'anadir_aviso') {
@@ -705,6 +709,7 @@ final class CommercialDashboardView
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-dashboard.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-dashboard.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-settings.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-settings.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-reports.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-reports.js')); ?>"></script>
+  <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-calls.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-calls.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-calendar-form.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-calendar-form.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-calendar-schedule.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-calendar-schedule.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-notifications.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-notifications.js')); ?>"></script>
@@ -817,10 +822,10 @@ final class CommercialDashboardView
       <?php endif; ?>
 
       <!-- Actividades comerciales: registrar (precaptación, aviso), gestión de tareas, actualizaciones y avisos en fachada -->
-      <?php $commercialViews = array_merge(['precaptacion', 'anadir_aviso', 'actualizaciones', 'avisos'], $taskViews); ?>
+      <?php $commercialViews = array_merge(['llamadas', 'precaptacion', 'anadir_aviso', 'actualizaciones', 'avisos'], $taskViews); ?>
       <?php if (array_intersect($commercialViews, $views) !== []): ?>
         <div class="relative group/nav" data-commercial-dropdown="comerciales">
-          <button type="button" class="flex items-center gap-space-xs px-2 xl:px-3 py-space-xs font-label-md text-label-md <?php echo ($isTaskActive || in_array($bucket, ['precaptacion', 'anadir_aviso', 'actualizaciones', 'avisos'], true)) ? ($activeClasses . ' active') : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-tab="comerciales" data-commercial-dropdown-trigger="comerciales" aria-expanded="false">
+          <button type="button" class="flex items-center gap-space-xs px-2 xl:px-3 py-space-xs font-label-md text-label-md <?php echo ($isTaskActive || in_array($bucket, ['llamadas', 'precaptacion', 'anadir_aviso', 'actualizaciones', 'avisos'], true)) ? ($activeClasses . ' active') : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-tab="comerciales" data-commercial-dropdown-trigger="comerciales" aria-expanded="false">
             <span class="material-symbols-outlined text-[16px]" aria-hidden="true">business_center</span>
             <span>Actividades comerciales</span>
             <span class="material-symbols-outlined text-[16px] group-hover/nav:rotate-180 transition-transform" aria-hidden="true">expand_more</span>
@@ -849,10 +854,15 @@ final class CommercialDashboardView
               </div>
             </div>
             <?php endif; ?>
-            <?php if (array_intersect(['precaptacion', 'anadir_aviso', 'actualizaciones', 'avisos'], $views)): ?>
+            <?php if (array_intersect(['llamadas', 'precaptacion', 'anadir_aviso', 'actualizaciones', 'avisos'], $views)): ?>
             <div class="min-w-[250px]">
-            <?php if (array_intersect(['precaptacion', 'anadir_aviso'], $views)): ?>
+            <?php if (array_intersect(['llamadas', 'precaptacion', 'anadir_aviso'], $views)): ?>
               <div class="flex items-center gap-1.5 px-3 pt-2 pb-1 font-label-sm text-[11px] uppercase font-semibold text-secondary"><span class="material-symbols-outlined text-[15px]" aria-hidden="true">edit_note</span><span>Registrar</span></div>
+              <?php if (in_array('llamadas', $views, true)): ?>
+              <a class="flex items-center gap-2 px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="llamadas" href="<?php echo esc_url(self::url($baseUrl, ['tab'=>'llamadas'])); ?>">
+                <span class="material-symbols-outlined text-[18px] text-secondary" aria-hidden="true">call</span><span>Llamadas</span>
+              </a>
+              <?php endif; ?>
               <?php if (in_array('precaptacion', $views, true)): ?>
               <a class="flex items-center gap-2 px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="precaptacion" href="<?php echo esc_url(self::url($baseUrl, ['tab'=>'precaptacion'])); ?>">
                 <span class="material-symbols-outlined text-[18px] text-secondary" aria-hidden="true">add_home_work</span><span>Precaptación</span>
@@ -4950,6 +4960,7 @@ final class CommercialDashboardView
     'Reportes comerciales' => ['reportes_pagar', 'reportes_editar_valor'],
     'Tareas' => ['ver_ticket', 'responder', 'agregar_nota', 'seguimiento', 'postergar', 'activar', 'cerrar', 'cambiar_estado', 'reasignar'],
     'Notificaciones' => ['enviar_notificacion', 'eliminar_notificacion', 'campanas_enviar', 'campanas_eliminar', 'plantillas_editar'],
+    'Llamadas' => ['llamadas_crear', 'llamadas_editar', 'llamadas_tarea'],
     'Precaptación' => ['precaptacion_crear', 'precaptacion_editar', 'precaptacion_ticket', 'precaptacion_catalogos'],
     'Inmuebles y avisos' => ['ingresar_inmueble', 'registrar_aviso', 'editar_actor'],
     'Herramientas' => ['mercado_vista_completa', 'aseo_vista_interna', 'plan_estrategico_editar'],

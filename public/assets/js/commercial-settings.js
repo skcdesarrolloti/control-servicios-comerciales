@@ -195,6 +195,18 @@
         app.setAttribute("data-scm-runtime", JSON.stringify(runtime));
       },
     },
+    llamadas: {
+      title: "Llamadas",
+      html: function (settings) {
+        var check = function (name, label) { return '<label class="flex items-start gap-2 text-sm text-slate-800 cursor-pointer"><input type="checkbox" name="' + name + '" class="mt-1"' + (settings[name] ? " checked" : "") + "><span>" + label + "</span></label>"; };
+        return '<form data-config-form class="text-left space-y-3">' + intro("Correos que salen cuando se crea una tarea desde una llamada.") +
+          check("asignado", "Avisar al funcionario asignado") + check("solicitante", "Avisar al solicitante") + check("administradores", "Avisar a estos administradores") +
+          '<label class="block text-sm text-slate-700"><strong>Correos de administradores</strong><textarea name="admin_emails" rows="3" class="mt-1 w-full px-2 py-1.5 rounded-lg border border-slate-300 text-sm" placeholder="Uno por línea">' + esc((settings.admin_emails || []).join("\n")) + "</textarea></label></form>";
+      },
+      collect: function (form) {
+        return { asignado: form.elements.asignado.checked, solicitante: form.elements.solicitante.checked, administradores: form.elements.administradores.checked, admin_emails: form.elements.admin_emails.value };
+      },
+    },
     reportes: {
       title: "Reportes comerciales",
       html: function (settings) {

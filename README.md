@@ -233,6 +233,10 @@ Para verificar todos los archivos PHP:
 Get-ChildItem -Recurse -Filter *.php | ForEach-Object { php -l $_.FullName }
 ```
 
+## Actividades comerciales: Llamadas
+
+El menú **Actividades comerciales → Llamadas** reemplaza los formularios "Añadir/Actualizar control de llamada" y "Crear ticket comercial con llamadas", sobre las mismas tablas (`jet_cct_cct_llamadas`, `jet_cct_tickets`). Cada llamada es una solicitud con su propio medio: al editar, el medio y la fecha no se leen de la petición (solo se puede completar un medio vacío en llamadas antiguas). Si la persona vuelve por otro medio se usa **Nueva solicitud**, y el historial del contacto agrupa sus solicitudes por celular. Con medio Club PPH se pide la tarjeta del aliado; aliado y tarjeta quedan en la llamada y en la tarea, con `bandera` = No. Una llamada que merece tarea abre el formulario de la tarea en el mismo popup, y la tarea hereda el medio. Los correos se configuran en **Configuración › Llamadas** y salen por shared-notifications. Prueba de navegador: `tests/Fixtures/commercial-calls.php` en 127.0.0.1:8774 y `node tools/check-commercial-calls.cjs RUTA_A_NODE_MODULES`.
+
 ## Actividades comerciales: Precaptación
 
 El menú **Actividades comerciales → Precaptación** integra el panel suministrado en

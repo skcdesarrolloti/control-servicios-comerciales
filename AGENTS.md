@@ -18,6 +18,7 @@
 - Las notificaciones nuevas deben ser configurables cuando aplique y encolarse mediante `shared-notifications`; evitar envíos directos o destinatarios quemados en código.
 - En los modales del panel, preferir popups internos y conservar el contexto de la tarea; evitar abrir pestañas nuevas si la acción puede resolverse dentro de la app.
 - En registros CCT creados o modificados por funcionarios, `cct_author_id` debe guardar el `id_empleado` real de `wp_jet_cct_funcionarios`, no el `_ID` interno de la sesión.
+- El medio de una llamada no se cambia al editarla porque las estadísticas cuentan por medio: otro medio es otra solicitud (llamada nueva) en el historial del contacto, y la tarea hereda el medio de su llamada.
 - Las acciones destructivas deben pedir confirmación clara y dejar trazabilidad cuando el módulo ya maneja historial.
 - El nombre corporativo visible en vistas, PDFs, correos e informes es `SKC SuCasa Inmobiliaria`.
 - Al agregar clases de Tailwind en PHP o JS, regenerar `public/assets/css/tailwind.css` con `npm run build:css`.

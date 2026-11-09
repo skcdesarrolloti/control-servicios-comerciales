@@ -98,6 +98,8 @@ final class CommercialApiController
       $html = CommercialDashboardView::renderReportsPage((string) ($input['reporte_sub'] ?? ''), $this->policy);
     } elseif ($bucket === 'promocion') {
       $html = \SCM\Views\Promotion\PromotionView::page($input, $this->policy, $this->db, $this->settings, $this->baseUrl);
+    } elseif ($bucket === 'llamadas') {
+      $html = \SCM\Views\CommercialCallsView::page($input, new \SCM\Commercial\Calls\CommercialCallsService($this->db, $this->settings, $this->policy, $this->config), $this->policy);
     } elseif ($bucket === 'precaptacion') {
       $html = CommercialDashboardView::renderPrecaptacion($this->baseUrl, $input);
     } elseif ($bucket === 'inicio') {

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SCM\Http\Api;
 
 use SCM\Http\Controller\CampaignApiController;
+use SCM\Http\Controller\CommercialCallsApiController;
 use SCM\Http\Controller\CommercialApiController;
 use SCM\Http\Controller\CommercialReportsApiController;
 use SCM\Http\Controller\PromotionApiController;
@@ -64,6 +65,17 @@ final class CommercialActionRouter
     'commercial_reports_account_excel' => 'accountExcel',
   ];
 
+  /** Actividades comerciales › Llamadas: los atiende CommercialCallsApiController. */
+  public const CALL_ACTIONS = [
+    'commercial_calls_list' => 'list',
+    'commercial_calls_form' => 'form',
+    'commercial_calls_save' => 'save',
+    'commercial_calls_task_form' => 'taskForm',
+    'commercial_calls_task_save' => 'taskSave',
+    'commercial_calls_history' => 'history',
+    'commercial_calls_card' => 'card',
+  ];
+
   private CommercialApiController $controller;
   /** @var (\Closure():PromotionApiController)|null */
   private ?\Closure $promotion;
@@ -73,20 +85,24 @@ final class CommercialActionRouter
   private ?\Closure $campaigns;
   /** @var (\Closure():CommercialReportsApiController)|null */
   private ?\Closure $reports;
+  /** @var (\Closure():CommercialCallsApiController)|null */
+  private ?\Closure $calls;
 
   /**
    * @param (\Closure():PromotionApiController)|null $promotion
    * @param (\Closure():StrategicPlanApiController)|null $strategy
    * @param (\Closure():CampaignApiController)|null $campaigns
    * @param (\Closure():CommercialReportsApiController)|null $reports
+   * @param (\Closure():CommercialCallsApiController)|null $calls
    */
-  public function __construct(CommercialApiController $controller, ?\Closure $promotion = null, ?\Closure $strategy = null, ?\Closure $campaigns = null, ?\Closure $reports = null)
+  public function __construct(CommercialApiController $controller, ?\Closure $promotion = null, ?\Closure $strategy = null, ?\Closure $campaigns = null, ?\Closure $reports = null, ?\Closure $calls = null)
   {
     $this->controller = $controller;
     $this->promotion = $promotion;
     $this->strategy = $strategy;
     $this->campaigns = $campaigns;
     $this->reports = $reports;
+    $this->calls = $calls;
   }
 
   /** @param array<string,mixed> $input */
@@ -116,6 +132,12 @@ final class CommercialActionRouter
       }
       $target = ($this->reports)();
       $method = self::REPORT_ACTIONS[$action];
+    } elseif (isset(self::CALL_ACTIONS[$action])) {
+      if ($this->calls === null) {
+        return false;
+      }
+      $target = ($this->calls)();
+      $method = self::CALL_ACTIONS[$action];
     } else {
       $target = $this->controller;
       $method = self::controllerMethod($action);

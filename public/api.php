@@ -37,7 +37,8 @@ $router = new \SCM\Http\Api\CommercialActionRouter(
   static fn(): \SCM\Http\Controller\PromotionApiController => new \SCM\Http\Controller\PromotionApiController($scmDb, $scmSettings, $scmCsrf, $scmConfig),
   static fn(): \SCM\Http\Controller\StrategicPlanApiController => new \SCM\Http\Controller\StrategicPlanApiController($scmDb, $scmSettings, $scmCsrf, $scmConfig),
   static fn(): \SCM\Http\Controller\CampaignApiController => new \SCM\Http\Controller\CampaignApiController($scmDb, $scmSettings, $scmCsrf, $scmConfig),
-  static fn(): \SCM\Http\Controller\CommercialReportsApiController => new \SCM\Http\Controller\CommercialReportsApiController($scmDb, $scmSettings, $scmCsrf, $scmConfig)
+  static fn(): \SCM\Http\Controller\CommercialReportsApiController => new \SCM\Http\Controller\CommercialReportsApiController($scmDb, $scmSettings, $scmCsrf, $scmConfig),
+  static fn(): \SCM\Http\Controller\CommercialCallsApiController => new \SCM\Http\Controller\CommercialCallsApiController($scmDb, $scmSettings, $scmCsrf, $scmConfig)
 );
 
 session_write_close();

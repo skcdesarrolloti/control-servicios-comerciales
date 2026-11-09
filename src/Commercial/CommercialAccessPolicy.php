@@ -13,6 +13,7 @@ final class CommercialAccessPolicy
   public const VIEWS = [
     'inicio' => 'Inicio',
     'calendario' => 'Calendario comercial',
+    'llamadas' => 'Llamadas',
     'precaptacion' => 'Precaptación',
     'anadir_aviso' => 'Añadir aviso',
     'inmuebles' => 'Inmuebles',
@@ -41,6 +42,9 @@ final class CommercialAccessPolicy
     'enviar_notificacion' => 'Enviar notificaciones comerciales',
     'eliminar_notificacion' => 'Eliminar notificaciones comerciales (solo administradores)',
     'editar_actor' => 'Editar datos de actores y registros relacionados',
+    'llamadas_crear' => 'Registrar llamadas y nuevas solicitudes de un contacto',
+    'llamadas_editar' => 'Editar llamadas (el medio no se puede cambiar)',
+    'llamadas_tarea' => 'Crear tarea desde una llamada',
     'precaptacion_crear' => 'Registrar precaptaciones',
     'precaptacion_editar' => 'Editar resultados de precaptación',
     'precaptacion_ticket' => 'Crear tarea desde precaptación',
@@ -131,7 +135,7 @@ final class CommercialAccessPolicy
   /** Grupos del menú del encabezado, en el mismo orden, para la configuración de accesos. */
   public const VIEW_GROUPS = [
     'General' => ['inicio', 'calendario'],
-    'Actividades comerciales' => ['precaptacion', 'anadir_aviso', 'actualizaciones', 'avisos', 'abiertos', 'mis_tickets', 'postergados', 'cerrados', 'reportes_comerciales'],
+    'Actividades comerciales' => ['llamadas', 'precaptacion', 'anadir_aviso', 'actualizaciones', 'avisos', 'abiertos', 'mis_tickets', 'postergados', 'cerrados', 'reportes_comerciales'],
     'Inventario' => ['inmuebles'],
     'Promoción' => ['promocion'],
     'Comunicación y herramientas' => ['notificaciones', 'herramientas'],
@@ -144,6 +148,7 @@ final class CommercialAccessPolicy
   public const SCOPED_VIEWS = [
     'inicio' => ['Solo sus tareas e indicadores', 'Indicadores de todo el equipo'],
     'calendario' => ['Solo sus vencimientos', 'Vencimientos de todo el equipo'],
+    'llamadas' => ['Solo sus llamadas (asignadas o registradas por la persona)', 'Llamadas de todo el equipo'],
     'precaptacion' => ['Solo sus precaptaciones', 'Precaptaciones de todo el equipo'],
     'actualizaciones' => ['Solo sus inmuebles', 'Inmuebles de todo el equipo'],
     'avisos' => ['Solo sus avisos', 'Avisos de todo el equipo'],
