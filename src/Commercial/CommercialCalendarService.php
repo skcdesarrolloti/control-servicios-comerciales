@@ -20,8 +20,7 @@ final class CommercialCalendarService
   public const CATEGORY_SETTING = 'commercial_calendar_categories';
   public const CARGOS_SETTING = 'commercial_calendar_cargos';
 
-  public const DEFAULT_APP_URL = 'https://calendar-skc.netlify.app';
-  public const DEFAULT_API_URL = 'https://sucasainmobiliaria.com.co/calendario-actividades/index.php?action=';
+  public const CITA_CATEGORY_SETTING = 'commercial_calendar_cita_category';
 
   /** Tipos de vencimiento comercial: etiqueta, grupo, color y vista requerida para verlos. */
   public const DUE_TYPES = [
@@ -110,8 +109,9 @@ final class CommercialCalendarService
         ], $employees)),
         'commercial_open_statuses' => CommercialStatusCatalog::OPEN,
         'calendar_current_employee_id' => $currentEmployeeId,
-        'calendar_app_url' => (string) ($this->config['calendar_app_url'] ?? self::DEFAULT_APP_URL),
-        'calendar_api_url' => (string) ($this->config['calendar_api_url'] ?? self::DEFAULT_API_URL),
+        'calendar_api_url' => $this->apiUrl(),
+        'calendar_can_assign_others' => $this->policy->canSubview('calendario', 'team'),
+        'calendar_cita_category_id' => $this->citaCategoryId(),
         'calendar_initial_subtab' => in_array($subtab, ['mine', 'team', 'due'], true) ? $subtab : 'mine',
         'calendar_can_configure' => $this->policy->canManage(),
         'calendar_due_types' => $this->visibleDueTypes(),
@@ -119,6 +119,31 @@ final class CommercialCalendarService
         'is_admin' => $this->policy->canManage(),
       ],
     ];
+  }
+
+  /** API propia del panel, salvo que CALENDAR_API_URL indique otra. */
+  public function apiUrl(): string
+  {
+    $configured = trim((string) ($this->config['calendar_api_url'] ?? ''));
+    return $configured !== '' ? $configured : rtrim((string) (defined('SCM_BASE_URL') ? SCM_BASE_URL : ''), '/') . '/calendar-api.php?action=';
+  }
+
+  /** Categoría que se preselecciona al agendar una cita con cliente. */
+  public function citaCategoryId(): string
+  {
+    return (string) (int) $this->settings->get(self::CITA_CATEGORY_SETTING, 0);
+  }
+
+  /** @return array<string,bool> */
+  public function notificationSettings(): array
+  {
+    $saved = $this->settings->get(Calendar\CalendarMailer::SETTING, []);
+    $saved = is_array($saved) ? $saved : [];
+    $out = [];
+    foreach (Calendar\CalendarMailer::DEFAULTS as $key => $default) {
+      $out[$key] = array_key_exists($key, $saved) ? (bool) $saved[$key] : $default;
+    }
+    return $out;
   }
 
   /** Acciones AJAX que usa el motor del calendario (mismos nombres de clave que en administrativo). @return array<string,string> */
@@ -460,11 +485,8 @@ final class CommercialCalendarService
         return (string) ($employee['id_empleado'] ?? '');
       }
     }
-    $current = $this->tickets->currentEmployeeTicketFilter($cargos);
-    if ($current === '' && $employees !== []) {
-      $current = (string) ($employees[0]['id_empleado'] ?? '');
-    }
-    return $current;
+    // Si no se sabe quién es, no se le muestra la agenda de nadie.
+    return '';
   }
 
   /** @return array<int,string> */

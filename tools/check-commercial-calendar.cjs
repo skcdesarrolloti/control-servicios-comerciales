@@ -1,5 +1,5 @@
-// Calendario comercial con base SQLite aislada (tests/Fixtures/commercial-calendar.php) y la API del
-// calendario de actividades simulada. Servir el repositorio en 127.0.0.1:8769 y ejecutar:
+// Calendario comercial con base SQLite aislada (tests/Fixtures/commercial-calendar.php) y public/calendar-api.php
+// simulada. Servir el repositorio en 127.0.0.1:8769 y ejecutar:
 //   node tools/check-commercial-calendar.cjs RUTA_A_NODE_MODULES
 const path = require('path');
 const { chromium } = require(process.argv[2] ? path.join(process.argv[2], 'playwright') : 'playwright');
@@ -36,8 +36,11 @@ async function closeSwal(page) {
   const calls = [];
   page.on('pageerror', error => errors.push(error.message));
   page.on('dialog', dialog => dialog.accept());
-  await page.route('**/calendario-actividades/index.php**', route => {
+  const external = [];
+  page.on('request', request => { if (/calendario-actividades|calendar-skc\.netlify/.test(request.url())) external.push(request.url()); });
+  await page.route('**/calendar-api.php**', route => {
     const action = new URL(route.request().url()).searchParams.get('action');
+    if (route.request().method() === 'POST') assert(route.request().headers()['x-scm-nonce'] === 'fixture', 'La API del calendario no recibe el nonce: ' + action);
     let body = {};
     try { body = route.request().postDataJSON() || {}; } catch (error) { body = {}; }
     calls.push({ action, body });
@@ -49,6 +52,10 @@ async function closeSwal(page) {
       listar_pendientes_vencidos: [{ id: 77, titulo: 'Visita sin cerrar', fecha_inicio: '2026-10-20 10:00:00', id_ticket: '1' }],
       estado_google_oauth: { configured: true, connected: true, sync_enabled: true },
       crear_evento: { id: 900, google_pendiente: false },
+      crear_item_calendario: { id: 901, aviso_programado: true, google_pendiente: false },
+      obtener_tickets_funcionario: [{ _ID: '1', id_ticket: '1', solicitante: 'Laura Gómez', direccion: 'Calle 25 #20-10', estado_comercial: 'Contactado' }],
+      preparar_reporte_comercial: Number(body.id_evento) === 501 ? { habilitado: true, tipos_permitidos: ['Visita', 'Otras actividades'], tipo_predeterminado: 'Visita', inmueble_obligatorio: true, valor_maximo: 8000, inmuebles: [{ id: '4501', codigo: '4501', titulo: 'Apartamento Manga', direccion: 'Calle 25', id_cotizacion: '9' }] } : { habilitado: false },
+      cambiar_estado: { google_pendiente: false },
     }[action] ?? [];
     return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ success: true, message: 'OK', data }) });
   });
@@ -64,10 +71,19 @@ async function closeSwal(page) {
   await page.locator('#commercial-config-trigger').click();
   await page.locator('[data-commercial-config-action="calendario"]').click();
   await page.locator('[data-config-form] [name="category_ids"]').first().waitFor();
+  assert(await page.locator('[data-category-row][data-id="3"] [data-category-remove]').count() === 0, 'Una categoría con eventos se puede eliminar');
+  assert(await page.locator('[data-category-row][data-id="12"] [data-category-remove]').count() === 1, 'Una categoría sin eventos no ofrece Eliminar');
+  await page.locator('[data-category-add]').click();
+  await page.locator('[data-category-rows] tr:last-child [data-field="nombre"]').fill('Feria inmobiliaria');
+  const categorySave = page.waitForResponse(response => response.request().method() === 'POST' && (response.request().postData() || '').includes('commercial_settings_save'));
   await page.locator('[data-toggle-all="category_ids"][data-value="0"]').click();
   await page.locator('[name="category_ids"][value="3"]').check();
   await page.locator('[name="category_ids"][value="26"]').check();
+  await page.locator('[data-category-rows] tr:last-child [name="category_ids"]').check();
   await page.locator('.swal2-confirm').click();
+  const savedCategories = ((await (await categorySave).json()).data.settings || {}).calendario || {};
+  assert((savedCategories.categories || []).some(row => row.nombre === 'Feria inmobiliaria'), 'La categoría nueva no quedó guardada');
+  assert((savedCategories.category_ids || []).length === 3, 'La categoría nueva no quedó habilitada para comercial');
   await page.locator('.swal2-popup:has-text("Configuración del calendario comercial guardada")').waitFor();
   await closeSwal(page);
   const configSaves = calls.length;
@@ -114,6 +130,20 @@ async function closeSwal(page) {
   await page.locator('.scm-calendar-create-form').waitFor();
   const createCategories = await page.locator('.scm-calendar-create-form [name="id_categoria"] option').allTextContents();
   assert(createCategories.join('|') === 'Selecciona categoría|Visita comercial|Captación', 'El popup de crear no respeta las categorías comerciales: ' + createCategories.join(', '));
+  // Formulario corto: un solo paso, con lo opcional recogido.
+  assert(await page.locator('.scm-cal-kinds input').count() === 3, 'Faltan los tipos cita, evento y recordatorio');
+  assert(!(await page.locator('.scm-calendar-availability-panel').count()), 'Sigue el panel lateral del formulario anterior');
+  assert(!(await page.locator('[name="descripcion"]').isVisible()), 'La descripción debe quedar en Más opciones');
+  await page.locator('[data-commercial-schedule-form] [name="id_categoria"]').selectOption('26');
+  assert(await page.locator('[name="titulo"]').inputValue() === 'Captación', 'El título no se completa con la categoría');
+  await page.locator('[data-form-place="Oficina Manga"]').click();
+  assert(await page.locator('[name="ubicacion"]').inputValue() === 'Oficina Manga', 'El acceso rápido de oficina no llena la ubicación');
+  await page.locator('.scm-cal-kinds label:has-text("Recordatorio")').click();
+  assert(!(await page.locator('[name="ubicacion"]').isVisible()) && await page.locator('[name="aviso_minutos_antes"]').isVisible(), 'El recordatorio no adapta sus campos');
+  await page.locator('.scm-cal-kinds label:has-text("Evento")').click();
+  await page.setViewportSize({ width: 390, height: 800 });
+  assert(await page.evaluate(() => { const form = document.querySelector('.scm-cal-form'); return form.scrollWidth <= form.clientWidth + 1; }), 'El formulario se desborda en móvil');
+  await page.setViewportSize({ width: 1440, height: 950 });
   assert(!(await page.locator('.scm-calendar-create-shell').textContent()).includes('&'), 'El popup de crear muestra entidades HTML');
   await page.locator('.swal2-cancel').click();
 
@@ -121,7 +151,9 @@ async function closeSwal(page) {
   await page.goto(endpoint + '?tab=calendario&subtab=due');
   await page.waitForFunction(() => Number(document.querySelector('[data-scm-calendar-total]').textContent) > 0);
   const dueText = await page.locator('[data-scm-calendar-grid]').textContent();
-  assert(dueText.includes('Tarea #1') && dueText.includes('Seguimiento tarea #1'), 'Faltan los vencimientos de tareas y seguimientos');
+  assert(dueText.includes('Tarea #2') && dueText.includes('Seguimiento tarea #1'), 'Faltan los vencimientos de tareas y seguimientos');
+  // Lo que venció antes del mes visible va en Atrasados, no en la grilla.
+  assert((await page.locator('[data-scm-calendar-backlog]').textContent()).includes('Tarea #1'), 'Faltan las tareas atrasadas');
   assert(await page.locator('[data-scm-calendar-due-type-filter] [name="due_type"]').count() === 7, 'Faltan tipos de vencimiento comercial');
 
   // Filtro por funcionario: el administrador ve todo el equipo y puede acotar a un funcionario.
@@ -176,10 +208,25 @@ async function closeSwal(page) {
   const created = calls.filter(call => call.action === 'crear_evento').pop();
   assert(created, 'No se creó la cita');
   assert(created.body.id_ticket === '1' && created.body.es_cita === 'si', 'La cita no queda vinculada a la tarea');
-  assert(created.body.estado_comercial === 'Contactado' && created.body.estado_administrativo === 'Sin novedad', 'La cita borra los estados de la tarea');
+  assert(created.body.estado_comercial === 'Contactado', 'La cita cambia el estado comercial de la tarea');
+  assert(!('estado_administrativo' in created.body) && !('creado_por' in created.body), 'El navegador no debe decidir el estado administrativo ni el autor');
   await closeSwal(page);
 
+  // Cerrar un evento que exige reporte comercial pide inmueble y envía el reporte.
+  await page.goto(endpoint + '?tab=calendario&subtab=mine');
+  await page.waitForFunction(() => document.querySelector('[data-scm-calendar-total]').textContent === '2');
+  await page.locator('[data-scm-calendar-events] [data-scm-calendar-complete-event]').first().click();
+  await page.locator('[data-commercial-report-form]').waitFor();
+  await page.locator('.swal2-confirm').click();
+  await page.locator('.swal2-validation-message:has-text("Debes seleccionar un inmueble")').waitFor();
+  await page.locator('[data-commercial-report-form] [name="id_inmueble"]').selectOption('4501');
+  await page.locator('.swal2-confirm').click();
+  await page.waitForFunction(() => !document.querySelector('[data-commercial-report-form]'));
+  const closed = calls.filter(call => call.action === 'cambiar_estado').pop();
+  assert(closed && closed.body.reporte && closed.body.reporte.id_inmueble === '4501' && closed.body.reporte.id_cotizacion === '9', 'El cierre no envía el reporte comercial');
+
+  assert(!external.length, 'Sigue llamando a la app externa: ' + external.join(', '));
   if (errors.length) throw new Error(errors.join('\n'));
-  console.log('Calendario comercial UI: agenda, edición, menú Configuración, categorías comerciales, vencimientos y agendar desde la tarea: OK');
+  console.log('Calendario comercial UI: API propia, agenda, edición, Configuración y categorías, formulario corto, vencimientos, agendar desde la tarea y reporte al cerrar: OK');
   await browser.close();
 })().catch(async error => { console.error(error); await browser?.close(); process.exitCode = 1; });

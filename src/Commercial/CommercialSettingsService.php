@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace SCM\Commercial;
 
+use SCM\Commercial\Calendar\CalendarCommercialReport;
+use SCM\Commercial\Calendar\CalendarMailer;
+use SCM\Commercial\Calendar\CalendarStore;
 use SCM\Commercial\Medios\MedioCatalog;
 use SCM\Commercial\Medios\MedioResolver;
 use SCM\Commercial\Promotion\Analytics\TrackerAnalyticsConfig;
@@ -107,6 +110,10 @@ final class CommercialSettingsService
     return [
       'calendario' => [
         'category_ids' => $calendar->categoryIds(),
+        'categories' => $this->calendarCategories(),
+        'cita_category_id' => $calendar->citaCategoryId(),
+        'notifications' => $calendar->notificationSettings(),
+        'report_cargo_ids' => $this->ids($this->systemValue(CalendarCommercialReport::CARGOS_SETTING) ?? []),
         'cargo_ids' => $calendar->calendarCargos(),
         'cargo_options' => $this->policy->cargoOptions(),
       ],
@@ -410,6 +417,74 @@ final class CommercialSettingsService
     return ['globals' => $globals, 'insumos' => $config['insumos'], 'transporte' => $config['transporte'], 'tramos' => $config['tramos']];
   }
 
+  /** @return array<int,array<string,mixed>> Vacío si la tabla de categorías no está disponible. */
+  private function calendarCategories(): array
+  {
+    try {
+      return (new CalendarStore($this->db))->categoriesWithUsage();
+    } catch (\Throwable $exception) {
+      error_log('[commercial-calendar] categorías: ' . $exception->getMessage());
+      return [];
+    }
+  }
+
+  /**
+   * Crea, edita y elimina categorías. Primero valida todo para no dejar cambios a medias. Una categoría con eventos no se
+   * borra: en la otra app eliminarla borraba también sus eventos.
+   * @param array<int,mixed> $rows
+   * @param array<int,string> $deleted
+   * @param array<int,string> $enabled
+   * @param array<int,string> $available
+   * @return array{0:array<int,string>,1:array<int,string>} Marcadas y disponibles, ya con las nuevas.
+   */
+  private function saveCategories(array $rows, array $deleted, array $enabled, array $available): array
+  {
+    $store = new CalendarStore($this->db);
+    foreach ($deleted as $id) {
+      $category = $store->category((int) $id);
+      if ($category !== null && $store->categoryEventCount((int) $id) > 0) {
+        throw new \InvalidArgumentException('La categoría "' . (string) $category['nombre'] . '" tiene eventos y no se puede eliminar.');
+      }
+    }
+    $clean = [];
+    $names = [];
+    foreach ($rows as $row) {
+      if (!is_array($row)) {
+        continue;
+      }
+      $id = (int) ($row['id'] ?? 0);
+      $name = preg_replace('/\s+/u', ' ', trim((string) ($row['nombre'] ?? ''))) ?? '';
+      $color = trim((string) ($row['color'] ?? ''));
+      if ($name === '' || mb_strlen($name) > 100) {
+        throw new \InvalidArgumentException('Cada categoría necesita un nombre de hasta 100 caracteres.');
+      }
+      if (preg_match('/^#[0-9a-fA-F]{6}$/', $color) !== 1) {
+        throw new \InvalidArgumentException('El color de "' . $name . '" no es válido.');
+      }
+      $key = mb_strtolower($name);
+      if (isset($names[$key]) || $store->categoryNameTaken($name, $id)) {
+        throw new \InvalidArgumentException('Ya existe una categoría llamada "' . $name . '".');
+      }
+      $names[$key] = true;
+      $clean[] = ['id' => $id, 'nombre' => $name, 'color' => $color, 'descripcion' => trim((string) ($row['descripcion'] ?? '')), 'comercial' => !empty($row['comercial'])];
+    }
+    foreach ($clean as $row) {
+      if ($row['id'] > 0) {
+        $store->updateCategory($row['id'], $row['nombre'], $row['color'], $row['descripcion']);
+        continue;
+      }
+      $id = (string) $store->insertCategory($row['nombre'], $row['color'], $row['descripcion']);
+      $available[] = $id;
+      if ($row['comercial']) {
+        $enabled[] = $id;
+      }
+    }
+    foreach ($deleted as $id) {
+      $store->deleteCategory((int) $id);
+    }
+    return [array_values(array_diff($enabled, $deleted)), array_values(array_diff($available, $deleted))];
+  }
+
   /** @param array<string,mixed> $data */
   private function saveCalendar(array $data): string
   {
@@ -420,6 +495,22 @@ final class CommercialSettingsService
     $categoryIds = $this->ids($data['category_ids'] ?? []);
     $available = $this->ids($data['available_category_ids'] ?? []);
     $calendar = new CommercialCalendarService($this->db, $this->settings, $this->policy, $this->config);
+    if (is_array($data['categories'] ?? null) || is_array($data['deleted_category_ids'] ?? null)) {
+      [$categoryIds, $available] = $this->saveCategories(is_array($data['categories'] ?? null) ? $data['categories'] : [], $this->ids($data['deleted_category_ids'] ?? []), $categoryIds, $available);
+    }
+    $saved = $calendar->notificationSettings();
+    if (is_array($data['notifications'] ?? null)) {
+      foreach (array_keys($saved) as $key) {
+        $saved[$key] = !empty($data['notifications'][$key]);
+      }
+      $this->settings->set(CalendarMailer::SETTING, $saved, Auth::userId());
+    }
+    if (array_key_exists('cita_category_id', $data)) {
+      $this->settings->set(CommercialCalendarService::CITA_CATEGORY_SETTING, (int) $data['cita_category_id'], Auth::userId());
+    }
+    if (array_key_exists('report_cargo_ids', $data)) {
+      $this->saveSystemValue(CalendarCommercialReport::CARGOS_SETTING, (string) json_encode(array_map('intval', $this->ids($data['report_cargo_ids']))));
+    }
     if ($categoryIds !== [] || $available !== []) {
       $calendar->saveCategoryIds($categoryIds, $available);
     }

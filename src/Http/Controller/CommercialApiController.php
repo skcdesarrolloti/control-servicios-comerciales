@@ -189,6 +189,9 @@ final class CommercialApiController
     if (!$this->policy->canView('calendario')) {
       JsonResponse::error('No tienes permiso para usar el calendario comercial.', 403);
     }
+    if (!$this->calendarService()->notificationSettings()['whatsapp_citas']) {
+      JsonResponse::success(['message' => 'Los avisos por WhatsApp de citas están apagados en Configuración.', 'queued' => 0, 'skipped' => 0, 'errors' => []]);
+    }
     $appointments = json_decode((string) ($input['appointments'] ?? '[]'), true);
     try {
       $result = (new \SCM\Commercial\CommercialCalendarNotifier($this->db))->notify(is_array($appointments) ? $appointments : []);

@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 // Calendario comercial con base SQLite aislada. Servir el repositorio en 127.0.0.1:8769;
-// la API del calendario de actividades se simula desde el navegador (tools/check-commercial-calendar.cjs).
+// public/calendar-api.php se simula desde el navegador (tools/check-commercial-calendar.cjs); su lógica la cubre CommercialCalendarApiTest.
 if (PHP_SAPI !== 'cli-server' || ($_SERVER['REMOTE_ADDR'] ?? '') !== '127.0.0.1') { http_response_code(404); exit; }
 require dirname(__DIR__, 2) . '/tests/bootstrap.php';
 require dirname(__DIR__, 2) . '/src/Core/Helpers.php';
@@ -48,6 +48,14 @@ $db->insert($tickets, ['_ID' => 1, 'id_ticket' => '1', 'estado' => 'En proceso',
 $db->insert($tickets, ['_ID' => 2, 'id_ticket' => '2', 'estado' => 'Nuevo', 'estado_comercial' => 'Nuevo', 'asunto' => 'Avalúo casa Crespo', 'solicitante' => 'Pedro Ruiz', 'id_empleado' => '900', 'nombre_empleado' => 'Ana Pérez', 'tema_ayuda' => 'Avaluo', 'fecha' => strtotime($recent), 'cct_created' => $recent, 'cct_modified' => $recent]);
 $older = date('Y-m-d H:i:s', strtotime('-60 days'));
 $db->insert($tickets, ['_ID' => 3, 'id_ticket' => '3', 'estado' => 'En proceso', 'estado_comercial' => 'Mostrando', 'asunto' => 'Arriendo local Bocagrande', 'solicitante' => 'María Díaz', 'id_empleado' => '999', 'nombre_empleado' => 'Administrador', 'tema_ayuda' => 'Arriendo', 'fecha' => strtotime($older), 'cct_created' => $older, 'cct_modified' => $older]);
+
+// Configuración › Calendario comercial lee y guarda las categorías en la base.
+$pdo->exec('CREATE TABLE categorias_calendario (id INTEGER PRIMARY KEY AUTOINCREMENT, nombre TEXT, color TEXT, descripcion TEXT, roles_notificar TEXT)');
+$pdo->exec("CREATE TABLE calendario_actividades (id INTEGER PRIMARY KEY AUTOINCREMENT, id_categoria INTEGER, titulo TEXT, estado TEXT DEFAULT 'No')");
+foreach ([[3, 'Visita comercial', '#2563eb'], [26, 'Captación', '#16a34a'], [40, 'Avalúo', '#f59e0b'], [12, 'Preventiva', '#7c3aed']] as [$id, $name, $color]) {
+  $db->insert('categorias_calendario', ['id' => $id, 'nombre' => $name, 'color' => $color, 'descripcion' => '']);
+}
+$db->insert('calendario_actividades', ['id_categoria' => 3, 'titulo' => 'Visita']);
 
 $settings = new SCM\Core\Settings($db, false, 'control_servicios_comerciales_config');
 $csrf = new SCM\Core\Csrf(str_repeat('x', 40));

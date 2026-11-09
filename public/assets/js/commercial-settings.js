@@ -86,37 +86,54 @@
     }).join("") + "</div>";
   }
 
-  function calendarCategories() {
-    var url = String(config.calendar_api_url || "https://sucasainmobiliaria.com.co/calendario-actividades/index.php?action=") + "listar_categorias";
-    return fetch(url, { credentials: "same-origin" }).then(function (response) { return response.json(); }).then(function (json) {
-      return json && json.success && Array.isArray(json.data) ? json.data : [];
-    });
+  function categoryRowHtml(row, enabled) {
+    var id = String(row.id || "");
+    var events = Number(row.eventos || 0);
+    return '<tr data-category-row data-id="' + esc(id) + '">' +
+      '<td class="py-1.5 px-2 text-center"><input type="checkbox" name="category_ids" value="' + esc(id) + '"' + (enabled ? " checked" : "") + ' aria-label="Usar en comercial"></td>' +
+      '<td class="py-1.5 px-2"><input type="color" data-field="color" value="' + esc(/^#[0-9a-fA-F]{6}$/.test(String(row.color || "")) ? row.color : "#1e3c76") + '" class="w-8 h-8 rounded border border-slate-300 cursor-pointer" aria-label="Color"></td>' +
+      '<td class="py-1.5 px-2"><input data-field="nombre" value="' + esc(row.nombre || "") + '" maxlength="100" required class="w-full px-2 py-1.5 rounded-lg border border-slate-300 text-sm" aria-label="Nombre"></td>' +
+      '<td class="py-1.5 px-2 text-right text-xs text-slate-500 whitespace-nowrap">' + events + "</td>" +
+      '<td class="py-1.5 px-2 text-right">' + (events > 0 ? "" : '<button type="button" data-category-remove class="px-2 py-1 rounded-lg text-xs font-semibold text-rose-700 hover:bg-rose-50">Eliminar</button>') + "</td></tr>";
   }
-
   var sections = {
     calendario: {
       title: "Calendario comercial",
-      prepare: function (settings) {
-        return calendarCategories().catch(function () { return []; }).then(function (categories) {
-          return { settings: settings, categories: categories };
-        });
-      },
-      html: function (data) {
-        var current = data.settings.category_ids || [];
-        var categories = data.categories.map(function (row) {
-          return { id: String(row.id || row._ID || ""), label: row.nombre || row.categoria || "Categoría", color: row.color || "#94a3b8" };
-        }).filter(function (row) { return row.id; }).sort(function (a, b) { return a.label.localeCompare(b.label, "es"); });
+      html: function (settings) {
+        var data = { settings: settings };
+        var current = (settings.category_ids || []).map(String);
+        var categories = settings.categories || [];
+        var notifications = settings.notifications || {};
+        var reportCargos = (settings.report_cargo_ids || []).map(String);
+        var citaCategory = String(settings.cita_category_id || "");
         var cargos = (data.settings.cargo_options || []).map(function (row) {
           return { id: String(row.id), label: row.name, hint: "(" + row.total + ")" };
         });
         var selectedCargos = (data.settings.cargo_ids || []).map(String);
         return '<form data-config-form class="text-left space-y-4">' +
-          "<section>" + '<h4 class="text-sm font-bold text-slate-800 mb-1">Categorías que se usan en comercial</h4>' +
-          intro("Solo estas categorías salen al crear, filtrar y agendar en el calendario comercial. Si marcas todas, también aparecerán las que se creen después.") +
+          "<section>" + '<h4 class="text-sm font-bold text-slate-800 mb-1">Categorías del calendario</h4>' +
+          intro("Marca las que se usan en comercial: solo esas salen al crear y agendar. Los nombres y colores son compartidos con el panel administrativo. Una categoría con eventos no se puede eliminar.") +
           (categories.length
-            ? '<div class="flex gap-2 mb-2"><button type="button" class="px-3 py-1 rounded-lg bg-slate-100 text-xs font-semibold" data-toggle-all="category_ids" data-value="1">Marcar todas</button><button type="button" class="px-3 py-1 rounded-lg bg-slate-100 text-xs font-semibold" data-toggle-all="category_ids" data-value="0">Quitar todas</button></div>' +
-              checkboxGrid("category_ids", categories, function (id) { return !current.length || current.indexOf(id) !== -1; })
-            : '<p class="text-sm text-rose-700">No se pudieron consultar las categorías del calendario; se conserva la selección actual.</p>') +
+            ? '<div class="flex gap-2 mb-2"><button type="button" class="px-3 py-1 rounded-lg bg-slate-100 text-xs font-semibold" data-toggle-all="category_ids" data-value="1">Marcar todas</button><button type="button" class="px-3 py-1 rounded-lg bg-slate-100 text-xs font-semibold" data-toggle-all="category_ids" data-value="0">Quitar todas</button></div>'
+            : '<p class="text-sm text-rose-700 mb-2">No se pudieron consultar las categorías del calendario.</p>') +
+          '<div class="max-h-[34vh] overflow-y-auto border border-slate-200 rounded-xl"><table class="w-full text-sm text-left"><thead><tr class="text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-200"><th class="py-2 px-2 text-center">Comercial</th><th class="py-2 px-2">Color</th><th class="py-2 px-2">Nombre</th><th class="py-2 px-2 text-right">Eventos</th><th></th></tr></thead><tbody data-category-rows class="divide-y divide-slate-100">' +
+          categories.map(function (row) { return categoryRowHtml(row, !current.length || current.indexOf(String(row.id)) !== -1); }).join("") +
+          "</tbody></table></div>" +
+          '<button type="button" data-category-add class="mt-2 px-3 py-1.5 rounded-lg bg-[#1E3C76] text-white text-xs font-semibold">Agregar categoría</button>' +
+          "</section><section>" + '<h4 class="text-sm font-bold text-slate-800 mb-1">Cita con cliente</h4>' +
+          '<label class="block text-sm text-slate-700">Categoría que se elige sola al agendar una cita<select name="cita_category_id" class="mt-1 w-full px-2 py-1.5 rounded-lg border border-slate-300 text-sm"><option value="0">Buscar la llamada "Cita con cliente"</option>' +
+          categories.map(function (row) { return '<option value="' + esc(row.id) + '"' + (String(row.id) === citaCategory ? " selected" : "") + ">" + esc(row.nombre) + "</option>"; }).join("") +
+          "</select></label>" +
+          "</section><section>" + '<h4 class="text-sm font-bold text-slate-800 mb-1">Avisos del calendario</h4>' +
+          checkboxGrid("notifications", [
+            { id: "funcionario_email", label: "Correo al funcionario" },
+            { id: "solicitante_email", label: "Correo al cliente en citas" },
+            { id: "whatsapp_citas", label: "WhatsApp de citas" },
+            { id: "propietario_email", label: "Correo al propietario con el reporte" },
+          ], function (id) { return notifications[id] !== false; }) +
+          "</section><section>" + '<h4 class="text-sm font-bold text-slate-800 mb-1">Cargos que llenan reporte comercial al cerrar</h4>' +
+          intro("Se pide al cerrar visitas, captaciones y demás eventos comerciales de funcionarios con estos cargos.") +
+          checkboxGrid("report_cargo_ids", (settings.cargo_options || []).map(function (row) { return { id: String(row.id), label: row.name, hint: "(" + row.total + ")" }; }), function (id) { return reportCargos.indexOf(id) !== -1; }) +
           "</section><section>" + '<h4 class="text-sm font-bold text-slate-800 mb-1">Cargos de los funcionarios del calendario</h4>' +
           intro("Los funcionarios activos de estos cargos aparecen en Mi calendario, Calendario equipo y al agendar desde una tarea.") +
           checkboxGrid("cargo_ids", cargos, function (id) { return selectedCargos.indexOf(id) !== -1; }) +
@@ -128,9 +145,49 @@
         };
         var available = values("category_ids", false);
         var categories = values("category_ids", true);
-        if (available.length && !categories.length) throw new Error("Selecciona al menos una categoría.");
+        if (!categories.length) throw new Error("Selecciona al menos una categoría.");
         if (!values("cargo_ids", true).length) throw new Error("Selecciona al menos un cargo.");
-        return { category_ids: categories, available_category_ids: available, cargo_ids: values("cargo_ids", true) };
+        var rows = Array.prototype.slice.call(form.querySelectorAll("[data-category-row]")).map(function (row) {
+          return {
+            id: row.getAttribute("data-id") || "",
+            nombre: row.querySelector('[data-field="nombre"]').value,
+            color: row.querySelector('[data-field="color"]').value,
+            comercial: row.querySelector('[name="category_ids"]').checked,
+          };
+        });
+        var existing = function (list) { return list.filter(Boolean); };
+        var notifications = {};
+        form.querySelectorAll('[name="notifications"]').forEach(function (input) { notifications[input.value] = input.checked; });
+        return {
+          category_ids: existing(categories),
+          available_category_ids: existing(available),
+          cargo_ids: values("cargo_ids", true),
+          categories: rows,
+          deleted_category_ids: (form.getAttribute("data-deleted-categories") || "").split(",").filter(Boolean),
+          notifications: notifications,
+          report_cargo_ids: values("report_cargo_ids", true),
+          cita_category_id: form.elements.cita_category_id.value,
+        };
+      },
+      bind: function (popup) {
+        var form = popup.querySelector("[data-config-form]");
+        var body = popup.querySelector("[data-category-rows]");
+        popup.querySelector("[data-category-add]").addEventListener("click", function () {
+          body.insertAdjacentHTML("beforeend", categoryRowHtml({ id: "", color: "#1e3c76", nombre: "", eventos: 0 }, true));
+          var input = body.querySelector("tr:last-child [data-field='nombre']");
+          input.focus();
+          input.scrollIntoView({ block: "nearest" });
+        });
+        body.addEventListener("click", function (event) {
+          var button = event.target.closest("[data-category-remove]");
+          if (!button) return;
+          var row = button.closest("[data-category-row]");
+          var name = row.querySelector('[data-field="nombre"]').value || "esta categoría";
+          if (!window.confirm("¿Eliminar " + name + "? Se aplica al guardar.")) return;
+          var id = row.getAttribute("data-id");
+          if (id) form.setAttribute("data-deleted-categories", [form.getAttribute("data-deleted-categories"), id].filter(Boolean).join(","));
+          row.remove();
+        });
       },
       after: function (settings) {
         document.dispatchEvent(new CustomEvent("scm:calendar-categories-changed", { detail: { category_ids: settings.category_ids || [] } }));

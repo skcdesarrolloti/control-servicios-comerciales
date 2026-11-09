@@ -160,11 +160,10 @@
     var actionAdminDueCase = actions.admin_due_case || "";
     var actionAdminDueSettingsSave = actions.admin_due_settings_save || "";
     var calendarAppUrl = String(
-      (config && config.calendar_app_url) || "https://calendar-skc.netlify.app",
+      (config && config.calendar_app_url) || "",
     ).replace(/\/+$/, "");
     var calendarApiUrl = String(
-      (config && config.calendar_api_url) ||
-        "https://sucasainmobiliaria.com.co/calendario-actividades/index.php?action=",
+      (config && config.calendar_api_url) || "",
     );
 
     function buildCalendarUrl(path) {
@@ -285,8 +284,10 @@
           method: method || (payload ? "POST" : "GET"),
           credentials: "same-origin",
         };
+        // La API del panel exige el nonce; un CALENDAR_API_URL externo no lo acepta en CORS.
+        options.headers = /calendar-api\.php/.test(calendarApiUrl) ? { "X-SCM-Nonce": nonce } : {};
         if (payload) {
-          options.headers = { "Content-Type": "application/json" };
+          options.headers["Content-Type"] = "application/json";
           options.body = JSON.stringify(payload);
         }
         return fetch(calendarApiUrl + encodeURIComponent(action), options).then(function (r) {
@@ -3982,6 +3983,23 @@
 
       function openCompleteEventPopup(eventId, options) {
         options = options || {};
+        // Si el evento exige reporte comercial se cierra con su propio formulario.
+        var reportForm = window.SCMCommercialCalendarForm;
+        if (reportForm && !options.reportChecked) {
+          var continueNormally = function () {
+            options.reportChecked = true;
+            openCompleteEventPopup(eventId, options);
+          };
+          reportForm.prepareReport(eventId).then(function (report) {
+            if (!report || !report.habilitado) {
+              continueNormally();
+              return;
+            }
+            var reportRow = calendarItemById(eventId, "evento") || {};
+            reportForm.openReport({ eventId: eventId, report: report, title: reportRow.titulo || "", returnTo: options.returnTo, onSaved: function () { loadEvents(); } });
+          }).catch(continueNormally);
+          return;
+        }
         if (!window.Swal || typeof window.Swal.fire !== "function") {
           showToast("error", "No esta disponible el popup para marcar eventos.");
           return;
@@ -4236,6 +4254,21 @@
       function openCreateEventPopup(mode, defaults) {
         mode = mode === "multiple" ? "multiple" : "single";
         defaults = defaults || {};
+        // Comercial usa un solo formulario corto (commercial-calendar-form.js).
+        if (window.SCMCommercialCalendarForm) {
+          window.SCMCommercialCalendarForm.open({
+            multiple: mode === "multiple",
+            kind: defaults.kind === "reminder" ? "recordatorio" : (defaults.kind === "cita" ? "cita" : "evento"),
+            date: String(defaults.date || selectedDay || toDateKey(new Date())).slice(0, 10),
+            start: String(defaults.start || "").slice(0, 5),
+            end: String(defaults.end || "").slice(0, 5),
+            title: String(defaults.title || "").trim(),
+            employeeId: selectedEmployeeFromFilter(),
+            lockEmployee: lockCurrentEmployee && mode !== "multiple",
+            onSaved: function () { loadEvents(); },
+          });
+          return;
+        }
         var preselectedEmployee = selectedEmployeeFromFilter();
         var employeeOptions = allowedEmployees.map(function (row) { return employeeOptionHtml(row, preselectedEmployee); }).join("");
         var categoryOptions = calendarAdminCategories().map(function (row) {

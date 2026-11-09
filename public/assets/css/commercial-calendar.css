@@ -699,6 +699,39 @@
   font-size: 12px;
   font-weight: 800;
   line-height: 1.45; }
+/* Formulario único del calendario comercial (commercial-calendar-form.js) */
+.scm-cal-shell { text-align: left; padding: 22px 24px 8px; }
+.scm-cal-head { display: flex; flex-direction: column; gap: 2px; margin-bottom: 14px; }
+.scm-cal-head strong { color: #061d49; font-size: 18px; }
+.scm-cal-head span { color: #64748b; font-size: 13px; }
+.scm-cal-form { display: flex; flex-direction: column; gap: 12px; }
+.scm-cal-form [hidden] { display: none !important; }
+.scm-cal-form .scm-seg-field > span b { color: #dc2626; }
+.scm-cal-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.scm-cal-grid--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.scm-cal-kinds { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; padding: 4px; border-radius: 12px; background: #e2e8f0; }
+.scm-cal-kinds input { position: absolute; opacity: 0; pointer-events: none; }
+.scm-cal-kinds span { display: block; padding: 7px 8px; border-radius: 9px; color: #475569; font-size: 13px; font-weight: 600; text-align: center; cursor: pointer; }
+.scm-cal-kinds input:checked + span { background: #fff; color: #061d49; box-shadow: 0 1px 2px rgba(15, 23, 42, .15); }
+.scm-cal-kinds input:focus-visible + span { outline: 2px solid #1e3c76; }
+.scm-cal-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.scm-cal-chips button, .scm-cal-days span { padding: 3px 10px; border: 1px solid #cbd5e1; border-radius: 999px; background: #fff; color: #334155; font-size: 12px; cursor: pointer; }
+.scm-cal-days input { position: absolute; opacity: 0; }
+.scm-cal-days input:checked + span { border-color: #1e3c76; background: #1e3c76; color: #fff; }
+.scm-cal-task { display: flex; align-items: center; gap: 6px; margin: 0; padding: 7px 10px; border-radius: 10px; background: #ebf1fb; color: #1e3c76; font-size: 13px; font-weight: 600; }
+.scm-cal-task .material-symbols-outlined { font-size: 16px; }
+.scm-cal-hint { display: block; margin-top: 3px; color: #64748b; font-size: 12px; }
+.scm-cal-google { display: flex; align-items: center; gap: 8px; color: #334155; font-size: 13px; cursor: pointer; }
+.scm-cal-more summary, .scm-cal-day summary { color: #1e3c76; font-size: 13px; font-weight: 600; cursor: pointer; }
+.scm-cal-more-body { display: flex; flex-direction: column; gap: 12px; margin-top: 10px; }
+.scm-cal-day { margin-top: 6px; }
+.scm-cal-day ul { margin: 6px 0 0; padding: 0; list-style: none; max-height: 160px; overflow-y: auto; color: #334155; font-size: 12px; }
+.scm-cal-day em { color: #64748b; font-style: normal; }
+.scm-cal-form .scm-cal-only-reminder { display: none; }
+.scm-cal-form.is-reminder .scm-cal-only-reminder { display: flex; }
+.scm-cal-form.is-reminder .scm-cal-only-event, .scm-cal-form.is-reminder .scm-cal-only-repeat, .scm-cal-form.no-repeat .scm-cal-only-repeat { display: none; }
+@media (max-width: 560px) { .scm-cal-grid, .scm-cal-grid--3 { grid-template-columns: minmax(0, 1fr); } .scm-cal-shell { padding: 16px 14px 6px; } }
+
 .swal2-popup.scm-calendar-create-swal { background: #f8fafc !important;
   border: 1px solid rgba(203, 213, 225, 0.92) !important;
   border-radius: 18px !important;

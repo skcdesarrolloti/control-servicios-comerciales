@@ -1487,8 +1487,7 @@
     var runtime = root ? parseRuntime(root) || {} : {};
     var config = runtime.config || {};
     return String(
-      config.calendar_api_url ||
-        "https://sucasainmobiliaria.com.co/calendario-actividades/index.php?action=",
+      config.calendar_api_url || "",
     );
   }
 
@@ -1497,11 +1496,13 @@
       method: payload ? "POST" : "GET",
       credentials: "same-origin",
     };
+    var calendarUrl = calendarApiBase(root);
+    options.headers = /calendar-api\.php/.test(calendarUrl) ? { "X-SCM-Nonce": (parseRuntime(root) || {}).nonce || "" } : {};
     if (payload) {
-      options.headers = { "Content-Type": "application/json" };
+      options.headers["Content-Type"] = "application/json";
       options.body = JSON.stringify(payload);
     }
-    return fetch(calendarApiBase(root) + encodeURIComponent(action), options).then(function (response) {
+    return fetch(calendarUrl + encodeURIComponent(action), options).then(function (response) {
       return response.json();
     });
   }
