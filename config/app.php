@@ -48,6 +48,8 @@ return [
   'calendar_allowed_cargos' => array_values(array_filter(array_map('trim', explode(',', (string) $env('CALENDAR_ALLOWED_CARGOS', '9,10,17'))))),
   // Vacío = la API del propio panel (public/calendar-api.php).
   'calendar_api_url' => $env('CALENDAR_API_URL', ''),
+  // Encender solo cuando control-servicios-inmobiliarios ya ignore las cuentas CCO-: comparten tabla.
+  'commercial_billing_enabled' => $envBool('COMERCIAL_CUENTAS_COBRO_ENABLED', false),
   'google_client_id' => $env('GOOGLE_CLIENT_ID', ''),
   'google_client_secret' => $env('GOOGLE_CLIENT_SECRET', ''),
   'google_redirect_uri' => $env('CALENDARIO_GOOGLE_REDIRECT_URI', ''),

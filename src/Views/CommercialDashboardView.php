@@ -656,6 +656,8 @@ final class CommercialDashboardView
             echo self::renderPropertyUpdatesPage($filters, $ticketEmployees, $filterOptions, $policy);
           } elseif ($bucket === 'avisos') {
             echo self::renderSignsPage($filters, $ticketEmployees, $filterOptions, $policy);
+          } elseif ($bucket === 'reportes_comerciales') {
+            echo self::renderReportsPage((string) ($data['report_sub'] ?? ''), $policy);
           } elseif ($bucket === 'calendario') {
             echo self::renderCalendarPage($runtime['config'] ?? [], $calendarEmployees, $subtab, $policy, $baseUrl);
           } elseif ($bucket === 'inmuebles') {
@@ -710,6 +712,7 @@ final class CommercialDashboardView
   <script src="<?php echo esc_url($baseUrl . '/assets/js/admin-dashboard-runtime.js?v=' . SCM_VERSION); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-dashboard.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-dashboard.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-settings.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-settings.js')); ?>"></script>
+  <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-reports.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-reports.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-calendar-form.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-calendar-form.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-calendar-schedule.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-calendar-schedule.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-notifications.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-notifications.js')); ?>"></script>
@@ -1097,6 +1100,26 @@ final class CommercialDashboardView
                   <span class="block font-semibold text-on-surface"><?php echo esc_html($promoLabel); ?></span>
                   <?php if ($promoHint !== ''): ?><span class="block text-[11px] text-secondary"><?php echo esc_html($promoHint); ?></span><?php endif; ?>
                 </div>
+              </a>
+              <?php endif; ?>
+            <?php endforeach; ?>
+          </div>
+        </div>
+      <?php endif; ?>
+
+      <!-- Dropdown Reportes comerciales: una entrada por subpestaña que el cargo puede abrir -->
+      <?php if (in_array('reportes_comerciales', $views, true)): ?>
+        <div class="relative group/nav" data-commercial-dropdown="reportes_comerciales">
+          <button type="button" class="flex items-center gap-space-xs px-2 xl:px-3 py-space-xs whitespace-nowrap font-label-md text-label-md <?php echo $bucket === 'reportes_comerciales' ? ($activeClasses . ' active') : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-tab="reportes_comerciales" data-commercial-dropdown-trigger="reportes_comerciales" aria-expanded="false">
+            <span class="material-symbols-outlined text-[16px]" aria-hidden="true">receipt_long</span>
+            <span>Reportes</span>
+            <span class="material-symbols-outlined text-[16px] group-hover/nav:rotate-180 transition-transform" aria-hidden="true">expand_more</span>
+          </button>
+          <div class="absolute right-0 top-full hidden group-hover/nav:block bg-surface-container-lowest shadow-[0_12px_32px_rgba(0,0,0,0.14)] rounded-2xl py-space-xs min-w-[240px] z-50 border border-outline-variant/30 text-on-surface" data-commercial-dropdown-menu="reportes_comerciales">
+            <?php foreach (CommercialAccessPolicy::SUBVIEWS['reportes_comerciales'] as $reportKey => $reportLabel): ?>
+              <?php if (!$policy instanceof CommercialAccessPolicy || $policy->canSubview('reportes_comerciales', $reportKey)): ?>
+              <a class="flex items-center gap-2.5 px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="reportes_comerciales" href="<?php echo esc_url(self::url($baseUrl, ['tab' => $reportKey])); ?>">
+                <span class="font-semibold text-on-surface"><?php echo esc_html($reportLabel); ?></span>
               </a>
               <?php endif; ?>
             <?php endforeach; ?>
@@ -3121,6 +3144,27 @@ final class CommercialDashboardView
     return date('d/m/Y', $timestamp);
   }
 
+  /** Cada subpestaña de Reportes comerciales; los datos los carga commercial-reports.js según el permiso de cada endpoint. */
+  public static function renderReportsPage(string $sub, CommercialAccessPolicy $policy): string
+  {
+    $texts = [
+      'mis_reportes' => ['Mis reportes', 'Tus reportes comerciales y tus cuentas de cobro.'],
+      'reportes_consolidado' => ['Consolidado de reportes', 'Reportes de todo el equipo por exportar, pendientes de pago y pagados.'],
+      'cuentas_cobro' => ['Cuentas de cobro', 'Cuentas comerciales creadas por los funcionarios.'],
+    ];
+    if (!isset($texts[$sub]) || !$policy->canSubview('reportes_comerciales', $sub)) {
+      $allowed = array_values(array_intersect(array_keys($texts), $policy->allowedSubviews('reportes_comerciales')));
+      $sub = $allowed[0] ?? '';
+    }
+    if ($sub === '') {
+      return '';
+    }
+    [$title, $description] = $texts[$sub];
+    return '<section class="w-full max-w-[1680px] mx-auto px-4 sm:px-6 pt-5 pb-10 space-y-4 text-slate-800" data-commercial-reports data-sub="' . esc_attr($sub) . '">'
+      . '<header><p class="text-[13px] font-medium text-slate-500">Reportes comerciales</p><h1 class="text-[26px] font-semibold tracking-tight text-slate-900 leading-tight">' . esc_html($title) . '</h1><p class="text-sm text-slate-600">' . esc_html($description) . '</p></header>'
+      . '<div class="space-y-4" data-report-content><p class="text-sm text-slate-500">Cargando...</p></div></section>';
+  }
+
   /**
    * @param array<string,mixed> $config
    * @param array<int,array<string,string>> $employees
@@ -4912,6 +4956,7 @@ final class CommercialDashboardView
 
   /** Acciones de la configuración de accesos, agrupadas por módulo. Toda acción de CommercialAccessPolicy::ACTIONS va en un grupo. */
   private const PERMISSION_ACTION_GROUPS = [
+    'Reportes comerciales' => ['reportes_pagar', 'reportes_editar_valor'],
     'Tareas' => ['ver_ticket', 'responder', 'agregar_nota', 'seguimiento', 'postergar', 'activar', 'cerrar', 'cambiar_estado', 'reasignar'],
     'Notificaciones' => ['enviar_notificacion', 'eliminar_notificacion', 'campanas_enviar', 'campanas_eliminar', 'plantillas_editar'],
     'Precaptación' => ['precaptacion_crear', 'precaptacion_editar', 'precaptacion_ticket', 'precaptacion_catalogos'],

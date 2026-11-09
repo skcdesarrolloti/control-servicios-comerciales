@@ -94,6 +94,8 @@ final class CommercialApiController
       $preapproval = $this->preapprovalService();
       if (!in_array($tool, ['ganancia_ocasional', 'calculadora_mercado', 'calculadora_aseo', 'generador_utm', 'plan_estrategico'], true) && $this->policy->canSubview('herramientas', 'simulador_ingreso_neto')) $preapproval->syncUsury();
       $html = \SCM\Views\CommercialToolsView::render($tool, $preapproval,$this->baseUrl, \SCM\Views\CommercialToolsView::context($tool, $this->policy, $this->db, $this->settings));
+    } elseif ($bucket === 'reportes_comerciales') {
+      $html = CommercialDashboardView::renderReportsPage((string) ($input['reporte_sub'] ?? ''), $this->policy);
     } elseif ($bucket === 'promocion') {
       $html = \SCM\Views\Promotion\PromotionView::page($input, $this->policy, $this->db, $this->settings, $this->baseUrl);
     } elseif ($bucket === 'precaptacion') {

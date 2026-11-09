@@ -22,6 +22,7 @@ final class CommercialAccessPolicy
     'mis_tickets' => 'Mis tareas',
     'actualizaciones' => 'Actualizaciones de inmuebles',
     'avisos' => 'Avisos en fachada',
+    'reportes_comerciales' => 'Reportes comerciales',
     'promocion' => 'Promoción',
     'notificaciones' => 'Notificaciones comerciales',
     'herramientas' => 'Herramientas',
@@ -60,16 +61,18 @@ final class CommercialAccessPolicy
     'campanas_eliminar' => 'Envíos masivos: eliminar envíos terminados o cancelados con su historial (además de enviar)',
     'plantillas_editar' => 'Plantillas de correo: crear, editar, duplicar y archivar',
     'plan_estrategico_editar' => 'Plan estratégico: crear, editar y eliminar objetivos, metas, tareas y campañas',
+    'reportes_pagar' => 'Reportes comerciales: marcar reportes y cuentas de cobro como pagados',
+    'reportes_editar_valor' => 'Reportes comerciales: corregir el valor de reportes sin exportar',
   ];
 
   /** Acciones que un cargo sin configurar no recibe por defecto: hay que marcarlas. */
-  public const OPT_IN_ACTIONS = ['editar_actor', 'mercado_vista_completa', 'aseo_vista_interna', 'promocion_ver_ip', 'plan_estrategico_editar', 'pop_gestionar', 'pop_anular', 'pop_ver_costos', 'redes_ver_inversion', 'redes_sincronizar', 'piezas_gestionar', 'piezas_archivar', 'campanas_enviar', 'campanas_eliminar', 'plantillas_editar'];
+  public const OPT_IN_ACTIONS = ['editar_actor', 'mercado_vista_completa', 'aseo_vista_interna', 'promocion_ver_ip', 'plan_estrategico_editar', 'pop_gestionar', 'pop_anular', 'pop_ver_costos', 'redes_ver_inversion', 'redes_sincronizar', 'piezas_gestionar', 'piezas_archivar', 'campanas_enviar', 'campanas_eliminar', 'plantillas_editar', 'reportes_pagar', 'reportes_editar_valor'];
 
   /**
    * Vistas que un cargo sin configurar no recibe por defecto: hay que marcarlas en Permisos. Los cargos con acceso total
    * administrativo las ven siempre.
    */
-  public const OPT_IN_VIEWS = ['promocion'];
+  public const OPT_IN_VIEWS = ['promocion', 'reportes_comerciales'];
 
   public const SUBVIEWS = [
     'inmuebles' => [
@@ -92,6 +95,11 @@ final class CommercialAccessPolicy
       'calculadora_aseo' => 'Calculadora de aseo',
       'generador_utm' => 'Generador UTM',
       'plan_estrategico' => 'Plan estratégico',
+    ],
+    'reportes_comerciales' => [
+      'mis_reportes' => 'Mis reportes',
+      'reportes_consolidado' => 'Consolidado de reportes',
+      'cuentas_cobro' => 'Cuentas de cobro',
     ],
     // Promoción (traída por fases de dashboard-marketing): cada subpestaña se agrega cuando ya funciona.
     'promocion' => [
@@ -117,12 +125,13 @@ final class CommercialAccessPolicy
     'herramientas' => 'herramienta',
     'promocion' => 'promocion_sub',
     'notificaciones' => 'notif_sub',
+    'reportes_comerciales' => 'reporte_sub',
   ];
 
   /** Grupos del menú del encabezado, en el mismo orden, para la configuración de accesos. */
   public const VIEW_GROUPS = [
     'General' => ['inicio', 'calendario'],
-    'Actividades comerciales' => ['precaptacion', 'anadir_aviso', 'actualizaciones', 'avisos', 'abiertos', 'mis_tickets', 'postergados', 'cerrados'],
+    'Actividades comerciales' => ['precaptacion', 'anadir_aviso', 'actualizaciones', 'avisos', 'abiertos', 'mis_tickets', 'postergados', 'cerrados', 'reportes_comerciales'],
     'Inventario' => ['inmuebles'],
     'Promoción' => ['promocion'],
     'Comunicación y herramientas' => ['notificaciones', 'herramientas'],
@@ -149,6 +158,9 @@ final class CommercialAccessPolicy
   public const SCOPES = [
     'calendario.mine' => 'Su agenda',
     'calendario.team' => 'Agenda del equipo',
+    'reportes_comerciales.mis_reportes' => 'Solo sus reportes',
+    'reportes_comerciales.reportes_consolidado' => 'Reportes de todo el equipo',
+    'reportes_comerciales.cuentas_cobro' => 'Cuentas de todo el equipo',
     'anadir_aviso' => 'Formulario de registro',
     'mis_tickets' => 'Siempre sus tareas, también para administradores',
     'inmuebles.publicos' => 'Todo el inventario',

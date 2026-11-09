@@ -465,6 +465,7 @@
     if (["simulador_ingreso_neto", "ganancia_ocasional", "calculadora_mercado", "calculadora_aseo", "generador_utm", "plan_estrategico"].indexOf(tab) >= 0) return "herramientas";
     if (["analitica_web", "actividad_portales", "material_pop", "redes_sociales", "banco_piezas"].indexOf(tab) >= 0) return "promocion";
     if (["enviar_notificaciones", "campanas", "plantillas_correo"].indexOf(tab) >= 0) return "notificaciones";
+    if (["mis_reportes", "reportes_consolidado", "cuentas_cobro"].indexOf(tab) >= 0) return "reportes_comerciales";
     // Tareas, precaptación, avisos y actualizaciones van dentro del menú Actividades comerciales.
     return ["abiertos", "postergados", "cerrados", "mis_tickets", "precaptacion", "anadir_aviso", "actualizaciones", "avisos"].indexOf(tab) >= 0 ? "comerciales" : tab;
   }

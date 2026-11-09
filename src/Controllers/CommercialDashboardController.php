@@ -70,7 +70,7 @@ final class CommercialDashboardController
     }
     $navigation = $repository->scopedNavigation($bucket, $filters, $currentEmployeeFilter, $policy);
     $tabCounts = $navigation['tabs'];
-    $result = in_array($bucket, ['actualizaciones', 'avisos', 'calendario', 'inmuebles', 'notificaciones', 'precaptacion', 'anadir_aviso', 'herramientas', 'promocion'], true) ? ['rows' => [], 'counts' => $repository->statusCounts($filters), 'pagination' => []] : $repository->search($bucket === 'inicio' ? 'abiertos' : $bucket, $filters);
+    $result = in_array($bucket, ['actualizaciones', 'avisos', 'calendario', 'inmuebles', 'notificaciones', 'precaptacion', 'anadir_aviso', 'herramientas', 'promocion', 'reportes_comerciales'], true) ? ['rows' => [], 'counts' => $repository->statusCounts($filters), 'pagination' => []] : $repository->search($bucket === 'inicio' ? 'abiertos' : $bucket, $filters);
     $homeDashboard = $repository->homeDashboard($navigation['home'], $policy);
     $canSeeAll = $policy->canSeeAll('inmuebles');
     $propertiesRepository = new CommercialPropertiesRepository($this->db);
@@ -115,6 +115,7 @@ final class CommercialDashboardController
       'campaigns_html' => $bucket === 'notificaciones' ? \SCM\Views\Campaigns\CampaignsView::page((string) ($input['notif_sub'] ?? ''), $input, $policy, $this->db, $this->settings, (string) SCM_BASE_URL) : '',
       'sign_service' => $bucket === 'anadir_aviso' ? new \SCM\Commercial\CommercialSignService($this->db, $policy, $this->config) : null,
       'tools_service' => $bucket === 'herramientas' ? new \SCM\Commercial\CommercialOwnerPreapprovalService($this->db, $policy) : null,
+      'report_sub' => $bucket === 'reportes_comerciales' ? (string) ($input['reporte_sub'] ?? '') : '',
       'tools_view' => $bucket === 'herramientas' ? (string) ($input['herramienta'] ?? '') : '',
       'tools_context' => $bucket === 'herramientas' ? \SCM\Views\CommercialToolsView::context((string) ($input['herramienta'] ?? ''), $policy, $this->db, $this->settings) : [],
       'promotion_html' => $bucket === 'promocion' ? \SCM\Views\Promotion\PromotionView::page($input, $policy, $this->db, $this->settings, (string) SCM_BASE_URL, null, null, false) : '',
