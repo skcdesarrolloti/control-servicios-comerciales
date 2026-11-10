@@ -237,6 +237,10 @@ Get-ChildItem -Recurse -Filter *.php | ForEach-Object { php -l $_.FullName }
 
 El menú **Actividades comerciales → Llamadas** reemplaza los formularios "Añadir/Actualizar control de llamada" y "Crear ticket comercial con llamadas", sobre las mismas tablas (`jet_cct_cct_llamadas`, `jet_cct_tickets`). Cada llamada es una solicitud con su propio medio: al editar solo se corrigen los datos personales del contacto, y lo demás no se lee de la petición (solo se puede completar un medio vacío en llamadas antiguas). Código y presupuesto aplican a Arriendo, Venta y Arriendo o venta; el precio, a Captación y Recaptación. Si la persona vuelve por otro medio se usa **Nueva solicitud**, y el historial del contacto agrupa sus solicitudes por celular. Con medio Club PPH se pide la tarjeta del aliado; aliado y tarjeta quedan en la llamada y en la tarea, con `bandera` = No. Una llamada que merece tarea abre el formulario de la tarea en el mismo popup, y la tarea hereda el medio. Los correos se configuran en **Configuración › Llamadas** y salen por shared-notifications. Prueba de navegador: `tests/Fixtures/commercial-calls.php` en 127.0.0.1:8774 y `node tools/check-commercial-calls.cjs RUTA_A_NODE_MODULES`.
 
+### Conversación con el cliente y avisos
+
+`public/tarea.php` es la vista pública de una tarea: el cliente entra con un enlace firmado de 90 días (`PublicTaskAccess`), ve su conversación y escribe. Solo lee la tabla `scm_tarea_mensajes`, así que nunca muestra notas, seguimientos ni el resumen interno. Su mensaje llega al responsable y a las copias de **Configuración › Notificaciones internas**, y aparece en el historial de la tarea. Las plantillas de WhatsApp están en `docs/plantillas-whatsapp-tareas-comerciales.md` y se encienden en **Configuración › Llamadas**.
+
 ## Actividades comerciales: Precaptación
 
 El menú **Actividades comerciales → Precaptación** integra el panel suministrado en

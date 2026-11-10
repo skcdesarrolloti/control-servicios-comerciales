@@ -11,6 +11,7 @@ require __DIR__ . '/CommercialCallsDatabase.php';
 define('SCM_BASE_URL', 'http://127.0.0.1:8774/public');
 define('SCM_VERSION', 'test');
 define('SCM_PUBLIC_PATH', dirname(__DIR__, 2) . '/public');
+define('SCM_APP_SECRET', str_repeat('x', 40));
 
 session_start();
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'GET') {
@@ -26,6 +27,17 @@ $_SESSION['scm_csrf']['commercial_nonce'] = 'fixture';
 SCM\Core\App::init($db, new SCM\Core\Auth($db), $csrf, $settings);
 $config = ['dashboard_admin_cargos' => ['13'], 'commercial_employee_cargos' => ['9', '13']];
 
+if (isset($_GET['enlace_tarea'])) {
+  echo SCM\Support\PublicTaskAccess::reference((int) $_GET['enlace_tarea']);
+  exit;
+}
+if (isset($_GET['t'])) {
+  // Vista pública real (public/tarea.php) sobre la base de prueba.
+  session_write_close();
+  $limiter = new SCM\Support\FileRateLimiter(sys_get_temp_dir() . '/scm-calls-limits-' . getmypid());
+  (new SCM\Http\Controller\PublicTaskPageController($db, $settings, $limiter, 'http://127.0.0.1:8774/tests/Fixtures/commercial-calls.php'))->handle($_GET, $_POST, (string) $_SERVER['REQUEST_METHOD'], '127.0.0.1');
+  exit;
+}
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   session_write_close();
   $calls = static fn(): SCM\Http\Controller\CommercialCallsApiController => new SCM\Http\Controller\CommercialCallsApiController($db, $settings, $csrf, $config);

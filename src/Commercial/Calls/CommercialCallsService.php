@@ -518,7 +518,7 @@ final class CommercialCallsService
   private function notify(int $taskId, array $task): void
   {
     try {
-      $notifier = $this->notifier ?? new CommercialCallsNotifier($this->db, $this->settings, $this->config);
+      $notifier = $this->notifier ?? new CommercialCallsNotifier($this->db, $this->settings);
       $notifier->taskCreated($taskId, $task, $this->repository->branch((string) ($task['sucursal'] ?? '')) ?? []);
     } catch (\Throwable $exception) {
       error_log('[llamadas:notificacion] ' . $exception->getMessage());

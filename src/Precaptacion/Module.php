@@ -51,6 +51,17 @@ final class Module
     return self::db()->getRow('SELECT * FROM `' . self::db()->table('jet_cct_funcionarios') . '` WHERE id_empleado = ? LIMIT 1', [$id]) ?? [];
   }
 
+  /**
+   * Correos de Notificaciones internas para ese evento; mientras no se marque a nadie se usan los de siempre.
+   * @param array<int,string> $fallback
+   * @return array<int,string>
+   */
+  public static function internalEmails(string $event, array $fallback): array
+  {
+    if (!self::$settings instanceof Settings) return $fallback;
+    return (new \SCM\Commercial\CommercialInternalNotifications(self::db(), self::$settings))->emails($event) ?: $fallback;
+  }
+
   public static function deferEmail(array $recipients, string $subject, string $html, array $headers = []): void
   {
     self::$emails[] = [$recipients, $subject, $html, $headers];
@@ -232,6 +243,6 @@ final class Module
     $html = str_replace($old, esc_url(rtrim(SCM_BASE_URL, '/') . '/?tab=precaptacion'), $html);
     $recipients = preg_split('/[,;]/', (string) $config['custom_email']);
     if (!empty($config['cc_email'])) $recipients = array_merge($recipients, preg_split('/[,;]/', (string) $config['cc_email']));
-    self::deferEmail($recipients, $replace((string) $config['subject']), $html);
+    self::deferEmail(self::internalEmails('precaptacion_creada', $recipients), $replace((string) $config['subject']), $html);
   }
 }

@@ -7,6 +7,11 @@ namespace Tests\Unit;
 use PHPUnit\Framework\TestCase;
 use SCM\Commercial\Calls\CommercialCallsNotifier;
 use SCM\Commercial\Calls\CommercialCallsService;
+use SCM\Commercial\Calls\PublicTaskConversation;
+use SCM\Commercial\CommercialInternalNotifications;
+use SCM\Commercial\CommercialStatusCatalog;
+use SCM\Support\PublicTaskAccess;
+use SCM\Views\PublicTaskView;
 use SCM\Commercial\CommercialAccessPolicy;
 use SCM\Core\Database;
 use SCM\Core\Settings;
@@ -24,6 +29,8 @@ final class CommercialCallsTest extends TestCase
     $this->previousSession = $_SESSION ?? [];
     require_once dirname(__DIR__, 2) . '/src/Core/Helpers.php';
     require_once dirname(__DIR__) . '/Fixtures/CommercialCallsDatabase.php';
+    if (!defined('SCM_APP_SECRET')) define('SCM_APP_SECRET', 'secreto-de-prueba-de-al-menos-32-caracteres');
+    if (!defined('SCM_BASE_URL')) define('SCM_BASE_URL', 'https://panel.test/public');
     $this->db = CommercialCallsDatabase::create();
     $this->login('101', '9');
   }
@@ -40,7 +47,7 @@ final class CommercialCallsTest extends TestCase
 
   private function service(?CommercialCallsNotifier $notifier = null): CommercialCallsService
   {
-    return new CommercialCallsService($this->db, new Settings($this->db), CommercialCallsDatabase::policy($this->db), [], $notifier ?? new CommercialCallsNotifier($this->db, new Settings($this->db), [], static function (): void {}));
+    return new CommercialCallsService($this->db, new Settings($this->db), CommercialCallsDatabase::policy($this->db), [], $notifier ?? new CommercialCallsNotifier($this->db, new Settings($this->db), static function (): void {}));
   }
 
   private function row(int $id): array
@@ -355,14 +362,157 @@ final class CommercialCallsTest extends TestCase
     self::assertStringContainsString('data-ccl-new', $html);
   }
 
+  /** @return array{0:CommercialCallsNotifier,1:object} */
+  private function recorder(array $settings = []): array
+  {
+    $log = new \stdClass();
+    $log->mail = [];
+    $log->whatsapp = [];
+    if ($settings !== []) {
+      (new Settings($this->db))->set(CommercialCallsNotifier::SETTING, $settings, 1);
+    }
+    $notifier = new CommercialCallsNotifier($this->db, new Settings($this->db),
+      static function ($to, string $subject, string $html) use ($log): void { $log->mail[] = [$to, $subject, $html]; },
+      static function (string $phone, string $template, array $components) use ($log): void { $log->whatsapp[] = [$phone, $template, $components]; });
+    return [$notifier, $log];
+  }
+
+  private function taskFromCall(?CommercialCallsNotifier $notifier = null): int
+  {
+    return $this->service($notifier)->createTask($this->taskInput($this->create()))['id'];
+  }
+
+  private function setInternal(string $event, array $ids): void
+  {
+    $internal = new CommercialInternalNotifications($this->db, new Settings($this->db));
+    $internal->save([$event => $ids]);
+  }
+
+  public function testWhatsappStaysOffUntilEnabledAndClientGetsSignedLink(): void
+  {
+    [$notifier, $log] = $this->recorder();
+    $this->taskFromCall($notifier);
+    self::assertSame([], $log->whatsapp, 'Sin plantillas aprobadas no debe salir WhatsApp.');
+    $client = array_values(array_filter($log->mail, static fn(array $mail): bool => $mail[0] === 'laura@example.test'))[0];
+    self::assertStringContainsString('tarea.php?t=', $client[2]);
+
+    [$notifier, $log] = $this->recorder(['whatsapp_asignado' => true, 'whatsapp_solicitante' => true]);
+    $id = $this->service($notifier)->createTask($this->taskInput($this->create(['celular' => '3005551212']), ['celular_solicitante' => '3005551212']))['id'];
+    self::assertSame(['+573000000101', '+573005551212'], [$this->phoneOf($log->whatsapp[0]), $this->phoneOf($log->whatsapp[1])]);
+    self::assertSame('scm_tarea_comercial_asignada_v1', $log->whatsapp[0][1]);
+    self::assertSame('scm_tarea_comercial_registrada_v1', $log->whatsapp[1][1]);
+    self::assertSame($id, PublicTaskAccess::verify($log->whatsapp[1][2][1]['parameters'][0]['text']));
+  }
+
+  private function phoneOf(array $whatsapp): string
+  {
+    return $whatsapp[0];
+  }
+
+  public function testClientBlockedChannelsAreRespected(): void
+  {
+    $this->db->insert('wp_jet_cct_clientes', ['nombre' => 'Laura', 'celular' => '3001234567', 'bloqueo_whatsapp' => '1', 'bloqueo_email' => '1']);
+    [$notifier, $log] = $this->recorder(['whatsapp_solicitante' => true]);
+    $this->taskFromCall($notifier);
+    self::assertSame([], $log->whatsapp);
+    self::assertSame([], array_values(array_filter($log->mail, static fn(array $mail): bool => $mail[0] === 'laura@example.test')));
+  }
+
+  public function testPublicLinkRejectsTamperingAndExpiry(): void
+  {
+    $reference = PublicTaskAccess::reference(7);
+    self::assertSame(7, PublicTaskAccess::verify($reference));
+    self::assertSame(0, PublicTaskAccess::verify('8' . substr($reference, 1)));
+    self::assertSame(0, PublicTaskAccess::verify(PublicTaskAccess::reference(7, time() - 10)));
+    self::assertSame(0, PublicTaskAccess::verify('7'));
+  }
+
+  public function testClientReplyReachesAssigneeCopiesAndTaskHistory(): void
+  {
+    [$notifier, $log] = $this->recorder(['whatsapp_asignado' => true]);
+    $id = $this->taskFromCall($notifier);
+    $this->setInternal('llamada_respuesta_cliente', ['303', '101']);
+    $log->mail = [];
+    $log->whatsapp = [];
+    [$notifier, $log] = $this->recorder();
+    $conversation = new PublicTaskConversation($this->db, $notifier);
+    $conversation->clientReply($id, "Quisiera <b>visitar</b>\r\nel sábado");
+    self::assertSame(['101@example.test', '303@example.test'], $log->mail[0][0], 'Responsable y copia, sin repetir al responsable.');
+    self::assertStringContainsString('visitar', $log->mail[0][2]);
+    $history = $this->db->getRow('SELECT * FROM wp_jet_cct_historial_del_ticket WHERE id_ticket = ?', [$id]);
+    self::assertSame('cliente', $history['id_empleado']);
+    self::assertSame("Quisiera visitar\nel sábado", $history['respuesta']);
+    $conversation->clientReply($id, "Quisiera <b>visitar</b>\r\nel sábado");
+    self::assertCount(1, $conversation->messages($id), 'Un doble envío no se repite.');
+    self::assertCount(1, $log->mail);
+  }
+
+  public function testClientCannotReplyToClosedOrEmpty(): void
+  {
+    [$notifier] = $this->recorder();
+    $id = $this->taskFromCall($notifier);
+    $conversation = new PublicTaskConversation($this->db, $notifier);
+    foreach (['   ', str_repeat('a', 2001)] as $bad) {
+      try {
+        $conversation->clientReply($id, $bad);
+        self::fail('Debía rechazar el mensaje.');
+      } catch (\InvalidArgumentException) {
+        self::assertSame([], $conversation->messages($id));
+      }
+    }
+    $closed = CommercialStatusCatalog::statusesForBucket('cerrados')[0];
+    $this->db->update('wp_jet_cct_tickets', ['estado_comercial' => $closed], ['_ID' => $id]);
+    $this->expectException(\InvalidArgumentException::class);
+    $conversation->clientReply($id, 'Hola');
+  }
+
+  public function testPublicViewShowsOnlySharedConversationEscaped(): void
+  {
+    [$notifier, $log] = $this->recorder(['whatsapp_solicitante' => true]);
+    $id = $this->taskFromCall($notifier);
+    $conversation = new PublicTaskConversation($this->db, $notifier);
+    $this->db->update('wp_jet_cct_tickets', ['descripcion' => 'Dato interno reservado'], ['_ID' => $id]);
+    $log->whatsapp = [];
+    $conversation->officerReply($id, 'Te espero <script>alert(1)</script> el lunes', 'Consultora Uno', '101');
+    self::assertSame('scm_tarea_comercial_respuesta_funcionario_v1', $log->whatsapp[0][1]);
+    $html = PublicTaskView::render($conversation->task($id), $conversation->messages($id), 'tarea.php?t=x', 'a.css', 'logo.png');
+    self::assertStringContainsString('Te espero', $html);
+    self::assertStringNotContainsString('<script>', $html);
+    self::assertStringNotContainsString('Dato interno reservado', $html);
+    self::assertStringContainsString('name="mensaje"', $html);
+    $this->db->update('wp_jet_cct_tickets', ['estado_comercial' => CommercialStatusCatalog::statusesForBucket('cerrados')[0]], ['_ID' => $id]);
+    self::assertStringNotContainsString('name="mensaje"', PublicTaskView::render($conversation->task($id), [], 'x', 'a.css', 'logo.png'));
+  }
+
+  public function testInternalNotificationsKeepOnlyKnownEventsAndActiveStaff(): void
+  {
+    $this->db->update('wp_jet_cct_funcionarios', ['activo' => 'No'], ['id_empleado' => '202']);
+    $internal = new CommercialInternalNotifications($this->db, new Settings($this->db));
+    $internal->save(['llamada_tarea_creada' => ['303', '202', '303', 'x'], 'evento_inventado' => ['101']]);
+    self::assertSame(['llamada_tarea_creada' => ['303', '202']], $internal->settings());
+    self::assertSame(['303@example.test'], $internal->emails('llamada_tarea_creada'), 'Un funcionario inactivo no recibe.');
+    self::assertSame([], $internal->emails('precaptacion_creada'));
+  }
+
+  public function testTemplateSettingsAreValidated(): void
+  {
+    $this->expectException(\InvalidArgumentException::class);
+    CommercialCallsNotifier::validated(['plantilla_asignada' => 'Plantilla Mala'], []);
+  }
+
   public function testNotifierUsesConfiguredRecipients(): void
   {
     $sent = [];
     $queue = static function ($to, string $subject) use (&$sent): void { $sent[] = [$to, $subject]; };
     (new Settings($this->db))->set(CommercialCallsNotifier::SETTING, ['asignado' => true, 'solicitante' => false, 'administradores' => true, 'admin_emails' => ['jefe@example.test']], 1);
     $id = $this->create();
-    $this->service(new CommercialCallsNotifier($this->db, new Settings($this->db), [], $queue))->createTask($this->taskInput($id));
-    self::assertSame(['101@example.test', ['jefe@example.test']], array_column($sent, 0));
+    $this->service(new CommercialCallsNotifier($this->db, new Settings($this->db), $queue))->createTask($this->taskInput($id));
+    self::assertSame(['101@example.test', ['jefe@example.test']], array_column($sent, 0), 'La lista anterior sigue activa hasta marcar funcionarios.');
+    $this->setInternal('llamada_tarea_creada', ['303']);
+    $sent = [];
+    $id = $this->create(['celular' => '3001010101', 'tema_ayuda' => 'Venta']);
+    $this->service(new CommercialCallsNotifier($this->db, new Settings($this->db), $queue))->createTask($this->taskInput($id, ['tema_ayuda' => 'Venta']));
+    self::assertSame(['303@example.test'], $sent[1][0]);
     self::assertStringNotContainsString('ticket', strtolower($sent[0][1]));
   }
 }

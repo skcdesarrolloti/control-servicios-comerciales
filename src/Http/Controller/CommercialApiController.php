@@ -500,16 +500,28 @@ final class CommercialApiController
     if ($message === '') {
       JsonResponse::error('La respuesta no puede estar vacía.', 422);
     }
+    // El aviso al cliente lo envía la conversación pública, con su enlace para responder.
+    $notifyClient = $this->notifyTargets($input) !== [];
     $result = $this->workflow->saveTicketResponse(
       $ticketPk,
       $message,
       '__keep__',
       false,
-      $this->notifyTargets($input),
+      [],
       $this->uploadedImages('evidencia'),
       $this->uploadedDocuments()
     );
     $this->ensureWorkflowSucceeded($result);
+    if ($notifyClient) {
+      try {
+        $conversation = new \SCM\Commercial\Calls\PublicTaskConversation($this->db, new \SCM\Commercial\Calls\CommercialCallsNotifier($this->db, $this->settings));
+        $conversation->officerReply($ticketPk, wp_strip_all_tags($message, true), \SCM\Core\Auth::user(), \SCM\Core\Auth::employeeId());
+        $result['message'] = 'Respuesta guardada. Se avisó al cliente.';
+      } catch (\Throwable $exception) {
+        error_log('[llamadas:respuesta] ' . $exception->getMessage());
+        $result['message'] = 'Respuesta guardada, pero no se pudo avisar al cliente.';
+      }
+    }
 
     $newStatus = trim((string) ($input['estado'] ?? ''));
     if ($newStatus !== '' && $newStatus !== '__keep__') {

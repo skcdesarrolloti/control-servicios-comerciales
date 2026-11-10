@@ -22,9 +22,10 @@ final class CommercialCallsDatabase
     'jet_cct_sucursales' => ['nombre', 'gerente_comercial', 'celular_ge_comercial'],
     'jet_cct_paises' => ['pais', 'codigo'],
     'jet_cct_club_pph' => ['nombre', 'tarjeta_bienvenida', 'activo', 'total_puntos'],
-    'jet_cct_clientes' => ['nombre', 'celular', 'correo', 'indicativo', 'tipo_cliente', 'id_cliente'],
+    'jet_cct_clientes' => ['nombre', 'celular', 'correo', 'indicativo', 'tipo_cliente', 'id_cliente', 'bloqueo_email', 'bloqueo_whatsapp'],
     'jet_cct_cct_llamadas' => ['id_ticket', 'id_inmueble', 'id_empleado', 'sucursal', 'merece_ticket', 'cliente', 'celular', 'email', 'tipo_inmueble', 'medio', 'presupuesto', 'destinacion', 'uso', 'factores_importantes', 'precio', 'tema_ayuda', 'observacion', 'descripcion', 'id_pph', 'tarjeta_pph', 'nombre_pph', 'celular_wsp', 'id_cliente', 'indicativo', 'cliente_inmediato', 'mes_inmueble', 'comisionista', 'usuario_wsp'],
     'jet_cct_tickets' => ['id_creador', 'id_cliente', 'id_inmueble', 'nombre_empleado', 'correo_empleado', 'celular_empleado', 'asunto', 'descripcion', 'empleado', 'prioridad', 'tema_ayuda', 'departamento', 'estado', 'estado_comercial', 'medio', 'tipo_inmueble', 'destinacion', 'uso', 'factores', 'presupuesto', 'precio', 'solicitante', 'correo_solicitante', 'celular_solicitante', 'sucursal', 'id_empleado', 'id_llamada', 'id_solicitante', 'tuvo_seguimiento', 'tuvo_reporte', 'id_pph', 'tarjeta_pph', 'nombre_pph', 'bandera', 'celular_wsp', 'indicativo', 'creador_por', 'usuario_wsp'],
+    'jet_cct_historial_del_ticket' => ['id_ticket', 'nombre', 'correo', 'celular', 'respuesta', 'id_empleado', 'fue_editada', 'imagen', 'archivos'],
     'jet_cct_historial_del_inmueble' => ['reporte_realizado_por_his', 'fecha_his', 'id_del_inmueble_his', 'observacion_his', 'id_inmueble', 'funcionario', 'observacion', 'id_empleado', 'id_ticket', 'tipo_de_reporte_his', 'tipo_reporte'],
   ];
 
@@ -42,7 +43,7 @@ final class CommercialCallsDatabase
       return $db;
     }
     foreach ([[101, 'Consultora Uno', '9'], [202, 'Consultor Dos', '9'], [303, 'Coordinación', '13'], [404, 'Supervisión', '6']] as [$id, $name, $cargo]) {
-      $db->insert('wp_jet_cct_funcionarios', ['_ID' => $id, 'id_empleado' => (string) $id, 'nombre' => $name, 'correo' => $id . '@example.test', 'celular' => '300000' . $id, 'activo' => 'Si', 'id_cargo' => $cargo, 'id_sucursal' => '1']);
+      $db->insert('wp_jet_cct_funcionarios', ['_ID' => $id, 'id_empleado' => (string) $id, 'nombre' => $name, 'correo' => $id . '@example.test', 'celular' => '3000000' . $id, 'activo' => 'Si', 'id_cargo' => $cargo, 'id_sucursal' => '1']);
     }
     $db->insert('wp_jet_cct_sucursales', ['_ID' => 1, 'nombre' => 'Principal', 'gerente_comercial' => 'Gerencia Comercial', 'celular_ge_comercial' => '3009999999']);
     $db->insert('wp_jet_cct_cargos', ['_ID' => 9, 'nombre_cargo' => 'Consultor']);

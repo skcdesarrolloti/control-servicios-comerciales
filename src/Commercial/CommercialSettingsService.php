@@ -57,7 +57,7 @@ final class CommercialSettingsService
     'factor_prestacional' => ['Factor prestacional', 0, 0, 100],
   ];
 
-  public const SECTIONS = ['calendario', 'reportes', 'llamadas', 'tiempos', 'avisos', 'actualizaciones', 'destacados', 'aseo', 'utm', 'medios', 'analitica', 'plan', 'material_pop', 'banner_revista'];
+  public const SECTIONS = ['notificaciones_internas', 'calendario', 'reportes', 'llamadas', 'tiempos', 'avisos', 'actualizaciones', 'destacados', 'aseo', 'utm', 'medios', 'analitica', 'plan', 'material_pop', 'banner_revista'];
 
   /** Operaciones de la sección "medios" (todas guardan, salvo preview, que solo cuenta). */
   public const MEDIOS_OPS = ['add', 'rename', 'toggle', 'merge', 'aliases', 'alias_raw', 'rewrite_raw', 'preview'];
@@ -121,6 +121,7 @@ final class CommercialSettingsService
       ],
       'reportes' => CommercialReportsService::settings($this->settings),
       'llamadas' => CommercialCallsNotifier::settings($this->settings),
+      'notificaciones_internas' => $section === 'notificaciones_internas' ? $this->internalNotifications() : [],
       'tiempos' => ['topics' => $topics],
       'avisos' => ['values' => $signs],
       'actualizaciones' => ['limits' => self::propertyUpdateLimits($this->settings)],
@@ -288,6 +289,9 @@ final class CommercialSettingsService
         return 'Configuración de reportes comerciales guardada.';
       case 'llamadas':
         return $this->saveCallNotifications($data);
+      case 'notificaciones_internas':
+        (new CommercialInternalNotifications($this->db, $this->settings))->save((array) ($data['events'] ?? []));
+        return 'Notificaciones internas guardadas.';
       case 'tiempos':
         return $this->saveSla($data);
       case 'avisos':
@@ -596,21 +600,16 @@ final class CommercialSettingsService
   /** @param array<string,mixed> $data */
   private function saveCallNotifications(array $data): string
   {
-    $emails = [];
-    foreach (preg_split('/[\s,;]+/', trim((string) ($data['admin_emails'] ?? ''))) ?: [] as $email) {
-      if ($email === '') {
-        continue;
-      }
-      if (filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
-        throw new \InvalidArgumentException('"' . $email . '" no es un correo válido.');
-      }
-      $emails[strtolower($email)] = $email;
-    }
-    $this->settings->set(CommercialCallsNotifier::SETTING, [
-      'asignado' => !empty($data['asignado']), 'solicitante' => !empty($data['solicitante']), 'administradores' => !empty($data['administradores']), 'admin_emails' => array_values($emails),
-    ], Auth::userId());
+    $this->settings->set(CommercialCallsNotifier::SETTING, CommercialCallsNotifier::validated($data, CommercialCallsNotifier::settings($this->settings)), Auth::userId());
     $this->settings->refresh();
     return 'Configuración de llamadas guardada.';
+  }
+
+  /** @return array{catalog:array<string,mixed>,employees:list<array<string,string>>,events:array<string,list<string>>} */
+  private function internalNotifications(): array
+  {
+    $internal = new CommercialInternalNotifications($this->db, $this->settings);
+    return ['catalog' => CommercialInternalNotifications::CATALOG, 'employees' => $internal->employees(), 'events' => $internal->settings()];
   }
 
   private function savePropertyUpdates(array $data): string

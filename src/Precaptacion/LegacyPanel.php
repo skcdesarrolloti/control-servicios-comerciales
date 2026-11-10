@@ -2542,7 +2542,7 @@ final class LegacyPanel
             );
         }
 
-        foreach (['sucasacorreos@gmail.com', 'gcorrearivera@gmail.com', 'sucasacomercial@gmail.com'] as $email) {
+        foreach (Module::internalEmails('precaptacion_tarea_creada', ['sucasacorreos@gmail.com', 'gcorrearivera@gmail.com', 'sucasacomercial@gmail.com']) as $email) {
             wp_mail(
                 $email,
                 self::ticket_email_replace('Tarea comercial #%inserted_cct_tickets% creada', $context),

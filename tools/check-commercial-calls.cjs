@@ -157,6 +157,24 @@ async function fillCall(modal, values) {
     await page.keyboard.press('Escape');
     await modal.waitFor({ state: 'hidden' });
 
+    // Vista pública: el cliente entra con su enlace firmado, escribe y no ve lo interno.
+    const reference = await (await context.request.get(endpoint + '?enlace_tarea=1')).text();
+    const client = await context.newPage();
+    await client.setViewportSize({ width: 390, height: 844 });
+    await client.goto(endpoint + '?t=' + reference);
+    assert.ok((await client.locator('h1').innerText()).includes('#1'));
+    assert.ok(!(await client.locator('body').innerText()).includes('Quiere arrendar en enero'), 'El resumen interno no se muestra al cliente');
+    await client.locator('#ptk-message').fill('Quisiera visitar el apartamento el sábado');
+    await client.locator('.ptk-form button').click();
+    await client.locator('.ptk-ok').waitFor();
+    assert.ok((await client.locator('.ptk-thread').innerText()).includes('Quisiera visitar'));
+    assert.equal(await client.evaluate(() => document.documentElement.scrollWidth > window.innerWidth), false, 'Desbordamiento de la vista pública');
+    await client.screenshot({ path: 'output/calls-public-mobile.png', fullPage: true });
+    const forged = await client.goto(endpoint + '?t=1.1893456000.' + 'a'.repeat(64));
+    assert.equal(forged.status(), 403, 'Un enlace alterado no debe abrir');
+    assert.ok((await client.locator('.ptk-alert').innerText()).includes('no es válido'));
+    await client.close();
+
     // El consultor 202 no ve llamadas ajenas, y la API tampoco se las entrega.
     const other = await context.newPage();
     await other.goto(endpoint + '?as=202');

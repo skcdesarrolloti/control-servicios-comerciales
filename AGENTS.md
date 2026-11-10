@@ -16,6 +16,7 @@
 - Cada subpestaña de Inmuebles es su propia vista (`propertyViews`): título, descripción y filtros propios, sin tarjetas ni pestañas globales. Se navega desde el menú Inmuebles, que muestra el conteo de cada vista (`menuCounts`), y el móvil lista las mismas entradas.
 - Las cuentas de cobro comerciales comparten `wp_jet_cct_cuentas_cobro` con el panel inmobiliario y se distinguen por el prefijo `CCO-` del número: sus números de reporte son de otra tabla, así que cada panel solo lista, abre y paga las suyas.
 - Las notificaciones nuevas deben ser configurables cuando aplique y encolarse mediante `shared-notifications`; evitar envíos directos o destinatarios quemados en código.
+- Cuando un módulo deba avisar a funcionarios internos, agregar o reutilizar un evento en `CommercialInternalNotifications::CATALOG` y tomar los destinatarios de ahí (`recipients` o `emails`), nunca correos fijos. Aparece solo en **Configuración › Notificaciones internas**.
 - En los modales del panel, preferir popups internos y conservar el contexto de la tarea; evitar abrir pestañas nuevas si la acción puede resolverse dentro de la app.
 - En registros CCT creados o modificados por funcionarios, `cct_author_id` debe guardar el `id_empleado` real de `wp_jet_cct_funcionarios`, no el `_ID` interno de la sesión.
 - El medio de una llamada no se cambia al editarla porque las estadísticas cuentan por medio: otro medio es otra solicitud (llamada nueva) en el historial del contacto, y la tarea hereda el medio de su llamada.

@@ -300,6 +300,19 @@ final class CommercialCallsRepository
     return (int) $this->db->getVar('SELECT `_ID` FROM `' . $this->db->table('jet_cct_clientes') . '` WHERE ' . $clause . ' ORDER BY `_ID` DESC LIMIT 1', [$value]);
   }
 
+  /** @return array<string,mixed> Ficha del cliente con ese celular (con sus preferencias de contacto), o vacío. */
+  public function clientRow(string $digits): array
+  {
+    $id = $this->clientId($digits);
+    return $id > 0 ? ($this->db->getRow('SELECT * FROM `' . $this->db->table('jet_cct_clientes') . '` WHERE `_ID` = ?', [$id]) ?? []) : [];
+  }
+
+  /** @param array<string,mixed> $data */
+  public function insertTaskHistory(array $data): void
+  {
+    $this->db->insert($this->db->table('jet_cct_historial_del_ticket'), $this->existing('jet_cct_historial_del_ticket', $data));
+  }
+
   /** @param array<string,mixed> $data */
   public function insertClient(array $data): int
   {

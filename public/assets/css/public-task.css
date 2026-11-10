@@ -1,0 +1,30 @@
+:root { color-scheme: light; --navy:#061d49; --blue:#1e3c76; --line:#dfe3ee; --muted:#5b6780; }
+* { box-sizing:border-box; }
+body { margin:0; background:#f1f4f9; color:#24334c; font-family:Poppins,Arial,sans-serif; line-height:1.5; }
+.ptk { min-height:100vh; display:flex; justify-content:center; align-items:flex-start; padding:24px 16px; }
+.ptk-card { width:min(720px,100%); background:#fff; border:1px solid var(--line); border-radius:20px; overflow:hidden; box-shadow:0 16px 40px rgba(6,29,73,.12); }
+.ptk-head { display:flex; align-items:center; gap:16px; padding:20px 24px; border-bottom:1px solid var(--line); }
+.ptk-logo { max-height:48px; max-width:140px; width:auto; }
+.ptk-brand { margin:0; font-size:12px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+.ptk-head h1 { margin:0; font-size:22px; color:var(--navy); }
+.ptk-body { padding:20px 24px 28px; display:flex; flex-direction:column; gap:16px; }
+.ptk-hello { margin:0; }
+.ptk-details { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin:0; padding:14px 16px; background:#f6f7fb; border-radius:14px; }
+.ptk-details dt { font-size:12px; font-weight:700; color:var(--muted); }
+.ptk-details dd { margin:0; overflow-wrap:anywhere; }
+h2 { margin:0 0 8px; font-size:16px; color:var(--navy); }
+.ptk-thread { display:flex; flex-direction:column; gap:10px; margin:0; padding:0; list-style:none; }
+.ptk-thread li { max-width:88%; padding:10px 14px; border-radius:14px; background:#eef1f8; }
+.ptk-thread li.is-client { align-self:flex-end; background:#fff4d6; }
+.ptk-author { margin:0; font-size:12px; font-weight:600; color:var(--muted); }
+.ptk-text { margin:2px 0 0; white-space:pre-line; overflow-wrap:anywhere; }
+.ptk-empty { margin:0; color:var(--muted); }
+.ptk-ok,.ptk-alert { margin:0; padding:12px 14px; border-radius:12px; font-weight:600; }
+.ptk-ok { background:#e7f3ec; color:#14532d; }
+.ptk-alert { background:#fde8e6; color:#8c1d18; }
+.ptk-form { display:flex; flex-direction:column; gap:8px; }
+.ptk-form label { font-weight:600; font-size:14px; }
+.ptk-form textarea { width:100%; padding:10px 12px; border:1px solid #c6cddc; border-radius:12px; font:inherit; resize:vertical; }
+.ptk-form textarea:focus-visible,.ptk-form button:focus-visible { outline:3px solid #1e3c7690; outline-offset:1px; }
+.ptk-form button { align-self:flex-end; min-height:44px; padding:0 22px; border:0; border-radius:12px; background:var(--blue); color:#fff; font:inherit; font-weight:600; cursor:pointer; }
+.ptk-form button:hover { background:var(--navy); }

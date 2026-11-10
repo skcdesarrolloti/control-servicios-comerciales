@@ -199,12 +199,60 @@
       title: "Llamadas",
       html: function (settings) {
         var check = function (name, label) { return '<label class="flex items-start gap-2 text-sm text-slate-800 cursor-pointer"><input type="checkbox" name="' + name + '" class="mt-1"' + (settings[name] ? " checked" : "") + "><span>" + label + "</span></label>"; };
-        return '<form data-config-form class="text-left space-y-3">' + intro("Correos que salen cuando se crea una tarea desde una llamada.") +
-          check("asignado", "Avisar al funcionario asignado") + check("solicitante", "Avisar al solicitante") + check("administradores", "Avisar a estos administradores") +
-          '<label class="block text-sm text-slate-700"><strong>Correos de administradores</strong><textarea name="admin_emails" rows="3" class="mt-1 w-full px-2 py-1.5 rounded-lg border border-slate-300 text-sm" placeholder="Uno por línea">' + esc((settings.admin_emails || []).join("\n")) + "</textarea></label></form>";
+        var template = function (name, label) { return '<label class="block text-sm text-slate-700">' + label + '<input name="' + name + '" value="' + esc(settings[name] || "") + '" class="mt-1 w-full px-2 py-1.5 rounded-lg border border-slate-300 text-sm"></label>'; };
+        return '<form data-config-form class="text-left space-y-3">' + intro("Avisos de las tareas. Las copias a otros funcionarios se eligen en Notificaciones internas.") +
+          check("asignado", "Correo al funcionario asignado") + check("solicitante", "Correo al cliente al crear la tarea") +
+          check("whatsapp_asignado", "WhatsApp al funcionario (actívalo cuando Meta apruebe las plantillas)") + check("whatsapp_solicitante", "WhatsApp al cliente (actívalo cuando Meta apruebe las plantillas)") +
+          template("plantilla_asignada", "Plantilla: tarea asignada") + template("plantilla_registrada", "Plantilla: solicitud registrada") +
+          template("plantilla_respuesta_cliente", "Plantilla: el cliente escribió") + template("plantilla_respuesta_funcionario", "Plantilla: el funcionario respondió") +
+          template("idioma", "Idioma de las plantillas") + "</form>";
       },
       collect: function (form) {
-        return { asignado: form.elements.asignado.checked, solicitante: form.elements.solicitante.checked, administradores: form.elements.administradores.checked, admin_emails: form.elements.admin_emails.value };
+        var out = {};
+        ["asignado", "solicitante", "whatsapp_asignado", "whatsapp_solicitante"].forEach(function (name) { out[name] = form.elements[name].checked; });
+        ["plantilla_asignada", "plantilla_registrada", "plantilla_respuesta_cliente", "plantilla_respuesta_funcionario", "idioma"].forEach(function (name) { out[name] = form.elements[name].value.trim(); });
+        return out;
+      },
+    },
+    notificaciones_internas: {
+      title: "Notificaciones internas",
+      wide: true,
+      html: function (settings) {
+        var events = settings.events || {};
+        var employees = settings.employees || [];
+        var body = Object.keys(settings.catalog || {}).map(function (groupKey) {
+          var group = settings.catalog[groupKey];
+          var items = Object.keys(group.items).map(function (eventKey) {
+            var item = group.items[eventKey];
+            var selected = events[eventKey] || [];
+            var checks = employees.map(function (employee) {
+              return '<label class="flex items-center gap-2 text-sm text-slate-800 cursor-pointer" data-employee-name="' + esc(employee.nombre.toLowerCase()) + '"><input type="checkbox" data-event="' + esc(eventKey) + '" value="' + esc(employee.id) + '"' + (selected.indexOf(employee.id) >= 0 ? " checked" : "") + "><span>" + esc(employee.nombre) + "</span></label>";
+            }).join("");
+            return '<details class="rounded-lg border border-slate-200 p-3" data-internal-event><summary class="cursor-pointer text-sm font-semibold text-slate-800">' + esc(item.label) + ' <span class="font-normal text-slate-500">· <span data-event-count>' + selected.length + "</span> · " + esc(item.channel) + '</span></summary><p class="mt-1 text-xs text-slate-500">' + esc(item.description) + '</p><div class="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-1">' + checks + "</div></details>";
+          }).join("");
+          return '<section class="space-y-2"><h3 class="text-sm font-bold text-slate-900">' + esc(group.label) + "</h3>" + items + "</section>";
+        }).join("");
+        return '<form data-config-form class="text-left space-y-4">' + intro("Marca qué funcionarios reciben copia de cada aviso. Los módulos nuevos aparecen aquí con sus avisos.") +
+          '<input type="search" data-employee-filter class="w-full px-2 py-1.5 rounded-lg border border-slate-300 text-sm" placeholder="Buscar funcionario" aria-label="Buscar funcionario">' + body + "</form>";
+      },
+      bind: function (popup) {
+        popup.querySelector("[data-employee-filter]").addEventListener("input", function (event) {
+          var term = event.target.value.trim().toLowerCase();
+          popup.querySelectorAll("[data-employee-name]").forEach(function (label) { label.classList.toggle("hidden", term !== "" && label.getAttribute("data-employee-name").indexOf(term) < 0); });
+          popup.querySelectorAll("[data-internal-event]").forEach(function (details) { details.open = term !== ""; });
+        });
+        popup.addEventListener("change", function (event) {
+          var box = event.target.closest("[data-internal-event]");
+          if (box && event.target.matches("[data-event]")) box.querySelector("[data-event-count]").textContent = box.querySelectorAll("[data-event]:checked").length;
+        });
+      },
+      collect: function (form) {
+        var events = {};
+        form.querySelectorAll("[data-event]:checked").forEach(function (input) {
+          var key = input.getAttribute("data-event");
+          (events[key] = events[key] || []).push(input.value);
+        });
+        return { events: events };
       },
     },
     reportes: {
@@ -1077,7 +1125,7 @@
       return window.Swal.fire({
         title: section.title,
         html: section.html(prepared),
-        width: section.manage ? 980 : 760,
+        width: section.manage || section.wide ? 980 : 760,
         showCancelButton: true,
         // Las secciones que administran una lista guardan cada acción al confirmarla: no tienen botón Guardar.
         showConfirmButton: !section.manage,

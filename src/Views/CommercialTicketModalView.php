@@ -474,6 +474,11 @@ final class CommercialTicketModalView
               $author = trim((string) ($item['nombre'] ?? '')) ?: 'Sistema';
               $actorId = trim((string) ($item['actor_id'] ?? ''));
               $actorEmail = trim((string) ($item['actor_email'] ?? ''));
+              // Mensaje que el cliente escribió desde su enlace público.
+              $fromClient = $type === 'respuesta' && $actorId === \SCM\Commercial\Calls\PublicTaskConversation::CLIENT_MARK;
+              if ($fromClient) {
+                $actorId = '';
+              }
               $time = self::formatDate($item['_timestamp'] ?? $item['fecha'] ?? 0);
               $msg = trim(wp_strip_all_tags((string) ($item['message'] ?? ''), true));
 
@@ -496,7 +501,7 @@ final class CommercialTicketModalView
                       <?php echo $icon; ?>
                     </span>
                     <div>
-                      <span class="text-xs font-bold text-slate-900"><?php echo esc_html($labels[$type] ?? 'Actividad'); ?></span>
+                      <span class="text-xs font-bold text-slate-900"><?php echo esc_html($fromClient ? 'Mensaje del cliente' : ($labels[$type] ?? 'Actividad')); ?></span>
                       <span class="text-xs text-slate-500">· <?php echo esc_html($author); ?></span>
                     </div>
                   </div>
