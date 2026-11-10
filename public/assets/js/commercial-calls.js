@@ -6,7 +6,7 @@
   var runtime = {};
   try { runtime = JSON.parse(app.getAttribute("data-scm-runtime") || "{}"); } catch (_error) {}
   var lastFocus = null;
-  var FILTERS = ["ll_q", "ll_medio", "ll_tema", "ll_estado", "ll_empleado", "ll_desde", "ll_hasta", "ll_tarjeta"];
+  var FILTERS = ["ll_q", "ll_medio", "ll_tema", "ll_estado", "ll_comisionista", "ll_inmediato", "ll_mes", "ll_empleado", "ll_desde", "ll_hasta", "ll_tarjeta"];
 
   function notify(type, message) {
     if (window.Swal) window.Swal.fire({ toast: true, position: "top-end", timer: 3200, showConfirmButton: false, icon: type, title: message });
@@ -87,9 +87,17 @@
   }
 
   function value(form, name) { var field = form.elements[name]; return field ? field.value : ""; }
+  // Código y presupuesto son de arriendo y venta; el precio, de captación y recaptación.
+  function syncTopic(form) {
+    var topic = value(form, "tema_ayuda");
+    var offer = ["Arriendo", "Venta", "Arriendo o venta"].indexOf(topic) >= 0;
+    var visible = { codigo: offer, presupuesto: offer, factores: offer, precio: topic === "Captacion" || topic === "Recaptacion" };
+    form.querySelectorAll("[data-ccl-topic-field]").forEach(function (node) { node.hidden = !visible[node.getAttribute("data-ccl-topic-field")]; });
+  }
   function syncForm() {
     var form = content() && content().querySelector("[data-ccl-form]");
     if (form) {
+      syncTopic(form);
       var box = form.querySelector("[data-ccl-pph]");
       if (box && form.elements.medio) box.hidden = form.elements.medio.value !== form.getAttribute("data-pph-medio");
       var month = form.querySelector("[data-ccl-month]");
@@ -99,15 +107,18 @@
       }
     }
     var task = content() && content().querySelector("[data-ccl-task-form]");
-    if (task) {
-      var topic = value(task, "tema_ayuda");
-      var offer = ["Arriendo", "Venta", "Arriendo o venta"].indexOf(topic) >= 0;
-      var toggle = function (name, visible) { var node = task.querySelector('[data-ccl-task-field="' + name + '"]'); if (node) node.hidden = !visible; };
-      toggle("codigo", topic !== "Captacion");
-      toggle("precio", topic === "Captacion" || topic === "Recaptacion");
-      toggle("presupuesto", offer);
-      toggle("factores", offer);
+    if (task) syncTopic(task);
+  }
+  function formatMoney(field) {
+    var right = field.value.slice(field.selectionStart).replace(/\D/g, "").length;
+    var digits = field.value.replace(/\D/g, "").replace(/^0+(?=\d)/, "").slice(0, 15);
+    var formatted = digits.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    field.value = formatted;
+    var position = formatted.length;
+    for (var seen = 0; position > 0 && seen < right; position--) {
+      if (/\d/.test(formatted[position - 1])) seen++;
     }
+    field.setSelectionRange(position, position);
   }
   function lookupContact(form) {
     var phone = value(form, "celular").replace(/\D+/g, "");
@@ -178,7 +189,7 @@
   }
 
   document.addEventListener("click", function (event) {
-    var target = event.target.closest("[data-ccl-new],[data-ccl-edit],[data-ccl-repeat],[data-ccl-history],[data-ccl-task],[data-ccl-close],[data-ccl-state],[data-ccl-page-to],[data-ccl-clear]");
+    var target = event.target.closest("[data-ccl-new],[data-ccl-edit],[data-ccl-repeat],[data-ccl-history],[data-ccl-task],[data-ccl-close],[data-ccl-state],[data-ccl-toggle],[data-ccl-page-to],[data-ccl-clear]");
     if (!target) {
       // Abrir una tarea desde el historial la muestra en su propio modal.
       if (event.target.closest("#commercial-call-modal [data-commercial-open-case]")) closeModal();
@@ -193,6 +204,13 @@
     if (target.hasAttribute("data-ccl-state")) {
       var form = filtersForm();
       if (form) { form.elements.ll_estado.value = target.getAttribute("data-ccl-state"); refresh(1); }
+      return;
+    }
+    if (target.hasAttribute("data-ccl-toggle")) {
+      var select = filtersForm().elements[target.getAttribute("data-ccl-toggle")];
+      var wanted = target.getAttribute("data-value");
+      select.value = select.value === wanted ? "" : wanted;
+      refresh(1);
       return;
     }
     if (target.hasAttribute("data-ccl-page-to")) return void refresh(Number(target.getAttribute("data-ccl-page-to")));
@@ -223,6 +241,9 @@
         if (result.open) openTask(result.id);
       });
     }
+  });
+  document.addEventListener("input", function (event) {
+    if (event.target.matches("[data-ccl-money]")) formatMoney(event.target);
   });
   document.addEventListener("change", function (event) {
     if (!event.target.closest("[data-ccl-modal]")) return;

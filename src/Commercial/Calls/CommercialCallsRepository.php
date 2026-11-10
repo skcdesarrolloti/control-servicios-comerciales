@@ -42,11 +42,11 @@ final class CommercialCallsRepository
    * Una página de llamadas con sus conteos. $scope: null = todo el equipo; id_empleado = solo lo suyo; '' = no se sabe
    * quién es y no se muestra nada.
    * @param array<string,string> $filters
-   * @return array{rows:list<array<string,mixed>>,total:int,counts:array{total:int,pendientes:int,con_tarea:int,pph:int}}
+   * @return array{rows:list<array<string,mixed>>,total:int,counts:array{total:int,pendientes:int,con_tarea:int,pph:int,comisionistas:int,mas_adelante:int}}
    */
   public function search(array $filters, ?string $scope, int $page, int $perPage, string $pphMedio): array
   {
-    $empty = ['rows' => [], 'total' => 0, 'counts' => ['total' => 0, 'pendientes' => 0, 'con_tarea' => 0, 'pph' => 0]];
+    $empty = ['rows' => [], 'total' => 0, 'counts' => ['total' => 0, 'pendientes' => 0, 'con_tarea' => 0, 'pph' => 0, 'comisionistas' => 0, 'mas_adelante' => 0]];
     if ($scope === '') {
       return $empty;
     }
@@ -55,6 +55,8 @@ final class CommercialCallsRepository
       'SELECT COUNT(*) AS total,'
       . " SUM(CASE WHEN `merece_ticket` = 'Si' AND NOT (" . self::HAS_TASK . ') THEN 1 ELSE 0 END) AS pendientes,'
       . ' SUM(CASE WHEN ' . self::HAS_TASK . ' THEN 1 ELSE 0 END) AS con_tarea,'
+      . " SUM(CASE WHEN `comisionista` = 'Si' THEN 1 ELSE 0 END) AS comisionistas,"
+      . " SUM(CASE WHEN `cliente_inmediato` = 'No' THEN 1 ELSE 0 END) AS mas_adelante,"
       . ' SUM(CASE WHEN `medio` = ? THEN 1 ELSE 0 END) AS pph'
       . ' FROM `' . $this->calls() . '`' . $where,
       array_merge([$pphMedio], $args)
@@ -71,6 +73,8 @@ final class CommercialCallsRepository
         'pendientes' => (int) ($counts['pendientes'] ?? 0),
         'con_tarea' => (int) ($counts['con_tarea'] ?? 0),
         'pph' => (int) ($counts['pph'] ?? 0),
+        'comisionistas' => (int) ($counts['comisionistas'] ?? 0),
+        'mas_adelante' => (int) ($counts['mas_adelante'] ?? 0),
       ],
     ];
   }
@@ -93,7 +97,7 @@ final class CommercialCallsRepository
       $clauses[] = '(`cliente` LIKE ? OR `celular` LIKE ? OR `email` LIKE ? OR `celular_wsp` LIKE ? OR CAST(`_ID` AS CHAR) = ?)';
       array_push($args, $like, $like, $like, $like, $q);
     }
-    foreach (['medio' => 'medio', 'tema' => 'tema_ayuda'] as $key => $column) {
+    foreach (['medio' => 'medio', 'tema' => 'tema_ayuda', 'comisionista' => 'comisionista', 'inmediato' => 'cliente_inmediato', 'mes' => 'mes_inmueble'] as $key => $column) {
       if (trim($f[$key] ?? '') !== '') {
         $clauses[] = '`' . $column . '` = ?';
         $args[] = trim($f[$key]);

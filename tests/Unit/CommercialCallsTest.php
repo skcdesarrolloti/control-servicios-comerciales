@@ -96,6 +96,57 @@ final class CommercialCallsTest extends TestCase
     self::assertSame('Laura Editada', $after['cliente']);
   }
 
+  public function testEditOnlyChangesPersonalData(): void
+  {
+    $id = $this->create(['tema_ayuda' => 'Arriendo', 'presupuesto' => '1.000.000', 'descripcion' => 'Original']);
+    $before = $this->row($id);
+    $result = $this->service()->save(CommercialCallsDatabase::validInput(['id' => (string) $id, 'tema_ayuda' => 'Venta', 'presupuesto' => '9', 'descripcion' => 'Cambio', 'merece_ticket' => 'No', 'id_empleado' => '202', 'comisionista' => 'Si', 'cliente' => 'Nombre Corregido', 'email' => 'nuevo@example.test', 'usuario_wsp' => 'nuevo']));
+    $after = $this->row($id);
+    foreach (['tema_ayuda', 'presupuesto', 'descripcion', 'merece_ticket', 'id_empleado', 'comisionista', 'medio'] as $field) {
+      self::assertSame($before[$field], $after[$field], $field);
+    }
+    self::assertSame('Nombre Corregido', $after['cliente']);
+    self::assertSame('nuevo@example.test', $after['email']);
+    self::assertSame('nuevo', $after['usuario_wsp']);
+    self::assertSame('list', $result['next'], 'Corregir datos personales no abre la tarea.');
+  }
+
+  public function testOldCallCanFixContactWithoutMissingEmailCountryOrPartner(): void
+  {
+    $this->db->insert('wp_jet_cct_cct_llamadas', ['_ID' => 60, 'id_empleado' => '101', 'cct_author_id' => '101', 'cliente' => 'Vieja', 'celular' => '3001110000', 'medio' => 'Club PPH', 'email' => '', 'indicativo' => '']);
+    $this->service()->save(['id' => '60', 'cliente' => 'Vieja Corregida', 'celular' => '3001110000', 'email' => '', 'indicativo' => '']);
+    self::assertSame('Vieja Corregida', $this->row(60)['cliente']);
+  }
+
+  public function testFieldsDependOnTopicAndAmountsAreDigits(): void
+  {
+    $rent = $this->row($this->create(['tema_ayuda' => 'Arriendo', 'presupuesto' => '1.500.000', 'precio' => '9.000', 'id_inmueble' => '45']));
+    self::assertSame('1500000', $rent['presupuesto']);
+    self::assertSame('', $rent['precio']);
+    self::assertSame('45', $rent['id_inmueble']);
+    $listing = $this->row($this->create(['tema_ayuda' => 'Captacion', 'celular' => '3003334444', 'presupuesto' => '1.000', 'precio' => '250.000.000', 'id_inmueble' => '45']));
+    self::assertSame('250000000', $listing['precio']);
+    self::assertSame('', $listing['presupuesto']);
+    self::assertSame('', $listing['id_inmueble']);
+    self::assertSame('1.500.000', CommercialCallsService::money('1500000.00'));
+    self::assertSame('1.500', CommercialCallsService::money('1.500'));
+  }
+
+  public function testGroupsCommissionAgentsAndLaterClients(): void
+  {
+    $agent = $this->create(['comisionista' => 'Si', 'celular' => '3001000001']);
+    $later = $this->create(['cliente_inmediato' => 'No', 'mes_inmueble' => 'Febrero', 'celular' => '3001000002']);
+    $service = $this->service();
+    $counts = $service->listing([])['counts'];
+    self::assertSame(1, $counts['comisionistas']);
+    self::assertSame(1, $counts['mas_adelante']);
+    self::assertSame([$agent], array_column($service->listing(['ll_comisionista' => 'Si'])['rows'], 'id'));
+    self::assertSame([$later], array_column($service->listing(['ll_inmediato' => 'No', 'll_mes' => 'Febrero'])['rows'], 'id'));
+    $html = CommercialCallsView::results($service->listing([]), $service, CommercialCallsDatabase::policy($this->db));
+    self::assertStringContainsString('Para Febrero', $html);
+    self::assertStringContainsString('>Comisionista<', $html);
+  }
+
   public function testOldCallWithoutMedioCanBeCompletedOnce(): void
   {
     $this->db->insert('wp_jet_cct_cct_llamadas', ['_ID' => 50, 'id_empleado' => '101', 'cct_author_id' => '101', 'cliente' => 'Antigua', 'celular' => '3005556666', 'medio' => '']);
@@ -266,6 +317,9 @@ final class CommercialCallsTest extends TestCase
     $html = CommercialCallsView::form($service->formData(['id' => (string) $id]), $service->options());
     self::assertStringContainsString('Medio: Referido', $html);
     self::assertStringNotContainsString('name="medio"', $html);
+    self::assertStringNotContainsString('name="tema_ayuda"', $html);
+    self::assertStringNotContainsString('name="id_empleado"', $html);
+    self::assertStringContainsString('data-ccl-repeat', $html);
     $new = CommercialCallsView::form($service->formData([]), $service->options());
     self::assertStringContainsString('name="medio"', $new);
     self::assertStringContainsString('data-ccl-pph hidden', $new);

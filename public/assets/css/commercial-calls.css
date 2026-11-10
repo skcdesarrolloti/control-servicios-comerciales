@@ -43,7 +43,7 @@
 .ccl-icon:hover { background:#eef1f8; }
 .ccl-empty { padding:32px; text-align:center; color:var(--ccl-muted); background:#fff; border:1px dashed var(--ccl-line); border-radius:16px; }
 .ccl-pager { display:flex; align-items:center; justify-content:center; gap:12px; margin-top:16px; font-size:14px; color:var(--ccl-muted); }
-.ccl-modal { display:flex; flex-direction:column; width:min(920px,100%); max-height:calc(100dvh - 24px); margin:auto; background:#fff; border-radius:20px; box-shadow:0 24px 60px rgba(6,29,73,.3); overflow:hidden; }
+.ccl-modal { display:flex; flex-direction:column; width:min(1240px,100%); max-height:calc(100dvh - 24px); margin:auto; background:#fff; border-radius:20px; box-shadow:0 24px 60px rgba(6,29,73,.3); overflow:hidden; }
 .ccl-modal-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:18px 22px; border-bottom:1px solid var(--ccl-line); }
 .ccl-modal-head h2 { margin:0; font-size:20px; font-weight:700; color:var(--ccl-navy); }
 .ccl-modal-head p { margin:2px 0 0; font-size:13px; color:var(--ccl-muted); }
@@ -53,6 +53,11 @@
 .ccl-modal-foot { display:flex; justify-content:flex-end; gap:8px; padding:14px 22px; border-top:1px solid var(--ccl-line); background:#fafbfd; }
 .ccl-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; }
 .ccl-span { grid-column:1/-1; }
+.ccl-grid-6 { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:12px; }
+.ccl-wide { grid-column:span 2; }
+.ccl-tags { display:flex; flex-wrap:wrap; gap:4px; margin-top:4px; }
+.ccl-tag { padding:1px 8px; border-radius:999px; background:#e7ecf7; color:var(--ccl-blue); font-size:12px; font-weight:600; }
+.ccl-tag.is-later { background:#fff1cc; color:#6b4700; }
 .ccl-origin { display:flex; flex-direction:column; gap:8px; }
 .ccl-hint { margin:0; font-size:12px; color:var(--ccl-muted); }
 .ccl-hint[data-state="ok"] { color:#146c43; font-weight:600; }
@@ -77,6 +82,8 @@
 #commercial-call-modal .ccl-history .ccl-task { margin-top:6px; }
 @media (min-width:640px) { .ccl-modal { max-height:calc(100dvh - 40px); } }
 @media (min-width:1024px) { .ccl-modal { max-height:calc(100dvh - 56px); } }
+@media (max-width:1023px) { .ccl-grid-6 { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media (max-width:640px) { .ccl-grid-6 { grid-template-columns:minmax(0,1fr); } .ccl-wide { grid-column:auto; } }
 @media (max-width:820px) {
   .ccl { padding:16px 16px 48px; }
   .ccl-field-wide { grid-column:auto; }

@@ -28,6 +28,7 @@ final class CommercialCallsService
   public const PPH_MEDIO = 'Club PPH';
 
   private const CLIENT_TOPICS = ['Arriendo' => 'Cliente para arriendo', 'Venta' => 'Cliente para venta', 'Arriendo o venta' => 'Cliente para arriendo - venta'];
+  private const LISTING_TOPICS = ['Captacion', 'Recaptacion'];
   private const DEFAULT_PRIORITY = 'Prioridad comercial';
   private const DUPLICATE_SECONDS = 60;
 
@@ -79,7 +80,7 @@ final class CommercialCallsService
   public function listing(array $input): array
   {
     $filters = [];
-    foreach (['q', 'medio', 'tema', 'estado', 'empleado', 'desde', 'hasta', 'tarjeta'] as $key) {
+    foreach (['q', 'medio', 'tema', 'estado', 'empleado', 'desde', 'hasta', 'tarjeta', 'comisionista', 'inmediato', 'mes'] as $key) {
       $value = $input['ll_' . $key] ?? '';
       $filters[$key] = is_scalar($value) ? mb_substr(trim((string) $value), 0, 120) : '';
     }
@@ -105,6 +106,9 @@ final class CommercialCallsService
         'tarjeta' => (string) ($row['tarjeta_pph'] ?? ''),
         'responsable' => $names[trim((string) ($row['id_empleado'] ?? ''))] ?? '',
         'merece' => (string) ($row['merece_ticket'] ?? ''),
+        'comisionista' => trim((string) ($row['comisionista'] ?? '')) === 'Si',
+        'mas_adelante' => trim((string) ($row['cliente_inmediato'] ?? '')) === 'No',
+        'mes' => trim((string) ($row['mes_inmueble'] ?? '')),
         'tarea' => $task,
         'tarea_estado' => $task > 0 ? ($tasks[(string) $task] ?? '') : '',
         'editable' => $this->policy->canAct('llamadas_editar') && $this->canAccess($row, $me, $team),
@@ -154,7 +158,7 @@ final class CommercialCallsService
     if ($id > 0) {
       $this->requireAct('llamadas_editar', 'No tienes permiso para editar llamadas.');
       $call = $this->accessible($id);
-      return ['mode' => 'edit', 'call' => $call, 'factores' => self::factors($call['factores_importantes'] ?? ''), 'has_task' => self::taskId($call) > 0];
+      return ['mode' => 'edit', 'call' => $call, 'factores' => [], 'can_repeat' => $this->policy->canAct('llamadas_crear')];
     }
     $this->requireAct('llamadas_crear', 'No tienes permiso para registrar llamadas.');
     $call = ['id_empleado' => $this->me(), 'fecha' => time(), 'indicativo' => '57'];
@@ -165,11 +169,12 @@ final class CommercialCallsService
         $call[$field] = $source[$field] ?? '';
       }
     }
-    return ['mode' => $from > 0 ? 'repeat' : 'new', 'call' => $call, 'factores' => [], 'has_task' => false];
+    return ['mode' => $from > 0 ? 'repeat' : 'new', 'call' => $call, 'factores' => [], 'can_repeat' => false];
   }
 
   /**
-   * Registra o edita una llamada. Al editar, el medio y la fecha se conservan siempre: nunca se leen de la petición.
+   * Registra una llamada o corrige sus datos personales. Lo demás (medio, fecha, motivo, inmueble, asignación) es de la
+   * solicitud y al editar nunca se lee de la petición: si cambia, es una solicitud nueva.
    * @param array<string,mixed> $input
    * @return array{id:int,next:string,message:string}
    */
@@ -195,14 +200,12 @@ final class CommercialCallsService
         }
         $data += ['cct_status' => 'publish', 'cct_author_id' => $me, 'cct_created' => $now, 'sucursal' => $this->branchOf($me)];
         $id = $this->repository->insert($data);
+        if ($data['merece_ticket'] === 'Si' && isset(self::CLIENT_TOPICS[(string) $data['tema_ayuda']])) {
+          $clientId = $this->ensureClient($id, $data, $me);
+          $this->repository->update($id, ['id_cliente' => (string) $clientId]);
+        }
       } else {
         $this->repository->update($id, $data);
-      }
-      $merece = (string) ($data['merece_ticket'] ?? ($current['merece_ticket'] ?? ''));
-      $topic = (string) ($data['tema_ayuda'] ?? '');
-      if ($merece === 'Si' && isset(self::CLIENT_TOPICS[$topic])) {
-        $clientId = $this->ensureClient($id, $data, $me);
-        $this->repository->update($id, ['id_cliente' => (string) $clientId]);
       }
       $pdo->commit();
     } catch (\Throwable $exception) {
@@ -211,8 +214,7 @@ final class CommercialCallsService
       }
       throw $exception;
     }
-    $hasTask = $current !== null && self::taskId($current) > 0;
-    $next = $merece === 'Si' && !$hasTask && $this->policy->canAct('llamadas_tarea') ? 'task' : 'list';
+    $next = $current === null && $data['merece_ticket'] === 'Si' && $this->policy->canAct('llamadas_tarea') ? 'task' : 'list';
     return ['id' => $id, 'next' => $next, 'message' => $current === null ? 'Llamada registrada.' : 'Llamada actualizada.'];
   }
 
@@ -242,53 +244,59 @@ final class CommercialCallsService
       return $value;
     };
     $yesNo = static fn(string $key, string $label): string => $choice($key, ['Si', 'No'], $label);
-    $hasTask = $current !== null && self::taskId($current) > 0;
+    // Una llamada antigua sin correo o sin país se puede corregir sin exigirlos.
+    $needed = static fn(string $key): bool => $current === null || trim((string) ($current[$key] ?? '')) !== '';
 
     $cliente = $text('cliente');
     if ($cliente === '') {
       throw new \InvalidArgumentException('Escribe el nombre del contacto.');
     }
     $email = $text('email');
-    if ($email === '' || filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+    if ($email === '' ? $needed('email') : filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
       throw new \InvalidArgumentException('Escribe un correo válido.');
     }
     $celular = CommercialCallsRepository::digits($text('celular'));
     if (strlen($celular) < 7 || strlen($celular) > 15) {
       throw new \InvalidArgumentException('Escribe el celular sin indicativo (solo números).');
     }
-    $countries = array_column($options['paises'], 'value');
-    $immediate = $yesNo('cliente_inmediato', 'si el cliente es inmediato');
-    $factors = array_values(array_intersect((array) ($input['factores_importantes'] ?? []), array_merge($options['factores'], self::factors($current['factores_importantes'] ?? ''))));
-    $data = [
-      'tema_ayuda' => $choice('tema_ayuda', $options['temas'], 'el motivo'),
-      'comisionista' => $yesNo('comisionista', 'si es comisionista'),
-      'cliente_inmediato' => $immediate,
-      'mes_inmueble' => $immediate === 'No' ? $choice('mes_inmueble', $options['meses'], 'el mes en que necesita el inmueble') : '',
+    $contact = [
       'cliente' => $cliente,
       'email' => $email,
       'celular' => $celular,
-      'indicativo' => $choice('indicativo', $countries, 'el país'),
+      'indicativo' => $choice('indicativo', array_column($options['paises'], 'value'), 'el país', $needed('indicativo')),
       'celular_wsp' => CommercialCallsRepository::digits($text('celular_wsp')),
       'usuario_wsp' => $text('usuario_wsp'),
+    ];
+    if ($current !== null) {
+      return $contact + $this->originFields($input, $current, $options);
+    }
+
+    $immediate = $yesNo('cliente_inmediato', 'si el cliente es inmediato');
+    $topic = $choice('tema_ayuda', $options['temas'], 'el motivo');
+    $offer = isset(self::CLIENT_TOPICS[$topic]);
+    $code = (int) $text('id_inmueble');
+    $employee = $this->repository->employee($text('id_empleado'));
+    if ($employee === null || ($employee['activo'] ?? '') !== 'Si') {
+      throw new \InvalidArgumentException('Selecciona un funcionario activo para asignar la llamada.');
+    }
+    $factors = array_values(array_intersect((array) ($input['factores_importantes'] ?? []), $options['factores']));
+    return $contact + [
+      'tema_ayuda' => $topic,
+      'comisionista' => $yesNo('comisionista', 'si es comisionista'),
+      'cliente_inmediato' => $immediate,
+      'mes_inmueble' => $immediate === 'No' ? $choice('mes_inmueble', $options['meses'], 'el mes en que necesita el inmueble') : '',
       'tipo_inmueble' => $choice('tipo_inmueble', $options['tipos'], 'el tipo de inmueble', false),
       'destinacion' => $choice('destinacion', $options['destinaciones'], 'la destinación', false),
       'uso' => $choice('uso', $options['usos'], 'el uso', false),
-      'id_inmueble' => (string) (int) $text('id_inmueble') === '0' ? '' : (string) (int) $text('id_inmueble'),
-      'presupuesto' => self::amount($text('presupuesto')),
-      'precio' => self::amount($text('precio')),
+      'id_inmueble' => $offer && $code > 0 ? (string) $code : '',
+      'presupuesto' => $offer ? self::amount($text('presupuesto')) : '',
+      'precio' => in_array($topic, self::LISTING_TOPICS, true) ? self::amount($text('precio')) : '',
       'factores_importantes' => implode(', ', $factors),
       'observacion' => $choice('observacion', $options['observaciones'], 'la observación', false),
       'descripcion' => is_scalar($input['descripcion'] ?? null) ? trim(strip_tags((string) $input['descripcion'])) : '',
-    ];
-    if (!$hasTask) {
-      $data['merece_ticket'] = $yesNo('merece_ticket', 'si merece tarea');
-      $employee = $this->repository->employee($text('id_empleado'));
-      if ($employee === null || ($employee['activo'] ?? '') !== 'Si') {
-        throw new \InvalidArgumentException('Selecciona un funcionario activo para asignar la llamada.');
-      }
-      $data['id_empleado'] = trim((string) $employee['id_empleado']);
-    }
-    return $data + $this->originFields($input, $current, $options);
+      'merece_ticket' => $yesNo('merece_ticket', 'si merece tarea'),
+      'id_empleado' => trim((string) $employee['id_empleado']),
+    ] + $this->originFields($input, null, $options);
   }
 
   /**
@@ -318,8 +326,10 @@ final class CommercialCallsService
       $out['fecha'] = self::callTimestamp(is_scalar($input['fecha'] ?? null) ? (string) $input['fecha'] : '');
     }
     $hasPartner = !in_array(trim((string) ($current['id_pph'] ?? '')), ['', '0'], true);
-    if ($saved === $this->pphMedio() && !$hasPartner) {
-      $partner = $this->resolveCard(is_scalar($input['tarjeta_pph'] ?? null) ? (string) $input['tarjeta_pph'] : '');
+    $card = is_scalar($input['tarjeta_pph'] ?? null) ? trim((string) $input['tarjeta_pph']) : '';
+    // Una llamada antigua de Club PPH sin aliado se puede completar, pero no impide corregir los datos personales.
+    if ($saved === $this->pphMedio() && !$hasPartner && ($current === null || isset($out['medio']) || $card !== '')) {
+      $partner = $this->resolveCard($card);
       $out += ['id_pph' => $partner['id'], 'tarjeta_pph' => $partner['tarjeta'], 'nombre_pph' => $partner['nombre']];
     }
     return $out;
@@ -432,6 +442,7 @@ final class CommercialCallsService
     if (!in_array($topic, $options['temas'], true) && $topic !== trim((string) ($call['tema_ayuda'] ?? ''))) {
       throw new \InvalidArgumentException('Selecciona el tema de la tarea.');
     }
+    $offer = isset(self::CLIENT_TOPICS[$topic]);
     $priority = $text('prioridad');
     $priority = in_array($priority, $options['prioridades'], true) ? $priority : self::DEFAULT_PRIORITY;
     $factors = array_values(array_intersect((array) ($input['factores'] ?? []), array_merge($options['factores'], self::factors($call['factores_importantes'] ?? ''))));
@@ -456,13 +467,13 @@ final class CommercialCallsService
       'usuario_wsp' => $text('usuario_wsp'),
       'prioridad' => $priority,
       'tema_ayuda' => $topic,
-      'id_inmueble' => $inmueble > 0 && $topic !== 'Captacion' ? (string) $inmueble : '',
+      'id_inmueble' => $inmueble > 0 && $offer ? (string) $inmueble : '',
       'tipo_inmueble' => $text('tipo_inmueble'),
       'destinacion' => $text('destinacion'),
       'uso' => $text('uso'),
       'medio' => $medio,
-      'precio' => self::amount($text('precio')),
-      'presupuesto' => self::amount($text('presupuesto')),
+      'precio' => in_array($topic, self::LISTING_TOPICS, true) ? self::amount($text('precio')) : '',
+      'presupuesto' => $offer ? self::amount($text('presupuesto')) : '',
       'factores' => implode(', ', $factors),
       'asunto' => $asunto,
       'descripcion' => $descripcion,
@@ -635,10 +646,21 @@ final class CommercialCallsService
     return (int) trim((string) ($row['id_ticket'] ?? ''));
   }
 
-  private static function amount(string $value): string
+  /** Monto en solo dígitos. Quita los decimales de valores antiguos ("1500000.00"), no los puntos de miles ("1.500.000"). */
+  public static function amount(string $value): string
   {
-    $digits = (string) preg_replace('/[^\d]/', '', $value);
-    return $digits === '' ? '' : $digits;
+    $value = trim($value);
+    if (preg_match('/^(\d+)[.,]\d{1,2}$/', $value, $match) === 1) {
+      $value = $match[1];
+    }
+    return substr((string) preg_replace('/\D+/', '', $value), 0, 15);
+  }
+
+  /** Monto para mostrar: 1500000 -> 1.500.000. */
+  public static function money(string $value): string
+  {
+    $digits = self::amount($value);
+    return $digits === '' ? '' : strrev(implode('.', str_split(strrev($digits), 3)));
   }
 
   /** Hoy conserva la hora real; un día anterior queda al mediodía de ese día para no cambiar de fecha por la zona horaria. */

@@ -47,6 +47,15 @@ async function fillCall(modal, values) {
     assert.ok(await modal.locator('[data-ccl-pph]').isVisible(), 'Club PPH debe pedir la tarjeta');
     assert.ok(await modal.locator('[data-ccl-month]').isVisible(), 'Cliente no inmediato debe pedir el mes');
     await modal.locator('[name="mes_inmueble"]').selectOption('Enero');
+    assert.ok(await page.evaluate(() => document.querySelector('.ccl-modal').getBoundingClientRect().width) >= 1200, 'El popup debe ser ancho');
+    assert.ok(await modal.locator('[name="presupuesto"]').isVisible() && await modal.locator('[name="id_inmueble"]').isVisible(), 'Arriendo pide presupuesto y código');
+    assert.ok(await modal.locator('[name="precio"]').isHidden(), 'Arriendo no pide precio');
+    await modal.locator('[name="presupuesto"]').pressSequentially('1500000');
+    assert.equal(await modal.locator('[name="presupuesto"]').inputValue(), '1.500.000');
+    await modal.locator('[name="tema_ayuda"]').selectOption('Captacion');
+    assert.ok(await modal.locator('[name="precio"]').isVisible(), 'Captación pide precio');
+    assert.ok(await modal.locator('[name="presupuesto"]').isHidden() && await modal.locator('[name="id_inmueble"]').isHidden(), 'Captación no pide presupuesto ni código');
+    await modal.locator('[name="tema_ayuda"]').selectOption('Arriendo');
     await modal.locator('[name="tarjeta_pph"]').fill('NO-EXISTE');
     await modal.locator('[name="tarjeta_pph"]').blur();
     await page.waitForFunction(() => document.querySelector('[data-ccl-card-result]').dataset.state === 'error');
@@ -87,6 +96,8 @@ async function fillCall(modal, values) {
     await modal.locator('[data-ccl-form]').waitFor();
     assert.equal(await modal.locator('[name="medio"]').count(), 0);
     assert.ok((await modal.innerText()).includes('Medio: Club PPH'));
+    for (const name of ['tema_ayuda', 'comisionista', 'cliente_inmediato', 'presupuesto', 'descripcion', 'merece_ticket', 'id_empleado']) assert.equal(await modal.locator('[name="' + name + '"]').count(), 0, name + ' no se edita');
+    await page.screenshot({ path: 'output/calls-edit-desktop.png' });
     await modal.locator('[name="cliente"]').fill('Laura Prueba Editada');
     await modal.locator('[type="submit"]').click();
     await modal.waitFor({ state: 'hidden' });
@@ -123,6 +134,11 @@ async function fillCall(modal, values) {
     await page.waitForFunction(() => document.querySelectorAll('[data-ccl-row]').length === 1);
     assert.ok(new URL(page.url()).searchParams.get('ll_medio') === 'Referido');
     await page.locator('[data-ccl-clear]').click();
+    await page.waitForFunction(() => document.querySelectorAll('[data-ccl-row]').length === 2);
+    await page.locator('[data-ccl-toggle="ll_inmediato"]').click();
+    await page.waitForFunction(() => document.querySelectorAll('[data-ccl-row]').length === 1);
+    assert.ok((await page.locator('[data-ccl-row]').innerText()).includes('Para Enero'));
+    await page.locator('[data-ccl-toggle="ll_inmediato"]').click();
     await page.waitForFunction(() => document.querySelectorAll('[data-ccl-row]').length === 2);
     await page.locator('[data-ccl-state="pendientes"]').click();
     await page.waitForFunction(() => document.querySelector('.ccl-empty') !== null);

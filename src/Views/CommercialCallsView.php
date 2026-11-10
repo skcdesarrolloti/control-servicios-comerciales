@@ -43,6 +43,9 @@ final class CommercialCallsView
       . $select('ll_medio', 'Medio', $list($options['medios_filtro']), $f['medio'], 'Todos')
       . $select('ll_tema', 'Motivo', $list($options['temas']), $f['tema'], 'Todos')
       . $select('ll_estado', 'Estado', ['pendientes' => 'Pendientes de crear tarea', 'con_tarea' => 'Con tarea', 'no_merece' => 'No merecen tarea'], $f['estado'], 'Todos')
+      . $select('ll_comisionista', '¿Comisionista?', ['Si' => 'Comisionistas', 'No' => 'No comisionistas'], $f['comisionista'], 'Todos')
+      . $select('ll_inmediato', '¿Cliente inmediato?', ['Si' => 'Inmediatos', 'No' => 'Para más adelante'], $f['inmediato'], 'Todos')
+      . $select('ll_mes', 'Mes que necesita', $list($options['meses']), $f['mes'], 'Todos')
       . ($team ? $select('ll_empleado', 'Responsable', $employees, $f['empleado'], 'Todo el equipo') : '')
       . '<label class="ccl-field"><span>Desde</span><input type="date" name="ll_desde" value="' . self::e($f['desde']) . '"></label>'
       . '<label class="ccl-field"><span>Hasta</span><input type="date" name="ll_hasta" value="' . self::e($f['hasta']) . '"></label>'
@@ -64,6 +67,10 @@ final class CommercialCallsView
     $html = '<div class="ccl-chips">';
     foreach ($chips as [$key, $label, $value]) {
       $html .= '<button type="button" class="ccl-chip' . ($current === $key ? ' is-active' : '') . '" data-ccl-state="' . $key . '" aria-pressed="' . ($current === $key ? 'true' : 'false') . '"><strong>' . number_format($value, 0, ',', '.') . '</strong>' . $label . '</button>';
+    }
+    foreach ([['ll_comisionista', 'comisionista', 'Si', 'Comisionistas', $counts['comisionistas']], ['ll_inmediato', 'inmediato', 'No', 'Para más adelante', $counts['mas_adelante']]] as [$name, $filter, $wanted, $label, $value]) {
+      $on = $listing['filters'][$filter] === $wanted;
+      $html .= '<button type="button" class="ccl-chip' . ($on ? ' is-active' : '') . '" data-ccl-toggle="' . $name . '" data-value="' . $wanted . '" aria-pressed="' . ($on ? 'true' : 'false') . '"><strong>' . number_format($value, 0, ',', '.') . '</strong>' . $label . '</button>';
     }
     $html .= '<span class="ccl-chip is-static"><strong>' . number_format($counts['pph'], 0, ',', '.') . '</strong>Clientes dados por Club PPH</span></div>';
     if ($listing['rows'] === []) {
@@ -91,9 +98,11 @@ final class CommercialCallsView
       if ($canCreate) {
         $actions .= '<button type="button" class="ccl-icon" data-ccl-repeat="' . $id . '" aria-label="Nueva solicitud de ' . self::e($row['cliente']) . '" title="Nueva solicitud de este contacto"><span class="material-symbols-outlined" aria-hidden="true">add_call</span></button>';
       }
+      $tags = ($row['comisionista'] ? '<span class="ccl-tag">Comisionista</span>' : '')
+        . ($row['mas_adelante'] ? '<span class="ccl-tag is-later">' . self::e($row['mes'] !== '' ? 'Para ' . $row['mes'] : 'Para más adelante') . '</span>' : '');
       $html .= '<tr data-ccl-row="' . $id . '">'
         . '<td data-label="Fecha">' . self::e($row['fecha'] ?: 'Sin fecha') . '</td>'
-        . '<td data-label="Contacto"><strong>' . self::e($row['cliente'] ?: 'Sin nombre') . '</strong><small>' . self::e($row['celular']) . '</small><small>' . self::e($row['email']) . '</small></td>'
+        . '<td data-label="Contacto"><strong>' . self::e($row['cliente'] ?: 'Sin nombre') . '</strong><small>' . self::e($row['celular']) . '</small><small>' . self::e($row['email']) . '</small>' . ($tags !== '' ? '<div class="ccl-tags">' . $tags . '</div>' : '') . '</td>'
         . '<td data-label="Motivo">' . self::e($row['tema']) . ($row['tipo'] !== '' || $row['inmueble'] !== '' ? '<small>' . self::e(trim($row['tipo'] . ($row['inmueble'] !== '' ? ' · #' . $row['inmueble'] : ''), ' ·')) . '</small>' : '') . '</td>'
         . '<td data-label="Medio">' . self::e($row['medio'] ?: 'Sin medio') . $partner . '</td>'
         . '<td data-label="Responsable">' . self::e($row['responsable'] ?: 'Sin asignar') . '</td>'
@@ -132,9 +141,9 @@ final class CommercialCallsView
     return $html . '</select></label>';
   }
 
-  private static function input(string $name, string $label, string $value, string $type = 'text', bool $required = false, string $extra = ''): string
+  private static function input(string $name, string $label, string $value, string $type = 'text', bool $required = false, string $extra = '', string $class = ''): string
   {
-    return '<label class="ccl-field"><span>' . $label . ($required ? ' <em aria-hidden="true">*</em>' : '') . '</span><input type="' . $type . '" name="' . $name . '" value="' . self::e($value) . '"' . ($required ? ' required' : '') . ' ' . $extra . '></label>';
+    return '<label class="ccl-field ' . $class . '"><span>' . $label . ($required ? ' <em aria-hidden="true">*</em>' : '') . '</span><input type="' . $type . '" name="' . $name . '" value="' . self::e($value) . '"' . ($required ? ' required' : '') . ' ' . $extra . '></label>';
   }
 
   /**
@@ -168,64 +177,68 @@ final class CommercialCallsView
     $mode = $data['mode'];
     $v = static fn(string $key): string => trim((string) ($call[$key] ?? ''));
     $yesNo = ['Si', 'No'];
-    $hasTask = (bool) $data['has_task'];
+    $editing = $mode === 'edit';
     $savedMedio = $v('medio');
-    $lockedMedio = $mode === 'edit' && $savedMedio !== '';
+    $lockedMedio = $editing && $savedMedio !== '';
     $pph = (string) $options['pph_medio'];
     $hasPartner = !in_array($v('id_pph'), ['', '0'], true);
-    $titles = ['new' => ['Registrar llamada', 'Registra el contacto y el medio por el que llegó.'], 'repeat' => ['Nueva solicitud', 'Ya conocemos a este contacto. Elige el medio por el que llegó esta vez.'], 'edit' => ['Editar llamada #' . (int) ($call['_ID'] ?? 0), 'El medio no se cambia para no alterar las estadísticas.']];
+    $titles = ['new' => ['Registrar llamada', 'Registra el contacto y el medio por el que llegó.'], 'repeat' => ['Nueva solicitud', 'Ya conocemos a este contacto. Elige el medio por el que llegó esta vez.'], 'edit' => ['Editar llamada #' . (int) ($call['_ID'] ?? 0), 'Aquí solo se corrigen los datos personales del contacto.']];
     [$title, $subtitle] = $titles[$mode];
     $origin = '';
     if ($lockedMedio) {
-      $origin = '<div class="ccl-locked"><span class="material-symbols-outlined" aria-hidden="true">lock</span><div><strong>Medio: ' . self::e($savedMedio) . '</strong><p>Si esta persona llegó por otro medio, es otra solicitud: usa <strong>Nueva solicitud</strong> y quedará en su historial.</p></div></div>';
+      $origin = '<div class="ccl-locked"><span class="material-symbols-outlined" aria-hidden="true">lock</span><div><strong>Medio: ' . self::e($savedMedio) . '</strong><p>El medio, el motivo, el inmueble y la asignación son de esta solicitud. Si algo de eso cambia, usa <strong>Nueva solicitud</strong> y quedará en su historial.</p></div></div>';
     } else {
-      $origin = self::selectField('medio', 'Medio', $options['medios'], '', true) . '<p class="ccl-hint">Revísalo bien: una vez guardado no se puede cambiar.</p>';
+      $origin = self::selectField('medio', 'Medio', $options['medios'], '', !$editing) . '<p class="ccl-hint">Revísalo bien: una vez guardado no se puede cambiar.</p>';
     }
     if ($lockedMedio && $hasPartner) {
       $origin .= '<p class="ccl-partner-box"><span class="material-symbols-outlined" aria-hidden="true">loyalty</span>Aliado Club PPH: <strong>' . self::e(trim($v('nombre_pph') . ' · ' . $v('tarjeta_pph'), ' ·')) . '</strong></p>';
     } elseif (!$hasPartner) {
-      $origin .= '<div class="ccl-card" data-ccl-pph' . ($savedMedio === $pph ? '' : ' hidden') . '><label class="ccl-field"><span>Tarjeta del aliado Club PPH <em aria-hidden="true">*</em></span><input type="text" name="tarjeta_pph" value="" autocomplete="off"></label><p class="ccl-hint" data-ccl-card-result role="status">El aliado queda ligado a este cliente para poder sumarle los puntos.</p></div>';
+      $origin .= '<div class="ccl-card" data-ccl-pph' . ($savedMedio === $pph ? '' : ' hidden') . '><label class="ccl-field"><span>Tarjeta del aliado Club PPH' . ($editing ? '' : ' <em aria-hidden="true">*</em>') . '</span><input type="text" name="tarjeta_pph" value="" autocomplete="off"></label><p class="ccl-hint" data-ccl-card-result role="status">El aliado queda ligado a este cliente para poder sumarle los puntos.</p></div>';
     }
     $html = self::modalHead($title, $subtitle)
       . '<form class="ccl-form" data-ccl-form data-pph-medio="' . self::e($pph) . '" novalidate>'
       . '<input type="hidden" name="id" value="' . ($mode === 'edit' ? (int) $call['_ID'] : 0) . '">'
       . '<div class="ccl-modal-body">'
       . '<p class="ccl-error" data-ccl-error role="alert" hidden></p>'
-      . '<h3>Contacto</h3><div class="ccl-grid">'
+      . '<h3>Contacto</h3><div class="ccl-grid-6">'
       . self::input('celular', 'Celular', $v('celular'), 'tel', true, 'inputmode="numeric" data-ccl-phone placeholder="Sin indicativo"')
-      . self::input('cliente', 'Nombre', $v('cliente'), 'text', true)
-      . self::input('email', 'Correo', $v('email'), 'email', true)
-      . self::pairField('indicativo', 'País', $options['paises'], $v('indicativo'), true)
+      . self::input('cliente', 'Nombre', $v('cliente'), 'text', true, '', 'ccl-wide')
+      . self::input('email', 'Correo', $v('email'), 'email', !$editing || $v('email') !== '', '', 'ccl-wide')
+      . self::pairField('indicativo', 'País', $options['paises'], $v('indicativo'), !$editing || $v('indicativo') !== '')
       . self::input('celular_wsp', 'Celular WhatsApp', $v('celular_wsp'), 'tel', false, 'inputmode="numeric"')
-      . self::input('usuario_wsp', 'Usuario WhatsApp', $v('usuario_wsp'))
+      . self::input('usuario_wsp', 'Usuario WhatsApp', $v('usuario_wsp'), 'text', false, '', 'ccl-wide')
       . '</div>'
       . '<div class="ccl-repeat" data-ccl-contact role="status" hidden></div>'
-      . '<h3>Origen</h3><div class="ccl-origin">' . $origin . '</div>'
+      . '<h3>Origen</h3><div class="ccl-origin">' . $origin . '</div>';
+    if ($editing) {
+      $repeat = !empty($data['can_repeat']) ? '<button type="button" class="ccl-secondary" data-ccl-repeat="' . (int) $call['_ID'] . '">Nueva solicitud</button>' : '';
+      return $html . '</div><footer class="ccl-modal-foot"><button type="button" class="ccl-secondary" data-ccl-close>Cancelar</button>' . $repeat . '<button type="submit" class="ccl-primary">Guardar cambios</button></footer></form>';
+    }
+    $money = 'inputmode="numeric" autocomplete="off" data-ccl-money';
+    $employees = array_map(static fn(array $employee): array => ['value' => (string) $employee['id'], 'label' => (string) $employee['name']], $options['funcionarios']);
+    return $html
+      . '<h3>Tipo de cliente</h3><div class="ccl-grid">'
+      . self::selectField('comisionista', '¿Es comisionista?', $yesNo, '', true)
+      . self::selectField('cliente_inmediato', '¿Cliente inmediato?', $yesNo, '', true)
+      . '<div data-ccl-month hidden>' . self::selectField('mes_inmueble', 'Mes en que necesita el inmueble', $options['meses'], '', false) . '</div>'
+      . '</div>'
       . '<h3>Solicitud</h3><div class="ccl-grid">'
-      . ($mode === 'edit' ? '' : self::input('fecha', 'Fecha', (new \DateTimeImmutable('now', new \DateTimeZone('America/Bogota')))->format('Y-m-d'), 'date', true))
-      . self::selectField('tema_ayuda', 'Motivo', $options['temas'], $v('tema_ayuda'), true)
-      . self::selectField('comisionista', '¿Es comisionista?', $yesNo, $v('comisionista'), true)
-      . self::selectField('cliente_inmediato', '¿Cliente inmediato?', $yesNo, $v('cliente_inmediato'), true)
-      . '<div data-ccl-month' . ($v('cliente_inmediato') === 'No' ? '' : ' hidden') . '>' . self::selectField('mes_inmueble', 'Mes en que necesita el inmueble', $options['meses'], $v('mes_inmueble'), false) . '</div>'
-      . self::selectField('tipo_inmueble', 'Tipo de inmueble', $options['tipos'], $v('tipo_inmueble'), false)
-      . self::selectField('destinacion', 'Destinación', $options['destinaciones'], $v('destinacion'), false)
-      . self::selectField('uso', 'Uso', $options['usos'], $v('uso'), false)
-      . self::input('id_inmueble', 'Código del inmueble', $v('id_inmueble'), 'text', false, 'inputmode="numeric"')
-      . self::input('presupuesto', 'Presupuesto', $v('presupuesto'), 'text', false, 'inputmode="numeric"')
-      . self::input('precio', 'Precio', $v('precio'), 'text', false, 'inputmode="numeric"')
-      . self::selectField('observacion', 'Observación', $options['observaciones'], $v('observacion'), false)
+      . self::input('fecha', 'Fecha', (new \DateTimeImmutable('now', new \DateTimeZone('America/Bogota')))->format('Y-m-d'), 'date', true)
+      . self::selectField('tema_ayuda', 'Motivo', $options['temas'], '', true)
+      . self::selectField('tipo_inmueble', 'Tipo de inmueble', $options['tipos'], '', false)
+      . self::selectField('destinacion', 'Destinación', $options['destinaciones'], '', false)
+      . self::selectField('uso', 'Uso', $options['usos'], '', false)
+      . '<div data-ccl-topic-field="codigo" hidden>' . self::input('id_inmueble', 'Código del inmueble', '', 'text', false, 'inputmode="numeric"') . '</div>'
+      . '<div data-ccl-topic-field="presupuesto" hidden>' . self::input('presupuesto', 'Presupuesto', '', 'text', false, $money) . '</div>'
+      . '<div data-ccl-topic-field="precio" hidden>' . self::input('precio', 'Precio', '', 'text', false, $money) . '</div>'
+      . self::selectField('observacion', 'Observación', $options['observaciones'], '', false)
       . '</div>'
       . self::checks('factores_importantes', 'Factores importantes', $options['factores'], $data['factores'])
-      . '<label class="ccl-field"><span>Descripción</span><textarea name="descripcion" rows="3">' . self::e($v('descripcion')) . '</textarea></label>'
-      . '<h3>Asignación</h3><div class="ccl-grid">';
-    if ($hasTask) {
-      $html .= '<p class="ccl-hint ccl-span">La llamada ya tiene tarea: el responsable y si merece tarea se gestionan desde la tarea.</p>';
-    } else {
-      $html .= self::selectField('merece_ticket', '¿Merece tarea?', $yesNo, $v('merece_ticket'), true);
-      $employees = array_map(static fn(array $employee): array => ['value' => (string) $employee['id'], 'label' => (string) $employee['name']], $options['funcionarios']);
-      $html .= self::pairField('id_empleado', 'Asignar a', $employees, $v('id_empleado'), true);
-    }
-    return $html . '</div></div><footer class="ccl-modal-foot"><button type="button" class="ccl-secondary" data-ccl-close>Cancelar</button><button type="submit" class="ccl-primary">' . ($mode === 'edit' ? 'Guardar cambios' : 'Guardar llamada') . '</button></footer></form>';
+      . '<label class="ccl-field"><span>Descripción</span><textarea name="descripcion" rows="3"></textarea></label>'
+      . '<h3>Asignación</h3><div class="ccl-grid">'
+      . self::selectField('merece_ticket', '¿Merece tarea?', $yesNo, '', true)
+      . self::pairField('id_empleado', 'Asignar a', $employees, $v('id_empleado'), true)
+      . '</div></div><footer class="ccl-modal-foot"><button type="button" class="ccl-secondary" data-ccl-close>Cancelar</button><button type="submit" class="ccl-primary">Guardar llamada</button></footer></form>';
   }
 
   /**
@@ -243,22 +256,22 @@ final class CommercialCallsView
       . '<div class="ccl-modal-body"><p class="ccl-error" data-ccl-error role="alert" hidden></p>'
       . '<div class="ccl-locked"><span class="material-symbols-outlined" aria-hidden="true">lock</span><div><strong>Medio: ' . self::e($v('medio') ?: 'Sin medio') . '</strong><p>Asignada a ' . self::e($data['responsable'] ?: 'sin responsable') . '. La tarea conserva el medio de su llamada.</p></div></div>'
       . ($partner ? '<p class="ccl-partner-box"><span class="material-symbols-outlined" aria-hidden="true">loyalty</span>Aliado Club PPH: <strong>' . self::e(trim($v('nombre_pph') . ' · ' . $v('tarjeta_pph'), ' ·')) . '</strong></p>' : '')
-      . '<h3>Solicitante</h3><div class="ccl-grid">'
-      . self::input('solicitante', 'Nombre', $v('cliente'), 'text', true)
-      . self::input('correo_solicitante', 'Correo', $v('email'), 'email')
+      . '<h3>Solicitante</h3><div class="ccl-grid-6">'
+      . self::input('solicitante', 'Nombre', $v('cliente'), 'text', true, '', 'ccl-wide')
+      . self::input('correo_solicitante', 'Correo', $v('email'), 'email', false, '', 'ccl-wide')
       . self::input('celular_solicitante', 'Celular', $v('celular'), 'tel', true, 'inputmode="numeric"')
       . self::input('celular_wsp', 'Celular WhatsApp', $v('celular_wsp'), 'tel', false, 'inputmode="numeric"')
-      . self::input('usuario_wsp', 'Usuario WhatsApp', $v('usuario_wsp'))
+      . self::input('usuario_wsp', 'Usuario WhatsApp', $v('usuario_wsp'), 'text', false, '', 'ccl-wide')
       . '</div><h3>Tarea</h3><div class="ccl-grid">'
       . self::selectField('prioridad', 'Prioridad', $options['prioridades'], 'Prioridad comercial', true)
       . self::selectField('tema_ayuda', 'Tema', $options['temas'], $topic, true)
-      . '<div data-ccl-task-field="codigo">' . self::input('id_inmueble', 'Código del inmueble', $v('id_inmueble'), 'text', false, 'inputmode="numeric"') . '</div>'
+      . '<div data-ccl-topic-field="codigo" hidden>' . self::input('id_inmueble', 'Código del inmueble', $v('id_inmueble'), 'text', false, 'inputmode="numeric"') . '</div>'
       . self::selectField('tipo_inmueble', 'Tipo de inmueble', $options['tipos'], $v('tipo_inmueble'), false)
       . self::selectField('destinacion', 'Destinación', $options['destinaciones'], $v('destinacion'), false)
       . self::selectField('uso', 'Uso', $options['usos'], $v('uso'), false)
-      . '<div data-ccl-task-field="precio" hidden>' . self::input('precio', 'Precio', $v('precio'), 'text', false, 'inputmode="numeric"') . '</div>'
-      . '<div data-ccl-task-field="presupuesto" hidden>' . self::input('presupuesto', 'Presupuesto', $v('presupuesto'), 'text', false, 'inputmode="numeric"') . '</div>'
-      . '</div><div data-ccl-task-field="factores" hidden>' . self::checks('factores', 'Factores importantes', $options['factores'], $data['factores']) . '</div>'
+      . '<div data-ccl-topic-field="precio" hidden>' . self::input('precio', 'Precio', CommercialCallsService::money($v('precio')), 'text', false, 'inputmode="numeric" autocomplete="off" data-ccl-money') . '</div>'
+      . '<div data-ccl-topic-field="presupuesto" hidden>' . self::input('presupuesto', 'Presupuesto', CommercialCallsService::money($v('presupuesto')), 'text', false, 'inputmode="numeric" autocomplete="off" data-ccl-money') . '</div>'
+      . '</div><div data-ccl-topic-field="factores" hidden>' . self::checks('factores', 'Factores importantes', $options['factores'], $data['factores']) . '</div>'
       . '<label class="ccl-field"><span>Asunto <em aria-hidden="true">*</em></span><input type="text" name="asunto" required maxlength="190"></label>'
       . '<label class="ccl-field"><span>Resumen <em aria-hidden="true">*</em></span><textarea name="descripcion" rows="4" required>' . self::e($v('descripcion')) . '</textarea></label>'
       . '</div><footer class="ccl-modal-foot"><button type="button" class="ccl-secondary" data-ccl-close>Crear más tarde</button><button type="submit" class="ccl-primary">Crear tarea</button></footer></form>';
