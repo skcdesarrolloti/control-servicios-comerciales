@@ -323,6 +323,8 @@ final class CommercialCallsTest extends TestCase
     $new = CommercialCallsView::form($service->formData([]), $service->options());
     self::assertStringContainsString('name="medio"', $new);
     self::assertStringContainsString('data-ccl-pph hidden', $new);
+    self::assertStringNotContainsString('name="observacion"', $new);
+    self::assertSame('', (string) ($this->row($this->create(['observacion' => 'Interesado', 'celular' => '3009990000']))['observacion'] ?? ''));
   }
 
   public function testPageEscapesValuesAndShowsFilters(): void

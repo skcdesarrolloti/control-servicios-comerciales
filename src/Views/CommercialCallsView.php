@@ -231,7 +231,6 @@ final class CommercialCallsView
       . '<div data-ccl-topic-field="codigo" hidden>' . self::input('id_inmueble', 'Código del inmueble', '', 'text', false, 'inputmode="numeric"') . '</div>'
       . '<div data-ccl-topic-field="presupuesto" hidden>' . self::input('presupuesto', 'Presupuesto', '', 'text', false, $money) . '</div>'
       . '<div data-ccl-topic-field="precio" hidden>' . self::input('precio', 'Precio', '', 'text', false, $money) . '</div>'
-      . self::selectField('observacion', 'Observación', $options['observaciones'], '', false)
       . '</div>'
       . self::checks('factores_importantes', 'Factores importantes', $options['factores'], $data['factores'])
       . '<label class="ccl-field"><span>Descripción</span><textarea name="descripcion" rows="3"></textarea></label>'
