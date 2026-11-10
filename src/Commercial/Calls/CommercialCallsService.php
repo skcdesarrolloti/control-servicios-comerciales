@@ -7,6 +7,7 @@ namespace SCM\Commercial\Calls;
 use SCM\Commercial\CommercialAccessPolicy;
 use SCM\Commercial\CommercialTicketsRepository;
 use SCM\Commercial\Medios\MedioCatalog;
+use SCM\Commercial\Medios\MedioResolver;
 use SCM\Core\Auth;
 use SCM\Core\Database;
 use SCM\Core\Settings;
@@ -121,7 +122,7 @@ final class CommercialCallsService
   public function options(): array
   {
     $glossary = fn(int $id): array => array_column($this->repository->glossary($id), 'value');
-    $topics = $glossary(816) ?: CommercialTicketsRepository::COMMERCIAL_TOPICS;
+    $topics = self::callTopics($glossary(816) ?: CommercialTicketsRepository::COMMERCIAL_TOPICS);
     return [
       'temas' => $topics,
       'tipos' => $glossary(783),
@@ -136,6 +137,27 @@ final class CommercialCallsService
       'funcionarios' => (new CommercialTicketsRepository($this->db))->ticketEmployees($this->commercialCargos()),
       'pph_medio' => $this->pphMedio(),
     ];
+  }
+
+  /**
+   * Motivos de una llamada: el glosario de temas hasta antes de "Entrega de inmuebles" (lo de ahí para abajo es de otras
+   * áreas) y sin Actualización. El glosario no se modifica porque lo usan otros formularios.
+   * @param list<string> $topics
+   * @return list<string>
+   */
+  private static function callTopics(array $topics): array
+  {
+    $out = [];
+    foreach ($topics as $topic) {
+      $key = MedioResolver::key($topic);
+      if (str_starts_with($key, MedioResolver::key('Entrega'))) {
+        break;
+      }
+      if ($key !== MedioResolver::key('Actualizacion')) {
+        $out[] = $topic;
+      }
+    }
+    return $out;
   }
 
   /** @return array<int,string> */

@@ -132,6 +132,24 @@ final class CommercialCallsTest extends TestCase
     self::assertSame('1.500', CommercialCallsService::money('1.500'));
   }
 
+  public function testMotivesStopBeforeDeliveryAndSkipUpdate(): void
+  {
+    $values = ['Avaluo', 'Actualizacion', 'Captacion', 'Arriendo', 'Venta', 'Entrega de inmuebles', 'Mantenimiento', 'Retoque'];
+    $this->db->update('wp_jet_post_types', ['meta_fields' => serialize(array_map(static fn(string $value): array => ['value' => $value, 'label' => $value, 'is_checked' => false], $values))], ['id' => 816]);
+    self::assertSame(['Avaluo', 'Captacion', 'Arriendo', 'Venta'], $this->service()->options()['temas']);
+    foreach (['Actualizacion', 'Entrega de inmuebles', 'Retoque'] as $removed) {
+      try {
+        $this->create(['tema_ayuda' => $removed, 'celular' => '3002220000']);
+        self::fail('No debía aceptar ' . $removed);
+      } catch (\InvalidArgumentException $exception) {
+        self::assertStringContainsString('motivo', $exception->getMessage());
+      }
+    }
+    $this->db->insert('wp_jet_cct_cct_llamadas', ['_ID' => 70, 'id_empleado' => '101', 'cct_author_id' => '101', 'cliente' => 'Antigua', 'celular' => '3002221111', 'medio' => 'Aviso', 'merece_ticket' => 'Si', 'tema_ayuda' => 'Actualizacion']);
+    $service = $this->service();
+    self::assertStringContainsString('value="Actualizacion" selected', CommercialCallsView::taskForm($service->taskData(70), $service->options()));
+  }
+
   public function testGroupsCommissionAgentsAndLaterClients(): void
   {
     $agent = $this->create(['comisionista' => 'Si', 'celular' => '3001000001']);
