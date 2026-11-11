@@ -1,6 +1,7 @@
 # Reglas operativas del panel de servicios comerciales
 
 - Después de cada cambio solicitado y verificado, hacer commit y push a `main`.
+- El panel está publicado en `https://sucasainmobiliaria.com.co/dashboard-comercial/public/` (ya no en `control-servicios-comerciales`). Usar esa base en documentación, plantillas de WhatsApp y ejemplos; en el código, siempre `SCM_BASE_URL` (`APP_URL`), nunca la dirección escrita.
 - Toda configuración del panel se abre desde el menú **Configuración** del encabezado (`#commercial-config-menu` en `CommercialDashboardView::render`), no con botones dentro de los paneles. Las secciones se cargan y guardan con `commercial_settings_load` / `commercial_settings_save` (`CommercialSettingsService`); el menú solo lo ven los cargos administradores.
 - Los valores que comparten otras aplicaciones (SLA de tareas `control_tickets_sla_config`, plazos y valores de avisos, cupos de destacados) se guardan en su fila de `wp_jet_cct_confi_sistema`; la configuración propia del panel va en `Settings` (`control_servicios_comerciales_config`).
 - No cambiar `estado_administrativo` de las tareas salvo que el usuario lo pida. La API del calendario (`public/calendar-api.php`, `src/Commercial/Calendar/`) nunca lo escribe y solo cambia `estado_comercial` si se eligió otro.
