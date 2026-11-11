@@ -6,7 +6,7 @@ Para todas: categoría **Utilidad**, idioma **Español (Colombia)** (`es_CO`), v
 
 En el botón, el campo **URL del sitio web** lleva todo lo que está antes de `{{1}}` (Meta pone `{{1}}` al final por su cuenta) y el panel completa solo el final: el número de la tarea o el código del enlace. Deja sin marcar **Permite que Meta use el seguimiento de enlaces**: el enlace del cliente es privado y así no pasa por Meta.
 
-Mientras Meta no las apruebe, deja apagados los WhatsApp en **Configuración › Llamadas**. El correo funciona sin ellas.
+Los WhatsApp vienen activos en **Configuración › Llamadas**: en cuanto Meta apruebe las plantillas empiezan a llegar. Mientras tanto Meta rechaza esos envíos y el correo sale igual.
 
 ## 1. `scm_tarea_comercial_asignada_v1`
 
@@ -72,4 +72,4 @@ Botón `Ver y responder`, la misma URL de la plantilla 2. En **URL de muestra** 
 
 ## Activación
 
-Cuando las cuatro estén **Activas**, entra a **Configuración › Llamadas** y enciende **WhatsApp al funcionario** y **WhatsApp al cliente**. Si Meta exige otro nombre, escríbelo ahí.
+No hay que encender nada. Si Meta exige otro nombre para alguna plantilla, escríbelo en **Configuración › Llamadas**.

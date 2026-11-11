@@ -202,7 +202,7 @@
         var template = function (name, label) { return '<label class="block text-sm text-slate-700">' + label + '<input name="' + name + '" value="' + esc(settings[name] || "") + '" class="mt-1 w-full px-2 py-1.5 rounded-lg border border-slate-300 text-sm"></label>'; };
         return '<form data-config-form class="text-left space-y-3">' + intro("Avisos de las tareas. Las copias a otros funcionarios se eligen en Notificaciones internas.") +
           check("asignado", "Correo al funcionario asignado") + check("solicitante", "Correo al cliente al crear la tarea") +
-          check("whatsapp_asignado", "WhatsApp al funcionario (actívalo cuando Meta apruebe las plantillas)") + check("whatsapp_solicitante", "WhatsApp al cliente (actívalo cuando Meta apruebe las plantillas)") +
+          check("whatsapp_asignado", "WhatsApp al funcionario") + check("whatsapp_solicitante", "WhatsApp al cliente") +
           template("plantilla_asignada", "Plantilla: tarea asignada") + template("plantilla_registrada", "Plantilla: solicitud registrada") +
           template("plantilla_respuesta_cliente", "Plantilla: el cliente escribió") + template("plantilla_respuesta_funcionario", "Plantilla: el funcionario respondió") +
           template("idioma", "Idioma de las plantillas") + "</form>";

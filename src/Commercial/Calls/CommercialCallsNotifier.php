@@ -26,7 +26,7 @@ final class CommercialCallsNotifier
     'plantilla_respuesta_cliente' => 'scm_tarea_comercial_respuesta_cliente_v1',
     'plantilla_respuesta_funcionario' => 'scm_tarea_comercial_respuesta_funcionario_v1',
   ];
-  public const DEFAULTS = ['asignado' => true, 'solicitante' => true, 'administradores' => true, 'whatsapp_asignado' => false, 'whatsapp_solicitante' => false, 'idioma' => 'es_CO', 'admin_emails' => []] + self::TEMPLATES;
+  public const DEFAULTS = ['asignado' => true, 'solicitante' => true, 'administradores' => true, 'whatsapp_asignado' => true, 'whatsapp_solicitante' => true, 'idioma' => 'es_CO', 'admin_emails' => []] + self::TEMPLATES;
 
   private const BROCHURE = 'https://sucasainmobiliaria.com.co/brochure-skc-sucasa-inmobiliaria/';
 

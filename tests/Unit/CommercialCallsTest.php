@@ -388,11 +388,14 @@ final class CommercialCallsTest extends TestCase
     $internal->save([$event => $ids]);
   }
 
-  public function testWhatsappStaysOffUntilEnabledAndClientGetsSignedLink(): void
+  public function testWhatsappIsOnByDefaultAndClientGetsSignedLink(): void
   {
     [$notifier, $log] = $this->recorder();
     $this->taskFromCall($notifier);
-    self::assertSame([], $log->whatsapp, 'Sin plantillas aprobadas no debe salir WhatsApp.');
+    self::assertSame(['scm_tarea_comercial_asignada_v1', 'scm_tarea_comercial_registrada_v1'], array_column($log->whatsapp, 1), 'El WhatsApp viene activo por defecto.');
+    [$notifier, $log] = $this->recorder(['whatsapp_asignado' => false, 'whatsapp_solicitante' => false]);
+    $this->service($notifier)->createTask($this->taskInput($this->create(['celular' => '3007770000'])));
+    self::assertSame([], $log->whatsapp, 'Apagado en Configuración no sale.');
     $client = array_values(array_filter($log->mail, static fn(array $mail): bool => $mail[0] === 'laura@example.test'))[0];
     self::assertStringContainsString('tarea.php?t=', $client[2]);
 
@@ -414,7 +417,7 @@ final class CommercialCallsTest extends TestCase
     $this->db->insert('wp_jet_cct_clientes', ['nombre' => 'Laura', 'celular' => '3001234567', 'bloqueo_whatsapp' => '1', 'bloqueo_email' => '1']);
     [$notifier, $log] = $this->recorder(['whatsapp_solicitante' => true]);
     $this->taskFromCall($notifier);
-    self::assertSame([], $log->whatsapp);
+    self::assertSame(['+573000000101'], array_column($log->whatsapp, 0), 'Al cliente que bloqueó WhatsApp no le llega; al funcionario sí.');
     self::assertSame([], array_values(array_filter($log->mail, static fn(array $mail): bool => $mail[0] === 'laura@example.test')));
   }
 
