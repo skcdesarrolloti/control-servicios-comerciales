@@ -4,7 +4,7 @@ Crea estas cuatro plantillas en **Meta Business Suite → Administrador de Whats
 
 Para todas: categoría **Utilidad**, idioma **Spanish (COL)** (`es_CO`), tipo de variable **Número**, pie de página `SKC SuCasa Inmobiliaria` y un botón **Ir al sitio web** con URL **Dinámica**. Usa los nombres exactos. Solo la 2 lleva encabezado (imagen).
 
-Cada dato es una sola variable: el contacto de un funcionario (nombre, correo y celular) lo arma el sistema en una línea, como en el panel inmobiliario. Meta no acepta cuerpos que empiecen o terminen con una variable ni dos variables seguidas.
+Cada dato es una sola variable: el contacto de un funcionario (nombre, correo y celular) lo arma el sistema en una línea, como en el panel inmobiliario. Meta no acepta cuerpos que empiecen o terminen con una variable ni dos variables seguidas: por eso el cuerpo siempre cierra con la línea `*Construimos confianza, protegemos su patrimonio.*` (la 1 ya estaba creada y queda como está).
 
 En el botón, **URL del sitio web** lleva todo lo que está antes de `{{1}}` (Meta pone `{{1}}` al final) y el panel completa solo el final. En **URL de muestra** va la URL completa. Deja sin marcar **Permite que Meta use el seguimiento de enlaces**.
 
@@ -12,7 +12,7 @@ Los WhatsApp vienen activos en **Configuración › Llamadas**: llegan en cuanto
 
 ## 1. `scm_tarea_comercial_asignada_v1`
 
-Para el funcionario asignado y las copias internas, al crear la tarea.
+Para el funcionario asignado y las copias internas, al crear la tarea. Ya está creada: no la cambies.
 
 ```text
 Hola *{{1}}.*
@@ -43,6 +43,8 @@ Registramos tu solicitud *#{{2}}* de *{{3}}*.
 *Te atenderá:* {{4}}.
 
 Desde el botón puedes ver tu solicitud y escribirnos.
+
+*Construimos confianza, protegemos su patrimonio.*
 ```
 
 Ejemplos: `{{1}}` Luis Prada · `{{2}}` 1686 · `{{3}}` Arriendo · `{{4}}` Jocabeth Cantillo · Correo: jocabeth@ejemplo.com · Celular: 3001234567
@@ -61,6 +63,8 @@ El cliente *{{2}}* escribió en la tarea comercial *#{{3}}*.
 *Mensaje:* {{4}}.
 
 Responde desde el panel.
+
+*Construimos confianza, protegemos su patrimonio.*
 ```
 
 Ejemplos: `{{1}}` Jocabeth Cantillo · `{{2}}` Luis Prada · `{{3}}` 1686 · `{{4}}` Quisiera visitar el apartamento el sábado
@@ -80,7 +84,8 @@ Desde el botón puedes leerla y escribirnos.
 
 Atentamente,
 {{3}}.
-Equipo comercial.
+
+*Construimos confianza, protegemos su patrimonio.*
 ```
 
 Ejemplos: `{{1}}` Luis Prada · `{{2}}` 1686 · `{{3}}` Jocabeth Cantillo · Correo: jocabeth@ejemplo.com · Celular: 3001234567
