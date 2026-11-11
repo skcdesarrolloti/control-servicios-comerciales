@@ -2,7 +2,7 @@
 
 Crea estas cuatro plantillas en **Meta Business Suite → Administrador de WhatsApp → Plantillas de mensajes → Crear plantilla**, en la misma cuenta que usa el panel.
 
-Para todas: categoría **Utilidad**, idioma **Español (Colombia)** (`es_CO`), variables tipo **Número**, sin encabezado salvo la 2, pie de página `SKC SuCasa Inmobiliaria` y un solo botón **Visitar sitio web** con URL **dinámica**. Usa los nombres exactos. Meta no acepta cuerpos que empiecen o terminen con una variable ni dos variables seguidas: por eso todos cierran con la firma fija.
+Para todas: categoría **Utilidad**, idioma **Español (Colombia)** (`es_CO`), variables tipo **Número**, sin encabezado salvo la 2, pie de página `SKC SuCasa Inmobiliaria` y un solo botón **Visitar sitio web** con URL **dinámica**. Usa los nombres exactos. Meta no acepta cuerpos que empiecen o terminen con una variable ni dos variables seguidas. El contacto de un funcionario va en una sola línea, y solo la respuesta del funcionario (plantilla 4) firma con "Atentamente".
 
 En el botón, el campo **URL del sitio web** lleva todo lo que está antes de `{{1}}` (Meta pone `{{1}}` al final por su cuenta) y el panel completa solo el final: el número de la tarea o el código del enlace. Deja sin marcar **Permite que Meta use el seguimiento de enlaces**: el enlace del cliente es privado y así no pasa por Meta.
 
@@ -18,12 +18,8 @@ Se registró la tarea comercial #{{2}} para gestión.
 Cliente: {{3}}.
 Motivo: {{4}}.
 Medio: {{5}}.
-Responsable: {{6}}.
-Correo: {{7}}.
-Celular: {{8}}.
+Responsable: {{6}} · Correo: {{7}} · Celular: {{8}}.
 Consulta los detalles en el panel.
-Atentamente,
-Equipo comercial de SKC SuCasa Inmobiliaria.
 ```
 
 Ejemplos: María Pérez · 10945 · Laura Gómez · Arriendo · Referido · Carlos López · carlos.lopez@ejemplo.com · 3001234567
@@ -39,12 +35,8 @@ Para el cliente, al crear la tarea. Es la única con **encabezado de imagen**: l
 ```text
 Hola {{1}}.
 Registramos tu solicitud #{{2}} de {{3}}.
-Te atenderá {{4}}.
-Correo: {{5}}.
-Celular: {{6}}.
+Te atenderá {{4}} · Correo: {{5}} · Celular: {{6}}.
 Desde el botón puedes ver tu solicitud y escribirnos.
-Atentamente,
-Equipo comercial de SKC SuCasa Inmobiliaria.
 ```
 
 Ejemplos: Laura Gómez · 10945 · Arriendo · Carlos López · carlos.lopez@ejemplo.com · 3001234567
@@ -60,8 +52,6 @@ Hola {{1}}.
 El cliente {{2}} escribió en la tarea comercial #{{3}}.
 Mensaje: {{4}}.
 Responde desde el panel.
-Atentamente,
-Equipo comercial de SKC SuCasa Inmobiliaria.
 ```
 
 Ejemplos: Carlos López · Laura Gómez · 10945 · Quisiera visitar el apartamento el sábado
@@ -74,15 +64,12 @@ Para el cliente, cuando el funcionario responde marcando avisar al cliente.
 
 ```text
 Hola {{1}}.
-{{2}} respondió tu solicitud #{{3}}.
-Correo: {{4}}.
-Celular: {{5}}.
-Desde el botón puedes leer la respuesta y escribirnos.
-Atentamente,
-Equipo comercial de SKC SuCasa Inmobiliaria.
+Tienes una respuesta en tu solicitud #{{2}}.
+Desde el botón puedes leerla y escribirnos.
+Atentamente, {{3}} · Correo: {{4}} · Celular: {{5}}, de SKC SuCasa Inmobiliaria.
 ```
 
-Ejemplos: Laura Gómez · Carlos López · 10945 · carlos.lopez@ejemplo.com · 3001234567
+Ejemplos: Laura Gómez · 10945 · Carlos López · carlos.lopez@ejemplo.com · 3001234567
 
 Botón `Ver y responder`, la misma URL de la plantilla 2. En **URL de muestra** escribe la URL completa: `https://sucasainmobiliaria.com.co/dashboard-comercial/public/tarea.php?t=10945.1893456000.ejemplo`.
 

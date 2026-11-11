@@ -202,7 +202,7 @@ final class CommercialCallsNotifier
     }
     if ($this->settings['whatsapp_solicitante'] && !$this->blocked($client, 'whatsapp')) {
       $this->whatsappTo(self::clientPhone($task), (string) ($task['indicativo'] ?? ''), (string) $this->settings['plantilla_respuesta_funcionario'],
-        [$task['solicitante'] ?? '', $author, (string) $id, $email, $phone], PublicTaskAccess::reference($id), $key . ':whatsapp');
+        [$task['solicitante'] ?? '', (string) $id, $author, $email, $phone], PublicTaskAccess::reference($id), $key . ':whatsapp');
     }
   }
 

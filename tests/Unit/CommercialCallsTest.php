@@ -532,7 +532,7 @@ final class CommercialCallsTest extends TestCase
     $log->whatsapp = [];
     $conversation->officerReply($id, 'Te espero <script>alert(1)</script> el lunes', 'Consultora Uno', '101');
     self::assertSame('scm_tarea_comercial_respuesta_funcionario_v1', $log->whatsapp[0][1]);
-    self::assertSame(['Laura Prueba', 'Consultora Uno', (string) $id, '101@example.test', '3000000101'], array_column($log->whatsapp[0][2][0]['parameters'], 'text'), 'Nombre, correo y celular de quien responde.');
+    self::assertSame(['Laura Prueba', (string) $id, 'Consultora Uno', '101@example.test', '3000000101'], array_column($log->whatsapp[0][2][0]['parameters'], 'text'), 'Nombre, correo y celular de quien responde.');
     $html = PublicTaskView::render($conversation->task($id), $conversation->messages($id), 'tarea.php?t=x', 'a.css', 'logo.png');
     self::assertStringContainsString('Te espero', $html);
     self::assertStringNotContainsString('<script>', $html);
