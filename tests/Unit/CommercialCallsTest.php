@@ -404,12 +404,64 @@ final class CommercialCallsTest extends TestCase
     self::assertSame(['+573000000101', '+573005551212'], [$this->phoneOf($log->whatsapp[0]), $this->phoneOf($log->whatsapp[1])]);
     self::assertSame('scm_tarea_comercial_asignada_v1', $log->whatsapp[0][1]);
     self::assertSame('scm_tarea_comercial_registrada_v1', $log->whatsapp[1][1]);
-    self::assertSame($id, PublicTaskAccess::verify($log->whatsapp[1][2][1]['parameters'][0]['text']));
+    self::assertSame($id, PublicTaskAccess::verify(end($log->whatsapp[1][2])['parameters'][0]['text']));
   }
 
   private function phoneOf(array $whatsapp): string
   {
     return $whatsapp[0];
+  }
+
+  public function testClientWhatsappHeaderUsesTheAssigneeCard(): void
+  {
+    $this->db->update('wp_jet_cct_funcionarios', ['ficha' => 'https://panel.test/public/file.php?n=ficha.jpg&s=abc'], ['id_empleado' => '101']);
+    [$notifier, $log] = $this->recorder();
+    $this->taskFromCall($notifier);
+    $client = array_values(array_filter($log->whatsapp, static fn(array $item): bool => $item[1] === 'scm_tarea_comercial_registrada_v1'))[0];
+    self::assertSame(['type' => 'header', 'parameters' => [['type' => 'image', 'image' => ['link' => 'https://panel.test/public/file.php?n=ficha.jpg&s=abc']]]], $client[2][0]);
+    $staff = array_values(array_filter($log->whatsapp, static fn(array $item): bool => $item[1] === 'scm_tarea_comercial_asignada_v1'))[0];
+    self::assertSame('body', $staff[2][0]['type'], 'La plantilla del funcionario no lleva imagen.');
+  }
+
+  public function testClientWhatsappHeaderFallsBackWhenNoCard(): void
+  {
+    [$notifier, $log] = $this->recorder();
+    $this->taskFromCall($notifier);
+    $client = array_values(array_filter($log->whatsapp, static fn(array $item): bool => $item[1] === 'scm_tarea_comercial_registrada_v1'))[0];
+    self::assertSame('header', $client[2][0]['type']);
+    self::assertNotSame('', $client[2][0]['parameters'][0]['image']['link'], 'Sin ficha va una imagen de respaldo.');
+  }
+
+  public function testStaffCardsSaveRemoveAndPermissions(): void
+  {
+    self::assertSame('Fichas de funcionarios', CommercialAccessPolicy::SUBVIEWS['promocion']['fichas_funcionarios']);
+    self::assertContains('fichas_gestionar', CommercialAccessPolicy::OPT_IN_ACTIONS);
+    self::assertSame('staffCardSave', CommercialActionRouter::PROMOTION_ACTIONS['commercial_staff_card_save']);
+    $files = new class extends \SCM\Commercial\Promotion\Pop\PopFiles {
+      public function count(string $field): int { return 1; }
+      public function store(string $field, int $max): array { return ['https://panel.test/public/file.php?n=nueva.jpg&s=1']; }
+    };
+    $service = new \SCM\Commercial\Promotion\StaffCardService($this->db, $files);
+    self::assertTrue($service->available());
+    $service->save('101');
+    self::assertSame('https://panel.test/public/file.php?n=nueva.jpg&s=1', $service->cardOf('101'));
+    $service->remove('101');
+    self::assertSame('', $service->cardOf('101'));
+    $this->db->update('wp_jet_cct_funcionarios', ['activo' => 'No'], ['id_empleado' => '202']);
+    $this->expectException(\InvalidArgumentException::class);
+    $service->save('202');
+  }
+
+  public function testStaffCardsViewHidesManagementWithoutPermission(): void
+  {
+    $this->db->update('wp_jet_cct_funcionarios', ['ficha' => 'https://panel.test/f.jpg'], ['id_empleado' => '101']);
+    $html = \SCM\Views\Promotion\StaffCardsView::render(\SCM\Views\Promotion\StaffCardsView::context(CommercialCallsDatabase::policy($this->db), $this->db), 'https://panel.test/public');
+    self::assertStringContainsString('Ficha de Consultora Uno', $html);
+    self::assertStringNotContainsString('data-staff-card-form', $html, 'El cargo 9 no tiene fichas_gestionar.');
+    $this->login('303', '13');
+    $html = \SCM\Views\Promotion\StaffCardsView::render(\SCM\Views\Promotion\StaffCardsView::context(CommercialCallsDatabase::policy($this->db), $this->db), 'https://panel.test/public');
+    self::assertStringContainsString('data-staff-card-form', $html);
+    self::assertStringContainsString('data-staff-card-remove="101"', $html);
   }
 
   public function testClientBlockedChannelsAreRespected(): void

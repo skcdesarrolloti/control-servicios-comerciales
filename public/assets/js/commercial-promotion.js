@@ -648,6 +648,58 @@
     }
   });
 
+  // ── Fichas de funcionarios ─────────────────────────────────────────
+  document.addEventListener("input", function (event) {
+    if (!event.target.matches || !event.target.matches("[data-staff-filter]")) return;
+    var term = event.target.value.trim().toLowerCase();
+    document.querySelectorAll("[data-staff-card]").forEach(function (card) {
+      card.hidden = term !== "" && card.getAttribute("data-staff-search").indexOf(term) < 0;
+    });
+  });
+
+  document.addEventListener("submit", async function (event) {
+    var form = event.target.closest && event.target.closest("form[data-staff-card-form]");
+    if (!form) return;
+    event.preventDefault();
+    var error = form.querySelector("[data-staff-error]");
+    var submit = form.querySelector('[type="submit"]');
+    if (!form.reportValidity()) return;
+    var data = new FormData(form);
+    data.set("action", "commercial_staff_card_save");
+    data.set("nonce", runtime.nonce || "");
+    submit.disabled = true;
+    error.hidden = true;
+    try {
+      var response = await fetch(runtime.ajaxUrl || "api.php", { method: "POST", body: data, credentials: "same-origin" });
+      var json = null;
+      try { json = await response.json(); } catch (_error) { json = null; }
+      if (!response.ok || !json || !json.success) throw new Error((json && json.data && json.data.message) || "No se pudo guardar la ficha.");
+      notify("success", json.data.message || "Ficha guardada.");
+      navigate("");
+    } catch (problem) {
+      error.textContent = problem.message;
+      error.hidden = false;
+    } finally {
+      submit.disabled = false;
+    }
+  });
+
+  document.addEventListener("click", function (event) {
+    var button = event.target.closest && event.target.closest("[data-staff-card-remove]");
+    if (!button) return;
+    var name = button.getAttribute("data-staff-name") || "este funcionario";
+    var ask = window.Swal
+      ? window.Swal.fire({ icon: "warning", title: "Quitar ficha", text: "¿Quitar la ficha de " + name + "? Sus clientes recibirán el banner de los correos hasta que subas otra.", showCancelButton: true, confirmButtonText: "Quitar", cancelButtonText: "Cancelar" }).then(function (result) { return result.isConfirmed; })
+      : Promise.resolve(false);
+    ask.then(function (confirmed) {
+      if (!confirmed) return;
+      return request("commercial_staff_card_remove", { id_empleado: button.getAttribute("data-staff-card-remove"), confirm: "1" }).then(function (result) {
+        notify("success", result.message || "Ficha quitada.");
+        navigate("");
+      });
+    }).catch(function (problem) { notify("error", problem.message); });
+  });
+
   document.addEventListener("submit", async function (event) {
     var form = event.target.closest && event.target.closest("form[data-piece-form], form[data-piece-links-form]");
     if (!form) return;

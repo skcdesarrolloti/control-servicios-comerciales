@@ -60,7 +60,8 @@ function daysBetween(from, to) {
     await page.mouse.click(5, 880);
     await page.setViewportSize({ width: 1440, height: 1000 });
     const menuLinks = page.locator('[data-commercial-dropdown-menu="promocion"] a');
-    assert.equal(await menuLinks.count(), 5);
+    assert.equal(await menuLinks.count(), 6);
+    assert.match(await menuLinks.nth(5).getAttribute('href'), /[?&]tab=fichas_funcionarios$/);
     assert.match(await menuLinks.nth(0).getAttribute('href'), /[?&]tab=analitica_web$/);
     assert.match(await menuLinks.nth(1).getAttribute('href'), /[?&]tab=actividad_portales$/);
     assert.match(await menuLinks.nth(2).getAttribute('href'), /[?&]tab=material_pop$/);

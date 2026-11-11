@@ -28,6 +28,8 @@ final class CommercialActionRouter
     'commercial_piece_active' => 'pieceActive',
     'commercial_piece_posts' => 'piecePosts',
     'commercial_piece_links' => 'pieceLinks',
+    'commercial_staff_card_save' => 'staffCardSave',
+    'commercial_staff_card_remove' => 'staffCardRemove',
   ];
 
   /** Endpoints de Herramientas › Plan estratégico: los atiende StrategicPlanApiController, creado solo cuando se piden. */

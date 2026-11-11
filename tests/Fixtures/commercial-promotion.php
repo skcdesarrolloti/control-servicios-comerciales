@@ -16,6 +16,9 @@ define('SCM_PUBLIC_PATH', dirname(__DIR__, 2) . '/public');
 define('SCM_VERSION', 'fixture');
 // Los archivos del Banco de piezas van a output/, nunca a storage/.
 define('SCM_PIECES_ROOT', dirname(__DIR__, 2) . '/output/commercial-pieces');
+// Fichas de funcionarios y demás imágenes del panel: también a output/.
+define('SCM_UPLOAD_PATH', dirname(__DIR__, 2) . '/output/commercial-uploads');
+define('SCM_UPLOAD_MAX_BYTES', 10485760);
 // El mismo secreto con que seed() armó los resúmenes, para que la puesta al día de la página cuente igual.
 define('SCM_APP_SECRET', \Tests\Fixtures\CommercialPromotionDatabase::SECRET);
 
@@ -52,6 +55,8 @@ CommercialPromotionDatabase::pop($db, $settings);
 CommercialPromotionDatabase::social($db);
 // Banco de piezas: piezas de muestra, con sus archivos para que no aparezcan como pendientes de copiar.
 CommercialPromotionDatabase::pieces($db);
+// Fichas de funcionarios: la columna que se crea en producción.
+try { $db->pdo()->exec('ALTER TABLE wp_jet_cct_funcionarios ADD COLUMN ficha TEXT'); } catch (PDOException) {}
 if (!is_dir(SCM_PIECES_ROOT . '/storage/branding-assets/2026/08')) {
   mkdir(SCM_PIECES_ROOT . '/storage/branding-assets/2026/08', 0777, true);
   file_put_contents(SCM_PIECES_ROOT . '/storage/branding-assets/2026/08/logo.png', 'x');

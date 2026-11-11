@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SCM\Commercial\Calls;
 
 use SCM\Commercial\CommercialInternalNotifications;
+use SCM\Commercial\Promotion\StaffCardService;
 use SCM\Core\Database;
 use SCM\Core\Settings;
 use SCM\Support\EmailQueue;
@@ -32,6 +33,7 @@ final class CommercialCallsNotifier
 
   private CommercialInternalNotifications $internal;
   private CommercialCallsRepository $repository;
+  private StaffCardService $cards;
   /** @var callable(string|list<string>,string,string,array<string,mixed>):void */
   private $enqueue;
   /** @var callable(string,string,list<array<string,mixed>>,array<string,mixed>):void */
@@ -56,6 +58,7 @@ final class CommercialCallsNotifier
     $this->settings = self::settings($settings);
     $this->internal = new CommercialInternalNotifications($db, $settings);
     $this->repository = new CommercialCallsRepository($db);
+    $this->cards = new StaffCardService($db);
   }
 
   /** @return array<string,mixed> */
@@ -153,7 +156,7 @@ final class CommercialCallsNotifier
     if ($this->settings['whatsapp_solicitante'] && !$this->blocked($client, 'whatsapp')) {
       $this->whatsappTo(self::clientPhone($task), (string) ($task['indicativo'] ?? ''), (string) $this->settings['plantilla_registrada'],
         [$task['solicitante'] ?? '', (string) $id, $task['tema_ayuda'] ?? '', $task['nombre_empleado'] ?? ''], PublicTaskAccess::reference($id),
-        'llamadas:tarea:' . $id . ':whatsapp:solicitante');
+        'llamadas:tarea:' . $id . ':whatsapp:solicitante', $this->cardImage((string) ($task['id_empleado'] ?? '')));
     }
   }
 
@@ -285,7 +288,21 @@ final class CommercialCallsNotifier
   /**
    * @param list<mixed> $values Variables del cuerpo: Meta no acepta vacíos, saltos de línea ni textos muy largos.
    */
-  private function whatsappTo(string $rawPhone, string $country, string $template, array $values, string $buttonValue, string $dedupe): void
+  /**
+   * Imagen del encabezado de la plantilla registrada: la ficha del funcionario (Promoción › Fichas de funcionarios) o, si no
+   * tiene, el banner de los correos. La plantilla tiene encabezado de imagen, así que nunca se envía sin ella.
+   */
+  private function cardImage(string $employee): string
+  {
+    $card = $this->cards->cardOf($employee);
+    if ($card !== '') {
+      return $card;
+    }
+    $logo = function_exists('system_image') ? system_image('portal_logo_url') : '';
+    return function_exists('system_image') ? system_image('banner', $logo) : $logo;
+  }
+
+  private function whatsappTo(string $rawPhone, string $country, string $template, array $values, string $buttonValue, string $dedupe, string $headerImage = ''): void
   {
     $phone = self::phone($rawPhone, $country);
     if ($phone === '') {
@@ -295,10 +312,11 @@ final class CommercialCallsNotifier
       $text = trim((string) preg_replace('/\s+/u', ' ', (string) $value));
       return ['type' => 'text', 'text' => $text !== '' ? mb_substr($text, 0, 180) : '-'];
     }, $values);
-    $components = [
+    $components = $headerImage !== '' ? [['type' => 'header', 'parameters' => [['type' => 'image', 'image' => ['link' => $headerImage]]]]] : [];
+    array_push($components,
       ['type' => 'body', 'parameters' => $parameters],
-      ['type' => 'button', 'sub_type' => 'url', 'index' => '0', 'parameters' => [['type' => 'text', 'text' => $buttonValue]]],
-    ];
+      ['type' => 'button', 'sub_type' => 'url', 'index' => '0', 'parameters' => [['type' => 'text', 'text' => $buttonValue]]]
+    );
     try {
       ($this->whatsapp)($phone, $template, $components, ['source_module' => 'llamadas-whatsapp', 'dedupe_key' => $dedupe, 'priority' => 100, 'template_language' => (string) $this->settings['idioma']]);
     } catch (\Throwable $exception) {

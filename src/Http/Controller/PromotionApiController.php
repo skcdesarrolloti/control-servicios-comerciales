@@ -182,6 +182,44 @@ final class PromotionApiController
     });
   }
 
+  /** Fichas de funcionarios: la imagen llega en el campo "ficha". @param array<string,mixed> $input */
+  public function staffCardSave(array $input): never
+  {
+    $this->staffCards($input, static fn(\SCM\Commercial\Promotion\StaffCardService $service): array => ['message' => 'Ficha guardada.', 'url' => $service->save(trim((string) ($input['id_empleado'] ?? '')))]);
+  }
+
+  /** Quitar la ficha pide confirmación. @param array<string,mixed> $input */
+  public function staffCardRemove(array $input): never
+  {
+    $this->confirmed($input);
+    $this->staffCards($input, static function (\SCM\Commercial\Promotion\StaffCardService $service) use ($input): array {
+      $service->remove(trim((string) ($input['id_empleado'] ?? '')));
+      return ['message' => 'Ficha quitada. Ese funcionario enviará el banner de los correos.'];
+    });
+  }
+
+  /** @param array<string,mixed> $input */
+  private function staffCards(array $input, callable $operation): never
+  {
+    $this->guard($input, 'fichas_funcionarios', 'Fichas de funcionarios');
+    if (!$this->policy->canAct('fichas_gestionar')) {
+      JsonResponse::error('No tienes permiso para cambiar las fichas de los funcionarios.', 403);
+    }
+    $service = new \SCM\Commercial\Promotion\StaffCardService($this->db);
+    if (!$service->available()) {
+      JsonResponse::error('Falta la columna ficha en la tabla de funcionarios.', 409);
+    }
+    try {
+      $data = $operation($service);
+    } catch (\InvalidArgumentException $exception) {
+      JsonResponse::error($exception->getMessage(), 422);
+    } catch (\Throwable $exception) {
+      error_log('[commercial-staff-cards] ' . $exception->getMessage());
+      JsonResponse::error('No se pudo guardar la ficha. Intenta de nuevo.', 500);
+    }
+    JsonResponse::success($data);
+  }
+
   /** Archivar (active=0) o restaurar (active=1) con confirmación: el archivo y sus vínculos se conservan. @param array<string,mixed> $input */
   public function pieceActive(array $input): never
   {

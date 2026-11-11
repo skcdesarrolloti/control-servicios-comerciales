@@ -18,7 +18,7 @@ final class CommercialCallsDatabase
   private const TABLES = [
     'jet_cct_confi_sistema' => ['funcion', 'valor', 'imagen', 'departamento'],
     'jet_cct_cargos' => ['nombre_cargo'],
-    'jet_cct_funcionarios' => ['id_empleado', 'nombre', 'correo', 'celular', 'activo', 'id_cargo', 'id_sucursal'],
+    'jet_cct_funcionarios' => ['id_empleado', 'nombre', 'correo', 'celular', 'activo', 'id_cargo', 'id_sucursal', 'ficha'],
     'jet_cct_sucursales' => ['nombre', 'gerente_comercial', 'celular_ge_comercial'],
     'jet_cct_paises' => ['pais', 'codigo'],
     'jet_cct_club_pph' => ['nombre', 'tarjeta_bienvenida', 'activo', 'total_puntos'],

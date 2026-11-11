@@ -4941,6 +4941,7 @@ final class CommercialDashboardView
     'material_pop' => ['inventory_2', 'Existencias, entregas y movimientos de souvenirs'],
     'redes_sociales' => ['share', 'Instagram, Facebook, YouTube, TikTok y publicidad'],
     'banco_piezas' => ['palette', 'Artes de marca, su estado e impacto'],
+    'fichas_funcionarios' => ['badge', 'Imagen de cada funcionario para los clientes'],
   ];
 
   /** Ícono y ayuda de cada subpestaña de Notificaciones en el menú de escritorio. */
@@ -4965,7 +4966,7 @@ final class CommercialDashboardView
     'Precaptación' => ['precaptacion_crear', 'precaptacion_editar', 'precaptacion_ticket', 'precaptacion_catalogos'],
     'Inmuebles y avisos' => ['ingresar_inmueble', 'registrar_aviso', 'editar_actor'],
     'Herramientas' => ['mercado_vista_completa', 'aseo_vista_interna', 'plan_estrategico_editar'],
-    'Promoción' => ['promocion_ver_ip', 'pop_gestionar', 'pop_anular', 'pop_ver_costos', 'redes_ver_inversion', 'redes_sincronizar', 'piezas_gestionar', 'piezas_archivar'],
+    'Promoción' => ['promocion_ver_ip', 'pop_gestionar', 'pop_anular', 'pop_ver_costos', 'redes_ver_inversion', 'redes_sincronizar', 'piezas_gestionar', 'piezas_archivar', 'fichas_gestionar'],
   ];
 
   /** @param array<int,string> $employeeCargoIds */

@@ -41,6 +41,8 @@ final class PromotionView
       $body = MaterialPopView::render(MaterialPopView::context($input, $policy, $db, $settings), $baseUrl);
     } elseif ($sub === 'banco_piezas' && $policy->canSubview('promocion', 'banco_piezas')) {
       $body = BrandAssetsView::render(BrandAssetsView::context($input, $policy, $db), $baseUrl);
+    } elseif ($sub === 'fichas_funcionarios' && $policy->canSubview('promocion', 'fichas_funcionarios')) {
+      $body = StaffCardsView::render(StaffCardsView::context($policy, $db), $baseUrl);
     } else {
       $sub = '';
       $body = '<p class="cpr-empty">Esta sección de Promoción no está disponible.</p>';

@@ -61,6 +61,7 @@ final class CommercialAccessPolicy
     'redes_sincronizar' => 'Redes sociales: sincronizar y conectar o desconectar YouTube y TikTok',
     'piezas_gestionar' => 'Banco de piezas: subir y editar piezas y vincular publicaciones',
     'piezas_archivar' => 'Banco de piezas: archivar y restaurar piezas',
+    'fichas_gestionar' => 'Fichas de funcionarios: subir, reemplazar y quitar la imagen que llega a los clientes',
     'campanas_enviar' => 'Envíos masivos: crear, enviar, pausar, reanudar, reintentar y cancelar',
     'campanas_eliminar' => 'Envíos masivos: eliminar envíos terminados o cancelados con su historial (además de enviar)',
     'plantillas_editar' => 'Plantillas de correo: crear, editar, duplicar y archivar',
@@ -70,7 +71,7 @@ final class CommercialAccessPolicy
   ];
 
   /** Acciones que un cargo sin configurar no recibe por defecto: hay que marcarlas. */
-  public const OPT_IN_ACTIONS = ['editar_actor', 'mercado_vista_completa', 'aseo_vista_interna', 'promocion_ver_ip', 'plan_estrategico_editar', 'pop_gestionar', 'pop_anular', 'pop_ver_costos', 'redes_ver_inversion', 'redes_sincronizar', 'piezas_gestionar', 'piezas_archivar', 'campanas_enviar', 'campanas_eliminar', 'plantillas_editar', 'reportes_pagar', 'reportes_editar_valor'];
+  public const OPT_IN_ACTIONS = ['editar_actor', 'mercado_vista_completa', 'aseo_vista_interna', 'promocion_ver_ip', 'plan_estrategico_editar', 'pop_gestionar', 'pop_anular', 'pop_ver_costos', 'redes_ver_inversion', 'redes_sincronizar', 'piezas_gestionar', 'piezas_archivar', 'fichas_gestionar', 'campanas_enviar', 'campanas_eliminar', 'plantillas_editar', 'reportes_pagar', 'reportes_editar_valor'];
 
   /**
    * Vistas que un cargo sin configurar no recibe por defecto: hay que marcarlas en Permisos. Los cargos con acceso total
@@ -112,6 +113,7 @@ final class CommercialAccessPolicy
       'material_pop' => 'Material POP',
       'redes_sociales' => 'Redes sociales',
       'banco_piezas' => 'Banco de piezas',
+      'fichas_funcionarios' => 'Fichas de funcionarios',
     ],
     // Notificaciones: el envío uno a uno, las campañas masivas (traídas de dashboard-marketing) y sus plantillas de correo.
     'notificaciones' => [

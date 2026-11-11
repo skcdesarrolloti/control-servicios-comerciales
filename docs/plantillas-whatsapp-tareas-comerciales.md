@@ -2,7 +2,7 @@
 
 Crea estas cuatro plantillas en **Meta Business Suite → Administrador de WhatsApp → Plantillas de mensajes → Crear plantilla**, en la misma cuenta que usa el panel.
 
-Para todas: categoría **Utilidad**, idioma **Español (Colombia)** (`es_CO`), variables tipo **Número**, sin encabezado, pie de página `SKC SuCasa Inmobiliaria` y un solo botón **Visitar sitio web** con URL **dinámica**. Usa los nombres exactos.
+Para todas: categoría **Utilidad**, idioma **Español (Colombia)** (`es_CO`), variables tipo **Número**, sin encabezado salvo la 2, pie de página `SKC SuCasa Inmobiliaria` y un solo botón **Visitar sitio web** con URL **dinámica**. Usa los nombres exactos.
 
 En el botón, el campo **URL del sitio web** lleva todo lo que está antes de `{{1}}` (Meta pone `{{1}}` al final por su cuenta) y el panel completa solo el final: el número de la tarea o el código del enlace. Deja sin marcar **Permite que Meta use el seguimiento de enlaces**: el enlace del cliente es privado y así no pasa por Meta.
 
@@ -28,7 +28,9 @@ Botón `Ver tarea`, URL `https://sucasainmobiliaria.com.co/dashboard-comercial/p
 
 ## 2. `scm_tarea_comercial_registrada_v1`
 
-Para el cliente, al crear la tarea.
+Para el cliente, al crear la tarea. Es la única con **encabezado de imagen**: la ficha del funcionario asignado (Promoción › Fichas de funcionarios). Si el funcionario no tiene ficha se envía el banner de los correos.
+
+- **Encabezado:** Multimedia → **Imagen**. Como muestra sube cualquier ficha de ejemplo en JPG o PNG (por ejemplo, la tarjeta de presentación de un asesor con datos inventados).
 
 ```text
 Hola {{1}}.
