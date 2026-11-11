@@ -4,6 +4,8 @@ Crea estas cuatro plantillas en **Meta Business Suite → Administrador de Whats
 
 Para todas: categoría **Utilidad**, idioma **Español (Colombia)** (`es_CO`), variables tipo **Número**, sin encabezado, pie de página `SKC SuCasa Inmobiliaria` y un solo botón **Visitar sitio web** con URL **dinámica**. Usa los nombres exactos.
 
+En el botón, el campo **URL del sitio web** lleva todo lo que está antes de `{{1}}` (Meta pone `{{1}}` al final por su cuenta) y el panel completa solo el final: el número de la tarea o el código del enlace. Deja sin marcar **Permite que Meta use el seguimiento de enlaces**: el enlace del cliente es privado y así no pasa por Meta.
+
 Mientras Meta no las apruebe, deja apagados los WhatsApp en **Configuración › Llamadas**. El correo funciona sin ellas.
 
 ## 1. `scm_tarea_comercial_asignada_v1`
@@ -22,7 +24,7 @@ Consulta los detalles en el panel.
 
 Ejemplos: María Pérez · 10945 · Laura Gómez · Arriendo · Referido · Carlos López
 
-Botón `Ver tarea`, URL `https://sucasainmobiliaria.com.co/control-servicios-comerciales/public/index.php?tab=abiertos&ticket_id={{1}}`. Ejemplo: `10945`.
+Botón `Ver tarea`, URL `https://sucasainmobiliaria.com.co/control-servicios-comerciales/public/index.php?tab=abiertos&ticket_id={{1}}`. En **URL de muestra** escribe la URL completa: `https://sucasainmobiliaria.com.co/control-servicios-comerciales/public/index.php?tab=abiertos&ticket_id=10945`.
 
 ## 2. `scm_tarea_comercial_registrada_v1`
 
@@ -37,7 +39,7 @@ Desde el botón puedes ver tu solicitud y escribirnos.
 
 Ejemplos: Laura Gómez · 10945 · Arriendo · Carlos López
 
-Botón `Ver y responder`, URL `https://sucasainmobiliaria.com.co/control-servicios-comerciales/public/tarea.php?t={{1}}`. Ejemplo: `10945.1893456000.ejemplo`.
+Botón `Ver y responder`, URL `https://sucasainmobiliaria.com.co/control-servicios-comerciales/public/tarea.php?t={{1}}`. En **URL de muestra** escribe la URL completa: `https://sucasainmobiliaria.com.co/control-servicios-comerciales/public/tarea.php?t=10945.1893456000.ejemplo`.
 
 ## 3. `scm_tarea_comercial_respuesta_cliente_v1`
 
@@ -52,7 +54,7 @@ Responde desde el panel.
 
 Ejemplos: Carlos López · Laura Gómez · 10945 · Quisiera visitar el apartamento el sábado
 
-Botón `Ver tarea`, la misma URL de la plantilla 1. Ejemplo: `10945`.
+Botón `Ver tarea`, la misma URL de la plantilla 1. En **URL de muestra** escribe la URL completa: `https://sucasainmobiliaria.com.co/control-servicios-comerciales/public/index.php?tab=abiertos&ticket_id=10945`.
 
 ## 4. `scm_tarea_comercial_respuesta_funcionario_v1`
 
@@ -66,7 +68,7 @@ Desde el botón puedes leer la respuesta y escribirnos.
 
 Ejemplos: Laura Gómez · Carlos López · 10945
 
-Botón `Ver y responder`, la misma URL de la plantilla 2. Ejemplo: `10945.1893456000.ejemplo`.
+Botón `Ver y responder`, la misma URL de la plantilla 2. En **URL de muestra** escribe la URL completa: `https://sucasainmobiliaria.com.co/control-servicios-comerciales/public/tarea.php?t=10945.1893456000.ejemplo`.
 
 ## Activación
 
