@@ -138,7 +138,7 @@ final class CommercialCallsNotifier
     if ($this->settings['whatsapp_asignado']) {
       foreach ($staff as $person) {
         $this->whatsappTo($person['celular'], '57', (string) $this->settings['plantilla_asignada'],
-          [$person['nombre'], (string) $id, $task['solicitante'] ?? '', $task['tema_ayuda'] ?? '', $task['medio'] ?? '', $task['nombre_empleado'] ?? ''], (string) $id,
+          [$person['nombre'], (string) $id, $task['solicitante'] ?? '', $task['tema_ayuda'] ?? '', $task['medio'] ?? '', $task['nombre_empleado'] ?? '', $task['correo_empleado'] ?? '', $task['celular_empleado'] ?? ''], (string) $id,
           'llamadas:tarea:' . $id . ':whatsapp:' . $person['id']);
       }
     }
@@ -155,7 +155,7 @@ final class CommercialCallsNotifier
     }
     if ($this->settings['whatsapp_solicitante'] && !$this->blocked($client, 'whatsapp')) {
       $this->whatsappTo(self::clientPhone($task), (string) ($task['indicativo'] ?? ''), (string) $this->settings['plantilla_registrada'],
-        [$task['solicitante'] ?? '', (string) $id, $task['tema_ayuda'] ?? '', $task['nombre_empleado'] ?? ''], PublicTaskAccess::reference($id),
+        [$task['solicitante'] ?? '', (string) $id, $task['tema_ayuda'] ?? '', $task['nombre_empleado'] ?? '', $task['correo_empleado'] ?? '', $task['celular_empleado'] ?? ''], PublicTaskAccess::reference($id),
         'llamadas:tarea:' . $id . ':whatsapp:solicitante', $this->cardImage((string) ($task['id_empleado'] ?? '')));
     }
   }
@@ -186,8 +186,12 @@ final class CommercialCallsNotifier
    * El funcionario respondió desde el panel marcando avisar al cliente.
    * @param array<string,mixed> $task
    */
-  public function officerReplied(int $id, array $task, string $message, string $author): void
+  public function officerReplied(int $id, array $task, string $message, string $author, string $employee = ''): void
   {
+    // Contacto de quien respondió; si no se conoce, el del responsable de la tarea.
+    $staff = $this->repository->employee($employee) ?? [];
+    $email = trim((string) ($staff['correo'] ?? '')) ?: (string) ($task['correo_empleado'] ?? '');
+    $phone = trim((string) ($staff['celular'] ?? '')) ?: (string) ($task['celular_empleado'] ?? '');
     $e = static fn($value): string => EmailTemplate::e((string) $value);
     $key = 'llamadas:tarea:' . $id . ':funcionario:' . substr(hash('sha256', $message), 0, 16);
     $client = $this->clientPreferences($task);
@@ -198,7 +202,7 @@ final class CommercialCallsNotifier
     }
     if ($this->settings['whatsapp_solicitante'] && !$this->blocked($client, 'whatsapp')) {
       $this->whatsappTo(self::clientPhone($task), (string) ($task['indicativo'] ?? ''), (string) $this->settings['plantilla_respuesta_funcionario'],
-        [$task['solicitante'] ?? '', $author, (string) $id], PublicTaskAccess::reference($id), $key . ':whatsapp');
+        [$task['solicitante'] ?? '', $author, (string) $id, $email, $phone], PublicTaskAccess::reference($id), $key . ':whatsapp');
     }
   }
 

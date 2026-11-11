@@ -105,7 +105,7 @@ final class PublicTaskConversation
       return;
     }
     $this->record($id, 'funcionario', $author, $employee, $text);
-    $this->notifier->officerReplied($id, $task, $text, $author);
+    $this->notifier->officerReplied($id, $task, $text, $author, $employee);
   }
 
   private function record(int $id, string $author, string $name, string $employee, string $text): bool
