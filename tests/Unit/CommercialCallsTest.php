@@ -421,7 +421,7 @@ final class CommercialCallsTest extends TestCase
     self::assertSame(['type' => 'header', 'parameters' => [['type' => 'image', 'image' => ['link' => 'https://panel.test/public/file.php?n=ficha.jpg&s=abc']]]], $client[2][0]);
     $staff = array_values(array_filter($log->whatsapp, static fn(array $item): bool => $item[1] === 'scm_tarea_comercial_asignada_v1'))[0];
     self::assertSame('body', $staff[2][0]['type'], 'La plantilla del funcionario no lleva imagen.');
-    self::assertSame(['Consultora Uno', '1', 'Laura Prueba', 'Arriendo', 'Referido', 'Consultora Uno', '101@example.test', '3000000101'], array_column($staff[2][0]['parameters'], 'text'), 'Nombre, correo y celular del responsable.');
+    self::assertSame(['Consultora Uno', '1', 'Laura Prueba', 'Arriendo', 'Referido', 'Consultora Uno · Correo: 101@example.test · Celular: 3000000101'], array_column($staff[2][0]['parameters'], 'text'), 'Nombre, correo y celular del responsable.');
   }
 
   public function testClientWhatsappHeaderFallsBackWhenNoCard(): void
@@ -430,7 +430,7 @@ final class CommercialCallsTest extends TestCase
     $this->taskFromCall($notifier);
     $client = array_values(array_filter($log->whatsapp, static fn(array $item): bool => $item[1] === 'scm_tarea_comercial_registrada_v1'))[0];
     self::assertSame('header', $client[2][0]['type']);
-    self::assertSame(['Laura Prueba', '1', 'Arriendo', 'Consultora Uno', '101@example.test', '3000000101'], array_column($client[2][1]['parameters'], 'text'), 'Nombre, correo y celular de quien atiende.');
+    self::assertSame(['Laura Prueba', '1', 'Arriendo', 'Consultora Uno · Correo: 101@example.test · Celular: 3000000101'], array_column($client[2][1]['parameters'], 'text'), 'Nombre, correo y celular de quien atiende.');
     self::assertNotSame('', $client[2][0]['parameters'][0]['image']['link'], 'Sin ficha va una imagen de respaldo.');
   }
 
@@ -532,7 +532,7 @@ final class CommercialCallsTest extends TestCase
     $log->whatsapp = [];
     $conversation->officerReply($id, 'Te espero <script>alert(1)</script> el lunes', 'Consultora Uno', '101');
     self::assertSame('scm_tarea_comercial_respuesta_funcionario_v1', $log->whatsapp[0][1]);
-    self::assertSame(['Laura Prueba', (string) $id, 'Consultora Uno', '101@example.test', '3000000101'], array_column($log->whatsapp[0][2][0]['parameters'], 'text'), 'Nombre, correo y celular de quien responde.');
+    self::assertSame(['Laura Prueba', (string) $id, 'Consultora Uno · Correo: 101@example.test · Celular: 3000000101'], array_column($log->whatsapp[0][2][0]['parameters'], 'text'), 'Nombre, correo y celular de quien responde.');
     $html = PublicTaskView::render($conversation->task($id), $conversation->messages($id), 'tarea.php?t=x', 'a.css', 'logo.png');
     self::assertStringContainsString('Te espero', $html);
     self::assertStringNotContainsString('<script>', $html);

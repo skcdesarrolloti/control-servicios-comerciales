@@ -138,7 +138,7 @@ final class CommercialCallsNotifier
     if ($this->settings['whatsapp_asignado']) {
       foreach ($staff as $person) {
         $this->whatsappTo($person['celular'], '57', (string) $this->settings['plantilla_asignada'],
-          [$person['nombre'], (string) $id, $task['solicitante'] ?? '', $task['tema_ayuda'] ?? '', $task['medio'] ?? '', $task['nombre_empleado'] ?? '', $task['correo_empleado'] ?? '', $task['celular_empleado'] ?? ''], (string) $id,
+          [$person['nombre'], (string) $id, $task['solicitante'] ?? '', $task['tema_ayuda'] ?? '', $task['medio'] ?? '', self::contactLine($task)], (string) $id,
           'llamadas:tarea:' . $id . ':whatsapp:' . $person['id']);
       }
     }
@@ -155,7 +155,7 @@ final class CommercialCallsNotifier
     }
     if ($this->settings['whatsapp_solicitante'] && !$this->blocked($client, 'whatsapp')) {
       $this->whatsappTo(self::clientPhone($task), (string) ($task['indicativo'] ?? ''), (string) $this->settings['plantilla_registrada'],
-        [$task['solicitante'] ?? '', (string) $id, $task['tema_ayuda'] ?? '', $task['nombre_empleado'] ?? '', $task['correo_empleado'] ?? '', $task['celular_empleado'] ?? ''], PublicTaskAccess::reference($id),
+        [$task['solicitante'] ?? '', (string) $id, $task['tema_ayuda'] ?? '', self::contactLine($task)], PublicTaskAccess::reference($id),
         'llamadas:tarea:' . $id . ':whatsapp:solicitante', $this->cardImage((string) ($task['id_empleado'] ?? '')));
     }
   }
@@ -202,8 +202,25 @@ final class CommercialCallsNotifier
     }
     if ($this->settings['whatsapp_solicitante'] && !$this->blocked($client, 'whatsapp')) {
       $this->whatsappTo(self::clientPhone($task), (string) ($task['indicativo'] ?? ''), (string) $this->settings['plantilla_respuesta_funcionario'],
-        [$task['solicitante'] ?? '', (string) $id, $author, $email, $phone], PublicTaskAccess::reference($id), $key . ':whatsapp');
+        [$task['solicitante'] ?? '', (string) $id, self::contactLine(['nombre_empleado' => $author, 'correo_empleado' => $email, 'celular_empleado' => $phone])], PublicTaskAccess::reference($id), $key . ':whatsapp');
     }
+  }
+
+  /**
+   * Nombre, correo y celular de un funcionario en una sola variable de la plantilla (como en el panel inmobiliario): la
+   * plantilla no necesita una variable por dato. Lo que falte no se escribe.
+   * @param array<string,mixed> $task
+   */
+  public static function contactLine(array $task): string
+  {
+    $parts = [trim((string) ($task['nombre_empleado'] ?? '')) ?: 'Equipo comercial'];
+    if (trim((string) ($task['correo_empleado'] ?? '')) !== '') {
+      $parts[] = 'Correo: ' . trim((string) $task['correo_empleado']);
+    }
+    if (trim((string) ($task['celular_empleado'] ?? '')) !== '') {
+      $parts[] = 'Celular: ' . trim((string) $task['celular_empleado']);
+    }
+    return implode(' · ', $parts);
   }
 
   public static function panelUrl(int $id): string

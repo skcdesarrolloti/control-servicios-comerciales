@@ -2,77 +2,91 @@
 
 Crea estas cuatro plantillas en **Meta Business Suite → Administrador de WhatsApp → Plantillas de mensajes → Crear plantilla**, en la misma cuenta que usa el panel.
 
-Para todas: categoría **Utilidad**, idioma **Español (Colombia)** (`es_CO`), variables tipo **Número**, sin encabezado salvo la 2, pie de página `SKC SuCasa Inmobiliaria` y un solo botón **Visitar sitio web** con URL **dinámica**. Usa los nombres exactos. Meta no acepta cuerpos que empiecen o terminen con una variable ni dos variables seguidas. El contacto de un funcionario va en una sola línea, y solo la respuesta del funcionario (plantilla 4) firma con "Atentamente".
+Para todas: categoría **Utilidad**, idioma **Spanish (COL)** (`es_CO`), tipo de variable **Número**, pie de página `SKC SuCasa Inmobiliaria` y un botón **Ir al sitio web** con URL **Dinámica**. Usa los nombres exactos. Solo la 2 lleva encabezado (imagen).
 
-En el botón, el campo **URL del sitio web** lleva todo lo que está antes de `{{1}}` (Meta pone `{{1}}` al final por su cuenta) y el panel completa solo el final: el número de la tarea o el código del enlace. Deja sin marcar **Permite que Meta use el seguimiento de enlaces**: el enlace del cliente es privado y así no pasa por Meta.
+Cada dato es una sola variable: el contacto de un funcionario (nombre, correo y celular) lo arma el sistema en una línea, como en el panel inmobiliario. Meta no acepta cuerpos que empiecen o terminen con una variable ni dos variables seguidas.
 
-Los WhatsApp vienen activos en **Configuración › Llamadas**: en cuanto Meta apruebe las plantillas empiezan a llegar. Mientras tanto Meta rechaza esos envíos y el correo sale igual.
+En el botón, **URL del sitio web** lleva todo lo que está antes de `{{1}}` (Meta pone `{{1}}` al final) y el panel completa solo el final. En **URL de muestra** va la URL completa. Deja sin marcar **Permite que Meta use el seguimiento de enlaces**.
+
+Los WhatsApp vienen activos en **Configuración › Llamadas**: llegan en cuanto Meta apruebe cada plantilla.
 
 ## 1. `scm_tarea_comercial_asignada_v1`
 
 Para el funcionario asignado y las copias internas, al crear la tarea.
 
 ```text
-Hola {{1}}.
-Se registró la tarea comercial #{{2}} para gestión.
-Cliente: {{3}}.
-Motivo: {{4}}.
-Medio: {{5}}.
-Responsable: {{6}} · Correo: {{7}} · Celular: {{8}}.
+Hola *{{1}}.*
+
+Se registró la tarea comercial *#{{2}}* para gestión.
+
+*Cliente:* {{3}}.
+*Motivo:* {{4}}.
+*Medio:* {{5}}.
+*Responsable:* {{6}}.
+
 Consulta los detalles en el panel.
 ```
 
-Ejemplos: María Pérez · 10945 · Laura Gómez · Arriendo · Referido · Carlos López · carlos.lopez@ejemplo.com · 3001234567
+Ejemplos: `{{1}}` Royner Guardo · `{{2}}` 1686 · `{{3}}` Luis Prada · `{{4}}` Arriendo · `{{5}}` Proppit · `{{6}}` Jocabeth Cantillo · Correo: jocabeth@ejemplo.com · Celular: 3001234567
 
-Botón `Ver tarea`, URL `https://sucasainmobiliaria.com.co/dashboard-comercial/public/index.php?tab=abiertos&ticket_id={{1}}`. En **URL de muestra** escribe la URL completa: `https://sucasainmobiliaria.com.co/dashboard-comercial/public/index.php?tab=abiertos&ticket_id=10945`.
+Botón `Ver tarea`. URL del sitio web `https://sucasainmobiliaria.com.co/dashboard-comercial/public/index.php?tab=abiertos&ticket_id=`. URL de muestra `https://sucasainmobiliaria.com.co/dashboard-comercial/public/index.php?tab=abiertos&ticket_id=1686`.
 
 ## 2. `scm_tarea_comercial_registrada_v1`
 
-Para el cliente, al crear la tarea. Es la única con **encabezado de imagen**: la ficha del funcionario asignado (Promoción › Fichas de funcionarios). Si el funcionario no tiene ficha se envía el banner de los correos.
-
-- **Encabezado:** Multimedia → **Imagen**. Como muestra sube cualquier ficha de ejemplo en JPG o PNG (por ejemplo, la tarjeta de presentación de un asesor con datos inventados).
+Para el cliente, al crear la tarea. **Encabezado:** en "Muestra de contenido multimedia" elige **Imagen** y sube una ficha de ejemplo (JPG o PNG, datos inventados). El panel envía la ficha del funcionario asignado (Promoción › Fichas de funcionarios) o, si no tiene, el banner de los correos.
 
 ```text
-Hola {{1}}.
-Registramos tu solicitud #{{2}} de {{3}}.
-Te atenderá {{4}} · Correo: {{5}} · Celular: {{6}}.
+Hola *{{1}}.*
+
+Registramos tu solicitud *#{{2}}* de *{{3}}*.
+
+*Te atenderá:* {{4}}.
+
 Desde el botón puedes ver tu solicitud y escribirnos.
 ```
 
-Ejemplos: Laura Gómez · 10945 · Arriendo · Carlos López · carlos.lopez@ejemplo.com · 3001234567
+Ejemplos: `{{1}}` Luis Prada · `{{2}}` 1686 · `{{3}}` Arriendo · `{{4}}` Jocabeth Cantillo · Correo: jocabeth@ejemplo.com · Celular: 3001234567
 
-Botón `Ver y responder`, URL `https://sucasainmobiliaria.com.co/dashboard-comercial/public/tarea.php?t={{1}}`. En **URL de muestra** escribe la URL completa: `https://sucasainmobiliaria.com.co/dashboard-comercial/public/tarea.php?t=10945.1893456000.ejemplo`.
+Botón `Ver y responder`. URL del sitio web `https://sucasainmobiliaria.com.co/dashboard-comercial/public/tarea.php?t=`. URL de muestra `https://sucasainmobiliaria.com.co/dashboard-comercial/public/tarea.php?t=1686.1893456000.ejemplo`.
 
 ## 3. `scm_tarea_comercial_respuesta_cliente_v1`
 
-Para el funcionario asignado y las copias internas, cuando el cliente escribe.
+Para el funcionario asignado y las copias internas, cuando el cliente escribe desde su enlace.
 
 ```text
-Hola {{1}}.
-El cliente {{2}} escribió en la tarea comercial #{{3}}.
-Mensaje: {{4}}.
+Hola *{{1}}.*
+
+El cliente *{{2}}* escribió en la tarea comercial *#{{3}}*.
+
+*Mensaje:* {{4}}.
+
 Responde desde el panel.
 ```
 
-Ejemplos: Carlos López · Laura Gómez · 10945 · Quisiera visitar el apartamento el sábado
+Ejemplos: `{{1}}` Jocabeth Cantillo · `{{2}}` Luis Prada · `{{3}}` 1686 · `{{4}}` Quisiera visitar el apartamento el sábado
 
-Botón `Ver tarea`, la misma URL de la plantilla 1. En **URL de muestra** escribe la URL completa: `https://sucasainmobiliaria.com.co/dashboard-comercial/public/index.php?tab=abiertos&ticket_id=10945`.
+Botón `Ver tarea`. URL del sitio web `https://sucasainmobiliaria.com.co/dashboard-comercial/public/index.php?tab=abiertos&ticket_id=`. URL de muestra `https://sucasainmobiliaria.com.co/dashboard-comercial/public/index.php?tab=abiertos&ticket_id=1686`.
 
 ## 4. `scm_tarea_comercial_respuesta_funcionario_v1`
 
-Para el cliente, cuando el funcionario responde marcando avisar al cliente.
+Para el cliente, cuando el funcionario le responde marcando avisar al cliente. Firma quien respondió.
 
 ```text
-Hola {{1}}.
-Tienes una respuesta en tu solicitud #{{2}}.
+Hola *{{1}}.*
+
+Tienes una respuesta en tu solicitud *#{{2}}*.
+
 Desde el botón puedes leerla y escribirnos.
-Atentamente, {{3}} · Correo: {{4}} · Celular: {{5}}, de SKC SuCasa Inmobiliaria.
+
+Atentamente,
+{{3}}.
+Equipo comercial.
 ```
 
-Ejemplos: Laura Gómez · 10945 · Carlos López · carlos.lopez@ejemplo.com · 3001234567
+Ejemplos: `{{1}}` Luis Prada · `{{2}}` 1686 · `{{3}}` Jocabeth Cantillo · Correo: jocabeth@ejemplo.com · Celular: 3001234567
 
-Botón `Ver y responder`, la misma URL de la plantilla 2. En **URL de muestra** escribe la URL completa: `https://sucasainmobiliaria.com.co/dashboard-comercial/public/tarea.php?t=10945.1893456000.ejemplo`.
+Botón `Ver y responder`. URL del sitio web `https://sucasainmobiliaria.com.co/dashboard-comercial/public/tarea.php?t=`. URL de muestra `https://sucasainmobiliaria.com.co/dashboard-comercial/public/tarea.php?t=1686.1893456000.ejemplo`.
 
-## Activación
+## Si Meta exige otro nombre
 
-No hay que encender nada. Si Meta exige otro nombre para alguna plantilla, escríbelo en **Configuración › Llamadas**.
+Escríbelo en **Configuración › Llamadas**. No borres una plantilla para volver a crearla: Meta no deja reusar ese nombre por varias semanas.
