@@ -1106,10 +1106,7 @@ final class LegacyPanel
         }
 
         if ($assigned_ticket_id) {
-            $ticket_url = add_query_arg(
-                ['id_ticket' => (string) $assigned_ticket_id],
-                'https://sucasainmobiliaria.com.co/ticket/'
-            );
+            $ticket_url = \SCM\Commercial\Calls\CommercialCallsNotifier::panelUrl((int) $assigned_ticket_id);
 
             return sprintf(
                 '<a class="precaptaciones__ticket-boton" href="%s" target="_blank" rel="noopener">Ver tarea</a>',
@@ -2357,7 +2354,6 @@ final class LegacyPanel
 
         $asignado = sanitize_text_field($request['asignado'] ?? $request['id_empleado'] ?? get_current_user_id());
         $assigned_funcionario = self::funcionario_data($asignado);
-        $creator = get_userdata(get_current_user_id());
         $fecha = current_time('timestamp');
         $fecha_texto = current_time('mysql');
         $solicitante = sanitize_text_field($request['solicitante'] ?? '');
@@ -2395,7 +2391,8 @@ final class LegacyPanel
             'factores' => sanitize_text_field($request['factores'] ?? ''),
             'asunto' => $asunto,
             'descripcion' => $descripcion,
-            'id_empleado' => sanitize_text_field($request['id_empleado'] ?? $asignado),
+            // La tarea es de quien se elige en "Asignar a": Mis tareas y los avisos la buscan por id_empleado.
+            'id_empleado' => $asignado,
             'sucursal' => get_user_meta(get_current_user_id(), 'sucursal-user', true),
             'id_pph' => $id_pph,
             'tarjeta_pph' => is_array($pph) ? (string) ($pph['tarjeta_bienvenida'] ?? '') : '',
@@ -2420,9 +2417,10 @@ final class LegacyPanel
         self::registrar_historial_ticket($ticket_id, $ticket_data);
         self::actualizar_precaptacion_con_ticket($precaptaciones_table, $id_precaptacion, $ticket_id);
         Module::workflow()->converted($wpdb->get_row($wpdb->prepare("SELECT * FROM {$precaptaciones_table} WHERE _ID = %d", $id_precaptacion), ARRAY_A), $ticket_id);
-        self::enviar_correos_ticket($ticket_id, $ticket_data, $creator);
+        // Mismos avisos que una tarea creada desde Llamadas; salen después de confirmar la transacción.
+        Module::deferTask($ticket_id);
 
-        $ticket_url = add_query_arg(['id_ticket' => (string) $ticket_id], 'https://sucasainmobiliaria.com.co/ticket/');
+        $ticket_url = \SCM\Commercial\Calls\CommercialCallsNotifier::panelUrl($ticket_id);
         wp_send_json_success([
             'message' => sprintf('Tarea #%s creada con exito.', number_format_i18n($ticket_id)),
             'ticket_id' => $ticket_id,
@@ -2516,204 +2514,6 @@ final class LegacyPanel
             ],
             ['_ID' => $id_precaptacion]
         );
-    }
-
-    private static function enviar_correos_ticket(int $ticket_id, array $ticket_data, $creator): void
-    {
-        $context = self::ticket_email_context($ticket_id, $ticket_data, $creator);
-        $headers = self::ticket_email_headers();
-
-        if (!empty($ticket_data['correo_empleado']) && is_email($ticket_data['correo_empleado'])) {
-            wp_mail(
-                $ticket_data['correo_empleado'],
-                self::ticket_email_replace('Nueva tarea #%inserted_cct_tickets% asignado', $context),
-                self::ticket_email_template_funcionario($context),
-                $headers
-            );
-        }
-
-        if (!empty($ticket_data['correo_solicitante']) && is_email($ticket_data['correo_solicitante'])) {
-            $solicitante_headers = self::ticket_email_headers($ticket_data['correo_empleado'] ?? '');
-            wp_mail(
-                $ticket_data['correo_solicitante'],
-                self::ticket_email_replace('Ticket #%inserted_cct_tickets% agendado', $context),
-                self::ticket_email_template_solicitante($context),
-                $solicitante_headers
-            );
-        }
-
-        foreach (Module::internalEmails('precaptacion_tarea_creada', ['sucasacorreos@gmail.com', 'gcorrearivera@gmail.com', 'sucasacomercial@gmail.com']) as $email) {
-            wp_mail(
-                $email,
-                self::ticket_email_replace('Tarea comercial #%inserted_cct_tickets% creada', $context),
-                self::ticket_email_template_admin($context),
-                $headers
-            );
-        }
-    }
-
-    private static function ticket_email_headers(string $reply_to = ''): array
-    {
-        $headers = [
-            'Content-Type: text/html; charset=UTF-8',
-            'From: SUCASA INMOBILIARIA <sucasainfo@sucasainmobiliaria.com.co>',
-        ];
-
-        if ($reply_to && is_email($reply_to)) {
-            $headers[] = 'Reply-To: ' . $reply_to;
-        }
-
-        return $headers;
-    }
-
-    private static function ticket_email_context(int $ticket_id, array $ticket_data, $creator): array
-    {
-        $ticket_url = add_query_arg(['id_ticket' => (string) $ticket_id], 'https://sucasainmobiliaria.com.co/ticket/');
-        $banner = (string) apply_filters('precaptaciones_ticket_email_banner', '');
-        $revista = (string) apply_filters('precaptaciones_ticket_email_revista_url', 'https://sucasainmobiliaria.com.co/revista/');
-        $brochure = (string) apply_filters('precaptaciones_ticket_email_brochure_url', 'https://sucasainmobiliaria.com.co/brochure-skc-sucasa-inmobiliaria/');
-
-        return [
-            'inserted_cct_tickets' => (string) $ticket_id,
-            'ticket_url' => $ticket_url,
-            'banner' => $banner,
-            'link_revista_correo' => $revista,
-            'brochure_url' => $brochure,
-            'nombre_empleado' => (string) ($ticket_data['nombre_empleado'] ?? $ticket_data['empleado'] ?? ''),
-            'celular_empleado' => (string) ($ticket_data['celular_empleado'] ?? ''),
-            'solicitante' => (string) ($ticket_data['solicitante'] ?? ''),
-            'tema_ayuda' => (string) ($ticket_data['tema_ayuda'] ?? 'Captacion'),
-            'asunto' => (string) ($ticket_data['asunto'] ?? 'Tarea comercial'),
-            'medio' => (string) ($ticket_data['medio'] ?? ''),
-            'nombre_comercial' => (string) apply_filters('precaptaciones_ticket_email_nombre_comercial', 'Equipo comercial'),
-            'celular_comercial' => (string) apply_filters('precaptaciones_ticket_email_celular_comercial', ''),
-            'nombre_creador' => $creator && !empty($creator->display_name) ? (string) $creator->display_name : '',
-        ];
-    }
-
-    private static function ticket_email_replace(string $content, array $context): string
-    {
-        $replace = [];
-        foreach ($context as $key => $value) {
-            $replace['%' . $key . '%'] = (string) $value;
-        }
-
-        return strtr($content, $replace);
-    }
-
-    private static function ticket_email_banner(array $context): string
-    {
-        if (empty($context['banner'])) {
-            return '';
-        }
-
-        return sprintf(
-            '<tr><td><img src="%s" alt="Banner SKC" style="width:100%%; height:auto; display:block;"></td></tr>',
-            esc_url($context['banner'])
-        );
-    }
-
-    private static function ticket_email_button(string $url, string $label): string
-    {
-        return sprintf(
-            '<a href="%s" style="background-color:#404041; padding:15px 20px; border-radius:5px; text-decoration:none; color:white; font-weight:700; display:inline-block; margin:15px 0;">%s</a>',
-            esc_url($url),
-            esc_html($label)
-        );
-    }
-
-    private static function ticket_email_shell(string $title, string $content, array $context): string
-    {
-        return '<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <title>' . esc_html($title) . '</title>
-</head>
-<body style="margin:0; padding:0; background-color:#f5f5f5; font-family:Arial, sans-serif;">
-  <table align="center" width="800" cellpadding="0" cellspacing="0" style="border:3px solid #ebecec; background:#ffffff;">
-    ' . self::ticket_email_banner($context) . '
-    ' . $content . '
-    <tr>
-      <td style="background:#f59120; text-align:center; font-weight:600; font-size:18px; padding:18px; color:white;">
-        Una empresa para lograr sus suenos.
-      </td>
-    </tr>
-  </table>
-</body>
-</html>';
-    }
-
-    private static function ticket_email_links(array $context, bool $brochure_with_utm = false): string
-    {
-        $brochure_url = $context['brochure_url'];
-        if ($brochure_with_utm) {
-            $brochure_url = add_query_arg(
-                [
-                    'utm_source' => 'Notificaciones pagina web',
-                    'utm_medium' => 'Email',
-                ],
-                $brochure_url
-            );
-        }
-
-        return '<tr>
-      <td style="padding:20px; text-align:center; color:#061d49;">
-        <p style="font-weight:500; margin:10px 0;">Si deseas ver toda la informacion de la tarea, ingresa por este enlace:</p>
-        ' . self::ticket_email_button($context['ticket_url'], 'Ver tarea') . '
-        <p style="font-weight:500; margin:20px 0 10px;">Descubre quienes somos y todo lo que podemos hacer por ti.</p>
-        ' . self::ticket_email_button($brochure_url, 'Ver brochure') . '
-        <p style="font-weight:500; margin:20px 0 10px;">Descubre nuestra revista digital. Mantente al dia con las mejores oportunidades inmobiliarias, tips exclusivos y tendencias del mercado.</p>
-        ' . self::ticket_email_button($context['link_revista_correo'], 'Ver revista') . '
-      </td>
-    </tr>';
-    }
-
-    private static function ticket_email_template_funcionario(array $context): string
-    {
-        $content = '<tr>
-      <td style="padding:20px; text-align:center; color:#061d49;">
-        <h3 style="font-size:16px; margin:0 0 20px;">Estimado/a ' . esc_html($context['nombre_empleado']) . '</h3>
-        <p style="font-weight:500; margin:10px 0;">
-          Se te ha asignado una nueva tarea comercial de <b>' . esc_html($context['tema_ayuda']) . '</b> que trata de <b>' . esc_html($context['asunto']) . '</b>
-        </p>
-      </td>
-    </tr>' . self::ticket_email_links($context);
-
-        return self::ticket_email_shell('Nueva tarea comercial', $content, $context);
-    }
-
-    private static function ticket_email_template_solicitante(array $context): string
-    {
-        $content = '<tr>
-      <td style="padding:20px; text-align:center; color:#061d49;">
-        <h3 style="font-size:16px; margin:0 0 20px;">Estimado/a ' . esc_html($context['solicitante']) . '</h3>
-        <p style="font-weight:500; margin:10px 0;">
-          Hemos registrado su solicitud de <b>' . esc_html($context['tema_ayuda']) . '</b>, asignandola a <b>' . esc_html($context['nombre_empleado'] . ' - ' . $context['celular_empleado']) . '</b>.
-          Su labor sera evaluada para garantizar un servicio optimo. Si no cumple sus expectativas, puede responder por esta misma via.
-        </p>
-        <p style="font-weight:500; margin:10px 0;">
-          Cordialmente:<br><br><b>' . esc_html($context['nombre_comercial']) . '</b> - <b>Coordinador(a) comercial</b>' . ($context['celular_comercial'] !== '' ? ' - <b>' . esc_html($context['celular_comercial']) . '</b>' : '') . '
-        </p>
-      </td>
-    </tr>' . self::ticket_email_links($context, true);
-
-        return self::ticket_email_shell('Nueva tarea agendada', $content, $context);
-    }
-
-    private static function ticket_email_template_admin(array $context): string
-    {
-        $content = '<tr>
-      <td style="padding:20px; text-align:center; color:#061d49;">
-        <h3 style="font-size:16px; margin:0 0 20px;">Estimado administrador</h3>
-        <p style="font-weight:500; margin:10px 0;">
-          Se ha agregado una nueva tarea comercial de <b>' . esc_html($context['tema_ayuda']) . '</b> desde el medio <b>' . esc_html($context['medio']) . '</b>.
-          La cual fue asignada a <b>' . esc_html($context['nombre_empleado']) . '</b>.
-        </p>
-      </td>
-    </tr>' . self::ticket_email_links($context);
-
-        return self::ticket_email_shell('Nueva tarea comercial', $content, $context);
     }
 
     public static function ajax_marcar_duplicada(): void

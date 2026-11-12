@@ -32,7 +32,7 @@ final class CommercialInternalNotifications
       'label' => 'Precaptación',
       'items' => [
         'precaptacion_creada' => ['label' => 'Precaptación registrada', 'description' => 'Aviso de una precaptación nueva. Mientras no marques a nadie sigue llegando a los correos de siempre.', 'channel' => 'Correo'],
-        'precaptacion_tarea_creada' => ['label' => 'Tarea creada desde una precaptación', 'description' => 'Copia del aviso de la tarea. Mientras no marques a nadie sigue llegando a los correos de siempre.', 'channel' => 'Correo'],
+        'precaptacion_tarea_creada' => ['label' => 'Tarea creada desde una precaptación', 'description' => 'Copia del aviso de la tarea nueva. El responsable asignado la recibe siempre.', 'channel' => 'Correo y WhatsApp'],
       ],
     ],
   ];

@@ -112,21 +112,22 @@ final class CommercialCallsNotifier
   /**
    * @param array<string,mixed> $task Fila guardada de la tarea.
    * @param array<string,mixed> $branch Sucursal, para firmar el correo al solicitante.
+   * @param string $event Evento de Notificaciones internas que recibe la copia (la tarea puede salir de una llamada o de una precaptación).
    */
-  public function taskCreated(int $id, array $task, array $branch): void
+  public function taskCreated(int $id, array $task, array $branch, string $event = 'llamada_tarea_creada'): void
   {
     $e = static fn($value): string => EmailTemplate::e((string) $value);
     $topic = $e($task['tema_ayuda'] ?? '');
     $employee = $e($task['nombre_empleado'] ?? '');
     $staffButtons = $this->buttons(self::panelUrl($id), 'Ver tarea');
-    $staff = $this->staff($task, 'llamada_tarea_creada');
+    $staff = $this->staff($task, $event);
     if ($this->settings['asignado']) {
       $this->send($task['correo_empleado'] ?? '', 'Nueva tarea #' . $id . ' asignada', 'Nueva tarea comercial',
         '<p>Estimado/a <strong>' . $employee . '</strong>, se te asignó una nueva tarea comercial de <strong>' . $topic . '</strong> sobre <strong>' . $e($task['asunto'] ?? '') . '</strong>.</p>',
         $staffButtons, 'llamadas:tarea:' . $id . ':asignado');
     }
     $copies = $this->copies($staff);
-    if ($copies === [] && $this->settings['administradores']) {
+    if ($copies === [] && $this->settings['administradores'] && $event === 'llamada_tarea_creada') {
       // Lista anterior de Configuración › Llamadas: sigue funcionando hasta que se marquen funcionarios en Notificaciones internas.
       $copies = $this->settings['admin_emails'];
     }

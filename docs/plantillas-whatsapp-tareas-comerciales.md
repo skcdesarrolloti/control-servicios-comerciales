@@ -12,7 +12,7 @@ Los WhatsApp vienen activos en **Configuración › Llamadas**: llegan en cuanto
 
 ## 1. `scm_tarea_comercial_asignada_v1`
 
-Para el funcionario asignado y las copias internas, al crear la tarea. Ya está creada: no la cambies.
+Para el funcionario asignado y las copias internas, al crear la tarea (desde Llamadas o desde Precaptación). Ya está creada: no la cambies.
 
 ```text
 Hola *{{1}}.*
@@ -33,7 +33,7 @@ Botón `Ver tarea`. URL del sitio web `https://sucasainmobiliaria.com.co/dashboa
 
 ## 2. `scm_tarea_comercial_registrada_v1`
 
-Para el cliente, al crear la tarea. **Encabezado:** en "Muestra de contenido multimedia" elige **Imagen** y sube una ficha de ejemplo (JPG o PNG, datos inventados). El panel envía la ficha del funcionario asignado (Promoción › Fichas de funcionarios) o, si no tiene, el banner de los correos.
+Para el cliente, al crear la tarea (desde Llamadas o desde Precaptación). **Encabezado:** en "Muestra de contenido multimedia" elige **Imagen** y sube una ficha de ejemplo (JPG o PNG, datos inventados). El panel envía la ficha del funcionario asignado (Promoción › Fichas de funcionarios) o, si no tiene, el banner de los correos.
 
 ```text
 Hola *{{1}}.*

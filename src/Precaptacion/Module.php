@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace SCM\Precaptacion;
 
+use SCM\Commercial\Calls\CommercialCallsNotifier;
+use SCM\Commercial\Calls\CommercialCallsRepository;
 use SCM\Commercial\CommercialAccessPolicy;
 use SCM\Commercial\Medios\MedioCatalog;
 use SCM\Core\Auth;
@@ -21,6 +23,9 @@ final class Module
   private static CommercialAccessPolicy $access;
   private static Csrf $csrf;
   private static array $emails = [];
+  /** @var list<int> Tareas creadas en esta petición: se avisan después de confirmar la transacción. */
+  private static array $tasks = [];
+  private static ?CommercialCallsNotifier $notifier = null;
   private static ManagementHistory $history;
   private static Workflow $workflow;
 
@@ -62,6 +67,18 @@ final class Module
     return (new \SCM\Commercial\CommercialInternalNotifications(self::db(), self::$settings))->emails($event) ?: $fallback;
   }
 
+  /** Solo para pruebas: reemplaza el envío real a shared-notifications. */
+  public static function useNotifier(?CommercialCallsNotifier $notifier): void
+  {
+    self::$notifier = $notifier;
+  }
+
+  /** La tarea creada desde una precaptación avisa igual que la de Llamadas (correo y WhatsApp al asignado y al cliente). */
+  public static function deferTask(int $id): void
+  {
+    self::$tasks[] = $id;
+  }
+
   public static function deferEmail(array $recipients, string $subject, string $html, array $headers = []): void
   {
     self::$emails[] = [$recipients, $subject, $html, $headers];
@@ -83,12 +100,30 @@ final class Module
       }
     }
     self::$emails = [];
+    $tasks = self::$tasks;
+    self::$tasks = [];
+    foreach ($tasks as $id) self::notifyTask($id);
   }
 
   public static function rollback(): void
   {
     if (self::db()->pdo()->inTransaction()) self::db()->pdo()->rollBack();
     self::$emails = [];
+    self::$tasks = [];
+  }
+
+  private static function notifyTask(int $id): void
+  {
+    if (!self::$settings instanceof Settings) return;
+    try {
+      $task = self::db()->getRow('SELECT * FROM `' . self::db()->table('jet_cct_tickets') . '` WHERE _ID = ? LIMIT 1', [$id]);
+      if ($task === null) return;
+      try { $branch = (new CommercialCallsRepository(self::db()))->branch((string) ($task['sucursal'] ?? '')) ?? []; }
+      catch (\Throwable $exception) { $branch = []; }
+      (self::$notifier ?? new CommercialCallsNotifier(self::db(), self::$settings))->taskCreated($id, $task, $branch, 'precaptacion_tarea_creada');
+    } catch (\Throwable $exception) {
+      error_log('[precaptacion:tarea] ' . $exception->getMessage());
+    }
   }
 
   public static function authorizeRecord(array $row): void
@@ -186,7 +221,7 @@ final class Module
           if ($candidate !== '' && $candidate !== '0') { $ticket = $candidate; break; }
         }
         if (LegacyPanel::row_has_ticket(self::db()->table('jet_cct_precaptaciones'), $row)) {
-          if ($action === 'precaptaciones_crear_ticket' && $ticket !== '') wp_send_json_success(['ticket_id'=>$ticket,'ticket_url'=>home_url('/ticket/?id_ticket=' . rawurlencode($ticket)),'message'=>'La precaptación ya tiene una tarea.']);
+          if ($action === 'precaptaciones_crear_ticket' && $ticket !== '') wp_send_json_success(['ticket_id'=>$ticket,'ticket_url'=>CommercialCallsNotifier::panelUrl((int) $ticket),'message'=>'La precaptación ya tiene una tarea.']);
           wp_send_json_error(['message'=>'Esta precaptación ya tiene una tarea y no se puede editar.'], 409);
         }
         // Identity and PPH reward state always come from the saved record.

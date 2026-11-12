@@ -253,6 +253,36 @@ final class PrecaptacionTest extends TestCase
     }
   }
 
+  public function testTaskFromPrecaptacionNotifiesLikeCallsAfterCommit(): void
+  {
+    if (!defined('SCM_APP_SECRET')) define('SCM_APP_SECRET', 'secreto-de-prueba-de-al-menos-32-caracteres');
+    $this->db->update('wp_jet_cct_funcionarios', ['celular'=>'3000000202'], ['id_empleado'=>'202']);
+    $this->db->update('wp_jet_cct_funcionarios', ['celular'=>'3000000101'], ['id_empleado'=>'101']);
+    (new \SCM\Commercial\CommercialInternalNotifications($this->db, new Settings($this->db)))->save(['precaptacion_tarea_creada'=>['101']]);
+    $log = new \stdClass();
+    $log->mail = [];
+    $log->whatsapp = [];
+    Module::useNotifier(new \SCM\Commercial\Calls\CommercialCallsNotifier($this->db, new Settings($this->db),
+      static function ($to, string $subject) use ($log): void { $log->mail[] = [$to, $subject]; },
+      static function (string $phone, string $template) use ($log): void { $log->whatsapp[] = [$phone, $template]; }));
+    $this->db->insert('wp_jet_cct_tickets', ['_ID'=>77,'id_empleado'=>'202','nombre_empleado'=>'Segundo consultor','correo_empleado'=>'other@example.test','celular_empleado'=>'3000000202',
+      'solicitante'=>'Contacto de prueba','correo_solicitante'=>'contacto@example.test','celular_solicitante'=>'3001234567','tema_ayuda'=>'Captacion','medio'=>'Recorrido','asunto'=>'Visita','sucursal'=>'Principal']);
+    try {
+      $this->db->pdo()->beginTransaction();
+      Module::deferTask(77);
+      Module::rollback();
+      self::assertSame([], $log->mail, 'Si la tarea no se guarda, no se avisa.');
+
+      $this->db->pdo()->beginTransaction();
+      Module::deferTask(77);
+      Module::commit();
+      self::assertSame(['other@example.test', ['test@example.test'], 'contacto@example.test'], array_column($log->mail, 0), 'Asignado, copia de Notificaciones internas y cliente; sin correos fijos.');
+      self::assertSame([['+573000000202', 'scm_tarea_comercial_asignada_v1'], ['+573000000101', 'scm_tarea_comercial_asignada_v1'], ['+573001234567', 'scm_tarea_comercial_registrada_v1']], $log->whatsapp);
+    } finally {
+      Module::useNotifier(null);
+    }
+  }
+
   public function testCannotCreateATaskFromAnUnansweredCall(): void
   {
     $this->expectException(\InvalidArgumentException::class);

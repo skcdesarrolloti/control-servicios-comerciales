@@ -83,6 +83,8 @@ const { chromium } = require(process.argv[2] ? path.join(process.argv[2], 'playw
     assert.equal(data.row.id_empleado,'101','El captador permanece separado del responsable de llamadas');
     assert.equal(data.task.medio,'Recorrido','Conserva el medio original');
     assert.equal(data.task.solicitante,'Contacto de prueba');
+    assert.equal(String(data.task.id_empleado),'202','La tarea es de quien se eligió en Asignar a');
+    assert.ok(task.payload.data.ticket_url.includes('index.php?tab=abiertos&ticket_id='),'Ver tarea abre el panel comercial');
     assert.equal(data.process.status,'convertida');
     assert.equal(Number(data.process.attempts),1,'Crear una tarea pendiente no registra otra llamada');
     assert.equal(Number((await post('precaptaciones_crear_ticket',{asignado:'202',asunto:'Otra',descripcion:'Otra'})).payload.data.ticket_id),Number(task.payload.data.ticket_id));
