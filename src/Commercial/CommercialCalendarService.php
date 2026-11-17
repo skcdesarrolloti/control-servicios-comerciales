@@ -133,18 +133,6 @@ final class CommercialCalendarService
     return (string) (int) $this->settings->get(self::CITA_CATEGORY_SETTING, 0);
   }
 
-  /** @return array<string,bool> */
-  public function notificationSettings(): array
-  {
-    $saved = $this->settings->get(Calendar\CalendarMailer::SETTING, []);
-    $saved = is_array($saved) ? $saved : [];
-    $out = [];
-    foreach (Calendar\CalendarMailer::DEFAULTS as $key => $default) {
-      $out[$key] = array_key_exists($key, $saved) ? (bool) $saved[$key] : $default;
-    }
-    return $out;
-  }
-
   /** Acciones AJAX que usa el motor del calendario (mismos nombres de clave que en administrativo). @return array<string,string> */
   public static function runtimeActions(): array
   {

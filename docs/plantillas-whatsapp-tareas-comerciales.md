@@ -8,7 +8,7 @@ Cada dato es una sola variable: el contacto de un funcionario (nombre, correo y 
 
 En el botón, **URL del sitio web** lleva todo lo que está antes de `{{1}}` (Meta pone `{{1}}` al final) y el panel completa solo el final. En **URL de muestra** va la URL completa. Deja sin marcar **Permite que Meta use el seguimiento de enlaces**.
 
-Los WhatsApp vienen activos en **Configuración › Llamadas**: llegan en cuanto Meta apruebe cada plantilla.
+Los WhatsApp siempre están activos y los nombres de las plantillas son fijos en el código (`CommercialCallsNotifier::TEMPLATE_*`, idioma `es_CO`): llegan en cuanto Meta apruebe cada plantilla.
 
 ## 1. `scm_tarea_comercial_asignada_v1`
 
@@ -94,4 +94,4 @@ Botón `Ver y responder`. URL del sitio web `https://sucasainmobiliaria.com.co/d
 
 ## Si Meta exige otro nombre
 
-Escríbelo en **Configuración › Llamadas**. No borres una plantilla para volver a crearla: Meta no deja reusar ese nombre por varias semanas.
+Cámbialo en la constante `TEMPLATE_*` de `src/Commercial/Calls/CommercialCallsNotifier.php`. No borres una plantilla para volver a crearla: Meta no deja reusar ese nombre por varias semanas.

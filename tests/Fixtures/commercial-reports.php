@@ -39,8 +39,6 @@ $settings = new SCM\Core\Settings($db, false, 'control_servicios_comerciales_con
 $csrf = new SCM\Core\Csrf(str_repeat('x', 40));
 $_SESSION['scm_csrf']['commercial_nonce'] = 'fixture';
 SCM\Core\App::init($db, new SCM\Core\Auth($db), $csrf, $settings);
-$settings->set(SCM\Commercial\Reports\CommercialReportsService::SETTING, ['billing_enabled' => (string) ($_GET['billing'] ?? '1') === '1', 'deadline_weekday' => 6], 3);
-$settings->refresh();
 $config = ['dashboard_admin_cargos' => ['11'], 'calendar_allowed_cargos' => ['9', '11']];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -57,5 +55,5 @@ $html = SCM\Views\CommercialDashboardView::render([
   'calendar_employees' => $calendar['employees'], 'base_url' => SCM_BASE_URL,
   'runtime' => ['ajaxUrl' => SCM_BASE_URL . '/api.php', 'nonce' => 'fixture', 'initialTab' => 'scm-panel-reportes_comerciales', 'actions' => [], 'calendarCategoryIds' => [], 'config' => $calendar['config']],
 ]);
-$self = 'http://127.0.0.1:8769/tests/Fixtures/commercial-reports.php' . ((string) ($_GET['billing'] ?? '1') === '1' ? '' : '?billing=0');
+$self = 'http://127.0.0.1:8769/tests/Fixtures/commercial-reports.php';
 echo str_replace(str_replace('/', '\\/', SCM_BASE_URL . '/api.php'), str_replace('/', '\\/', $self), $html);

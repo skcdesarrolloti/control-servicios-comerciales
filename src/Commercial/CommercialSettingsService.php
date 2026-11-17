@@ -5,10 +5,7 @@ declare(strict_types=1);
 namespace SCM\Commercial;
 
 use SCM\Commercial\Calendar\CalendarCommercialReport;
-use SCM\Commercial\Calendar\CalendarMailer;
 use SCM\Commercial\Calendar\CalendarStore;
-use SCM\Commercial\Calls\CommercialCallsNotifier;
-use SCM\Commercial\Reports\CommercialReportsService;
 use SCM\Commercial\Medios\MedioCatalog;
 use SCM\Commercial\Medios\MedioResolver;
 use SCM\Commercial\Promotion\Analytics\TrackerAnalyticsConfig;
@@ -34,6 +31,10 @@ use SCM\Support\SchemaInspector;
  * La lista única de Medios vive en su propia tabla (scm_medios, MedioCatalog): la sección "medios" la administra y, al
  * cambiarla, sincroniza el glosario "Medio de llamada" de JetEngine. Los catálogos del Plan estratégico (sección "plan")
  * son las mismas tablas CCT que usa el plugin Gestor Estratégico de WordPress.
+ *
+ * Solo se configura lo que el negocio cambia (datos, plazos, valores, destinatarios). Lo técnico va fijo en el código y
+ * no se agrega aquí: nombres e idioma de plantillas de WhatsApp, canales de los avisos (siempre activos) e interruptores
+ * de puesta en marcha.
  */
 final class CommercialSettingsService
 {
@@ -57,7 +58,7 @@ final class CommercialSettingsService
     'factor_prestacional' => ['Factor prestacional', 0, 0, 100],
   ];
 
-  public const SECTIONS = ['notificaciones_internas', 'calendario', 'reportes', 'llamadas', 'tiempos', 'avisos', 'actualizaciones', 'destacados', 'aseo', 'utm', 'medios', 'analitica', 'plan', 'material_pop', 'banner_revista'];
+  public const SECTIONS = ['notificaciones_internas', 'calendario', 'tiempos', 'avisos', 'actualizaciones', 'destacados', 'aseo', 'utm', 'medios', 'analitica', 'plan', 'material_pop', 'banner_revista'];
 
   /** Operaciones de la sección "medios" (todas guardan, salvo preview, que solo cuenta). */
   public const MEDIOS_OPS = ['add', 'rename', 'toggle', 'merge', 'aliases', 'alias_raw', 'rewrite_raw', 'preview'];
@@ -114,13 +115,10 @@ final class CommercialSettingsService
         'category_ids' => $calendar->categoryIds(),
         'categories' => $this->calendarCategories(),
         'cita_category_id' => $calendar->citaCategoryId(),
-        'notifications' => $calendar->notificationSettings(),
         'report_cargo_ids' => $this->ids($this->systemValue(CalendarCommercialReport::CARGOS_SETTING) ?? []),
         'cargo_ids' => $calendar->calendarCargos(),
         'cargo_options' => $this->policy->cargoOptions(),
       ],
-      'reportes' => CommercialReportsService::settings($this->settings),
-      'llamadas' => CommercialCallsNotifier::settings($this->settings),
       'notificaciones_internas' => $section === 'notificaciones_internas' ? $this->internalNotifications() : [],
       'tiempos' => ['topics' => $topics],
       'avisos' => ['values' => $signs],
@@ -283,12 +281,6 @@ final class CommercialSettingsService
     switch ($section) {
       case 'calendario':
         return $this->saveCalendar($data);
-      case 'reportes':
-        $this->settings->set(CommercialReportsService::SETTING, ['billing_enabled' => !empty($data['billing_enabled']), 'deadline_weekday' => max(0, min(6, (int) ($data['deadline_weekday'] ?? CommercialReportsService::DEFAULT_DEADLINE_WEEKDAY)))], Auth::userId());
-        $this->settings->refresh();
-        return 'Configuración de reportes comerciales guardada.';
-      case 'llamadas':
-        return $this->saveCallNotifications($data);
       case 'notificaciones_internas':
         (new CommercialInternalNotifications($this->db, $this->settings))->save((array) ($data['events'] ?? []));
         return 'Notificaciones internas guardadas.';
@@ -346,8 +338,8 @@ final class CommercialSettingsService
   }
 
   /**
-   * Configuración › Material POP: categorías con cuántos productos las usan y los funcionarios activos con correo que
-   * pueden recibir la alerta de stock bajo.
+   * Configuración › Material POP: categorías con cuántos productos las usan y la API. Quién recibe la alerta de stock bajo
+   * se elige en Notificaciones internas.
    * @return array<string,mixed>
    */
   private function popSettings(): array
@@ -368,13 +360,10 @@ final class CommercialSettingsService
       $key = mb_strtolower($name, 'UTF-8');
       $categories[] = ['name' => $name, 'products' => $usage[$key]['total'] ?? 0, 'listed' => in_array($key, $listed, true)];
     }
-    $funcionarios = $this->db->table('jet_cct_funcionarios');
-    $employees = $this->db->getResults("SELECT id_empleado AS id, TRIM(nombre) AS name, TRIM(correo) AS email FROM `{$funcionarios}` WHERE LOWER(TRIM(COALESCE(activo, ''))) = 'si' AND TRIM(COALESCE(correo, '')) <> '' ORDER BY nombre");
     $base = rtrim((string) ($this->config['base_url'] ?? (defined('SCM_BASE_URL') ? constant('SCM_BASE_URL') : '')), '/');
     return $config + [
       'api_url' => $base . '/inventory-api.php',
       'category_usage' => $categories,
-      'employees' => array_map(static fn(array $row): array => ['id' => (string) $row['id'], 'name' => (string) $row['name'], 'email' => (string) $row['email']], $employees),
     ];
   }
 
@@ -512,13 +501,6 @@ final class CommercialSettingsService
     if (is_array($data['categories'] ?? null) || is_array($data['deleted_category_ids'] ?? null)) {
       [$categoryIds, $available] = $this->saveCategories(is_array($data['categories'] ?? null) ? $data['categories'] : [], $this->ids($data['deleted_category_ids'] ?? []), $categoryIds, $available);
     }
-    $saved = $calendar->notificationSettings();
-    if (is_array($data['notifications'] ?? null)) {
-      foreach (array_keys($saved) as $key) {
-        $saved[$key] = !empty($data['notifications'][$key]);
-      }
-      $this->settings->set(CalendarMailer::SETTING, $saved, Auth::userId());
-    }
     if (array_key_exists('cita_category_id', $data)) {
       $this->settings->set(CommercialCalendarService::CITA_CATEGORY_SETTING, (int) $data['cita_category_id'], Auth::userId());
     }
@@ -594,15 +576,6 @@ final class CommercialSettingsService
       $this->saveSystemValue($key, $value);
     }
     return 'Plazos y valores de avisos guardados.';
-  }
-
-  /** @param array<string,mixed> $data */
-  /** @param array<string,mixed> $data */
-  private function saveCallNotifications(array $data): string
-  {
-    $this->settings->set(CommercialCallsNotifier::SETTING, CommercialCallsNotifier::validated($data, CommercialCallsNotifier::settings($this->settings)), Auth::userId());
-    $this->settings->refresh();
-    return 'Configuración de llamadas guardada.';
   }
 
   /** @return array{catalog:array<string,mixed>,employees:list<array<string,string>>,events:array<string,list<string>>} */

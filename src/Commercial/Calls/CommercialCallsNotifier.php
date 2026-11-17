@@ -15,19 +15,19 @@ use SCM\Support\SharedNotificationsBridge;
 
 /**
  * Avisos de las tareas comerciales: tarea creada, mensaje del cliente y respuesta del funcionario. Todo va por
- * shared-notifications. Los canales y las plantillas de WhatsApp se configuran en Configuración › Llamadas, y las copias
- * internas en Configuración › Notificaciones internas. Quién bloqueó un canal en su ficha de cliente no lo recibe.
+ * shared-notifications. Los canales (correo y WhatsApp al responsable y al cliente) siempre están activos y las plantillas
+ * de WhatsApp son fijas en el código (docs/); las copias internas se eligen en Configuración › Notificaciones internas.
+ * Quién bloqueó un canal en su ficha de cliente no lo recibe.
  */
 final class CommercialCallsNotifier
 {
+  /** Configuración anterior de Llamadas: solo se sigue leyendo su lista de correos de copia (admin_emails). */
   public const SETTING = 'commercial_calls_notifications';
-  public const TEMPLATES = [
-    'plantilla_asignada' => 'scm_tarea_comercial_asignada_v1',
-    'plantilla_registrada' => 'scm_tarea_comercial_registrada_v1',
-    'plantilla_respuesta_cliente' => 'scm_tarea_comercial_respuesta_cliente_v1',
-    'plantilla_respuesta_funcionario' => 'scm_tarea_comercial_respuesta_funcionario_v1',
-  ];
-  public const DEFAULTS = ['asignado' => true, 'solicitante' => true, 'administradores' => true, 'whatsapp_asignado' => true, 'whatsapp_solicitante' => true, 'idioma' => 'es_CO', 'admin_emails' => []] + self::TEMPLATES;
+  public const TEMPLATE_ASSIGNED = 'scm_tarea_comercial_asignada_v1';
+  public const TEMPLATE_REGISTERED = 'scm_tarea_comercial_registrada_v1';
+  public const TEMPLATE_CLIENT_REPLY = 'scm_tarea_comercial_respuesta_cliente_v1';
+  public const TEMPLATE_OFFICER_REPLY = 'scm_tarea_comercial_respuesta_funcionario_v1';
+  public const TEMPLATE_LANGUAGE = 'es_CO';
 
   private const BROCHURE = 'https://sucasainmobiliaria.com.co/brochure-skc-sucasa-inmobiliaria/';
 
@@ -38,8 +38,8 @@ final class CommercialCallsNotifier
   private $enqueue;
   /** @var callable(string,string,list<array<string,mixed>>,array<string,mixed>):void */
   private $whatsapp;
-  /** @var array<string,mixed> */
-  private array $settings;
+  /** @var list<string> Correos de copia de la configuración anterior, mientras no se marquen funcionarios. */
+  private array $legacyCopies;
 
   /**
    * @param (callable(string|list<string>,string,string,array<string,mixed>):void)|null $enqueue Correo; por defecto, shared-notifications.
@@ -55,58 +55,21 @@ final class CommercialCallsNotifier
         $queue->enqueueWhatsAppOfficialTemplate($phone, $template, $components, $options + ['project_code' => $bridge->projectCode(), 'created_by' => 'control-servicios-comerciales']);
       }
     };
-    $this->settings = self::settings($settings);
+    $this->legacyCopies = self::legacyCopies($settings);
     $this->internal = new CommercialInternalNotifications($db, $settings);
     $this->repository = new CommercialCallsRepository($db);
     $this->cards = new StaffCardService($db);
   }
 
-  /** @return array<string,mixed> */
-  public static function settings(Settings $settings): array
+  /** @return list<string> */
+  private static function legacyCopies(Settings $settings): array
   {
     $raw = $settings->get(self::SETTING, []);
     $raw = is_array($raw) ? $raw : [];
-    $out = [];
-    foreach (['asignado', 'solicitante', 'administradores', 'whatsapp_asignado', 'whatsapp_solicitante'] as $key) {
-      $out[$key] = (bool) ($raw[$key] ?? self::DEFAULTS[$key]);
+    if (array_key_exists('administradores', $raw) && !$raw['administradores']) {
+      return [];
     }
-    foreach (self::TEMPLATES as $key => $default) {
-      $value = is_scalar($raw[$key] ?? null) ? trim((string) $raw[$key]) : '';
-      $out[$key] = $value !== '' ? $value : $default;
-    }
-    $language = is_scalar($raw['idioma'] ?? null) ? trim((string) $raw['idioma']) : '';
-    $out['idioma'] = $language !== '' ? $language : self::DEFAULTS['idioma'];
-    $out['admin_emails'] = array_values(array_filter(array_map('strval', (array) ($raw['admin_emails'] ?? [])), static fn(string $email): bool => filter_var($email, FILTER_VALIDATE_EMAIL) !== false));
-    return $out;
-  }
-
-  /**
-   * Valida lo que llega de Configuración › Llamadas (mismas reglas de PanelCaseNotifications::validateConfig del panel inmobiliario).
-   * @param array<string,mixed> $data
-   * @param array<string,mixed> $current
-   * @return array<string,mixed>
-   */
-  public static function validated(array $data, array $current): array
-  {
-    $out = ['admin_emails' => $current['admin_emails'] ?? [], 'administradores' => (bool) ($current['administradores'] ?? true)];
-    foreach (['asignado', 'solicitante', 'whatsapp_asignado', 'whatsapp_solicitante'] as $key) {
-      $out[$key] = !empty($data[$key]);
-    }
-    foreach (self::TEMPLATES as $key => $default) {
-      $value = is_scalar($data[$key] ?? null) ? trim((string) $data[$key]) : '';
-      $value = $value !== '' ? $value : $default;
-      if (preg_match('/^[a-z0-9_]{1,512}$/D', $value) !== 1) {
-        throw new \InvalidArgumentException('Usa nombres de plantillas con minúsculas, números y guiones bajos.');
-      }
-      $out[$key] = $value;
-    }
-    $language = is_scalar($data['idioma'] ?? null) ? trim((string) $data['idioma']) : '';
-    $language = $language !== '' ? $language : self::DEFAULTS['idioma'];
-    if (preg_match('/^[a-z]{2}(?:_[A-Z]{2})?$/D', $language) !== 1) {
-      throw new \InvalidArgumentException('Indica el código exacto del idioma de las plantillas, por ejemplo es_CO.');
-    }
-    $out['idioma'] = $language;
-    return $out;
+    return array_values(array_filter(array_map('strval', (array) ($raw['admin_emails'] ?? [])), static fn(string $email): bool => filter_var($email, FILTER_VALIDATE_EMAIL) !== false));
   }
 
   /**
@@ -121,30 +84,26 @@ final class CommercialCallsNotifier
     $employee = $e($task['nombre_empleado'] ?? '');
     $staffButtons = $this->buttons(self::panelUrl($id), 'Ver tarea');
     $staff = $this->staff($task, $event);
-    if ($this->settings['asignado']) {
-      $this->send($task['correo_empleado'] ?? '', 'Nueva tarea #' . $id . ' asignada', 'Nueva tarea comercial',
-        '<p>Estimado/a <strong>' . $employee . '</strong>, se te asignó una nueva tarea comercial de <strong>' . $topic . '</strong> sobre <strong>' . $e($task['asunto'] ?? '') . '</strong>.</p>',
-        $staffButtons, 'llamadas:tarea:' . $id . ':asignado');
-    }
+    $this->send($task['correo_empleado'] ?? '', 'Nueva tarea #' . $id . ' asignada', 'Nueva tarea comercial',
+      '<p>Estimado/a <strong>' . $employee . '</strong>, se te asignó una nueva tarea comercial de <strong>' . $topic . '</strong> sobre <strong>' . $e($task['asunto'] ?? '') . '</strong>.</p>',
+      $staffButtons, 'llamadas:tarea:' . $id . ':asignado');
     $copies = $this->copies($staff);
-    if ($copies === [] && $this->settings['administradores'] && $event === 'llamada_tarea_creada') {
+    if ($copies === [] && $event === 'llamada_tarea_creada') {
       // Lista anterior de Configuración › Llamadas: sigue funcionando hasta que se marquen funcionarios en Notificaciones internas.
-      $copies = $this->settings['admin_emails'];
+      $copies = $this->legacyCopies;
     }
     if ($copies !== []) {
       $this->send($copies, 'Tarea comercial #' . $id . ' creada', 'Nueva tarea comercial',
         '<p>Se creó una tarea comercial de <strong>' . $topic . '</strong> desde el medio <strong>' . $e($task['medio'] ?? '') . '</strong>, asignada a <strong>' . $employee . '</strong>.</p>',
         $staffButtons, 'llamadas:tarea:' . $id . ':admin');
     }
-    if ($this->settings['whatsapp_asignado']) {
-      foreach ($staff as $person) {
-        $this->whatsappTo($person['celular'], '57', (string) $this->settings['plantilla_asignada'],
-          [$person['nombre'], (string) $id, $task['solicitante'] ?? '', $task['tema_ayuda'] ?? '', $task['medio'] ?? '', self::contactLine($task)], (string) $id,
-          'llamadas:tarea:' . $id . ':whatsapp:' . $person['id']);
-      }
+    foreach ($staff as $person) {
+      $this->whatsappTo($person['celular'], '57', self::TEMPLATE_ASSIGNED,
+        [$person['nombre'], (string) $id, $task['solicitante'] ?? '', $task['tema_ayuda'] ?? '', $task['medio'] ?? '', self::contactLine($task)], (string) $id,
+        'llamadas:tarea:' . $id . ':whatsapp:' . $person['id']);
     }
     $client = $this->clientPreferences($task);
-    if ($this->settings['solicitante'] && !$this->blocked($client, 'email')) {
+    if (!$this->blocked($client, 'email')) {
       $manager = trim((string) ($branch['gerente_comercial'] ?? ''));
       $signature = $manager !== ''
         ? '<p>Cordialmente:<br><strong>' . $e($manager) . '</strong> · Coordinación comercial' . (trim((string) ($branch['celular_ge_comercial'] ?? '')) !== '' ? ' · ' . $e($branch['celular_ge_comercial']) : '') . '</p>'
@@ -154,8 +113,8 @@ final class CommercialCallsNotifier
         . '</strong>' . (trim((string) ($task['celular_empleado'] ?? '')) !== '' ? ' (' . $e($task['celular_empleado']) . ')' : '') . '.</p><p>Desde el botón puedes ver tu solicitud y escribirnos. Su atención será evaluada para garantizar un servicio óptimo.</p>' . $signature,
         $this->buttons(PublicTaskAccess::url($id), 'Ver y responder'), 'llamadas:tarea:' . $id . ':solicitante', (string) ($task['correo_empleado'] ?? ''));
     }
-    if ($this->settings['whatsapp_solicitante'] && !$this->blocked($client, 'whatsapp')) {
-      $this->whatsappTo(self::clientPhone($task), (string) ($task['indicativo'] ?? ''), (string) $this->settings['plantilla_registrada'],
+    if (!$this->blocked($client, 'whatsapp')) {
+      $this->whatsappTo(self::clientPhone($task), (string) ($task['indicativo'] ?? ''), self::TEMPLATE_REGISTERED,
         [$task['solicitante'] ?? '', (string) $id, $task['tema_ayuda'] ?? '', self::contactLine($task)], PublicTaskAccess::reference($id),
         'llamadas:tarea:' . $id . ':whatsapp:solicitante', $this->cardImage((string) ($task['id_empleado'] ?? '')));
     }
@@ -171,15 +130,13 @@ final class CommercialCallsNotifier
     $key = 'llamadas:tarea:' . $id . ':cliente:' . substr(hash('sha256', $message), 0, 16);
     $staff = $this->staff($task, 'llamada_respuesta_cliente');
     $body = '<p>El cliente <strong>' . $e($task['solicitante'] ?? '') . '</strong> escribió en la tarea comercial <strong>#' . $id . '</strong>:</p><blockquote style="margin:12px 0;padding:12px 16px;background:#f1f5f9;border-left:4px solid #1e3c76;">' . nl2br($e($message)) . '</blockquote>';
-    $emails = array_values(array_unique(array_filter(array_merge($this->settings['asignado'] ? [(string) ($task['correo_empleado'] ?? '')] : [], $this->copies($staff)))));
+    $emails = array_values(array_unique(array_filter(array_merge([(string) ($task['correo_empleado'] ?? '')], $this->copies($staff)))));
     if ($emails !== []) {
       $this->send($emails, 'El cliente respondió la tarea #' . $id, 'Respuesta del cliente', $body, $this->buttons(self::panelUrl($id), 'Ver tarea'), $key);
     }
-    if ($this->settings['whatsapp_asignado']) {
-      foreach ($staff as $person) {
-        $this->whatsappTo($person['celular'], '57', (string) $this->settings['plantilla_respuesta_cliente'],
-          [$person['nombre'], $task['solicitante'] ?? '', (string) $id, $message], (string) $id, $key . ':whatsapp:' . $person['id']);
-      }
+    foreach ($staff as $person) {
+      $this->whatsappTo($person['celular'], '57', self::TEMPLATE_CLIENT_REPLY,
+        [$person['nombre'], $task['solicitante'] ?? '', (string) $id, $message], (string) $id, $key . ':whatsapp:' . $person['id']);
     }
   }
 
@@ -201,8 +158,8 @@ final class CommercialCallsNotifier
         '<p>Estimado/a <strong>' . $e($task['solicitante'] ?? '') . '</strong>, <strong>' . $e($author) . '</strong> respondió tu solicitud <strong>#' . $id . '</strong>:</p><blockquote style="margin:12px 0;padding:12px 16px;background:#f1f5f9;border-left:4px solid #1e3c76;">' . nl2br($e($message)) . '</blockquote>',
         $this->buttons(PublicTaskAccess::url($id), 'Ver y responder'), $key, (string) ($task['correo_empleado'] ?? ''));
     }
-    if ($this->settings['whatsapp_solicitante'] && !$this->blocked($client, 'whatsapp')) {
-      $this->whatsappTo(self::clientPhone($task), (string) ($task['indicativo'] ?? ''), (string) $this->settings['plantilla_respuesta_funcionario'],
+    if (!$this->blocked($client, 'whatsapp')) {
+      $this->whatsappTo(self::clientPhone($task), (string) ($task['indicativo'] ?? ''), self::TEMPLATE_OFFICER_REPLY,
         [$task['solicitante'] ?? '', (string) $id, self::contactLine(['nombre_empleado' => $author, 'correo_empleado' => $email, 'celular_empleado' => $phone])], PublicTaskAccess::reference($id), $key . ':whatsapp');
     }
   }
@@ -340,7 +297,7 @@ final class CommercialCallsNotifier
       ['type' => 'button', 'sub_type' => 'url', 'index' => '0', 'parameters' => [['type' => 'text', 'text' => $buttonValue]]]
     );
     try {
-      ($this->whatsapp)($phone, $template, $components, ['source_module' => 'llamadas-whatsapp', 'dedupe_key' => $dedupe, 'priority' => 100, 'template_language' => (string) $this->settings['idioma']]);
+      ($this->whatsapp)($phone, $template, $components, ['source_module' => 'llamadas-whatsapp', 'dedupe_key' => $dedupe, 'priority' => 100, 'template_language' => self::TEMPLATE_LANGUAGE]);
     } catch (\Throwable $exception) {
       error_log('[llamadas:whatsapp] ' . $exception->getMessage());
     }

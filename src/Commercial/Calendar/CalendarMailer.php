@@ -10,27 +10,22 @@ use SCM\Support\SharedNotificationsBridge;
 /**
  * Correos y recordatorios del calendario, siempre por shared-notifications. Lógica traída de
  * calendario/backend/helpers/email.php: conserva proyecto y `dedupe_key` para poder cancelar lo que la otra app dejó programado.
- * Cada aviso se puede apagar en Configuración › Calendario comercial.
+ * Todos los avisos están siempre activos (no se configuran).
  */
 class CalendarMailer
 {
-  public const SETTING = 'commercial_calendar_notifications';
-  public const DEFAULTS = ['funcionario_email' => true, 'solicitante_email' => true, 'propietario_email' => true, 'whatsapp_citas' => true];
   private const PROJECT = 'calendario-actividades';
   private const ORANGE_LINK = 'color:#1E3C76;font-weight:bold;';
 
   private CalendarStore $store;
   private SharedNotificationsBridge $bridge;
-  /** @var array<string,bool> */
-  private array $settings;
   /** @var array<string,mixed> */
   private array $config;
 
-  /** @param array<string,bool> $settings @param array<string,mixed> $config */
-  public function __construct(CalendarStore $store, array $settings, array $config, ?SharedNotificationsBridge $bridge = null)
+  /** @param array<string,mixed> $config */
+  public function __construct(CalendarStore $store, array $config, ?SharedNotificationsBridge $bridge = null)
   {
     $this->store = $store;
-    $this->settings = $settings + self::DEFAULTS;
     $this->config = $config;
     $this->bridge = $bridge ?? new SharedNotificationsBridge($store->database());
   }
@@ -38,9 +33,6 @@ class CalendarMailer
   /** @param array<string,mixed> $event */
   public function newEvent(array $event, int $eventId): void
   {
-    if (!$this->settings['funcionario_email']) {
-      return;
-    }
     $employee = $this->store->employee((string) $event['id_empleado']);
     if ($employee === null) {
       return;
@@ -54,7 +46,7 @@ class CalendarMailer
   public function bulkEvents(string $employeeId, array $events): void
   {
     $employee = $this->store->employee($employeeId);
-    if ($employee === null || $events === [] || !$this->settings['funcionario_email']) {
+    if ($employee === null || $events === []) {
       return;
     }
     $list = '<ul style="padding-left:20px;color:#404041;">';
@@ -71,9 +63,6 @@ class CalendarMailer
   /** @param array<string,mixed> $event */
   public function eventCompleted(array $event, int $eventId): void
   {
-    if (!$this->settings['funcionario_email']) {
-      return;
-    }
     $employee = $this->store->employee((string) $event['id_empleado']);
     if ($employee === null) {
       return;
@@ -86,9 +75,6 @@ class CalendarMailer
   /** @param array<string,mixed> $event */
   public function eventMoved(array $event, int $eventId): void
   {
-    if (!$this->settings['funcionario_email']) {
-      return;
-    }
     $employee = $this->store->employee((string) $event['id_empleado']);
     if ($employee === null) {
       return;
@@ -101,9 +87,6 @@ class CalendarMailer
   /** @param array<string,mixed> $event */
   public function requesterAppointment(array $event, bool $moved): void
   {
-    if (!$this->settings['solicitante_email']) {
-      return;
-    }
     $pk = (int) ($event['id_ticket'] ?? 0);
     $ticket = $pk > 0 ? $this->store->ticket($pk) : null;
     if ($ticket === null || trim((string) ($ticket['correo_solicitante'] ?? '')) === '') {
@@ -133,13 +116,13 @@ class CalendarMailer
     $detail = $property !== null ? trim('#' . ($property['codigo'] !== '' ? $property['codigo'] : $property['id']) . ' - ' . $property['titulo'] . ' - ' . $property['direccion']) : 'Sin inmueble asociado';
     $employee = $this->store->employee((string) $event['id_empleado']) ?? [];
     $lines = $this->row('Tipo', (string) $report['tipo_reporte']) . $this->row('Inmueble', $detail) . '<p style="margin:10px 0;"><strong>Resultado:</strong><br>' . nl2br(self::e((string) $report['observacion'])) . '</p>';
-    if ($this->settings['funcionario_email'] && trim((string) ($employee['correo'] ?? '')) !== '') {
+    if (trim((string) ($employee['correo'] ?? '')) !== '') {
       $this->sendEmail([(string) $employee['correo']], 'Reporte comercial #' . (string) ($report['_ID'] ?? '') . ' registrado desde el evento #' . $eventId, 'Reporte comercial registrado',
         $this->paragraph('Hola <strong>' . self::e((string) ($employee['nombre'] ?? '')) . '</strong>, se registró tu reporte del evento <strong>#' . self::e($eventId) . '</strong>.') . $lines . $this->row('Valor', '$' . number_format((int) $report['valor'], 0, ',', '.')),
         'reportes-comerciales-email', 'reporte-comercial:evento:' . $eventId . ':funcionario', []);
     }
     $owner = trim((string) ($property['correo_propietario'] ?? ''));
-    if ($this->settings['propietario_email'] && filter_var($owner, FILTER_VALIDATE_EMAIL)) {
+    if (filter_var($owner, FILTER_VALIDATE_EMAIL)) {
       $name = trim((string) ($property['propietario'] ?? ''));
       $this->sendEmail([$owner], 'Reporte de actividad de su inmueble', 'Actividad comercial de su inmueble',
         $this->paragraph('Apreciado/a <strong>' . self::e($name !== '' ? $name : 'Propietario/a') . '</strong>, se registró una actividad comercial relacionada con su inmueble.') . $lines,

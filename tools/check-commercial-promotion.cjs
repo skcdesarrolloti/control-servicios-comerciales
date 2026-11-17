@@ -178,11 +178,13 @@ function daysBetween(from, to) {
 
     // Configuración › Analítica web: carga la configuración y el estado, valida y guarda.
     await page.locator('#commercial-config-trigger').click();
-    await page.locator('[data-commercial-config-action="analitica"]').click();
+    await page.locator('[data-commercial-config-action="promocion"]').click();
+    await page.locator('[data-config-tab="analitica"]').click();
     const form = page.locator('[data-analytics-config]');
     await form.waitFor();
     assert.match(await form.locator('[name="internal_ips"]').inputValue(), /10\.0\.0\.0\/8/);
-    assert.equal(await form.locator('[name="exclude_bots"]').isChecked(), true);
+    assert.equal(await form.locator('[name="exclude_bots"], [name="exclude_internal"]').count(), 0, 'Robots y visitas internas son fijos');
+    assert.equal(await page.locator('.swal2-confirm').isVisible(), true, 'Analítica web sí tiene botón Guardar');
     assert.equal(await form.locator('[name="raw_retention_days"]').inputValue(), '0');
     assert.match(await form.innerText(), /Estado de los resúmenes/);
     assert.match(await form.innerText(), /Visitas pendientes por resumir\s+0/);
@@ -215,7 +217,8 @@ function daysBetween(from, to) {
     await page.locator('.swal2-confirm').click().catch(() => {});
     await page.locator('.swal2-popup').waitFor({ state: 'detached' }).catch(() => {});
     await page.locator('#commercial-config-trigger').click();
-    await page.locator('[data-commercial-config-action="analitica"]').click();
+    await page.locator('[data-commercial-config-action="promocion"]').click();
+    await page.locator('[data-config-tab="analitica"]').click();
     await form.waitFor();
     assert.equal(await form.locator('[name="raw_retention_days"]').inputValue(), '400');
     // Subir a 0 (nunca borrar) no pide confirmación.
@@ -236,9 +239,10 @@ function daysBetween(from, to) {
     // y responde con un mensaje dentro de la lista (sin abrir otro popup).
     await page.locator('.swal2-container').waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
     await page.locator('#commercial-config-trigger').click();
-    await page.locator('[data-commercial-config-action="medios"]').click();
+    await page.locator('[data-commercial-config-action="promocion"]').click();
     const medios = page.locator('[data-medios-root]');
     await medios.waitFor();
+    assert.deepEqual(await page.locator('[data-config-tab]').allTextContents(), ['Medios', 'Analítica web', 'Material POP', 'Banner y revista']);
     assert.equal(await page.locator('.swal2-confirm').isVisible(), false, 'Medios no tiene botón Guardar');
     assert.equal(await medios.locator('[data-medios-not-ready]').count(), 0);
     assert.ok(await medios.locator('[data-medio-row]').count() >= 42);
@@ -458,9 +462,11 @@ function daysBetween(from, to) {
 
       // Configuración › Material POP desde el menú del encabezado.
       await pop.locator('#commercial-config-trigger').click();
-      await pop.locator('[data-commercial-config-action="material_pop"]').click();
+      await pop.locator('[data-commercial-config-action="promocion"]').click();
+      await pop.locator('[data-config-tab="material_pop"]').click();
       await pop.locator('textarea[name="categories"]').waitFor();
-      assert.ok((await pop.locator('.swal2-popup').innerText()).includes('Coordinadora de mercadeo'));
+      assert.ok(!(await pop.locator('.swal2-popup').innerText()).includes('Coordinadora de mercadeo'), 'La alerta de stock bajo se elige en Notificaciones internas.');
+      assert.equal(await pop.locator('[name="alert_enabled"], [name="alert_employees"]').count(), 0);
       // API para formularios: activarla sin token se rechaza; el token se ve una sola vez y luego solo su final.
       await pop.locator('[name="api_enabled"]').check();
       await pop.locator('.swal2-confirm').click();
@@ -475,7 +481,8 @@ function daysBetween(from, to) {
       await pop.locator('.swal2-confirm').click();
       await pop.locator('.swal2-popup').waitFor({ state: 'hidden' });
       await pop.locator('#commercial-config-trigger').click();
-      await pop.locator('[data-commercial-config-action="material_pop"]').click();
+      await pop.locator('[data-commercial-config-action="promocion"]').click();
+      await pop.locator('[data-config-tab="material_pop"]').click();
       await pop.locator('[data-pop-api]').waitFor();
       assert.equal(await pop.locator('[name="api_enabled"]').isChecked(), true);
       assert.ok(!(await pop.locator('.swal2-popup').innerText()).includes(token), 'El token completo no se vuelve a mostrar.');
@@ -519,7 +526,8 @@ function daysBetween(from, to) {
       assert.equal(await noHorizontalScroll(closure), true);
 
       await closure.locator('#commercial-config-trigger').click();
-      await closure.locator('[data-commercial-config-action="analitica"]').click();
+      await closure.locator('[data-commercial-config-action="promocion"]').click();
+      await closure.locator('[data-config-tab="analitica"]').click();
       const merge = closure.locator('[data-merge-campaign]');
       await merge.waitFor();
       await merge.locator('[data-merge-from]').selectOption('feria-vivienda');
@@ -534,7 +542,8 @@ function daysBetween(from, to) {
       await closure.locator('.swal2-popup').waitFor({ state: 'detached' });
 
       await closure.locator('#commercial-config-trigger').click();
-      await closure.locator('[data-commercial-config-action="banner_revista"]').click();
+      await closure.locator('[data-commercial-config-action="promocion"]').click();
+      await closure.locator('[data-config-tab="banner_revista"]').click();
       const banner = closure.locator('.swal2-popup [data-config-form]');
       await banner.waitFor();
       await banner.locator('[name="banner_url"]').fill('http://inseguro.test/a.png');
@@ -546,7 +555,8 @@ function daysBetween(from, to) {
       await closure.waitForFunction(() => document.body.innerText.includes('Banner y link de la revista guardados.'));
       await closure.locator('.swal2-confirm').click();
       await closure.locator('#commercial-config-trigger').click();
-      await closure.locator('[data-commercial-config-action="banner_revista"]').click();
+      await closure.locator('[data-commercial-config-action="promocion"]').click();
+      await closure.locator('[data-config-tab="banner_revista"]').click();
       await banner.waitFor();
       assert.equal(await banner.locator('[name="link_revista"]').inputValue(), 'https://example.test/revista');
       await closure.locator('.swal2-cancel').click();

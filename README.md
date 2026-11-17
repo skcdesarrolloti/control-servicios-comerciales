@@ -166,16 +166,18 @@ node tools/check-commercial-calendar.cjs RUTA_A_NODE_MODULES
 
 ## Configuración
 
-El menú **Configuración** del encabezado (solo cargos administradores) reúne toda la configuración del panel, como en el panel administrativo. Cada sección se carga y guarda con `commercial_settings_load` / `commercial_settings_save` (`CommercialSettingsService`):
+El menú **Configuración** del encabezado (solo cargos administradores) reúne toda la configuración del panel, como en el panel administrativo. Tiene seis entradas, agrupadas como el menú principal; cada grupo abre un solo popup con una pestaña por sección (`groups` en `commercial-settings.js`). Cada sección se carga y guarda con `commercial_settings_load` / `commercial_settings_save` (`CommercialSettingsService`):
 
-| Sección | Qué configura | Dónde se guarda |
+| Entrada | Pestañas | Dónde se guarda |
 |---|---|---|
 | Permisos del panel | Vistas, subvistas, acciones y cargos visibles | `commercial_permissions`, `commercial_admin_cargos`, `commercial_employee_cargos` |
-| Calendario comercial | Categorías y cargos de los funcionarios | `commercial_calendar_categories`, `commercial_calendar_cargos` |
-| Tiempos de atención | Alerta y vencimiento por tema comercial (días hábiles) | `control_tickets_sla_config` (compartido con los informes de tareas) |
-| Avisos en fachada | Días de retoque e instalación, valor del aviso, transporte y factor prestacional | Filas `dia-retoque-*`, `dias-atraso-aviso-nuevo`, `valor_aviso`, `valor_transporte`, `factor_prestacional` |
-| Actualizaciones de inmuebles | Días de alerta y vencimiento por tipo de negocio | `commercial_property_update_limits` |
-| Cupos de destacados | Máximo de destacados por portal | Filas de cada portal en `jet_cct_confi_sistema` |
+| Notificaciones internas | Quién recibe copia de cada aviso (llamadas, precaptación, stock bajo de Material POP) | `internal_admin_notifications` |
+| Actividades comerciales | Calendario (categorías y cargos) · Tiempos de atención | `commercial_calendar_*`; `control_tickets_sla_config` (compartido con los informes de tareas) |
+| Inmuebles | Avisos en fachada · Actualizaciones · Cupos de destacados | Filas `dia-retoque-*`, `dias-atraso-aviso-nuevo`, `valor_aviso`, `valor_transporte`, `factor_prestacional`; `commercial_property_update_limits`; filas de cada portal |
+| Herramientas | Calculadora de aseo · Generador UTM · Plan estratégico | Filas de la calculadora; `commercial_utm_catalog`; tablas del Gestor Estratégico |
+| Promoción | Medios · Analítica web · Material POP · Banner y revista | `scm_medios`; `promotion_analytics_config`; `commercial_pop_config`; filas `banner` y `link_revista` |
+
+Solo se configura lo que el negocio cambia. Lo técnico es fijo en el código: nombres e idioma de las plantillas de WhatsApp (`CommercialCallsNotifier::TEMPLATE_*`), los canales de los avisos de tareas y del calendario (siempre activos), las cuentas de cobro comerciales (siempre habilitadas, día límite sábado) y no contar robots ni visitas internas en la analítica.
 
 ## Autologin firmado
 
@@ -235,11 +237,11 @@ Get-ChildItem -Recurse -Filter *.php | ForEach-Object { php -l $_.FullName }
 
 ## Actividades comerciales: Llamadas
 
-El menú **Actividades comerciales → Llamadas** reemplaza los formularios "Añadir/Actualizar control de llamada" y "Crear ticket comercial con llamadas", sobre las mismas tablas (`jet_cct_cct_llamadas`, `jet_cct_tickets`). Cada llamada es una solicitud con su propio medio: al editar solo se corrigen los datos personales del contacto, y lo demás no se lee de la petición (solo se puede completar un medio vacío en llamadas antiguas). Código y presupuesto aplican a Arriendo, Venta y Arriendo o venta; el precio, a Captación y Recaptación. Si la persona vuelve por otro medio se usa **Nueva solicitud**, y el historial del contacto agrupa sus solicitudes por celular. Con medio Club PPH se pide la tarjeta del aliado; aliado y tarjeta quedan en la llamada y en la tarea, con `bandera` = No. Una llamada que merece tarea abre el formulario de la tarea en el mismo popup, y la tarea hereda el medio. Los correos se configuran en **Configuración › Llamadas** y salen por shared-notifications. Prueba de navegador: `tests/Fixtures/commercial-calls.php` en 127.0.0.1:8774 y `node tools/check-commercial-calls.cjs RUTA_A_NODE_MODULES`.
+El menú **Actividades comerciales → Llamadas** reemplaza los formularios "Añadir/Actualizar control de llamada" y "Crear ticket comercial con llamadas", sobre las mismas tablas (`jet_cct_cct_llamadas`, `jet_cct_tickets`). Cada llamada es una solicitud con su propio medio: al editar solo se corrigen los datos personales del contacto, y lo demás no se lee de la petición (solo se puede completar un medio vacío en llamadas antiguas). Código y presupuesto aplican a Arriendo, Venta y Arriendo o venta; el precio, a Captación y Recaptación. Si la persona vuelve por otro medio se usa **Nueva solicitud**, y el historial del contacto agrupa sus solicitudes por celular. Con medio Club PPH se pide la tarjeta del aliado; aliado y tarjeta quedan en la llamada y en la tarea, con `bandera` = No. Una llamada que merece tarea abre el formulario de la tarea en el mismo popup, y la tarea hereda el medio. Los correos y WhatsApp siempre se envían (las plantillas son fijas en el código) y salen por shared-notifications; las copias internas se eligen en **Configuración › Notificaciones internas**. Prueba de navegador: `tests/Fixtures/commercial-calls.php` en 127.0.0.1:8774 y `node tools/check-commercial-calls.cjs RUTA_A_NODE_MODULES`.
 
 ### Conversación con el cliente y avisos
 
-`public/tarea.php` es la vista pública de una tarea: el cliente entra con un enlace firmado de 90 días (`PublicTaskAccess`), ve su conversación y escribe. Solo lee la tabla `scm_tarea_mensajes`, así que nunca muestra notas, seguimientos ni el resumen interno. Su mensaje llega al responsable y a las copias de **Configuración › Notificaciones internas**, y aparece en el historial de la tarea. Las plantillas de WhatsApp están en `docs/plantillas-whatsapp-tareas-comerciales.md` y se encienden en **Configuración › Llamadas**.
+`public/tarea.php` es la vista pública de una tarea: el cliente entra con un enlace firmado de 90 días (`PublicTaskAccess`), ve su conversación y escribe. Solo lee la tabla `scm_tarea_mensajes`, así que nunca muestra notas, seguimientos ni el resumen interno. Su mensaje llega al responsable y a las copias de **Configuración › Notificaciones internas**, y aparece en el historial de la tarea. Las plantillas de WhatsApp están en `docs/plantillas-whatsapp-tareas-comerciales.md` y siempre están activas.
 
 ## Actividades comerciales: Precaptación
 

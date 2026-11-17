@@ -501,23 +501,15 @@ final class CommercialDashboardView
                 </div>
                 <div class="p-1 flex flex-col gap-0.5">
                   <?php
+                    // Grupos como los del menú principal: cada uno abre un popup con una pestaña por sección
+                    // (commercial-settings.js, `groups`). Lo técnico (plantillas, canales de avisos) es fijo en el código.
                     $configItems = [
                       ['permissions', 'lock', 'Permisos del panel', 'Vistas, acciones y cargos visibles'],
-                      ['calendario', 'calendar_month', 'Calendario comercial', 'Categorías y funcionarios del calendario'],
-                      ['reportes', 'receipt_long', 'Reportes comerciales', 'Cuentas de cobro y día límite'],
-                      ['notificaciones_internas', 'notifications_active', 'Notificaciones internas', 'Qué funcionarios reciben copia de cada aviso'],
-                      ['llamadas', 'call', 'Llamadas', 'Correos y WhatsApp de las tareas'],
-                      ['tiempos', 'timer', 'Tiempos de atención', 'Alerta y vencimiento de tareas por tema'],
-                      ['avisos', 'signpost', 'Avisos en fachada', 'Plazos de retoque, instalación y valores'],
-                      ['actualizaciones', 'update', 'Actualizaciones de inmuebles', 'Plazos por tipo de negocio'],
-                      ['destacados', 'star', 'Cupos de destacados', 'Inmuebles destacados por portal'],
-                      ['aseo', 'cleaning_services', 'Calculadora de aseo', 'Salario, márgenes, insumos, transporte y tramos'],
-                      ['utm', 'link', 'Generador UTM', 'Campañas del equipo'],
-                      ['plan', 'flag', 'Plan estratégico', 'Gestiones, unidades, tipos, frecuencias y actores'],
-                      ['medios', 'alt_route', 'Medios', 'Lista única: registros, formularios, UTM y analítica'],
-                      ['analitica', 'monitoring', 'Analítica web', 'IPs internas, robots y retención de visitas'],
-                      ['material_pop', 'inventory_2', 'Material POP', 'Categorías y alerta de stock bajo'],
-                      ['banner_revista', 'image', 'Banner y revista', 'Imagen de los correos y link de la revista'],
+                      ['notificaciones_internas', 'notifications_active', 'Notificaciones internas', 'Quién recibe copia de cada aviso'],
+                      ['actividades', 'event_note', 'Actividades comerciales', 'Calendario y tiempos de atención'],
+                      ['inmuebles', 'home_work', 'Inmuebles', 'Avisos en fachada, actualizaciones y destacados'],
+                      ['herramientas', 'construction', 'Herramientas', 'Calculadora de aseo, Generador UTM y Plan estratégico'],
+                      ['promocion', 'campaign', 'Promoción', 'Medios, analítica web, Material POP, banner y revista'],
                     ];
                   ?>
                   <?php foreach ($configItems as [$configKey, $configIcon, $configLabel, $configHint]): ?>

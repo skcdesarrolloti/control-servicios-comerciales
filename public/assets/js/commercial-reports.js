@@ -160,12 +160,11 @@
         content.innerHTML = statesHtml(["no_exportados", "en_cobro", "pagados", "cuentas"], data.counts, state) + tableHtml(ACCOUNT_HEADERS, accountRows(data.accounts, false, false), "Todavía no tienes cuentas de cobro.");
         return;
       }
-      var canBill = state === "no_exportados" && data.billing_enabled;
+      var canBill = state === "no_exportados";
       content.innerHTML = statesHtml(["no_exportados", "en_cobro", "pagados", "cuentas"], data.counts, state) + summaryHtml(data.summary) +
         filtersHtml([{ name: "consecutivo", label: "Consecutivo" }, { name: "tipo", label: "Tipo" }, { name: "ticket", label: "Tarea" }, { name: "inmueble", label: "Inmueble" }, { name: "desde", label: "Desde", type: "date" }, { name: "hasta", label: "Hasta", type: "date" }]) +
         (canBill ? '<div class="flex items-center gap-3"><button type="button" class="' + PRIMARY + '" data-report-action="create" disabled>Crear cuenta de cobro</button><span class="text-sm text-slate-500" data-report-selection>Sin selección</span></div>' : "") +
         (state === "no_exportados" ? '<p class="text-sm text-slate-700" data-report-deadline>Envía tu cuenta a gerencia a más tardar el <strong>' + esc(deadlineLabel(data.deadline)) + "</strong>." + (data.items.some(function (item) { return item.fuera_plazo; }) ? ' <span class="text-rose-700">Tienes reportes fuera de plazo: puedes cobrarlos, pero la cuenta quedará marcada.</span>' : "") + "</p>" : "") +
-        (state === "no_exportados" && !data.billing_enabled ? '<p class="text-sm text-amber-700">Las cuentas de cobro comerciales todavía no están habilitadas.</p>' : "") +
         tableHtml((canBill ? [""] : []).concat(["Consecutivo", "Fecha", "Tipo", "Tarea", "Inmueble", "Valor", "Observación"]), data.items.map(function (item) { return reportRow(item, { select: canBill }); }), "No hay reportes en este estado.");
       restoreFilters();
     }

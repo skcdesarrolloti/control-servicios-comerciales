@@ -392,14 +392,16 @@ final class CommercialCallsTest extends TestCase
   {
     [$notifier, $log] = $this->recorder();
     $this->taskFromCall($notifier);
-    self::assertSame(['scm_tarea_comercial_asignada_v1', 'scm_tarea_comercial_registrada_v1'], array_column($log->whatsapp, 1), 'El WhatsApp viene activo por defecto.');
-    [$notifier, $log] = $this->recorder(['whatsapp_asignado' => false, 'whatsapp_solicitante' => false]);
+    self::assertSame(['scm_tarea_comercial_asignada_v1', 'scm_tarea_comercial_registrada_v1'], array_column($log->whatsapp, 1), 'El WhatsApp siempre está activo.');
+    // Una configuración anterior que apagaba canales o cambiaba plantillas ya no se tiene en cuenta: todo es fijo.
+    [$notifier, $log] = $this->recorder(['whatsapp_asignado' => false, 'whatsapp_solicitante' => false, 'asignado' => false, 'plantilla_asignada' => 'otra_v9', 'idioma' => 'en_US']);
     $this->service($notifier)->createTask($this->taskInput($this->create(['celular' => '3007770000'])));
-    self::assertSame([], $log->whatsapp, 'Apagado en Configuración no sale.');
+    self::assertSame(['scm_tarea_comercial_asignada_v1', 'scm_tarea_comercial_registrada_v1'], array_column($log->whatsapp, 1));
+    self::assertContains('101@example.test', array_column($log->mail, 0));
     $client = array_values(array_filter($log->mail, static fn(array $mail): bool => $mail[0] === 'laura@example.test'))[0];
     self::assertStringContainsString('tarea.php?t=', $client[2]);
 
-    [$notifier, $log] = $this->recorder(['whatsapp_asignado' => true, 'whatsapp_solicitante' => true]);
+    [$notifier, $log] = $this->recorder();
     $id = $this->service($notifier)->createTask($this->taskInput($this->create(['celular' => '3005551212']), ['celular_solicitante' => '3005551212']))['id'];
     self::assertSame(['+573000000101', '+573005551212'], [$this->phoneOf($log->whatsapp[0]), $this->phoneOf($log->whatsapp[1])]);
     self::assertSame('scm_tarea_comercial_asignada_v1', $log->whatsapp[0][1]);
@@ -469,7 +471,7 @@ final class CommercialCallsTest extends TestCase
   public function testClientBlockedChannelsAreRespected(): void
   {
     $this->db->insert('wp_jet_cct_clientes', ['nombre' => 'Laura', 'celular' => '3001234567', 'bloqueo_whatsapp' => '1', 'bloqueo_email' => '1']);
-    [$notifier, $log] = $this->recorder(['whatsapp_solicitante' => true]);
+    [$notifier, $log] = $this->recorder();
     $this->taskFromCall($notifier);
     self::assertSame(['+573000000101'], array_column($log->whatsapp, 0), 'Al cliente que bloqueó WhatsApp no le llega; al funcionario sí.');
     self::assertSame([], array_values(array_filter($log->mail, static fn(array $mail): bool => $mail[0] === 'laura@example.test')));
@@ -486,7 +488,7 @@ final class CommercialCallsTest extends TestCase
 
   public function testClientReplyReachesAssigneeCopiesAndTaskHistory(): void
   {
-    [$notifier, $log] = $this->recorder(['whatsapp_asignado' => true]);
+    [$notifier, $log] = $this->recorder();
     $id = $this->taskFromCall($notifier);
     $this->setInternal('llamada_respuesta_cliente', ['303', '101']);
     $log->mail = [];
@@ -525,7 +527,7 @@ final class CommercialCallsTest extends TestCase
 
   public function testPublicViewShowsOnlySharedConversationEscaped(): void
   {
-    [$notifier, $log] = $this->recorder(['whatsapp_solicitante' => true]);
+    [$notifier, $log] = $this->recorder();
     $id = $this->taskFromCall($notifier);
     $conversation = new PublicTaskConversation($this->db, $notifier);
     $this->db->update('wp_jet_cct_tickets', ['descripcion' => 'Dato interno reservado'], ['_ID' => $id]);
@@ -552,12 +554,6 @@ final class CommercialCallsTest extends TestCase
     self::assertSame([], $internal->emails('precaptacion_creada'));
   }
 
-  public function testTemplateSettingsAreValidated(): void
-  {
-    $this->expectException(\InvalidArgumentException::class);
-    CommercialCallsNotifier::validated(['plantilla_asignada' => 'Plantilla Mala'], []);
-  }
-
   public function testNotifierUsesConfiguredRecipients(): void
   {
     $sent = [];
@@ -565,7 +561,7 @@ final class CommercialCallsTest extends TestCase
     (new Settings($this->db))->set(CommercialCallsNotifier::SETTING, ['asignado' => true, 'solicitante' => false, 'administradores' => true, 'admin_emails' => ['jefe@example.test']], 1);
     $id = $this->create();
     $this->service(new CommercialCallsNotifier($this->db, new Settings($this->db), $queue))->createTask($this->taskInput($id));
-    self::assertSame(['101@example.test', ['jefe@example.test']], array_column($sent, 0), 'La lista anterior sigue activa hasta marcar funcionarios.');
+    self::assertSame(['101@example.test', ['jefe@example.test'], 'laura@example.test'], array_column($sent, 0), 'La lista anterior sigue activa hasta marcar funcionarios; el correo al cliente ya no se apaga.');
     $this->setInternal('llamada_tarea_creada', ['303']);
     $sent = [];
     $id = $this->create(['celular' => '3001010101', 'tema_ayuda' => 'Venta']);

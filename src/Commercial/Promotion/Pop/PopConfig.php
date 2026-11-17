@@ -10,8 +10,8 @@ use SCM\Core\Settings;
  * Configuración › Material POP (propia del panel, en Settings):
  * - categorías que se ofrecen al crear o editar un producto (dashboard-marketing las guardaba en
  *   storage/inventory-categories.json; aquí se administran desde el menú Configuración);
- * - alerta de stock bajo: si está activa, a qué funcionarios se les encola el correo (shared-notifications) cuando un
- *   producto llega a su stock mínimo o se agota;
+ * - alerta de stock bajo: sus destinatarios ahora se eligen en Configuración › Notificaciones internas; alert_enabled y
+ *   alert_employees quedan solo como la lista anterior (se leen, ya no se editan);
  * - API de inventario para formularios y sistemas externos (public/inventory-api.php): si está activa y su token. Del
  *   token solo se guarda el hash SHA-256 y sus últimos 4 caracteres; el token completo se muestra una sola vez al
  *   generarlo. SKC_INVENTORY_API_TOKEN (el token del panel de marketing anterior) también se acepta, para que los
@@ -40,7 +40,7 @@ final class PopConfig
   }
 
   /**
-   * @param array<string,mixed> $data categories (lista o texto con una por línea), alert_enabled, alert_employees, api_enabled.
+   * @param array<string,mixed> $data categories (lista o texto con una por línea) y api_enabled.
    * @return array<string,mixed>
    */
   public static function save(Settings $settings, array $data, int $userId): array
@@ -49,19 +49,14 @@ final class PopConfig
     if ($categories === []) {
       throw new \InvalidArgumentException('Deja al menos una categoría de productos.');
     }
-    $employees = self::employees($data['alert_employees'] ?? []);
-    $enabled = filter_var($data['alert_enabled'] ?? false, FILTER_VALIDATE_BOOLEAN);
-    if ($enabled && $employees === []) {
-      throw new \InvalidArgumentException('Elige al menos un funcionario que reciba la alerta de stock bajo, o desactívala.');
-    }
     $api = filter_var($data['api_enabled'] ?? false, FILTER_VALIDATE_BOOLEAN);
     $raw = self::raw($settings);
     if ($api && !self::hasToken($raw)) {
       throw new \InvalidArgumentException('Genera el token de la API antes de activarla.');
     }
-    // El token (hash, pista y fecha) se conserva: solo lo cambia rotateToken().
-    $config = ['categories' => $categories, 'alert_enabled' => $enabled, 'alert_employees' => $employees, 'api_enabled' => $api]
-      + array_intersect_key($raw, array_flip(['api_token_hash', 'api_token_hint', 'api_token_created']));
+    // El token (hash, pista y fecha) se conserva: solo lo cambia rotateToken(). La lista anterior de la alerta también.
+    $config = ['categories' => $categories, 'api_enabled' => $api]
+      + array_intersect_key($raw, array_flip(['alert_enabled', 'alert_employees', 'api_token_hash', 'api_token_hint', 'api_token_created']));
     $settings->set(self::KEY, $config, $userId);
     return $config;
   }

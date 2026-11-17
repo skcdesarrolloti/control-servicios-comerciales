@@ -42,7 +42,7 @@ final class CommercialCalendarApi
     $this->policy = $policy;
     $this->calendar = new CommercialCalendarService($db, $settings, $policy, $config);
     $this->tickets = new CommercialTicketsRepository($db);
-    $this->mailer = $mailer ?? new CalendarMailer($this->store, $this->calendar->notificationSettings(), $config);
+    $this->mailer = $mailer ?? new CalendarMailer($this->store, $config);
     $this->reports = new CalendarCommercialReport($db);
   }
 

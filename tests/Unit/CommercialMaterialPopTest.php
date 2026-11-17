@@ -6,6 +6,7 @@ namespace Tests\Unit;
 
 use PHPUnit\Framework\TestCase;
 use SCM\Commercial\CommercialAccessPolicy;
+use SCM\Commercial\CommercialInternalNotifications;
 use SCM\Commercial\CommercialSettingsService;
 use SCM\Commercial\Promotion\Pop\PopConfig;
 use SCM\Commercial\Promotion\Pop\PopInventoryService;
@@ -231,7 +232,9 @@ final class CommercialMaterialPopTest extends TestCase
     $service->adjustStock($llaveros, -2, 'Sin alerta configurada', '101');
     self::assertSame([], $this->sent);
 
-    PopConfig::save($this->settings, ['categories' => "Souvenir\nmerchandising\nPPH", 'alert_enabled' => '1', 'alert_employees' => ['505', '506']], 7);
+    // Quién recibe se elige en Configuración › Notificaciones internas (evento pop_stock_bajo).
+    $internal = new CommercialInternalNotifications($this->db, $this->settings);
+    $internal->save(['pop_stock_bajo' => ['505', '506']]);
     $service->adjustStock($llaveros, 5, 'Compra', '101');
     $service->createDelivery(['recipient_name' => 'Pedro', 'delivered_at' => '2026-11-03 09:00', 'items' => [['product_id' => $llaveros, 'quantity' => 6]]], '101');
     self::assertCount(1, $this->sent);
@@ -239,8 +242,16 @@ final class CommercialMaterialPopTest extends TestCase
     self::assertSame('Material POP: Llaveros llegó a su stock mínimo', $this->sent[0]['subject']);
     self::assertStringStartsWith('material-pop-stock:' . $llaveros . ':', (string) $this->sent[0]['options']['dedupe_key']);
 
-    $this->expectExceptionMessage('Elige al menos un funcionario');
-    PopConfig::save($this->settings, ['categories' => 'Souvenir', 'alert_enabled' => '1', 'alert_employees' => []], 7);
+    // La lista anterior de Configuración › Material POP sigue sirviendo mientras no se marque a nadie, y guardar la
+    // sección no la borra.
+    $internal->save([]);
+    $this->settings->set(PopConfig::KEY, ['categories' => ['Souvenir', 'PPH'], 'alert_enabled' => true, 'alert_employees' => ['505']], 7);
+    PopConfig::save($this->settings, ['categories' => "Souvenir\nmerchandising\nPPH"], 7);
+    self::assertSame(['505'], PopConfig::read($this->settings)['alert_employees']);
+    $service->adjustStock($llaveros, 5, 'Compra', '101');
+    $service->adjustStock($llaveros, -5, 'Ajuste', '101');
+    self::assertCount(2, $this->sent);
+    self::assertSame(['mercadeo@example.test'], $this->sent[1]['emails']);
   }
 
   public function testViewShowsActionsAndPricesOnlyWithTheirPermissions(): void
@@ -291,9 +302,9 @@ final class CommercialMaterialPopTest extends TestCase
     $section = $service->load('material_pop')['material_pop'];
     self::assertSame(['PPH', 'Souvenir'], $section['categories']);
     self::assertContains(['name' => 'merchandising', 'products' => 1, 'listed' => false], $section['category_usage']);
-    self::assertContains(['id' => '505', 'name' => 'Coordinadora de mercadeo', 'email' => 'mercadeo@example.test'], $section['employees']);
-    self::assertNotContains('retirado@example.test', array_column($section['employees'], 'email'));
-    self::assertSame('Configuración de Material POP guardada.', $service->save('material_pop', ['categories' => ['Souvenir', 'souvenir', ' Merchandising '], 'alert_enabled' => false]));
+    self::assertArrayNotHasKey('employees', $section, 'Quién recibe la alerta se elige en Notificaciones internas.');
+    self::assertArrayHasKey('pop_stock_bajo', $service->load('notificaciones_internas')['notificaciones_internas']['catalog']['promocion']['items']);
+    self::assertSame('Configuración de Material POP guardada.', $service->save('material_pop', ['categories' => ['Souvenir', 'souvenir', ' Merchandising ']]));
     self::assertSame(['Souvenir', 'Merchandising'], PopConfig::read($this->settings)['categories']);
     $this->expectException(\InvalidArgumentException::class);
     $service->save('material_pop', ['categories' => ['<b>']]);

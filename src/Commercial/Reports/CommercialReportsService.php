@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace SCM\Commercial\Reports;
 
 use SCM\Core\Database;
-use SCM\Core\Settings;
 
 /**
  * Reportes comerciales (wp_jet_cct_reportes_comerciales) y sus cuentas de cobro. Lógica traída de
@@ -24,8 +23,7 @@ final class CommercialReportsService
   public const PER_PAGE = 40;
   public const COMPANY_NAME = 'SOLUCIONES COMERCIALES Y CONSTRUCTIVAS S.A.S.';
   public const COMPANY_NIT = '900623242-4';
-  public const SETTING = 'commercial_reports_config';
-  /** 0 = domingo … 6 = sábado, como date('w'). */
+  /** Día límite para cobrar (fijo): 0 = domingo … 6 = sábado, como date('w'). */
   public const DEFAULT_DEADLINE_WEEKDAY = 6;
 
   private Database $db;
@@ -35,17 +33,6 @@ final class CommercialReportsService
   {
     $this->db = $db;
     $this->deadlineWeekday = max(0, min(6, $deadlineWeekday));
-  }
-
-  /** @return array{billing_enabled:bool,deadline_weekday:int} */
-  public static function settings(Settings $settings): array
-  {
-    $saved = $settings->get(self::SETTING, []);
-    $saved = is_array($saved) ? $saved : [];
-    return [
-      'billing_enabled' => !empty($saved['billing_enabled']),
-      'deadline_weekday' => max(0, min(6, (int) ($saved['deadline_weekday'] ?? self::DEFAULT_DEADLINE_WEEKDAY))),
-    ];
   }
 
   /** Último día para cobrar lo de esa fecha: el primer día límite en esa fecha o después. */

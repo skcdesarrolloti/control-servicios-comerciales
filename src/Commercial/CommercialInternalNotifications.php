@@ -35,6 +35,12 @@ final class CommercialInternalNotifications
         'precaptacion_tarea_creada' => ['label' => 'Tarea creada desde una precaptación', 'description' => 'Copia del aviso de la tarea nueva. El responsable asignado la recibe siempre.', 'channel' => 'Correo y WhatsApp'],
       ],
     ],
+    'promocion' => [
+      'label' => 'Promoción',
+      'items' => [
+        'pop_stock_bajo' => ['label' => 'Material POP con stock bajo', 'description' => 'Cuando una entrega o un ajuste deja un producto en su stock mínimo o lo agota (una vez por producto al día).', 'channel' => 'Correo'],
+      ],
+    ],
   ];
 
   private Database $db;

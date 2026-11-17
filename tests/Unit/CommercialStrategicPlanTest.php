@@ -70,7 +70,9 @@ final class CommercialStrategicPlanTest extends TestCase
     $source = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Views/CommercialDashboardView.php');
     self::assertMatchesRegularExpression("/'Herramientas' => \[[^\]]*'plan_estrategico_editar'/", $source);
     self::assertStringContainsString("canSubview('herramientas', 'plan_estrategico')", $source);
-    self::assertStringContainsString("['plan', 'flag', 'Plan estratégico'", $source);
+    // Su configuración es una pestaña del grupo Herramientas del menú Configuración.
+    self::assertStringContainsString("['herramientas', 'construction', 'Herramientas'", $source);
+    self::assertStringContainsString('["plan", "Plan estratégico"]', (string) file_get_contents(dirname(__DIR__, 2) . '/public/assets/js/commercial-settings.js'));
     self::assertStringContainsString('"generador_utm", "plan_estrategico"].indexOf(tab) >= 0) return "herramientas"', (string) file_get_contents(dirname(__DIR__, 2) . '/public/assets/js/commercial-dashboard.js'));
   }
 

@@ -49,12 +49,6 @@ function assert(condition, message) {
   await page.locator('[data-account-excel="31"]').click();
   assert((await excel).suggestedFilename() === 'cuenta_cobro_CCO-000031.xls', 'El Excel no se descarga');
 
-  // Sin habilitar, no se ofrece crear cuentas.
-  await page.goto(endpoint + '?sub=mis_reportes&billing=0');
-  await page.locator('[data-report-row="1"]').waitFor();
-  assert(!(await page.locator('[data-report-action="create"], [data-report-check]').count()), 'Se ofrecen cuentas de cobro sin habilitarlas');
-  assert((await page.locator('[data-report-content]').textContent()).includes('todavía no están habilitadas'), 'No avisa que las cuentas están deshabilitadas');
-
   // Consolidado: todo el equipo, corregir valor y pagar.
   await page.goto(endpoint + '?sub=reportes_consolidado');
   await page.locator('[data-report-row="3"]').waitFor();

@@ -22,7 +22,6 @@ final class CommercialReportsApiController
   private CommercialAccessPolicy $policy;
   private CommercialReportsService $service;
   private Csrf $csrf;
-  private bool $billingEnabled;
 
   /** @param array<string,mixed> $config */
   public function __construct(Database $db, Settings $settings, Csrf $csrf, array $config)
@@ -31,9 +30,7 @@ final class CommercialReportsApiController
     $this->csrf = $csrf;
     $adminCargos = is_array($config['dashboard_admin_cargos'] ?? null) ? $config['dashboard_admin_cargos'] : ['11', '12', '13', '14'];
     $this->policy = new CommercialAccessPolicy($settings, $db, $adminCargos);
-    $reports = CommercialReportsService::settings($settings);
-    $this->service = new CommercialReportsService($db, $reports['deadline_weekday']);
-    $this->billingEnabled = $reports['billing_enabled'];
+    $this->service = new CommercialReportsService($db);
   }
 
   private function require(array $input, string $subview, string $action = ''): void
@@ -74,7 +71,6 @@ final class CommercialReportsApiController
     $data = $this->service->ownReports($me, (string) ($input['state'] ?? ''), self::filters($input, ['consecutivo', 'tipo', 'ticket', 'inmueble', 'desde', 'hasta']));
     JsonResponse::success($data + [
       'accounts' => $me !== '' ? $this->service->accounts([], $me)['items'] : [],
-      'billing_enabled' => $this->billingEnabled,
     ]);
   }
 
@@ -82,9 +78,6 @@ final class CommercialReportsApiController
   public function accountCreate(array $input): never
   {
     $this->require($input, 'mis_reportes');
-    if (!$this->billingEnabled) {
-      JsonResponse::error('Las cuentas de cobro comerciales aún no están habilitadas.', 409);
-    }
     $this->guard(function () use ($input): void {
       $result = $this->service->createAccount($this->me(), CommercialReportsService::parseIds($input['ids'] ?? ''));
       JsonResponse::success($result + ['message' => 'Cuenta de cobro ' . $result['numero'] . ' creada.' . ($result['fuera_plazo'] ? ' Quedó marcada fuera de plazo.' : '')]);

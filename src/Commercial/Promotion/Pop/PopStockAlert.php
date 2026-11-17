@@ -4,14 +4,16 @@ declare(strict_types=1);
 
 namespace SCM\Commercial\Promotion\Pop;
 
+use SCM\Commercial\CommercialInternalNotifications;
 use SCM\Core\Database;
 use SCM\Core\Settings;
 use SCM\Support\EmailQueue;
 
 /**
  * Alerta de stock bajo de Material POP: cuando una salida deja un producto en su stock mínimo (o lo agota) y antes
- * estaba por encima, encola un correo en shared-notifications para los funcionarios elegidos en Configuración ›
- * Material POP. Una sola alerta por producto y día (dedupe_key).
+ * estaba por encima, encola un correo en shared-notifications para los funcionarios marcados en Configuración ›
+ * Notificaciones internas (evento pop_stock_bajo). Mientras no se marque a nadie, sigue llegando a quienes se eligieron
+ * antes en Configuración › Material POP. Una sola alerta por producto y día (dedupe_key).
  */
 class PopStockAlert
 {
@@ -43,11 +45,11 @@ class PopStockAlert
     if (!self::crosses($before, $after, $minimum)) {
       return 0;
     }
-    $config = PopConfig::read($this->settings);
-    if (!$config['alert_enabled'] || $config['alert_employees'] === []) {
-      return 0;
+    $emails = (new CommercialInternalNotifications($this->db, $this->settings))->emails('pop_stock_bajo');
+    if ($emails === []) {
+      $config = PopConfig::read($this->settings);
+      $emails = $config['alert_enabled'] && $config['alert_employees'] !== [] ? $this->emails($config['alert_employees']) : [];
     }
-    $emails = $this->emails($config['alert_employees']);
     if ($emails === []) {
       return 0;
     }

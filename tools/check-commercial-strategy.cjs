@@ -149,7 +149,8 @@ async function openTab(page, tab, rows) {
 
     // Configuración › Plan estratégico: renombrar un tipo de medio lo cambia en las campañas que lo usan.
     await page.locator('#commercial-config-trigger').click();
-    await page.locator('[data-commercial-config-action="plan"]').click();
+    await page.locator('[data-commercial-config-action="herramientas"]').click();
+    await page.locator('[data-config-tab="plan"]').click();
     const popup = page.locator('.swal2-popup');
     await popup.locator('[data-plan-catalog="tipos_medio"]').waitFor();
     await popup.locator('[data-plan-catalog="tipos_medio"] summary').click();
@@ -171,7 +172,8 @@ async function openTab(page, tab, rows) {
 
     // Quitar un elemento libre exige marcar la confirmación.
     await page.locator('#commercial-config-trigger').click();
-    await page.locator('[data-commercial-config-action="plan"]').click();
+    await page.locator('[data-commercial-config-action="herramientas"]').click();
+    await page.locator('[data-config-tab="plan"]').click();
     await popup.locator('[data-plan-catalog="tipos_medio"]').waitFor();
     await popup.locator('[data-plan-catalog="tipos_medio"] summary').click();
     await mediaRows.filter({ has: page.locator('input[value="Radio"]') }).locator('[data-plan-remove]').click();

@@ -90,7 +90,7 @@ final class CommercialCalendarApiTest extends TestCase
     $this->db->insert('calendario_actividades', ['id' => 12, 'titulo' => 'Cita médica', 'fecha_inicio' => $future . ' 15:00:00', 'fecha_fin' => $future . ' 16:00:00', 'id_empleado' => '300', 'id_categoria' => 8]);
     $this->settings = new Settings($this->db);
     $store = new CalendarStore($this->db);
-    $mailer = new CalendarMailer($store, [], [], new SharedNotificationsBridge($this->db, 'C:/no-existe'));
+    $mailer = new CalendarMailer($store, [], new SharedNotificationsBridge($this->db, 'C:/no-existe'));
     return new CommercialCalendarApi($this->db, $this->settings, new CommercialAccessPolicy($this->settings, $this->db, ['13']), ['calendar_allowed_cargos' => ['9']], $mailer);
   }
 
@@ -393,7 +393,6 @@ final class CommercialCalendarApiTest extends TestCase
         ['id' => '3', 'nombre' => 'Cita con cliente', 'color' => '#112233', 'comercial' => true],
         ['id' => '', 'nombre' => 'Feria', 'color' => '#445566', 'comercial' => true],
       ],
-      'notifications' => ['funcionario_email' => true],
       'report_cargo_ids' => ['9', '13'],
       'cita_category_id' => '3',
     ]);
@@ -402,7 +401,7 @@ final class CommercialCalendarApiTest extends TestCase
     $feria = (string) $this->db->getVar("SELECT id FROM categorias_calendario WHERE nombre = 'Feria'");
     $loaded = $service->load('calendario')['calendario'];
     self::assertSame(['3', $feria], $loaded['category_ids']);
-    self::assertFalse($loaded['notifications']['whatsapp_citas']);
+    self::assertArrayNotHasKey('notifications', $loaded, 'Los avisos del calendario no se configuran: siempre salen.');
     self::assertSame(['9', '13'], $loaded['report_cargo_ids']);
     self::assertSame('3', $loaded['cita_category_id']);
 

@@ -76,7 +76,9 @@ async function closeSwal(page) {
   assert(addDays.length > 0 && addDays.every(key => key >= yesterdayKey), 'El mes ofrece crear en días ya pasados');
   assert(!(await page.locator('[data-scm-calendar-configure-categories]').count()), 'La configuración no debe quedar como botón dentro del panel');
   await page.locator('#commercial-config-trigger').click();
-  await page.locator('[data-commercial-config-action="calendario"]').click();
+  assert(await page.locator('[data-commercial-config-action]').count() === 6, 'El menú Configuración debe tener 6 entradas agrupadas');
+  assert(!(await page.locator('[data-commercial-config-action="llamadas"], [data-commercial-config-action="reportes"]').count()), 'Llamadas y Reportes ya no se configuran');
+  await page.locator('[data-commercial-config-action="actividades"]').click();
   await page.locator('[data-config-form] [name="category_ids"]').first().waitFor();
   assert(await page.locator('[data-category-row][data-id="3"] [data-category-remove]').count() === 0, 'Una categoría con eventos se puede eliminar');
   assert(await page.locator('[data-category-row][data-id="12"] [data-category-remove]').count() === 1, 'Una categoría sin eventos no ofrece Eliminar');
@@ -95,11 +97,12 @@ async function closeSwal(page) {
   await closeSwal(page);
   const configSaves = calls.length;
 
-  // Las demás secciones cargan y guardan desde el mismo menú.
-  for (const [section, message] of [['tiempos', 'Tiempos de atención de tareas guardados'], ['avisos', 'Plazos y valores de avisos guardados'], ['actualizaciones', 'Plazos de actualización de inmuebles guardados'], ['destacados', 'Cupos de destacados guardados'], ['reportes', 'Configuración de reportes comerciales guardada']]) {
+  // Las demás secciones cargan y guardan desde su pestaña dentro del grupo.
+  for (const [group, section, message] of [['actividades', 'tiempos', 'Tiempos de atención de tareas guardados'], ['inmuebles', 'avisos', 'Plazos y valores de avisos guardados'], ['inmuebles', 'actualizaciones', 'Plazos de actualización de inmuebles guardados'], ['inmuebles', 'destacados', 'Cupos de destacados guardados']]) {
     await page.locator('#commercial-config-trigger').click();
-    await page.locator(`[data-commercial-config-action="${section}"]`).click();
-    await page.locator('[data-config-form] input').first().waitFor();
+    await page.locator(`[data-commercial-config-action="${group}"]`).click();
+    await page.locator(`[data-config-tab="${section}"]`).click();
+    await page.locator(`[data-config-pane="${section}"] [data-config-form] input`).first().waitFor();
     await page.locator('.swal2-confirm').click();
     await page.locator(`.swal2-popup:has-text("${message}")`).waitFor();
     await closeSwal(page);
@@ -108,7 +111,8 @@ async function closeSwal(page) {
   // Configuración → Generador UTM: solo las campañas (el medio sale de Configuración → Medios); el servidor normaliza y
   // quita repetidos.
   await page.locator('#commercial-config-trigger').click();
-  await page.locator('[data-commercial-config-action="utm"]').click();
+  await page.locator('[data-commercial-config-action="herramientas"]').click();
+  await page.locator('[data-config-tab="utm"]').click();
   await page.locator('[data-utm-list="campanas"]').waitFor();
   assert(!(await page.locator('[data-utm-list="medios"], [data-utm-list="fuentes"]').count()), 'El catálogo UTM sigue mostrando medios o fuentes');
   await page.locator('[data-utm-list="campanas"] [data-utm-add-row]').click();
@@ -125,7 +129,7 @@ async function closeSwal(page) {
 
   // Configuración → Medios sin la tabla instalada: muestra la lista inicial, avisa el paso de sistemas y no se edita.
   await page.locator('#commercial-config-trigger').click();
-  await page.locator('[data-commercial-config-action="medios"]').click();
+  await page.locator('[data-commercial-config-action="promocion"]').click();
   await page.locator('[data-medios-root] [data-medios-not-ready]').waitFor();
   assert(await page.locator('[data-medios-root] [data-medio-row]').count() >= 42, 'Falta la lista inicial de medios');
   assert(!(await page.locator('[data-medios-root] [data-medios-add], [data-medios-root] [data-medios-action]').count()), 'Sin instalar no se debe poder editar la lista');

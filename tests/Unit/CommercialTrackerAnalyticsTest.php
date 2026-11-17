@@ -392,8 +392,8 @@ final class CommercialTrackerAnalyticsTest extends TestCase
     self::assertStringNotContainsString('bin/', $message);
     $stored = $this->settings->get(TrackerAnalyticsConfig::SETTING);
     self::assertSame(['190.85.10.4', '10.0.0.0/8'], $stored['internal_ips']);
-    self::assertFalse($stored['exclude_bots']);
-    self::assertTrue($stored['exclude_internal']);
+    self::assertArrayNotHasKey('exclude_bots', $stored, 'No contar robots ni visitas internas es fijo: no se guarda.');
+    self::assertTrue(TrackerAnalyticsConfig::read($this->settings)['exclude_bots']);
     self::assertSame(365, $stored['raw_retention_days']);
     self::assertSame(['sucasainmobiliaria.com.co'], $stored['own_domains']);
 

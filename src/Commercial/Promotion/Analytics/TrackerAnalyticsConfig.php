@@ -9,7 +9,8 @@ use SCM\Core\Settings;
 /**
  * Configuración › Analítica web. Es propia del panel: se guarda en Settings (control_servicios_comerciales_config).
  *
- * Las IPs internas y los dominios propios se aplican al resumir cada visita; si cambian, los días ya resumidos conservan
+ * La pantalla de analítica abre siempre sin robots ni visitas internas (exclude_bots y exclude_internal son fijos; cada
+ * consulta puede incluirlos con sus filtros). Las IPs internas y los dominios propios se aplican al resumir cada visita; si cambian, los días ya resumidos conservan
  * la clasificación anterior hasta correr `php bin/tracker-rollup.php --rebuild-from=AAAA-MM-DD`.
  */
 final class TrackerAnalyticsConfig
@@ -49,8 +50,8 @@ final class TrackerAnalyticsConfig
     $changed = (string) ($raw['classification_changed_at'] ?? '');
     return [
       'internal_ips' => $ips,
-      'exclude_bots' => array_key_exists('exclude_bots', $raw) ? (bool) $raw['exclude_bots'] : true,
-      'exclude_internal' => array_key_exists('exclude_internal', $raw) ? (bool) $raw['exclude_internal'] : true,
+      'exclude_bots' => true,
+      'exclude_internal' => true,
       'raw_retention_days' => max(0, min(self::MAX_RETENTION_DAYS, $days)),
       'own_domains' => $domains,
       'classification_changed_at' => preg_match('/^\d{4}-\d{2}-\d{2}$/', $changed) === 1 ? $changed : '',
@@ -89,23 +90,12 @@ final class TrackerAnalyticsConfig
     }
     $clean = [
       'internal_ips' => $ips,
-      'exclude_bots' => self::flag($data['exclude_bots'] ?? false),
-      'exclude_internal' => self::flag($data['exclude_internal'] ?? false),
       'raw_retention_days' => $days,
       'own_domains' => $domains,
       'classification_changed_at' => $changed,
     ];
     $settings->set(self::SETTING, $clean, $userId);
     $settings->refresh();
-    return $clean;
-  }
-
-  /** @param mixed $value */
-  private static function flag($value): bool
-  {
-    if (is_string($value)) {
-      return in_array(strtolower(trim($value)), ['1', 'true', 'on', 'si', 'sí', 'yes'], true);
-    }
-    return (bool) $value;
+    return self::read($settings);
   }
 }

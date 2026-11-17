@@ -103,7 +103,6 @@
         var data = { settings: settings };
         var current = (settings.category_ids || []).map(String);
         var categories = settings.categories || [];
-        var notifications = settings.notifications || {};
         var reportCargos = (settings.report_cargo_ids || []).map(String);
         var citaCategory = String(settings.cita_category_id || "");
         var cargos = (data.settings.cargo_options || []).map(function (row) {
@@ -124,13 +123,6 @@
           '<label class="block text-sm text-slate-700">Categoría que se elige sola al agendar una cita<select name="cita_category_id" class="mt-1 w-full px-2 py-1.5 rounded-lg border border-slate-300 text-sm"><option value="0">Buscar la llamada "Cita con cliente"</option>' +
           categories.map(function (row) { return '<option value="' + esc(row.id) + '"' + (String(row.id) === citaCategory ? " selected" : "") + ">" + esc(row.nombre) + "</option>"; }).join("") +
           "</select></label>" +
-          "</section><section>" + '<h4 class="text-sm font-bold text-slate-800 mb-1">Avisos del calendario</h4>' +
-          checkboxGrid("notifications", [
-            { id: "funcionario_email", label: "Correo al funcionario" },
-            { id: "solicitante_email", label: "Correo al cliente en citas" },
-            { id: "whatsapp_citas", label: "WhatsApp de citas" },
-            { id: "propietario_email", label: "Correo al propietario con el reporte" },
-          ], function (id) { return notifications[id] !== false; }) +
           "</section><section>" + '<h4 class="text-sm font-bold text-slate-800 mb-1">Cargos que llenan reporte comercial al cerrar</h4>' +
           intro("Se pide al cerrar visitas, captaciones y demás eventos comerciales de funcionarios con estos cargos.") +
           checkboxGrid("report_cargo_ids", (settings.cargo_options || []).map(function (row) { return { id: String(row.id), label: row.name, hint: "(" + row.total + ")" }; }), function (id) { return reportCargos.indexOf(id) !== -1; }) +
@@ -156,15 +148,12 @@
           };
         });
         var existing = function (list) { return list.filter(Boolean); };
-        var notifications = {};
-        form.querySelectorAll('[name="notifications"]').forEach(function (input) { notifications[input.value] = input.checked; });
         return {
           category_ids: existing(categories),
           available_category_ids: existing(available),
           cargo_ids: values("cargo_ids", true),
           categories: rows,
           deleted_category_ids: (form.getAttribute("data-deleted-categories") || "").split(",").filter(Boolean),
-          notifications: notifications,
           report_cargo_ids: values("report_cargo_ids", true),
           cita_category_id: form.elements.cita_category_id.value,
         };
@@ -193,25 +182,6 @@
         document.dispatchEvent(new CustomEvent("scm:calendar-categories-changed", { detail: { category_ids: settings.category_ids || [] } }));
         runtime.calendarCategoryIds = settings.category_ids || [];
         app.setAttribute("data-scm-runtime", JSON.stringify(runtime));
-      },
-    },
-    llamadas: {
-      title: "Llamadas",
-      html: function (settings) {
-        var check = function (name, label) { return '<label class="flex items-start gap-2 text-sm text-slate-800 cursor-pointer"><input type="checkbox" name="' + name + '" class="mt-1"' + (settings[name] ? " checked" : "") + "><span>" + label + "</span></label>"; };
-        var template = function (name, label) { return '<label class="block text-sm text-slate-700">' + label + '<input name="' + name + '" value="' + esc(settings[name] || "") + '" class="mt-1 w-full px-2 py-1.5 rounded-lg border border-slate-300 text-sm"></label>'; };
-        return '<form data-config-form class="text-left space-y-3">' + intro("Avisos de las tareas. Las copias a otros funcionarios se eligen en Notificaciones internas.") +
-          check("asignado", "Correo al funcionario asignado") + check("solicitante", "Correo al cliente al crear la tarea") +
-          check("whatsapp_asignado", "WhatsApp al funcionario") + check("whatsapp_solicitante", "WhatsApp al cliente") +
-          template("plantilla_asignada", "Plantilla: tarea asignada") + template("plantilla_registrada", "Plantilla: solicitud registrada") +
-          template("plantilla_respuesta_cliente", "Plantilla: el cliente escribió") + template("plantilla_respuesta_funcionario", "Plantilla: el funcionario respondió") +
-          template("idioma", "Idioma de las plantillas") + "</form>";
-      },
-      collect: function (form) {
-        var out = {};
-        ["asignado", "solicitante", "whatsapp_asignado", "whatsapp_solicitante"].forEach(function (name) { out[name] = form.elements[name].checked; });
-        ["plantilla_asignada", "plantilla_registrada", "plantilla_respuesta_cliente", "plantilla_respuesta_funcionario", "idioma"].forEach(function (name) { out[name] = form.elements[name].value.trim(); });
-        return out;
       },
     },
     notificaciones_internas: {
@@ -253,22 +223,6 @@
           (events[key] = events[key] || []).push(input.value);
         });
         return { events: events };
-      },
-    },
-    reportes: {
-      title: "Reportes comerciales",
-      html: function (settings) {
-        var days = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
-        var selected = Number(settings.deadline_weekday);
-        return '<form data-config-form class="text-left space-y-4">' +
-          '<label class="flex items-start gap-2 text-sm text-slate-800 cursor-pointer"><input type="checkbox" name="billing_enabled" class="mt-1"' + (settings.billing_enabled ? " checked" : "") + "><span><strong>Permitir crear cuentas de cobro comerciales</strong><br>" +
-          '<small class="text-slate-500">Actívalo solo después de subir el panel inmobiliario actualizado: las dos clases de cuenta comparten tabla.</small></span></label>' +
-          '<label class="block text-sm text-slate-700"><strong>Día límite para enviar la cuenta a gerencia</strong><select name="deadline_weekday" class="mt-1 w-full px-2 py-1.5 rounded-lg border border-slate-300 text-sm">' +
-          days.map(function (day, index) { return '<option value="' + index + '"' + (index === selected ? " selected" : "") + ">" + day + "</option>"; }).join("") +
-          '</select></label><p class="text-sm text-slate-600">Cada reporte debe cobrarse a más tardar ese día de su semana. Después se puede cobrar igual, pero la cuenta queda marcada Fuera de plazo.</p></form>';
-      },
-      collect: function (form) {
-        return { billing_enabled: form.elements.billing_enabled.checked, deadline_weekday: form.elements.deadline_weekday.value };
       },
     },
     tiempos: {
@@ -549,7 +503,7 @@
       },
       bind: function (popup, settings) { bindMedios(popup, settings); },
     },
-    // Promoción › Analítica web: IPs internas, robots, retención de visitas crudas y dominios propios. El estado de los
+    // Promoción › Analítica web: IPs internas, retención de visitas crudas y dominios propios. El estado de los
     // resúmenes es solo lectura (lo mueve la tarea programada y la puesta al día al abrir la pantalla). Bajar los días de
     // "Conservar visitas crudas" programa un borrado que no se deshace: pide una confirmación explícita en el mismo popup.
     analitica: {
@@ -563,9 +517,6 @@
         var stamp = function (value) {
           var match = /^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}))?/.exec(String(value || ""));
           return match ? match[3] + "/" + match[2] + "/" + match[1] + (match[4] ? " " + match[4] + ":" + match[5] : "") : String(value || "");
-        };
-        var check = function (name, label, hint, on) {
-          return '<label class="flex items-start gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white cursor-pointer text-left"><input type="checkbox" class="mt-1" name="' + name + '"' + (on ? " checked" : "") + '><span class="text-sm text-slate-800">' + esc(label) + '<small class="block text-[11px] text-slate-500">' + esc(hint) + "</small></span></label>";
         };
         var area = function (name, label, hint, values, placeholder) {
           return '<label class="block text-left"><span class="block text-xs font-semibold text-slate-700 mb-1">' + esc(label) + "</span>" +
@@ -583,9 +534,6 @@
         return '<form data-config-form class="text-left space-y-4" data-analytics-config data-initial-retention="' + esc(String(retention)) + '">' +
           intro("Cómo se cuentan las visitas en Promoción › Analítica web. Los cambios de IPs internas y de dominios propios se aplican a las visitas nuevas; para recalcular meses anteriores, pide a sistemas que recalculen desde una fecha.") +
           '<section class="space-y-3">' + area("internal_ips", "IPs internas (oficina y equipo)", "Una por línea: IP exacta (IPv4 o IPv6), rango CIDR (190.0.0.0/24) o prefijo IPv4 (190.0.0.).", settings.internal_ips, "190.0.0.10\n10.0.0.0/8") +
-          '<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">' +
-          check("exclude_bots", "No contar robots", "Buscadores, monitores y navegadores automáticos.", settings.exclude_bots !== false) +
-          check("exclude_internal", "No contar visitas internas", "Las que llegan desde las IPs internas de arriba.", settings.exclude_internal !== false) + "</div>" +
           area("own_domains", "Dominios propios", "Una por línea. Las visitas que llegan desde ellos cuentan como navegación interna, no como sitio de referencia.", settings.own_domains, "sucasainmobiliaria.com.co") +
           '<label class="block text-left"><span class="block text-xs font-semibold text-slate-700 mb-1">Conservar visitas crudas (días)</span>' +
           numberField("raw_retention_days", retention, 0, settings.max_retention_days || 3650) +
@@ -619,14 +567,12 @@
         return {
           internal_ips: form.querySelector('[name="internal_ips"]').value,
           own_domains: form.querySelector('[name="own_domains"]').value,
-          exclude_bots: form.querySelector('[name="exclude_bots"]').checked,
-          exclude_internal: form.querySelector('[name="exclude_internal"]').checked,
           raw_retention_days: days,
         };
       },
     },
-    // Promoción › Material POP: categorías que se ofrecen al crear un producto y alerta de stock bajo (correo encolado en
-    // shared-notifications a los funcionarios marcados). Las categorías que ya usan productos se pueden quitar de la
+    // Promoción › Material POP: categorías que se ofrecen al crear un producto y la API (la alerta de stock bajo va a quienes
+    // se marquen en Notificaciones internas). Las categorías que ya usan productos se pueden quitar de la
     // lista: esos productos las conservan, pero no se ofrecen para productos nuevos.
     material_pop: {
       title: "Material POP",
@@ -634,8 +580,6 @@
         var usage = settings.category_usage || [];
         var listed = usage.filter(function (row) { return row.listed; }).map(function (row) { return row.name; });
         var unlisted = usage.filter(function (row) { return !row.listed && row.products > 0; });
-        var selected = (settings.alert_employees || []).map(String);
-        var employees = (settings.employees || []).map(function (row) { return { id: String(row.id), label: row.name, hint: row.email }; });
         return '<form data-config-form class="text-left space-y-4">' +
           '<section><h4 class="text-sm font-bold text-slate-800 mb-1">Categorías de productos</h4>' +
           intro("Una por línea. Son las que se ofrecen al crear o editar un producto en Promoción › Material POP.") +
@@ -645,22 +589,16 @@
           })) : "") +
           (unlisted.length ? '<p class="text-[11px] text-slate-500 mt-1">Las categorías fuera de la lista siguen en sus productos, pero no se ofrecen para productos nuevos.</p>' : "") +
           "</section>" +
-          '<section><h4 class="text-sm font-bold text-slate-800 mb-1">Alerta de stock bajo</h4>' +
-          intro("Cuando una entrega o un ajuste deja un producto en su stock mínimo o lo agota, se envía un correo a los funcionarios marcados (una vez por producto al día).") +
-          '<label class="flex items-start gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white cursor-pointer text-left mb-2"><input type="checkbox" class="mt-1" name="alert_enabled"' + (settings.alert_enabled ? " checked" : "") + '><span class="text-sm text-slate-800">Enviar la alerta por correo</span></label>' +
-          (employees.length ? checkboxGrid("alert_employees", employees, function (id) { return selected.indexOf(id) !== -1; }) : '<p class="text-sm text-rose-700">No hay funcionarios activos con correo.</p>') +
-          "</section>" + popApiHtml(settings) + "</form>";
+          '<p class="text-[11px] text-slate-500">Quién recibe la alerta de stock bajo se elige en Configuración › Notificaciones internas.</p>' +
+          popApiHtml(settings) + "</form>";
       },
       bind: function (popup, settings) { bindPopApi(popup, settings); },
       collect: function (form) {
         var categories = String(form.querySelector('[name="categories"]').value || "").split(/\r?\n/).map(function (line) { return line.trim(); }).filter(Boolean);
         if (!categories.length) throw new Error("Deja al menos una categoría de productos.");
-        var employees = Array.prototype.slice.call(form.querySelectorAll('[name="alert_employees"]:checked')).map(function (input) { return input.value; });
-        var enabled = form.querySelector('[name="alert_enabled"]').checked;
-        if (enabled && !employees.length) throw new Error("Marca al menos un funcionario para la alerta, o desactívala.");
         var api = form.querySelector('[name="api_enabled"]').checked;
         if (api && form.getAttribute("data-pop-token") !== "1") throw new Error("Genera el token de la API antes de activarla.");
-        return { categories: categories, alert_enabled: enabled, alert_employees: employees, api_enabled: api };
+        return { categories: categories, api_enabled: api };
       },
     },
     // Banner y link de la revista, en las mismas filas de jet_cct_confi_sistema que usaba dashboard-marketing (views/settings.php).
@@ -1114,45 +1052,113 @@
     });
   }
 
-  function openSection(key) {
+  // Grupos del menú Configuración (los mismos del menú principal): cada uno abre un solo popup con una pestaña por
+  // sección. Una entrada que no es grupo (Notificaciones internas) abre su sección sola, sin pestañas.
+  var groups = {
+    actividades: { title: "Actividades comerciales", tabs: [["calendario", "Calendario"], ["tiempos", "Tiempos de atención"]] },
+    inmuebles: { title: "Inmuebles", tabs: [["avisos", "Avisos en fachada"], ["actualizaciones", "Actualizaciones"], ["destacados", "Cupos de destacados"]] },
+    herramientas: { title: "Herramientas", tabs: [["aseo", "Calculadora de aseo"], ["utm", "Generador UTM"], ["plan", "Plan estratégico"]] },
+    promocion: { title: "Promoción", tabs: [["medios", "Medios"], ["analitica", "Analítica web"], ["material_pop", "Material POP"], ["banner_revista", "Banner y revista"]] },
+  };
+
+  function loadSection(key) {
     var section = sections[key];
-    if (!section || !window.Swal) return;
-    window.Swal.fire({ title: section.title, text: "Cargando configuración...", allowOutsideClick: false, didOpen: function () { window.Swal.showLoading(); } });
-    request("commercial_settings_load", { section: key }).then(function (data) {
+    return request("commercial_settings_load", { section: key }).then(function (data) {
       var settings = (data.settings || {})[key] || {};
       return Promise.resolve(section.prepare ? section.prepare(settings) : settings);
-    }).then(function (prepared) {
+    });
+  }
+
+  function tabsHtml(group, active) {
+    if (group.tabs.length < 2) return "";
+    return '<div class="flex flex-wrap gap-1 mb-4 border-b border-slate-200 text-left" role="tablist">' + group.tabs.map(function (tab) {
+      var on = tab[0] === active;
+      return '<button type="button" role="tab" aria-selected="' + (on ? "true" : "false") + '" data-config-tab="' + esc(tab[0]) + '" class="px-3 py-2 -mb-px border-b-2 text-sm font-semibold ' +
+        (on ? "border-[#1E3C76] text-[#1E3C76]" : "border-transparent text-slate-500 hover:text-slate-800") + '">' + esc(tab[1]) + "</button>";
+    }).join("") + "</div>";
+  }
+
+  function openConfig(action) {
+    var group = groups[action] || (sections[action] ? { title: sections[action].title, tabs: [[action, sections[action].title]] } : null);
+    if (!group || !window.Swal) return;
+    var first = group.tabs[0][0];
+    var wide = group.tabs.some(function (tab) { return sections[tab[0]].manage || sections[tab[0]].wide; });
+    var current = null;
+    var loading = first;
+    var dirty = false;
+
+    // Pinta la sección en un contenedor nuevo: los eventos que le pone bind() se van con ella al cambiar de pestaña.
+    function render(popup, key, prepared) {
+      var section = sections[key];
+      var body = popup.querySelector("[data-config-body]");
+      var pane = document.createElement("div");
+      pane.setAttribute("data-config-pane", key);
+      pane.innerHTML = section.html(prepared);
+      body.innerHTML = "";
+      body.appendChild(pane);
+      pane.querySelectorAll("[data-toggle-all]").forEach(function (button) {
+        button.addEventListener("click", function () {
+          var value = button.getAttribute("data-value") === "1";
+          pane.querySelectorAll('[name="' + button.getAttribute("data-toggle-all") + '"]').forEach(function (input) { input.checked = value; });
+        });
+      });
+      if (section.bind) section.bind(pane, prepared);
+      // Las secciones que administran una lista guardan cada acción al confirmarla: no tienen botón Guardar.
+      popup.classList.toggle("scm-config-manage", !!section.manage);
+      current = { key: key, section: section };
+      dirty = false;
+    }
+
+    window.Swal.fire({ title: group.title, text: "Cargando configuración...", allowOutsideClick: false, didOpen: function () { window.Swal.showLoading(); } });
+    loadSection(first).then(function (prepared) {
       return window.Swal.fire({
-        title: section.title,
-        html: section.html(prepared),
-        width: section.manage || section.wide ? 980 : 760,
+        title: group.title,
+        html: '<div data-config-tabs>' + tabsHtml(group, first) + '</div><div data-config-body class="text-left"></div>',
+        width: wide ? 980 : 760,
         showCancelButton: true,
-        // Las secciones que administran una lista guardan cada acción al confirmarla: no tienen botón Guardar.
-        showConfirmButton: !section.manage,
         confirmButtonText: "Guardar",
         cancelButtonText: "Cerrar",
-        customClass: { popup: "scm-calendar-swal-popup" + (section.manage ? " scm-config-manage" : "") },
+        customClass: { popup: "scm-calendar-swal-popup" },
         didOpen: function () {
           var popup = window.Swal.getPopup();
-          popup.querySelectorAll("[data-toggle-all]").forEach(function (button) {
-            button.addEventListener("click", function () {
-              var value = button.getAttribute("data-value") === "1";
-              popup.querySelectorAll('[name="' + button.getAttribute("data-toggle-all") + '"]').forEach(function (input) { input.checked = value; });
+          render(popup, first, prepared);
+          var body = popup.querySelector("[data-config-body]");
+          var markDirty = function () { if (current && !current.section.manage) dirty = true; };
+          body.addEventListener("input", markDirty);
+          body.addEventListener("change", markDirty);
+          popup.querySelector("[data-config-tabs]").addEventListener("click", function (event) {
+            var tab = event.target.closest("[data-config-tab]");
+            if (!tab) return;
+            var key = tab.getAttribute("data-config-tab");
+            if (key === loading) return;
+            if (dirty && !window.confirm("Hay cambios sin guardar en esta pestaña. ¿Descartarlos?")) return;
+            loading = key;
+            current = null;
+            window.Swal.resetValidationMessage();
+            popup.querySelector("[data-config-tabs]").innerHTML = tabsHtml(group, key);
+            body.innerHTML = '<p class="text-sm text-slate-500 py-8 text-center">Cargando configuración...</p>';
+            loadSection(key).then(function (data) {
+              if (loading === key) render(popup, key, data);
+            }).catch(function (error) {
+              if (loading === key) body.innerHTML = '<p class="text-sm text-rose-700 py-8 text-center">' + esc((error && error.message) || "No se pudo cargar la configuración.") + "</p>";
             });
           });
-          if (section.bind) section.bind(popup, prepared);
         },
         preConfirm: function () {
+          if (!current || current.section.manage) return false;
+          var saving = current;
           var form = window.Swal.getPopup().querySelector("[data-config-form]");
-          if (!form.reportValidity()) return false;
+          if (!form || !form.reportValidity()) return false;
           var payload;
           try {
-            payload = section.collect(form);
+            payload = saving.section.collect(form);
           } catch (error) {
             window.Swal.showValidationMessage(error.message);
             return false;
           }
-          return request("commercial_settings_save", { section: key, payload: JSON.stringify(payload) }).catch(function (error) {
+          return request("commercial_settings_save", { section: saving.key, payload: JSON.stringify(payload) }).then(function (data) {
+            return { key: saving.key, data: data };
+          }).catch(function (error) {
             window.Swal.showValidationMessage(error.message || "No se pudo guardar la configuración.");
             return false;
           });
@@ -1160,8 +1166,10 @@
       });
     }).then(function (result) {
       if (!result || !result.isConfirmed || !result.value) return;
-      if (section.after) section.after((result.value.settings || {})[key] || {});
-      notify("success", result.value.message || "Configuración guardada.");
+      var section = sections[result.value.key];
+      var data = result.value.data || {};
+      if (section.after) section.after((data.settings || {})[result.value.key] || {});
+      notify("success", data.message || "Configuración guardada.");
     }).catch(function (error) {
       notify("error", (error && error.message) || "No se pudo cargar la configuración.");
     });
@@ -1173,6 +1181,6 @@
     var action = item.getAttribute("data-commercial-config-action");
     setMenu(false);
     // "permissions" abre su modal desde commercial-dashboard.js (id commercial-open-permissions).
-    if (action !== "permissions") openSection(action);
+    if (action !== "permissions") openConfig(action);
   });
 })();
