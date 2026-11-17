@@ -184,36 +184,85 @@
         app.setAttribute("data-scm-runtime", JSON.stringify(runtime));
       },
     },
+    // Mismo diseño que Permisos del panel: se elige el aviso (como el cargo) y su tarjeta muestra los funcionarios activos.
+    // Todas las tarjetas siguen en el formulario (ocultas), así Guardar envía todos los avisos de una vez.
     notificaciones_internas: {
       title: "Notificaciones internas",
+      eyebrow: "Copias de los avisos",
       wide: true,
       html: function (settings) {
         var events = settings.events || {};
         var employees = settings.employees || [];
-        var body = Object.keys(settings.catalog || {}).map(function (groupKey) {
-          var group = settings.catalog[groupKey];
-          var items = Object.keys(group.items).map(function (eventKey) {
+        var catalog = settings.catalog || {};
+        var first = "";
+        var options = "";
+        var cards = "";
+        Object.keys(catalog).forEach(function (groupKey) {
+          var group = catalog[groupKey];
+          options += '<optgroup label="' + esc(group.label) + '">';
+          Object.keys(group.items).forEach(function (eventKey) {
             var item = group.items[eventKey];
             var selected = events[eventKey] || [];
+            first = first || eventKey;
+            options += '<option value="' + esc(eventKey) + '" data-internal-option="' + esc(item.label) + '">' + esc(item.label) + " · " + selected.length + " marcados</option>";
             var checks = employees.map(function (employee) {
-              return '<label class="flex items-center gap-2 text-sm text-slate-800 cursor-pointer" data-employee-name="' + esc(employee.nombre.toLowerCase()) + '"><input type="checkbox" data-event="' + esc(eventKey) + '" value="' + esc(employee.id) + '"' + (selected.indexOf(employee.id) >= 0 ? " checked" : "") + "><span>" + esc(employee.nombre) + "</span></label>";
+              var email = employee.correo ? employee.correo : "Sin correo";
+              return '<label class="flex items-start gap-2 p-2 bg-surface-container-lowest rounded-lg text-body-sm cursor-pointer border border-transparent hover:border-surface-container" data-employee-name="' + esc(employee.nombre.toLowerCase()) + '">' +
+                '<input type="checkbox" data-event="' + esc(eventKey) + '" value="' + esc(employee.id) + '"' + (selected.indexOf(employee.id) >= 0 ? " checked" : "") + ' class="rounded text-primary mt-0.5">' +
+                '<span class="min-w-0"><span class="block font-semibold text-on-surface">' + esc(employee.nombre) + '</span><span class="block text-[11px] text-secondary break-all">' + esc(email) + "</span></span></label>";
             }).join("");
-            return '<details class="rounded-lg border border-slate-200 p-3" data-internal-event><summary class="cursor-pointer text-sm font-semibold text-slate-800">' + esc(item.label) + ' <span class="font-normal text-slate-500">· <span data-event-count>' + selected.length + "</span> · " + esc(item.channel) + '</span></summary><p class="mt-1 text-xs text-slate-500">' + esc(item.description) + '</p><div class="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-1">' + checks + "</div></details>";
-          }).join("");
-          return '<section class="space-y-2"><h3 class="text-sm font-bold text-slate-900">' + esc(group.label) + "</h3>" + items + "</section>";
-        }).join("");
-        return '<form data-config-form class="text-left space-y-4">' + intro("Marca qué funcionarios reciben copia de cada aviso. Los módulos nuevos aparecen aquí con sus avisos.") +
-          '<input type="search" data-employee-filter class="w-full px-2 py-1.5 rounded-lg border border-slate-300 text-sm" placeholder="Buscar funcionario" aria-label="Buscar funcionario">' + body + "</form>";
+            cards += '<div class="bg-surface-container-low rounded-xl p-space-md border border-surface-container space-y-space-sm" data-internal-event="' + esc(eventKey) + '"' + (eventKey === first ? "" : " hidden") + ">" +
+              '<div class="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-surface-container">' +
+              '<span class="font-label-md font-semibold text-on-surface">' + esc(item.label) + "</span>" +
+              '<span class="font-label-sm text-secondary">' + esc(group.label) + " · " + esc(item.channel) + " · <span data-event-count>" + selected.length + "</span> marcados</span></div>" +
+              '<p class="text-[11px] text-secondary">' + esc(item.description) + "</p>" +
+              '<div class="flex flex-wrap items-center justify-between gap-2">' +
+              '<input type="search" data-employee-filter class="w-full sm:w-72 rounded-lg border border-surface-container bg-surface-container-lowest px-3 py-2 text-body-sm text-on-surface" placeholder="Buscar funcionario" aria-label="Buscar funcionario">' +
+              '<span class="flex gap-2">' +
+              '<button type="button" class="px-3 py-1 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface text-xs font-semibold cursor-pointer" data-internal-toggle="1">Marcar todos</button>' +
+              '<button type="button" class="px-3 py-1 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface text-xs font-semibold cursor-pointer" data-internal-toggle="0">Desmarcar todos</button></span></div>' +
+              (employees.length ? '<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">' + checks + "</div>" : '<p class="text-body-sm text-secondary">No hay funcionarios activos.</p>') +
+              "</div>";
+          });
+          options += "</optgroup>";
+        });
+        return '<form data-config-form class="text-left space-y-space-md">' +
+          '<p class="text-[11px] text-secondary">Elige un aviso y marca qué funcionarios reciben copia. El responsable de cada tarea lo recibe siempre; los módulos nuevos aparecen aquí con sus avisos.</p>' +
+          '<label class="block"><span class="block font-label-sm text-secondary font-semibold pb-1">Aviso a configurar</span>' +
+          '<select class="w-full md:w-96 rounded-lg border border-surface-container bg-surface-container-lowest px-3 py-2 text-body-sm text-on-surface" data-internal-select>' + options + "</select></label>" +
+          cards + "</form>";
       },
       bind: function (popup) {
-        popup.querySelector("[data-employee-filter]").addEventListener("input", function (event) {
-          var term = event.target.value.trim().toLowerCase();
-          popup.querySelectorAll("[data-employee-name]").forEach(function (label) { label.classList.toggle("hidden", term !== "" && label.getAttribute("data-employee-name").indexOf(term) < 0); });
-          popup.querySelectorAll("[data-internal-event]").forEach(function (details) { details.open = term !== ""; });
+        var form = popup.querySelector("[data-config-form]");
+        var select = popup.querySelector("[data-internal-select]");
+        var refresh = function (card) {
+          var count = card.querySelectorAll("[data-event]:checked").length;
+          card.querySelector("[data-event-count]").textContent = count;
+          var option = select.querySelector('option[value="' + card.getAttribute("data-internal-event") + '"]');
+          if (option) option.textContent = option.getAttribute("data-internal-option") + " · " + count + " marcados";
+        };
+        select.addEventListener("change", function () {
+          form.querySelectorAll("[data-internal-event]").forEach(function (card) { card.hidden = card.getAttribute("data-internal-event") !== select.value; });
         });
-        popup.addEventListener("change", function (event) {
-          var box = event.target.closest("[data-internal-event]");
-          if (box && event.target.matches("[data-event]")) box.querySelector("[data-event-count]").textContent = box.querySelectorAll("[data-event]:checked").length;
+        form.addEventListener("input", function (event) {
+          if (!event.target.matches("[data-employee-filter]")) return;
+          var term = event.target.value.trim().toLowerCase();
+          event.target.closest("[data-internal-event]").querySelectorAll("[data-employee-name]").forEach(function (label) {
+            label.classList.toggle("hidden", term !== "" && label.getAttribute("data-employee-name").indexOf(term) < 0);
+          });
+        });
+        // Marcar o desmarcar todos solo toca a los funcionarios que deja ver la búsqueda.
+        form.addEventListener("click", function (event) {
+          var toggle = event.target.closest("[data-internal-toggle]");
+          if (!toggle) return;
+          var card = toggle.closest("[data-internal-event]");
+          var checked = toggle.getAttribute("data-internal-toggle") === "1";
+          card.querySelectorAll("[data-employee-name]:not(.hidden) [data-event]").forEach(function (input) { input.checked = checked; });
+          refresh(card);
+          form.dispatchEvent(new Event("change", { bubbles: true }));
+        });
+        form.addEventListener("change", function (event) {
+          if (event.target.matches("[data-event]")) refresh(event.target.closest("[data-internal-event]"));
         });
       },
       collect: function (form) {
@@ -1071,15 +1120,18 @@
 
   function tabsHtml(group, active) {
     if (group.tabs.length < 2) return "";
-    return '<div class="flex flex-wrap gap-1 mb-4 border-b border-slate-200 text-left" role="tablist">' + group.tabs.map(function (tab) {
-      var on = tab[0] === active;
-      return '<button type="button" role="tab" aria-selected="' + (on ? "true" : "false") + '" data-config-tab="' + esc(tab[0]) + '" class="px-3 py-2 -mb-px border-b-2 text-sm font-semibold ' +
-        (on ? "border-[#1E3C76] text-[#1E3C76]" : "border-transparent text-slate-500 hover:text-slate-800") + '">' + esc(tab[1]) + "</button>";
+    return '<div class="flex flex-wrap gap-1 p-1 mb-space-md bg-surface-container-low rounded-xl w-fit max-w-full text-left" role="tablist">' + group.tabs.map(function (tab) {
+      return '<button type="button" role="tab" aria-selected="' + (tab[0] === active ? "true" : "false") + '" data-config-tab="' + esc(tab[0]) + '" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-secondary hover:text-on-surface aria-selected:bg-inverse-surface aria-selected:text-on-secondary aria-selected:shadow-sm transition-colors cursor-pointer">' + esc(tab[1]) + "</button>";
     }).join("") + "</div>";
   }
 
+  // Encabezado como el de Permisos del panel: rótulo pequeño en mayúsculas y el título.
+  function configTitle(group) {
+    return '<span class="scm-config-eyebrow">' + esc(group.eyebrow || "Configuración comercial") + '</span><span class="scm-config-heading">' + esc(group.title) + "</span>";
+  }
+
   function openConfig(action) {
-    var group = groups[action] || (sections[action] ? { title: sections[action].title, tabs: [[action, sections[action].title]] } : null);
+    var group = groups[action] || (sections[action] ? { title: sections[action].title, eyebrow: sections[action].eyebrow, tabs: [[action, sections[action].title]] } : null);
     if (!group || !window.Swal) return;
     var first = group.tabs[0][0];
     var wide = group.tabs.some(function (tab) { return sections[tab[0]].manage || sections[tab[0]].wide; });
@@ -1105,20 +1157,26 @@
       if (section.bind) section.bind(pane, prepared);
       // Las secciones que administran una lista guardan cada acción al confirmarla: no tienen botón Guardar.
       popup.classList.toggle("scm-config-manage", !!section.manage);
+      var cancel = window.Swal.getCancelButton();
+      if (cancel) cancel.textContent = section.manage ? "Cerrar" : "Cancelar";
       current = { key: key, section: section };
       dirty = false;
     }
 
-    window.Swal.fire({ title: group.title, text: "Cargando configuración...", allowOutsideClick: false, didOpen: function () { window.Swal.showLoading(); } });
+    window.Swal.fire({ title: configTitle(group), text: "Cargando configuración...", allowOutsideClick: false, customClass: { popup: "scm-calendar-swal-popup scm-config-popup" }, didOpen: function () { window.Swal.showLoading(); } });
     loadSection(first).then(function (prepared) {
       return window.Swal.fire({
-        title: group.title,
+        title: configTitle(group),
         html: '<div data-config-tabs>' + tabsHtml(group, first) + '</div><div data-config-body class="text-left"></div>',
+        showCloseButton: true,
+        reverseButtons: true,
+        closeButtonHtml: '<span class="material-symbols-outlined text-[20px]">close</span>',
+        closeButtonAriaLabel: "Cerrar",
         width: wide ? 980 : 760,
         showCancelButton: true,
         confirmButtonText: "Guardar",
-        cancelButtonText: "Cerrar",
-        customClass: { popup: "scm-calendar-swal-popup" },
+        cancelButtonText: "Cancelar",
+        customClass: { popup: "scm-calendar-swal-popup scm-config-popup" },
         didOpen: function () {
           var popup = window.Swal.getPopup();
           render(popup, first, prepared);

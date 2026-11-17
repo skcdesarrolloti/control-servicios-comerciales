@@ -235,6 +235,29 @@ function daysBetween(from, to) {
     const invalid = await post(page, { action: 'commercial_settings_save', section: 'analitica', payload: JSON.stringify({ internal_ips: 'no-es-ip', raw_retention_days: '0' }) });
     assert.equal(invalid.status, 422);
 
+    // Configuración › Notificaciones internas: mismo diseño que Permisos (se elige el aviso y su tarjeta lista funcionarios).
+    await page.locator('.swal2-container').waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
+    await page.locator('#commercial-config-trigger').click();
+    await page.locator('[data-commercial-config-action="notificaciones_internas"]').click();
+    const internal = page.locator('[data-config-pane="notificaciones_internas"]');
+    await internal.locator('[data-internal-select]').waitFor();
+    assert.match(await page.locator('.swal2-title').innerText(), /COPIAS DE LOS AVISOS[\s\S]*Notificaciones internas/i);
+    await internal.locator('[data-internal-select]').selectOption('pop_stock_bajo');
+    const stock = internal.locator('[data-internal-event="pop_stock_bajo"]');
+    assert.equal(await stock.isVisible(), true);
+    assert.equal(await internal.locator('[data-internal-event="llamada_tarea_creada"]').isVisible(), false);
+    await stock.locator('[data-employee-filter]').fill('mercadeo');
+    await stock.locator('[data-internal-toggle="1"]').click();
+    assert.equal(await stock.locator('[data-event-count]').innerText(), '1', 'Marcar todos solo marca a quienes deja ver la búsqueda');
+    assert.match(await internal.locator('[data-internal-select] option[value="pop_stock_bajo"]').innerText(), /· 1 marcados/);
+    const savedInternal = page.waitForResponse(response => response.request().method() === 'POST' && (response.request().postData() || '').includes('commercial_settings_save'));
+    await page.locator('.swal2-confirm').click();
+    const internalResponse = await savedInternal;
+    assert.equal((await internalResponse.json()).success, true);
+    assert.match(internalResponse.request().postData() || '', /pop_stock_bajo/);
+    await page.locator('.swal2-popup', { hasText: 'Notificaciones internas guardadas' }).waitFor();
+    await page.locator('.swal2-confirm').click().catch(() => {});
+
     // Configuración › Medios: lista única en su propia tabla. Cada acción se confirma en un panel interno del mismo popup
     // y responde con un mensaje dentro de la lista (sin abrir otro popup).
     await page.locator('.swal2-container').waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});

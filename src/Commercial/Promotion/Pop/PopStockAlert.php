@@ -62,11 +62,17 @@ class PopStockAlert
       . '<ul><li>Existencias: <strong>' . $after . ' ' . $e($unit) . '</strong> (antes ' . $before . ')</li>'
       . ($minimum > 0 ? '<li>Stock mínimo: ' . $minimum . ' ' . $e($unit) . '</li>' : '') . '</ul>'
       . '<p>Revísalo en el panel comercial › Promoción › Material POP.</p>';
-    $this->send($emails, $subject, $html, [
-      'source_module' => 'control-servicios-comerciales-material-pop',
-      'dedupe_key' => 'material-pop-stock:' . (int) ($product['id'] ?? 0) . ':' . date('Y-m-d'),
-      'meta' => ['categoria_mensaje' => 'alerta', 'producto_id' => (int) ($product['id'] ?? 0), 'existencias' => $after],
-    ]);
+    // La entrega o el ajuste ya quedaron guardados: si la cola de avisos falla, se registra y no se reporta como error.
+    try {
+      $this->send($emails, $subject, $html, [
+        'source_module' => 'control-servicios-comerciales-material-pop',
+        'dedupe_key' => 'material-pop-stock:' . (int) ($product['id'] ?? 0) . ':' . date('Y-m-d'),
+        'meta' => ['categoria_mensaje' => 'alerta', 'producto_id' => (int) ($product['id'] ?? 0), 'existencias' => $after],
+      ]);
+    } catch (\Throwable $exception) {
+      error_log('[commercial-material-pop] alerta de stock bajo: ' . $exception->getMessage());
+      return 0;
+    }
     return count($emails);
   }
 

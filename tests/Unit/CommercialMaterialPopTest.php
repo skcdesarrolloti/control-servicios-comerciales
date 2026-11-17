@@ -254,6 +254,21 @@ final class CommercialMaterialPopTest extends TestCase
     self::assertSame(['mercadeo@example.test'], $this->sent[1]['emails']);
   }
 
+  public function testStockAlertFailureDoesNotBreakTheSavedMovement(): void
+  {
+    (new CommercialInternalNotifications($this->db, $this->settings))->save(['pop_stock_bajo' => ['505']]);
+    $alert = new class ($this->db, $this->settings) extends PopStockAlert {
+      protected function send(array $emails, string $subject, string $html, array $options): void
+      {
+        throw new \RuntimeException('Cola de avisos no disponible');
+      }
+    };
+    $service = new PopInventoryService($this->db, $this->settings, null, $alert);
+    $llaveros = (int) $this->product('Llaveros')['id'];
+    $service->adjustStock($llaveros, -2, 'Conteo', '101');
+    self::assertSame(10, (int) $this->product('Llaveros')['quantity'], 'El ajuste queda guardado aunque la alerta falle.');
+  }
+
   public function testViewShowsActionsAndPricesOnlyWithTheirPermissions(): void
   {
     $render = function (string $cargo, string $employee, array $input = []): string {

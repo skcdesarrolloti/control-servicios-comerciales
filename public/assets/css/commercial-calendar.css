@@ -437,6 +437,53 @@
   min-width: 92px; }
 /* Configuración › Medios administra una lista: cada acción se guarda al confirmarla, sin botón Guardar. */
 .swal2-container .swal2-popup.scm-calendar-swal-popup.scm-config-manage .swal2-actions .swal2-confirm.swal2-styled { display: none !important; }
+/* Menú Configuración: mismo encabezado, botones y radio que el modal de Permisos del panel (tokens del panel). */
+.swal2-container .swal2-popup.scm-calendar-swal-popup.scm-config-popup { border-radius: 16px !important; }
+.swal2-popup.scm-calendar-swal-popup.scm-config-popup .swal2-title { background: #f2f3ff;
+  border-bottom: 1px solid #e9edff;
+  color: #001944 !important;
+  display: flex !important;
+  flex-direction: column;
+  gap: 2px;
+  padding: 24px 64px 20px 28px !important; }
+.swal2-popup.scm-config-popup .scm-config-eyebrow { color: #4b5d8c;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: .02em;
+  text-transform: uppercase; }
+.swal2-popup.scm-config-popup .scm-config-heading { color: #001944;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.3; }
+.swal2-popup.scm-config-popup .swal2-close { align-items: center;
+  border-radius: 9999px;
+  color: #4b5d8c;
+  display: flex;
+  height: 32px;
+  justify-content: center;
+  margin: 0;
+  position: absolute;
+  right: 20px;
+  top: 30px;
+  width: 32px; }
+.swal2-popup.scm-config-popup .swal2-close:hover { background: #e1e8ff;
+  color: #001944; }
+.swal2-popup.scm-config-popup .swal2-html-container { padding: 24px 28px 8px !important; }
+.swal2-popup.scm-config-popup .swal2-actions { background: #f2f3ff;
+  border-top: 1px solid #e9edff;
+  gap: 8px; }
+.swal2-container .swal2-popup.scm-calendar-swal-popup.scm-config-popup .swal2-actions .swal2-confirm.swal2-styled { background: #0b2e67 !important;
+  border: 1px solid #0b2e67 !important;
+  border-radius: 12px !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, .1), 0 2px 4px -2px rgba(0, 0, 0, .1) !important;
+  font-weight: 600 !important; }
+.swal2-container .swal2-popup.scm-calendar-swal-popup.scm-config-popup .swal2-actions .swal2-confirm.swal2-styled:hover { background: #4b5d8c !important; }
+.swal2-container .swal2-popup.scm-calendar-swal-popup.scm-config-popup .swal2-actions .swal2-cancel.swal2-styled { background: #e9edff !important;
+  border: 1px solid #e9edff !important;
+  border-radius: 12px !important;
+  color: #001944 !important;
+  font-weight: 600 !important; }
+.swal2-container .swal2-popup.scm-calendar-swal-popup.scm-config-popup .swal2-actions .swal2-cancel.swal2-styled:hover { background: #e1e8ff !important; }
 .swal2-popup .scm-calendar-popup-form { color: #0f2742;
   display: grid;
   gap: 18px;
