@@ -467,7 +467,7 @@
     if (["enviar_notificaciones", "campanas", "plantillas_correo"].indexOf(tab) >= 0) return "notificaciones";
     if (["mis_reportes", "reportes_consolidado", "cuentas_cobro"].indexOf(tab) >= 0) return "reportes_comerciales";
     // Tareas, llamadas, precaptación, avisos y actualizaciones van dentro del menú Actividades comerciales.
-    return ["abiertos", "postergados", "cerrados", "mis_tickets", "llamadas", "precaptacion", "anadir_aviso", "actualizaciones", "avisos"].indexOf(tab) >= 0 ? "comerciales" : tab;
+    return ["abiertos", "postergados", "cerrados", "mis_tickets", "llamadas", "precaptacion", "cotizaciones", "anadir_aviso", "actualizaciones", "avisos"].indexOf(tab) >= 0 ? "comerciales" : tab;
   }
 
   function setActiveTab(tab) {
@@ -740,7 +740,7 @@
     detailRequest = new AbortController();
     caseContent.innerHTML = loadingMarkup();
     caseContent.setAttribute("aria-busy", "true");
-    var action = kind === "sign" ? "commercial_task_sign_form" : (kind === "media" ? "commercial_property_media_form" : "commercial_property_entry_form");
+    var action = kind === "sign" ? "commercial_task_sign_form" : (kind === "media" ? "commercial_property_media_form" : (kind === "quote" ? "commercial_quote_form" : "commercial_property_entry_form"));
     request(action, { ticket_pk: ticketPk, id_inmueble: propertyCode }, detailRequest.signal).then(function (response) {
       caseContent.innerHTML = response.html || "";
       caseContent.removeAttribute("aria-busy");
@@ -750,6 +750,9 @@
       if (property && typeof window.initCommercialPropertyEntry === "function") window.initCommercialPropertyEntry(property);
       var media = caseContent.querySelector("[data-commercial-property-media]");
       if (media && typeof window.initCommercialPropertyMedia === "function") window.initCommercialPropertyMedia(media);
+      var quote = caseContent.querySelector("[data-cqt-task]");
+      if (quote && typeof window.initCommercialQuoteForm !== "function") throw new Error("Actualiza la página para cargar la versión actual del formulario.");
+      if (quote) window.initCommercialQuoteForm(quote);
       if ((property && typeof window.initCommercialPropertyEntry !== "function") || (media && typeof window.initCommercialPropertyMedia !== "function")) throw new Error("Actualiza la página para cargar la versión actual del formulario.");
       var heading = caseContent.querySelector("h1");
       if (heading) { heading.setAttribute("tabindex", "-1"); heading.focus({ preventScroll: true }); }

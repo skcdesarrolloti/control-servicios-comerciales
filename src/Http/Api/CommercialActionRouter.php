@@ -6,6 +6,7 @@ namespace SCM\Http\Api;
 
 use SCM\Http\Controller\CampaignApiController;
 use SCM\Http\Controller\CommercialCallsApiController;
+use SCM\Http\Controller\CommercialQuotesApiController;
 use SCM\Http\Controller\CommercialApiController;
 use SCM\Http\Controller\CommercialReportsApiController;
 use SCM\Http\Controller\PromotionApiController;
@@ -78,6 +79,15 @@ final class CommercialActionRouter
     'commercial_calls_card' => 'card',
   ];
 
+  /** Cotizaciones de inmuebles (popup de la tarea y Actividades comerciales › Cotizaciones): CommercialQuotesApiController. */
+  public const QUOTE_ACTIONS = [
+    'commercial_quote_form' => 'form',
+    'commercial_quote_properties' => 'properties',
+    'commercial_quote_create' => 'create',
+    'commercial_quotes_list' => 'list',
+    'commercial_quote_view' => 'view',
+  ];
+
   private CommercialApiController $controller;
   /** @var (\Closure():PromotionApiController)|null */
   private ?\Closure $promotion;
@@ -89,6 +99,8 @@ final class CommercialActionRouter
   private ?\Closure $reports;
   /** @var (\Closure():CommercialCallsApiController)|null */
   private ?\Closure $calls;
+  /** @var (\Closure():CommercialQuotesApiController)|null */
+  private ?\Closure $quotes;
 
   /**
    * @param (\Closure():PromotionApiController)|null $promotion
@@ -96,8 +108,9 @@ final class CommercialActionRouter
    * @param (\Closure():CampaignApiController)|null $campaigns
    * @param (\Closure():CommercialReportsApiController)|null $reports
    * @param (\Closure():CommercialCallsApiController)|null $calls
+   * @param (\Closure():CommercialQuotesApiController)|null $quotes
    */
-  public function __construct(CommercialApiController $controller, ?\Closure $promotion = null, ?\Closure $strategy = null, ?\Closure $campaigns = null, ?\Closure $reports = null, ?\Closure $calls = null)
+  public function __construct(CommercialApiController $controller, ?\Closure $promotion = null, ?\Closure $strategy = null, ?\Closure $campaigns = null, ?\Closure $reports = null, ?\Closure $calls = null, ?\Closure $quotes = null)
   {
     $this->controller = $controller;
     $this->promotion = $promotion;
@@ -105,6 +118,7 @@ final class CommercialActionRouter
     $this->campaigns = $campaigns;
     $this->reports = $reports;
     $this->calls = $calls;
+    $this->quotes = $quotes;
   }
 
   /** @param array<string,mixed> $input */
@@ -140,6 +154,12 @@ final class CommercialActionRouter
       }
       $target = ($this->calls)();
       $method = self::CALL_ACTIONS[$action];
+    } elseif (isset(self::QUOTE_ACTIONS[$action])) {
+      if ($this->quotes === null) {
+        return false;
+      }
+      $target = ($this->quotes)();
+      $method = self::QUOTE_ACTIONS[$action];
     } else {
       $target = $this->controller;
       $method = self::controllerMethod($action);

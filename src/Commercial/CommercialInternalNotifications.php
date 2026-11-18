@@ -35,6 +35,12 @@ final class CommercialInternalNotifications
         'precaptacion_tarea_creada' => ['label' => 'Tarea creada desde una precaptación', 'description' => 'Copia del aviso de la tarea nueva. El responsable asignado la recibe siempre.', 'channel' => 'Correo y WhatsApp'],
       ],
     ],
+    'cotizaciones' => [
+      'label' => 'Cotizaciones de inmuebles',
+      'items' => [
+        'cotizacion_creada' => ['label' => 'Cotización enviada a un cliente', 'description' => 'Copia del correo con la cotización, los inmuebles y el enlace. Quien la hizo la recibe siempre.', 'channel' => 'Correo'],
+      ],
+    ],
     'promocion' => [
       'label' => 'Promoción',
       'items' => [

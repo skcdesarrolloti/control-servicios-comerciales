@@ -1,8 +1,8 @@
 # Plantillas de WhatsApp de las tareas comerciales
 
-Crea estas cuatro plantillas en **Meta Business Suite → Administrador de WhatsApp → Plantillas de mensajes → Crear plantilla**, en la misma cuenta que usa el panel.
+Crea estas cinco plantillas en **Meta Business Suite → Administrador de WhatsApp → Plantillas de mensajes → Crear plantilla**, en la misma cuenta que usa el panel.
 
-Para todas: categoría **Utilidad**, idioma **Spanish (COL)** (`es_CO`), tipo de variable **Número**, pie de página `SKC SuCasa Inmobiliaria` y un botón **Ir al sitio web** con URL **Dinámica**. Usa los nombres exactos. Solo la 2 lleva encabezado (imagen).
+Para todas: categoría **Utilidad**, idioma **Spanish (COL)** (`es_CO`), tipo de variable **Número**, pie de página `SKC SuCasa Inmobiliaria` y un botón **Ir al sitio web** con URL **Dinámica**. Usa los nombres exactos. Solo la 2 y la 5 llevan encabezado (imagen).
 
 Cada dato es una sola variable: el contacto de un funcionario (nombre, correo y celular) lo arma el sistema en una línea, como en el panel inmobiliario. Meta no acepta cuerpos que empiecen o terminen con una variable ni dos variables seguidas: por eso el cuerpo siempre cierra con la línea `*Construimos confianza, protegemos su patrimonio.*` (la 1 ya estaba creada y queda como está).
 
@@ -92,6 +92,26 @@ Ejemplos: `{{1}}` Luis Prada · `{{2}}` 1686 · `{{3}}` Jocabeth Cantillo · Cor
 
 Botón `Ver y responder`. URL del sitio web `https://sucasainmobiliaria.com.co/dashboard-comercial/public/tarea.php?t=`. URL de muestra `https://sucasainmobiliaria.com.co/dashboard-comercial/public/tarea.php?t=1686.1893456000.ejemplo`.
 
+## 5. `scm_cotizacion_inmuebles_v1`
+
+Para el cliente, al crear una cotización de inmuebles desde el popup de la tarea. **Encabezado:** en "Muestra de contenido multimedia" elige **Imagen** y sube una foto de ejemplo de un inmueble (JPG o PNG). El panel envía la foto de portada del primer inmueble cotizado o, si no tiene, la ficha del asesor o el banner de los correos.
+
+```text
+Hola *{{1}}.*
+
+Te compartimos la cotización de inmuebles *#{{2}}* con *{{3}}*, de acuerdo con lo que buscas.
+
+*Te atiende:* {{4}}.
+
+Desde el botón puedes ver las fotos, los precios y la comparación de los inmuebles.
+
+*Construimos confianza, protegemos su patrimonio.*
+```
+
+Ejemplos: `{{1}}` Luis Prada · `{{2}}` 5868 · `{{3}}` 3 inmuebles en arriendo · `{{4}}` Jocabeth Cantillo · Correo: jocabeth@ejemplo.com · Celular: 3001234567
+
+Botón `Ver cotización`. URL del sitio web `https://sucasainmobiliaria.com.co/dashboard-comercial/public/cotizacion.php?c=`. URL de muestra `https://sucasainmobiliaria.com.co/dashboard-comercial/public/cotizacion.php?c=5868.1893456000.ejemplo`.
+
 ## Si Meta exige otro nombre
 
-Cámbialo en la constante `TEMPLATE_*` de `src/Commercial/Calls/CommercialCallsNotifier.php`. No borres una plantilla para volver a crearla: Meta no deja reusar ese nombre por varias semanas.
+Cámbialo en la constante `TEMPLATE_*` de `src/Commercial/Calls/CommercialCallsNotifier.php` (o `TEMPLATE` de `src/Commercial/Quotes/CommercialQuotesNotifier.php` para la cotización). No borres una plantilla para volver a crearla: Meta no deja reusar ese nombre por varias semanas.

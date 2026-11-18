@@ -171,8 +171,8 @@ El menú **Configuración** del encabezado (solo cargos administradores) reúne 
 | Entrada | Pestañas | Dónde se guarda |
 |---|---|---|
 | Permisos del panel | Vistas, subvistas, acciones y cargos visibles | `commercial_permissions`, `commercial_admin_cargos`, `commercial_employee_cargos` |
-| Notificaciones internas | Quién recibe copia de cada aviso (llamadas, precaptación, stock bajo de Material POP) | `internal_admin_notifications` |
-| Actividades comerciales | Calendario (categorías y cargos) · Tiempos de atención | `commercial_calendar_*`; `control_tickets_sla_config` (compartido con los informes de tareas) |
+| Notificaciones internas | Quién recibe copia de cada aviso (llamadas, precaptación, cotizaciones, stock bajo de Material POP) | `internal_admin_notifications` |
+| Actividades comerciales | Calendario (categorías y cargos) · Tiempos de atención · Cotizaciones (notas que ve el cliente) | `commercial_calendar_*`; `control_tickets_sla_config` (compartido con los informes de tareas); `commercial_quotes` |
 | Inmuebles | Avisos en fachada · Actualizaciones · Cupos de destacados | Filas `dia-retoque-*`, `dias-atraso-aviso-nuevo`, `valor_aviso`, `valor_transporte`, `factor_prestacional`; `commercial_property_update_limits`; filas de cada portal |
 | Herramientas | Calculadora de aseo · Generador UTM · Plan estratégico | Filas de la calculadora; `commercial_utm_catalog`; tablas del Gestor Estratégico |
 | Promoción | Medios · Analítica web · Material POP · Banner y revista | `scm_medios`; `promotion_analytics_config`; `commercial_pop_config`; filas `banner` y `link_revista` |
@@ -242,6 +242,22 @@ El menú **Actividades comerciales → Llamadas** reemplaza los formularios "Añ
 ### Conversación con el cliente y avisos
 
 `public/tarea.php` es la vista pública de una tarea: el cliente entra con un enlace firmado de 90 días (`PublicTaskAccess`), ve su conversación y escribe. Solo lee la tabla `scm_tarea_mensajes`, así que nunca muestra notas, seguimientos ni el resumen interno. Su mensaje llega al responsable y a las copias de **Configuración › Notificaciones internas**, y aparece en el historial de la tarea. Las plantillas de WhatsApp están en `docs/plantillas-whatsapp-tareas-comerciales.md` y siempre están activas.
+
+## Actividades comerciales: Cotizaciones de inmuebles
+
+Reemplaza el formulario JetFormBuilder "Crear cotización de inmuebles" y la página `/cotizacion-de-inmuebles/?numero=` de WordPress. Se crea desde el popup de la tarea (**Cotizar inmuebles**, acción `cotizacion_crear`): datos del cliente tomados de la tarea, buscador de inmuebles públicos con filtros y fotos, y una bandeja con los elegidos (hasta 20). Un inmueble con la actualización vencida no se puede cotizar hasta actualizarlo: la regla es la misma del control de Actualizaciones (`PropertyUpdateState`, plazos de Configuración › Inmuebles › Actualizaciones) y la tarjeta lleva a **Ir a actualizar**.
+
+Al crearla (`CommercialQuotesService::create`, en una transacción):
+
+- una fila en `jet_cct_cotizacion_inmuebles` con `inmuebles` serializado como lo guardaba JetEngine (el código del inmueble es el ID de su post), así la siguen leyendo el portal del cliente, reportes, destacados y el calendario;
+- **un registro de `jet_cct_historial_del_inmueble` por inmueble** (tipo `Cotizacion`, sin datos del cliente porque lo puede ver el propietario);
+- el mensaje en el historial de la tarea con el enlace y `id_cotizacion_comercial`; la tarea pasa a **Mostrando** salvo que esté postergada o cerrada (`estado_administrativo` no se toca).
+
+Luego sale por shared-notifications: correo y WhatsApp al cliente (plantilla `scm_cotizacion_inmuebles_v1`, en `docs/plantillas-whatsapp-tareas-comerciales.md`) con el enlace firmado de `public/cotizacion.php` (`PublicQuoteAccess`, un año), y correo a quien la hizo con copia a **Configuración › Notificaciones internas › Cotización enviada a un cliente**. Respeta los bloqueos de canal de la ficha del cliente.
+
+La vista pública muestra cada inmueble con su galería, datos, descripción y características, sus ventajas frente a los demás y la comparación completa (precio, administración, pago mensual, área, precio por m², habitaciones, baños, parqueaderos, estrato, antigüedad y características, con el mejor marcado; `QuoteComparison`). No muestra dirección, propietario ni llaves. Las notas finales se editan en Configuración › Actividades comerciales › Cotizaciones.
+
+**Actividades comerciales › Cotizaciones** lista las del equipo o las propias según el alcance del cargo (`SCOPED_VIEWS['cotizaciones']`); **Mi portafolio › Mis cotizaciones** (`?portafolio=1`) muestra siempre solo las de la persona. Cada fila abre la cotización en un popup tal como la ve el cliente. Prueba de navegador: `php -S 127.0.0.1:8775 -t .` y `node tools/check-commercial-quotes.cjs RUTA_A_NODE_MODULES`.
 
 ## Actividades comerciales: Precaptación
 

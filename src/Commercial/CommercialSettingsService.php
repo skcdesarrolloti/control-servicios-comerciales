@@ -58,7 +58,7 @@ final class CommercialSettingsService
     'factor_prestacional' => ['Factor prestacional', 0, 0, 100],
   ];
 
-  public const SECTIONS = ['notificaciones_internas', 'calendario', 'tiempos', 'avisos', 'actualizaciones', 'destacados', 'aseo', 'utm', 'medios', 'analitica', 'plan', 'material_pop', 'banner_revista'];
+  public const SECTIONS = ['notificaciones_internas', 'calendario', 'tiempos', 'cotizaciones', 'avisos', 'actualizaciones', 'destacados', 'aseo', 'utm', 'medios', 'analitica', 'plan', 'material_pop', 'banner_revista'];
 
   /** Operaciones de la sección "medios" (todas guardan, salvo preview, que solo cuenta). */
   public const MEDIOS_OPS = ['add', 'rename', 'toggle', 'merge', 'aliases', 'alias_raw', 'rewrite_raw', 'preview'];
@@ -121,6 +121,7 @@ final class CommercialSettingsService
       ],
       'notificaciones_internas' => $section === 'notificaciones_internas' ? $this->internalNotifications() : [],
       'tiempos' => ['topics' => $topics],
+      'cotizaciones' => \SCM\Commercial\Quotes\CommercialQuotesService::settingsFrom($this->settings),
       'avisos' => ['values' => $signs],
       'actualizaciones' => ['limits' => self::propertyUpdateLimits($this->settings)],
       'destacados' => ['portals' => $highlights],
@@ -286,6 +287,9 @@ final class CommercialSettingsService
         return 'Notificaciones internas guardadas.';
       case 'tiempos':
         return $this->saveSla($data);
+      case 'cotizaciones':
+        \SCM\Commercial\Quotes\CommercialQuotesService::saveSettings($this->settings, $data, Auth::userId());
+        return 'Textos de las cotizaciones guardados.';
       case 'avisos':
         return $this->saveSigns($data);
       case 'actualizaciones':

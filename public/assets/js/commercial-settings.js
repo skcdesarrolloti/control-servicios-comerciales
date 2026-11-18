@@ -311,6 +311,25 @@
         return { values: values };
       },
     },
+    // Textos que ve el cliente al final de su cotización de inmuebles (public/cotizacion.php).
+    cotizaciones: {
+      title: "Cotizaciones de inmuebles",
+      html: function (settings) {
+        var area = function (name, label, help, value) {
+          return '<label class="block text-left"><span class="block text-sm font-semibold text-on-surface mb-1">' + esc(label) + '</span>' +
+            '<span class="block text-xs text-secondary mb-1.5">' + esc(help) + '</span>' +
+            '<textarea name="' + esc(name) + '" rows="4" maxlength="3000" class="w-full px-3 py-2 rounded-xl border border-outline-variant bg-surface-container-lowest text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/30">' + esc(value || "") + "</textarea></label>";
+        };
+        return '<form data-config-form class="text-left space-y-4">' +
+          '<p class="text-sm text-secondary mb-3 text-left">Aparecen al final de cada cotización que reciben los clientes, bajo <strong>Notas a la presente cotización</strong>. Déjalos vacíos para no mostrarlos.</p>' +
+          area("nota_arriendo", "Nota para cotizaciones de arriendo", "Solo sale cuando la cotización es de arriendo, antes de las notas generales.", settings.nota_arriendo) +
+          area("notas", "Notas generales", "Salen en todas las cotizaciones.", settings.notas) +
+          "</form>";
+      },
+      collect: function (form) {
+        return { notas: form.elements.notas.value, nota_arriendo: form.elements.nota_arriendo.value };
+      },
+    },
     actualizaciones: {
       title: "Actualizaciones de inmuebles",
       html: function (settings) {
@@ -1104,7 +1123,7 @@
   // Grupos del menú Configuración (los mismos del menú principal): cada uno abre un solo popup con una pestaña por
   // sección. Una entrada que no es grupo (Notificaciones internas) abre su sección sola, sin pestañas.
   var groups = {
-    actividades: { title: "Actividades comerciales", tabs: [["calendario", "Calendario"], ["tiempos", "Tiempos de atención"]] },
+    actividades: { title: "Actividades comerciales", tabs: [["calendario", "Calendario"], ["tiempos", "Tiempos de atención"], ["cotizaciones", "Cotizaciones"]] },
     inmuebles: { title: "Inmuebles", tabs: [["avisos", "Avisos en fachada"], ["actualizaciones", "Actualizaciones"], ["destacados", "Cupos de destacados"]] },
     herramientas: { title: "Herramientas", tabs: [["aseo", "Calculadora de aseo"], ["utm", "Generador UTM"], ["plan", "Plan estratégico"]] },
     promocion: { title: "Promoción", tabs: [["medios", "Medios"], ["analitica", "Analítica web"], ["material_pop", "Material POP"], ["banner_revista", "Banner y revista"]] },

@@ -1483,32 +1483,7 @@ final class CommercialTicketsRepository
   /** @param array<string,mixed> $row @return array{status:string,label:string,days:int,max:int,min:int} */
   private function propertyUpdateState(array $row): array
   {
-    $reference = $this->parseMixedTimestamp($row['fecha_actualizacion'] ?? null);
-    if ($reference <= 0) {
-      $reference = $this->parseMixedTimestamp($row['fecha_publicacion'] ?? null);
-    }
-    if ($reference <= 0) {
-      $reference = $this->parseMixedTimestamp($row['cct_modified'] ?? null);
-    }
-    if ($reference <= 0) {
-      $reference = $this->parseMixedTimestamp($row['cct_created'] ?? null);
-    }
-
-    [$min, $max] = $this->propertyUpdateLimits((string) ($row['tipo_negocio'] ?? ''));
-    $days = $reference > 0 ? (int) floor((time() - $reference) / 86400) : 0;
-    if ($days >= $max) {
-      return ['status' => 'vencido', 'label' => 'Actualización vencida', 'days' => max(0, $days), 'max' => $max, 'min' => $min];
-    }
-    if ($days >= $min) {
-      return ['status' => 'alerta', 'label' => 'Actualización en alerta', 'days' => max(0, $days), 'max' => $max, 'min' => $min];
-    }
-    return ['status' => 'ok', 'label' => 'Actualización al día', 'days' => max(0, $days), 'max' => $max, 'min' => $min];
-  }
-
-  /** @return array{0:int,1:int} */
-  private function propertyUpdateLimits(string $businessType): array
-  {
-    // Plazos editables en Configuración → Actualizaciones de inmuebles.
+    // Plazos editables en Configuración → Actualizaciones de inmuebles; la regla es la misma de las cotizaciones.
     if ($this->propertyUpdateLimitsCache === null) {
       try {
         $settings = \SCM\Core\App::settings();
@@ -1517,30 +1492,13 @@ final class CommercialTicketsRepository
       }
       $this->propertyUpdateLimitsCache = CommercialSettingsService::propertyUpdateLimits($settings);
     }
-    $type = mb_strtolower($businessType, 'UTF-8');
-    $hasSale = str_contains($type, 'venta');
-    $hasRent = str_contains($type, 'arriendo');
-    $key = $hasSale && !$hasRent ? 'venta' : ($hasSale && $hasRent ? 'arriendo_venta' : 'arriendo');
-    $limits = $this->propertyUpdateLimitsCache[$key];
-    return [$limits['alerta'], $limits['vencido']];
+    return PropertyUpdateState::evaluate($row, $this->propertyUpdateLimitsCache);
   }
 
   /** @param array<string,mixed> $row */
   private function propertyUpdateUrl(array $row): string
   {
-    $code = trim((string) ($row['codigo'] ?? $row['_ID'] ?? ''));
-    if ($code === '') {
-      return '';
-    }
-
-    $params = [
-      'id_inmueble' => $code,
-      'id_empleado' => trim((string) ($row['id_funcionario'] ?? '')),
-      'id_propietario' => trim((string) ($row['id_propietario'] ?? '')),
-      'id_sucursal' => trim((string) ($row['func_sucursal'] ?? '')) ?: '1',
-    ];
-
-    return 'https://sucasainmobiliaria.com.co/mi-cuenta/actualizar-inmueble/?' . http_build_query(array_filter($params, static fn(string $value): bool => $value !== ''));
+    return PropertyUpdateState::updateUrl($row);
   }
 
   /** @param array<string,mixed> $row */
