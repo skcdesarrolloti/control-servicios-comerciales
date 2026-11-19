@@ -381,7 +381,6 @@ final class CommercialApiController
     $ticket = $reassignData['ticket'];
     $target = $reassignData['target'];
     $previousName = $reassignData['previous_name'];
-    $previousEmail = $reassignData['previous_email'];
 
     $userName = \SCM\Core\Auth::user();
     if ($userName === '') {
@@ -390,26 +389,21 @@ final class CommercialApiController
     }
 
     $newEmpNombre = (string) ($target['nombre'] ?? '');
-    $newEmpCorreo = (string) ($target['correo'] ?? '');
     $newEmpCelular = $notifyWhatsapp ? (string) ($target['celular'] ?? '') : '';
-    $newEmpId = (string) ($target['id'] ?? $newEmployeeId);
-
-    $this->workflow->notifyTrasladoCaso(
-      $ticket,
-      $newEmpNombre,
-      $newEmpCorreo,
-      $previousName,
-      $previousEmail,
-      $userName,
-      [],
-      false,
-      $notifyEmail,
-      $newEmpCelular,
-      $newEmpId
-    );
+    // Aviso del panel comercial: enlace individual del nuevo responsable que abre la tarea (no la página de tickets).
+    try {
+      (new \SCM\Commercial\Calls\CommercialCallsNotifier($this->db, $this->settings))->taskReassigned($ticketPk, array_merge($ticket, [
+        'id_empleado' => (string) ($target['id'] ?? $newEmployeeId),
+        'nombre_empleado' => $newEmpNombre,
+        'correo_empleado' => (string) ($target['correo'] ?? ''),
+        'celular_empleado' => (string) ($target['celular'] ?? ''),
+      ]), $previousName, wp_strip_all_tags($observacion), $userName, $notifyEmail, $notifyWhatsapp);
+    } catch (\Throwable $exception) {
+      error_log('[tareas:traslado] ' . $exception->getMessage());
+    }
 
     $hasWhatsapp = trim($newEmpCelular) !== '';
-    $message = 'Caso reasignado a ' . ($newEmpNombre ?: 'nuevo responsable') . '.';
+    $message = 'Tarea reasignada a ' . ($newEmpNombre ?: 'nuevo responsable') . '.';
     if ($hasWhatsapp) {
       $message .= ' Notificación por WhatsApp encolada.';
     }

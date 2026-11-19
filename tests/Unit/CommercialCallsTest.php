@@ -11,6 +11,7 @@ use SCM\Commercial\Calls\PublicTaskConversation;
 use SCM\Commercial\CommercialInternalNotifications;
 use SCM\Commercial\CommercialStatusCatalog;
 use SCM\Support\PublicTaskAccess;
+use SCM\Support\StaffTaskLink;
 use SCM\Views\PublicTaskView;
 use SCM\Commercial\CommercialAccessPolicy;
 use SCM\Core\Database;
@@ -486,6 +487,54 @@ final class CommercialCallsTest extends TestCase
     self::assertSame(0, PublicTaskAccess::verify('7'));
   }
 
+  public function testStaffLinkIsSignedPerEmployeeAndExpires(): void
+  {
+    $reference = StaffTaskLink::reference(7, '101');
+    self::assertSame(['id' => 7, 'employee' => '101'], StaffTaskLink::verify($reference));
+    self::assertNull(StaffTaskLink::verify(str_replace('.101.', '.202.', $reference)), 'Otro funcionario no sirve con la misma firma.');
+    self::assertNull(StaffTaskLink::verify('8' . substr($reference, 1)));
+    self::assertNull(StaffTaskLink::verify(StaffTaskLink::reference(7, '101', time() - 10)));
+    self::assertNull(StaffTaskLink::verify(PublicTaskAccess::reference(7)), 'El enlace del cliente no inicia sesión.');
+    self::assertSame('7', StaffTaskLink::reference(7, ''), 'Sin funcionario queda el número de la tarea.');
+    self::assertSame('https://panel.test/public/index.php?tab=abiertos&ticket_id=7&abrir_tarea=7', StaffTaskLink::url(7));
+    self::assertSame('https://panel.test/public/index.php?tab=abiertos&ticket_id=7&abrir_tarea=7', StaffTaskLink::nextUrl('tab=abiertos&ticket_id=7&abrir_tarea=7&x=1'));
+    foreach (['https://otro.test/', '//otro.test', 'tab=../../x&ticket_id=' . $reference, 'abrir_tarea=1 OR 1'] as $bad) {
+      self::assertSame('https://panel.test/public/index.php', StaffTaskLink::nextUrl($bad), 'El login solo vuelve a una pestaña o tarea del panel: ' . $bad);
+    }
+  }
+
+  public function testStaffLinkLogsInTheEmployeeAndOpensTheTask(): void
+  {
+    $auth = new \SCM\Core\Auth($this->db);
+    $open = 'https://panel.test/public/index.php?tab=abiertos&ticket_id=7&abrir_tarea=7';
+    self::assertNull(StaffTaskLink::redirectFor($auth, ['tab' => 'abiertos', 'ticket_id' => '7']), 'Un número de tarea es solo un filtro.');
+    self::assertSame($open, StaffTaskLink::redirectFor($auth, ['ticket_id' => StaffTaskLink::reference(7, '202')]), 'Con sesión abre la tarea sin cambiar de usuario.');
+    self::assertSame('101', $_SESSION['scm_employee_id']);
+    $_SESSION = [];
+    self::assertStringContainsString('/login.php?next=', (string) StaffTaskLink::redirectFor($auth, ['ticket_id' => StaffTaskLink::reference(7, '202', time() - 10)]), 'Vencido pasa por el login.');
+    self::assertSame([], $_SESSION);
+    $this->db->update('wp_jet_cct_funcionarios', ['activo' => 'No'], ['id_empleado' => '404']);
+    self::assertStringContainsString('/login.php?next=', (string) StaffTaskLink::redirectFor($auth, ['ticket_id' => StaffTaskLink::reference(7, '404')]), 'Un funcionario inactivo no entra.');
+    self::assertSame($open, @StaffTaskLink::redirectFor($auth, ['ticket_id' => StaffTaskLink::reference(7, '202')]));
+    self::assertSame('202', $_SESSION['scm_employee_id'], 'Inicia la sesión de quien recibió el enlace.');
+  }
+
+  public function testReassignedTaskNotifiesNewOwnerWithOwnLink(): void
+  {
+    [$notifier, $log] = $this->recorder();
+    $id = $this->taskFromCall($notifier);
+    [$notifier, $log] = $this->recorder();
+    $task = $this->db->getRow('SELECT * FROM wp_jet_cct_tickets WHERE _ID = ?', [$id]);
+    $notifier->taskReassigned($id, array_merge($task, ['id_empleado' => '202', 'nombre_empleado' => 'Consultor Dos', 'correo_empleado' => '202@example.test', 'celular_empleado' => '3000000202']), 'Consultora Uno', 'Vacaciones', 'Coordinación');
+    self::assertSame('202@example.test', $log->mail[0][0]);
+    self::assertStringContainsString('Vacaciones', $log->mail[0][2]);
+    self::assertStringNotContainsString('sucasainmobiliaria.com.co/ticket/', $log->mail[0][2], 'Nada de la página de tickets anterior.');
+    preg_match('#ticket_id=([0-9.]+202\.[a-f0-9]{64})#', $log->mail[0][2], $own);
+    self::assertSame(['id' => $id, 'employee' => '202'], StaffTaskLink::verify($own[1] ?? ''));
+    self::assertSame(['+573000000202', CommercialCallsNotifier::TEMPLATE_ASSIGNED], [$log->whatsapp[0][0], $log->whatsapp[0][1]]);
+    self::assertSame('202', StaffTaskLink::verify(end($log->whatsapp[0][2])['parameters'][0]['text'])['employee'] ?? '');
+  }
+
   public function testClientReplyReachesAssigneeCopiesAndTaskHistory(): void
   {
     [$notifier, $log] = $this->recorder();
@@ -496,14 +545,22 @@ final class CommercialCallsTest extends TestCase
     [$notifier, $log] = $this->recorder();
     $conversation = new PublicTaskConversation($this->db, $notifier);
     $conversation->clientReply($id, "Quisiera <b>visitar</b>\r\nel sábado");
-    self::assertSame(['101@example.test', '303@example.test'], $log->mail[0][0], 'Responsable y copia, sin repetir al responsable.');
+    self::assertSame('101@example.test', $log->mail[0][0], 'El responsable recibe su propio correo.');
+    self::assertSame(['303@example.test'], $log->mail[1][0], 'La copia va aparte, sin repetir al responsable.');
     self::assertStringContainsString('visitar', $log->mail[0][2]);
+    preg_match('#ticket_id=([0-9.]+101\.[a-f0-9]{64})#', $log->mail[0][2], $own);
+    self::assertSame(['id' => $id, 'employee' => '101'], StaffTaskLink::verify($own[1] ?? ''), 'El responsable recibe el enlace que inicia su sesión.');
+    self::assertStringContainsString('abrir_tarea=' . $id, html_entity_decode($log->mail[1][2]), 'La copia solo abre la tarea, sin sesión.');
+    self::assertDoesNotMatchRegularExpression('#ticket_id=[0-9]+\.[0-9]{10}\.#', $log->mail[1][2]);
+    $buttons = array_map(static fn(array $message): string => end($message[2])['parameters'][0]['text'], $log->whatsapp);
+    self::assertSame([$id, $id], array_map(static fn(string $ref): int => StaffTaskLink::verify($ref)['id'] ?? 0, $buttons), 'Cada WhatsApp lleva el enlace de su destinatario.');
+    self::assertSame(['101', '303'], array_map(static fn(string $ref): string => StaffTaskLink::verify($ref)['employee'] ?? '', $buttons));
     $history = $this->db->getRow('SELECT * FROM wp_jet_cct_historial_del_ticket WHERE id_ticket = ?', [$id]);
     self::assertSame('cliente', $history['id_empleado']);
     self::assertSame("Quisiera visitar\nel sábado", $history['respuesta']);
     $conversation->clientReply($id, "Quisiera <b>visitar</b>\r\nel sábado");
     self::assertCount(1, $conversation->messages($id), 'Un doble envío no se repite.');
-    self::assertCount(1, $log->mail);
+    self::assertCount(2, $log->mail, 'Solo los dos correos del primer envío.');
   }
 
   public function testClientCannotReplyToClosedOrEmpty(): void

@@ -14,7 +14,7 @@ if (!$wasLoggedIn && $autoLoginOk && isset($_GET['auto_signature'])) {
 
 // Ya autenticado → panel
 if (\SCM\Core\Auth::isLoggedIn()) {
-  header('Location: ' . SCM_BASE_URL . '/index.php');
+  header('Location: ' . \SCM\Support\StaffTaskLink::nextUrl(is_string($_GET['next'] ?? null) ? $_GET['next'] : ''));
   exit;
 }
 
@@ -53,7 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($scmAuth->attempt($user, $pass)) {
       $rateLimiter->clear($ipKey);
       $rateLimiter->clear($userKey);
-      header('Location: ' . SCM_BASE_URL . '/index.php');
+      header('Location: ' . \SCM\Support\StaffTaskLink::nextUrl(is_string($_GET['next'] ?? null) ? $_GET['next'] : ''), true, 303);
       exit;
     }
 

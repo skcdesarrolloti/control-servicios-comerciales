@@ -10,7 +10,14 @@ if (!$wasLoggedIn && $autoLoginOk && isset($_GET['auto_signature'])) {
   header('Location: ' . SCM_BASE_URL . '/index.php', true, 303);
   exit;
 }
-\SCM\Core\Auth::requireLogin(SCM_BASE_URL . '/login.php');
+// Enlace individual de un aviso (?ticket_id=<firma>): inicia la sesión del funcionario y abre la tarea.
+$taskRedirect = \SCM\Support\StaffTaskLink::redirectFor($scmAuth, $_GET);
+if ($taskRedirect !== null) {
+  header('Location: ' . $taskRedirect, true, 303);
+  exit;
+}
+// Sin sesión, el login vuelve a la misma tarea o pestaña.
+\SCM\Core\Auth::requireLogin(\SCM\Support\StaffTaskLink::loginUrl($_GET));
 
 $controller = new \SCM\Controllers\CommercialDashboardController($scmDb, $scmSettings, $scmCsrf, $scmConfig);
 echo $controller->render($_GET);

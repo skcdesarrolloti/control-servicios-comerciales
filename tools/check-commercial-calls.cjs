@@ -85,6 +85,24 @@ async function fillCall(modal, values) {
     await page.waitForFunction(() => document.querySelector('[data-fixture-case]') !== null);
     assert.ok(openedCase, 'Debe abrir la tarea recién creada');
     await page.evaluate(() => { document.getElementById('commercial-case-modal').classList.remove('open'); document.body.classList.remove('commercial-modal-open'); });
+
+    // "Ver tarea" de los avisos (?abrir_tarea=ID): la tarea se abre al cargar, sin buscarla en la lista.
+    const linked = await context.newPage();
+    let linkedPk = '';
+    await linked.route(endpoint, async route => {
+      const body = route.request().postData() || '';
+      if (body.includes('commercial_ticket_detail')) {
+        linkedPk = (body.match(/name="ticket_pk"\r?\n\r?\n(\d+)/) || body.match(/ticket_pk=(\d+)/) || [])[1] || '';
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, data: { html: '<p data-fixture-case>Tarea abierta</p>' } }) });
+      }
+      return route.continue();
+    });
+    await linked.goto(endpoint + '?tab=llamadas&abrir_tarea=1');
+    await linked.locator('#commercial-case-modal.open [data-fixture-case]').waitFor();
+    assert.equal(linkedPk, '1', 'Abre la tarea del enlace');
+    assert.ok(!linked.url().includes('abrir_tarea'), 'Recargar no la vuelve a abrir');
+    await linked.close();
+
     const row = await page.locator('[data-ccl-row]').innerText();
     assert.ok(row.includes('Aliada Uno') && row.includes('TAR-1'), row);
     assert.ok(row.includes('#1'), row);

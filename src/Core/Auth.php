@@ -84,6 +84,31 @@ final class Auth
     return is_array($row) && $row !== [] && $this->establishSession($row, $user);
   }
 
+  /**
+   * Inicia la sesión del funcionario activo con ese id_empleado, después de validar un enlace firmado individual
+   * (SCM\Support\StaffTaskLink). Copia de Auth::loginByEmployeeId de control-servicios-inmobiliarios.
+   */
+  public function loginByEmployeeId(string $employeeId): bool
+  {
+    $employeeId = trim($employeeId);
+    if ($employeeId === '' || strlen($employeeId) > 80) {
+      return false;
+    }
+
+    $table = $this->db->table('jet_cct_funcionarios');
+    $row = $this->db->getRow(
+      "SELECT `_ID`, `id_empleado`, `nombre`, `rol`, `user_others_apss`,
+              TRIM(COALESCE(`id_cargo`, '')) AS id_cargo
+         FROM `{$table}`
+        WHERE `id_empleado` = ?
+          AND `activo` = 'Si'
+        LIMIT 1",
+      [$employeeId]
+    );
+
+    return is_array($row) && $row !== [] && $this->establishSession($row, (string) ($row['user_others_apss'] ?? $employeeId));
+  }
+
   /** @param array<string,mixed> $row */
   private function establishSession(array $row, string $fallbackLogin): bool
   {

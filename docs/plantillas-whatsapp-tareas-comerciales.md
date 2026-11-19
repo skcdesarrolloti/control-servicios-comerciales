@@ -8,6 +8,8 @@ Cada dato es una sola variable: el contacto de un funcionario (nombre, correo y 
 
 En el botón, **URL del sitio web** lleva todo lo que está antes de `{{1}}` (Meta pone `{{1}}` al final) y el panel completa solo el final. En **URL de muestra** va la URL completa. Deja sin marcar **Permite que Meta use el seguimiento de enlaces**.
 
+En las plantillas para funcionarios (1 y 3) el final de `ticket_id=` es el enlace individual firmado de quien recibe el mensaje (`StaffTaskLink::reference`, por ejemplo `1686.1893456000.101.<firma>`): al tocar **Ver tarea** inicia su sesión y abre la tarea en su ventana. Si el enlace venció (30 días), pasa por el login y vuelve a la misma tarea. Las plantillas ya aprobadas no cambian.
+
 Los WhatsApp siempre están activos y los nombres de las plantillas son fijos en el código (`CommercialCallsNotifier::TEMPLATE_*`, idioma `es_CO`): llegan en cuanto Meta apruebe cada plantilla.
 
 ## 1. `scm_tarea_comercial_asignada_v1`

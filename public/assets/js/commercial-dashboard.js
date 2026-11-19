@@ -1885,4 +1885,17 @@
   if (root.querySelector("[data-commercial-home-controls]") || activeTab() === "actualizaciones" || activeTab() === "avisos") {
     window.setTimeout(initHomeControls, 0);
   }
+  // Enlace de un aviso (?abrir_tarea=ID, StaffTaskLink::openUrl): la tarea se abre en su ventana apenas carga el panel.
+  // Se quita de la dirección para que recargar o filtrar no la vuelva a abrir.
+  (function openLinkedTask() {
+    var url = new URL(window.location.href);
+    var pk = url.searchParams.get("abrir_tarea") || "";
+    if (!caseModal || !/^[1-9][0-9]{0,17}$/.test(pk)) return;
+    url.searchParams.delete("abrir_tarea");
+    window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+    currentCasePk = pk;
+    lastFocused = document.activeElement;
+    showCaseModal(true);
+    loadCase(pk, false);
+  })();
 })();

@@ -12,12 +12,14 @@ use SCM\Support\EmailQueue;
 use SCM\Support\EmailTemplate;
 use SCM\Support\PublicTaskAccess;
 use SCM\Support\SharedNotificationsBridge;
+use SCM\Support\StaffTaskLink;
 
 /**
- * Avisos de las tareas comerciales: tarea creada, mensaje del cliente y respuesta del funcionario. Todo va por
+ * Avisos de las tareas comerciales: tarea creada, traslado, mensaje del cliente y respuesta del funcionario. Todo va por
  * shared-notifications. Los canales (correo y WhatsApp al responsable y al cliente) siempre están activos y las plantillas
  * de WhatsApp son fijas en el código (docs/); las copias internas se eligen en Configuración › Notificaciones internas.
- * Quién bloqueó un canal en su ficha de cliente no lo recibe.
+ * Quién bloqueó un canal en su ficha de cliente no lo recibe. Lo que va a un solo funcionario lleva su enlace individual
+ * (StaffTaskLink::url: inicia su sesión y abre la tarea); los correos con copias, el que solo abre la tarea.
  */
 final class CommercialCallsNotifier
 {
@@ -82,11 +84,10 @@ final class CommercialCallsNotifier
     $e = static fn($value): string => EmailTemplate::e((string) $value);
     $topic = $e($task['tema_ayuda'] ?? '');
     $employee = $e($task['nombre_empleado'] ?? '');
-    $staffButtons = $this->buttons(self::panelUrl($id), 'Ver tarea');
     $staff = $this->staff($task, $event);
     $this->send($task['correo_empleado'] ?? '', 'Nueva tarea #' . $id . ' asignada', 'Nueva tarea comercial',
       '<p>Estimado/a <strong>' . $employee . '</strong>, se te asignó una nueva tarea comercial de <strong>' . $topic . '</strong> sobre <strong>' . $e($task['asunto'] ?? '') . '</strong>.</p>',
-      $staffButtons, 'llamadas:tarea:' . $id . ':asignado');
+      $this->buttons(StaffTaskLink::url($id, (string) ($task['id_empleado'] ?? '')), 'Ver tarea'), 'llamadas:tarea:' . $id . ':asignado');
     $copies = $this->copies($staff);
     if ($copies === [] && $event === 'llamada_tarea_creada') {
       // Lista anterior de Configuración › Llamadas: sigue funcionando hasta que se marquen funcionarios en Notificaciones internas.
@@ -95,11 +96,11 @@ final class CommercialCallsNotifier
     if ($copies !== []) {
       $this->send($copies, 'Tarea comercial #' . $id . ' creada', 'Nueva tarea comercial',
         '<p>Se creó una tarea comercial de <strong>' . $topic . '</strong> desde el medio <strong>' . $e($task['medio'] ?? '') . '</strong>, asignada a <strong>' . $employee . '</strong>.</p>',
-        $staffButtons, 'llamadas:tarea:' . $id . ':admin');
+        $this->buttons(self::panelUrl($id), 'Ver tarea'), 'llamadas:tarea:' . $id . ':admin');
     }
     foreach ($staff as $person) {
       $this->whatsappTo($person['celular'], '57', self::TEMPLATE_ASSIGNED,
-        [$person['nombre'], (string) $id, $task['solicitante'] ?? '', $task['tema_ayuda'] ?? '', $task['medio'] ?? '', self::contactLine($task)], (string) $id,
+        [$person['nombre'], (string) $id, $task['solicitante'] ?? '', $task['tema_ayuda'] ?? '', $task['medio'] ?? '', self::contactLine($task)], StaffTaskLink::reference($id, $person['id']),
         'llamadas:tarea:' . $id . ':whatsapp:' . $person['id']);
     }
     $client = $this->clientPreferences($task);
@@ -130,13 +131,16 @@ final class CommercialCallsNotifier
     $key = 'llamadas:tarea:' . $id . ':cliente:' . substr(hash('sha256', $message), 0, 16);
     $staff = $this->staff($task, 'llamada_respuesta_cliente');
     $body = '<p>El cliente <strong>' . $e($task['solicitante'] ?? '') . '</strong> escribió en la tarea comercial <strong>#' . $id . '</strong>:</p><blockquote style="margin:12px 0;padding:12px 16px;background:#f1f5f9;border-left:4px solid #1e3c76;">' . nl2br($e($message)) . '</blockquote>';
-    $emails = array_values(array_unique(array_filter(array_merge([(string) ($task['correo_empleado'] ?? '')], $this->copies($staff)))));
-    if ($emails !== []) {
-      $this->send($emails, 'El cliente respondió la tarea #' . $id, 'Respuesta del cliente', $body, $this->buttons(self::panelUrl($id), 'Ver tarea'), $key);
+    $assigned = trim((string) ($task['correo_empleado'] ?? ''));
+    $this->send($assigned, 'El cliente respondió la tarea #' . $id, 'Respuesta del cliente', $body,
+      $this->buttons(StaffTaskLink::url($id, (string) ($task['id_empleado'] ?? '')), 'Ver tarea'), $key);
+    $copies = array_values(array_diff(array_unique($this->copies($staff)), [$assigned]));
+    if ($copies !== []) {
+      $this->send($copies, 'El cliente respondió la tarea #' . $id, 'Respuesta del cliente', $body, $this->buttons(self::panelUrl($id), 'Ver tarea'), $key . ':copias');
     }
     foreach ($staff as $person) {
       $this->whatsappTo($person['celular'], '57', self::TEMPLATE_CLIENT_REPLY,
-        [$person['nombre'], $task['solicitante'] ?? '', (string) $id, $message], (string) $id, $key . ':whatsapp:' . $person['id']);
+        [$person['nombre'], $task['solicitante'] ?? '', (string) $id, $message], StaffTaskLink::reference($id, $person['id']), $key . ':whatsapp:' . $person['id']);
     }
   }
 
@@ -181,9 +185,35 @@ final class CommercialCallsNotifier
     return implode(' · ', $parts);
   }
 
+  /** Abre el panel con la tarea en su ventana (sin iniciar sesión): para correos con copias y enlaces internos. */
   public static function panelUrl(int $id): string
   {
-    return rtrim((string) SCM_BASE_URL, '/') . '/index.php?tab=abiertos&ticket_id=' . $id;
+    return StaffTaskLink::openUrl($id);
+  }
+
+  /**
+   * La tarea pasó a otro funcionario (Reasignar en el panel). Al nuevo responsable le llegan correo y WhatsApp con su
+   * enlace individual; usa la plantilla de tarea asignada, que ya está aprobada en Meta.
+   * @param array<string,mixed> $task La tarea con el nuevo responsable.
+   */
+  public function taskReassigned(int $id, array $task, string $previous, string $reason, string $by, bool $email = true, bool $whatsapp = true): void
+  {
+    $e = static fn($value): string => EmailTemplate::e((string) $value);
+    $employee = trim((string) ($task['id_empleado'] ?? ''));
+    $key = 'llamadas:tarea:' . $id . ':traslado:' . $employee . ':' . date('YmdHi');
+    if ($email) {
+      $this->send($task['correo_empleado'] ?? '', 'Tarea #' . $id . ' trasladada a tu gestión', 'Tarea comercial trasladada',
+        '<p>Estimado/a <strong>' . $e($task['nombre_empleado'] ?? '') . '</strong>, <strong>' . $e($by) . '</strong> te trasladó la tarea comercial <strong>#' . $id . '</strong>'
+        . (trim((string) ($task['tema_ayuda'] ?? '')) !== '' ? ' de <strong>' . $e($task['tema_ayuda']) . '</strong>' : '') . (trim((string) ($task['asunto'] ?? '')) !== '' ? ' sobre <strong>' . $e($task['asunto']) . '</strong>' : '') . '.</p>'
+        . '<p><strong>Cliente:</strong> ' . $e($task['solicitante'] ?? '') . '<br><strong>Responsable anterior:</strong> ' . $e($previous !== '' ? $previous : 'Sin asignar') . '</p>'
+        . (trim($reason) !== '' ? '<p><strong>Motivo:</strong> ' . $e($reason) . '</p>' : ''),
+        $this->buttons(StaffTaskLink::url($id, $employee), 'Ver tarea'), $key);
+    }
+    if ($whatsapp) {
+      $this->whatsappTo((string) ($task['celular_empleado'] ?? ''), '57', self::TEMPLATE_ASSIGNED,
+        [$task['nombre_empleado'] ?? '', (string) $id, $task['solicitante'] ?? '', $task['tema_ayuda'] ?? '', $task['medio'] ?? '', self::contactLine($task)],
+        StaffTaskLink::reference($id, $employee), $key . ':whatsapp');
+    }
   }
 
   /**
