@@ -8,4 +8,4 @@ require_once dirname(__DIR__) . '/bootstrap/app.php';
   $scmDb,
   $scmSettings,
   new \SCM\Support\FileRateLimiter(SCM_STORAGE_PATH . '/data/rate-limits')
-))->handle($_GET, $_POST, (string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'), (string) ($_SERVER['REMOTE_ADDR'] ?? ''));
+))->handle($_GET, $_POST, (string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'), (string) ($_SERVER['REMOTE_ADDR'] ?? ''), $_FILES, (int) ($_SERVER['CONTENT_LENGTH'] ?? 0));

@@ -525,23 +525,98 @@ final class CommercialCallsTest extends TestCase
     $conversation->clientReply($id, 'Hola');
   }
 
-  public function testPublicViewShowsOnlySharedConversationEscaped(): void
+  private function uploadConstants(): void
+  {
+    foreach (['SCM_UPLOAD_PATH' => sys_get_temp_dir() . '/scm-public-task-tests', 'SCM_UPLOAD_MAX_BYTES' => 10485760] as $key => $value) {
+      if (!defined($key)) define($key, $value);
+    }
+  }
+
+  /** @return array<string,string> Para PublicTaskView::render. */
+  private static function assets(): array
+  {
+    return ['css' => 'a.css', 'js' => 'a.js', 'logo' => 'logo.png', 'favicon' => 'https://panel.test/favicon.png'];
+  }
+
+  public function testPublicViewShowsTaskHistoryWithAttachmentsEscaped(): void
+  {
+    $this->uploadConstants();
+    [$notifier] = $this->recorder();
+    $id = $this->taskFromCall($notifier);
+    $conversation = new PublicTaskConversation($this->db, $notifier);
+    $this->db->update('wp_jet_cct_tickets', ['descripcion' => 'Dato interno reservado'], ['_ID' => $id]);
+    $storage = \SCM\Support\StoredFileService::fromRuntime();
+    $photo = $storage->urlFor('aaaaaaaaaaaaaaaaaaaaaaaa_1.jpg');
+    $pdf = $storage->urlFor('bbbbbbbbbbbbbbbbbbbbbbbb_1.pdf');
+    // Lo que el panel guarda al responder: texto con HTML, foto y PDF firmados.
+    $this->db->insert('wp_jet_cct_historial_del_ticket', ['id_ticket' => (string) $id, 'fecha' => time(), 'nombre' => 'Consultora Uno', 'id_empleado' => '101', 'cct_status' => 'publish',
+      'respuesta' => '<p>Te espero <script>alert(1)</script> el lunes</p>', 'imagen' => serialize([$photo, 'https://otro.test/x.jpg']), 'archivos' => serialize([['nombre_archivo' => 'Ficha.pdf', 'archivo' => $pdf]])]);
+    $this->db->insert('wp_jet_cct_historial_del_ticket', ['id_ticket' => (string) $id, 'fecha' => time(), 'nombre' => 'Consultora Uno', 'id_empleado' => '101', 'cct_status' => 'trash', 'respuesta' => 'Respuesta borrada']);
+    $conversation->clientReply($id, 'Puedo el lunes');
+    $task = $conversation->task($id);
+    $history = \SCM\Commercial\Calls\PublicTaskData::history($this->db, $task);
+    self::assertSame([false, true], array_column($history, 'external'), 'La respuesta del cliente se marca como suya; la borrada no aparece.');
+    self::assertSame([$photo], $history[0]['images'], 'Solo adjuntos firmados o de la empresa.');
+    $html = PublicTaskView::render(\SCM\Commercial\Calls\PublicTaskData::fromTicket($task), $history, 'tarea.php?t=x', self::assets());
+    self::assertStringContainsString('<link rel="icon" href="https://panel.test/favicon.png"', $html);
+    self::assertStringContainsString('Historial de la solicitud', $html);
+    self::assertStringContainsString('Te espero', $html);
+    self::assertStringContainsString('Puedo el lunes', $html);
+    self::assertStringContainsString('data-title="Ficha.pdf"', $html);
+    self::assertStringNotContainsString('<script>', $html);
+    self::assertStringNotContainsString('Respuesta borrada', $html);
+    self::assertStringNotContainsString('Dato interno reservado', $html, 'La descripción la escribe el consultor/a: no se publica.');
+    self::assertStringNotContainsString('laura@example.test', $html, 'Nunca los datos de contacto del cliente.');
+    self::assertStringContainsString('Su consultor/a asignado', $html);
+    self::assertStringContainsString('enctype="multipart/form-data"', $html);
+    self::assertStringContainsString('name="imagenes[]"', $html);
+    self::assertStringContainsString('name="archivos[]"', $html);
+    $this->db->update('wp_jet_cct_tickets', ['estado_comercial' => CommercialStatusCatalog::statusesForBucket('cerrados')[0]], ['_ID' => $id]);
+    $closed = PublicTaskView::render(\SCM\Commercial\Calls\PublicTaskData::fromTicket($conversation->task($id)), [], 'x', self::assets(), '', false, '', false);
+    self::assertStringNotContainsString('name="mensaje"', $closed);
+    self::assertStringContainsString('ya terminó', $closed);
+  }
+
+  public function testOfficerReplyNotifiesClientWithContactLine(): void
   {
     [$notifier, $log] = $this->recorder();
     $id = $this->taskFromCall($notifier);
     $conversation = new PublicTaskConversation($this->db, $notifier);
-    $this->db->update('wp_jet_cct_tickets', ['descripcion' => 'Dato interno reservado'], ['_ID' => $id]);
     $log->whatsapp = [];
-    $conversation->officerReply($id, 'Te espero <script>alert(1)</script> el lunes', 'Consultora Uno', '101');
+    $conversation->officerReply($id, 'Te espero el lunes', 'Consultora Uno', '101');
     self::assertSame('scm_tarea_comercial_respuesta_funcionario_v1', $log->whatsapp[0][1]);
     self::assertSame(['Laura Prueba', (string) $id, 'Consultora Uno · Correo: 101@example.test · Celular: 3000000101'], array_column($log->whatsapp[0][2][0]['parameters'], 'text'), 'Nombre, correo y celular de quien responde.');
-    $html = PublicTaskView::render($conversation->task($id), $conversation->messages($id), 'tarea.php?t=x', 'a.css', 'logo.png');
-    self::assertStringContainsString('Te espero', $html);
-    self::assertStringNotContainsString('<script>', $html);
-    self::assertStringNotContainsString('Dato interno reservado', $html);
-    self::assertStringContainsString('name="mensaje"', $html);
-    $this->db->update('wp_jet_cct_tickets', ['estado_comercial' => CommercialStatusCatalog::statusesForBucket('cerrados')[0]], ['_ID' => $id]);
-    self::assertStringNotContainsString('name="mensaje"', PublicTaskView::render($conversation->task($id), [], 'x', 'a.css', 'logo.png'));
+  }
+
+  public function testClientAttachmentsAreValidated(): void
+  {
+    $pdf = (string) tempnam(sys_get_temp_dir(), 'ptk');
+    file_put_contents($pdf, "%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF");
+    $group = static fn(array $names, int $error = UPLOAD_ERR_OK): array => ['name' => $names, 'error' => array_fill(0, count($names), $error), 'size' => array_fill(0, count($names), 100), 'tmp_name' => array_fill(0, count($names), $pdf)];
+    self::assertSame(['imagenes' => 0, 'archivos' => 2], PublicTaskConversation::validateFiles(['archivos' => $group(['a.pdf', 'b.pdf'])], false));
+    self::assertSame(['imagenes' => 0, 'archivos' => 0], PublicTaskConversation::validateFiles(['imagenes' => $group([''], UPLOAD_ERR_NO_FILE)], false), 'Un campo vacío no cuenta.');
+    $cases = [
+      'máximo 3' => ['archivos' => $group(['a.pdf', 'b.pdf', 'c.pdf', 'd.pdf'])],
+      'formato PDF' => ['archivos' => $group(['a.exe'])],
+      'Usa fotos' => ['imagenes' => $group(['foto.jpg'])],
+      'No se pudo cargar' => ['archivos' => $group(['a.pdf'], UPLOAD_ERR_INI_SIZE)],
+    ];
+    foreach ($cases as $message => $files) {
+      try {
+        PublicTaskConversation::validateFiles($files, false);
+        self::fail('Debía rechazar: ' . $message);
+      } catch (\InvalidArgumentException $exception) {
+        self::assertStringContainsString($message, $exception->getMessage());
+      }
+    }
+    try {
+      PublicTaskConversation::validateFiles(['archivos' => $group(['a.pdf'])]);
+      self::fail('Sin subida real no se acepta el archivo.');
+    } catch (\InvalidArgumentException) {
+      self::addToAssertionCount(1);
+    } finally {
+      @unlink($pdf);
+    }
   }
 
   public function testInternalNotificationsKeepOnlyKnownEventsAndActiveStaff(): void

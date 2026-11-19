@@ -164,10 +164,21 @@ async function fillCall(modal, values) {
     await client.goto(endpoint + '?t=' + reference);
     assert.ok((await client.locator('h1').innerText()).includes('#1'));
     assert.ok(!(await client.locator('body').innerText()).includes('Quiere arrendar en enero'), 'El resumen interno no se muestra al cliente');
-    await client.locator('#ptk-message').fill('Quisiera visitar el apartamento el sábado');
-    await client.locator('.ptk-form button').click();
-    await client.locator('.ptk-ok').waitFor();
-    assert.ok((await client.locator('.ptk-thread').innerText()).includes('Quisiera visitar'));
+    assert.equal(await client.locator('link[rel="icon"]').count(), 1, 'La vista pública lleva el favicon de la marca');
+    assert.ok((await client.locator('.ptk-history').innerText()).includes('Historial de la solicitud'));
+    // Responde con una foto y un PDF, como en la vista del caso inmobiliario.
+    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+    const pdf = Buffer.from('%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[]/Count 0>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF');
+    await client.locator('[name="mensaje"]').fill('Quisiera visitar el apartamento el sábado');
+    await client.locator('[data-media-input="image"]').setInputFiles({ name: 'sala.png', mimeType: 'image/png', buffer: png });
+    await client.locator('[data-media-input="pdf"]').setInputFiles({ name: 'cedula.pdf', mimeType: 'application/pdf', buffer: pdf });
+    assert.equal(await client.locator('[data-media-list] li').count(), 2, 'Se listan los adjuntos antes de enviar');
+    await client.locator('[data-reply-submit]').click();
+    await client.locator('.ptk-alert.is-success').waitFor();
+    const entry = client.locator('.ptk-entry.is-external').last();
+    assert.ok((await entry.innerText()).includes('Quisiera visitar'));
+    assert.equal(await entry.locator('[data-preview="image"]').count(), 1, 'La foto queda en el historial');
+    assert.equal(await entry.locator('[data-preview="pdf"]').innerText(), 'cedula.pdf');
     assert.equal(await client.evaluate(() => document.documentElement.scrollWidth > window.innerWidth), false, 'Desbordamiento de la vista pública');
     await client.screenshot({ path: 'output/calls-public-mobile.png', fullPage: true });
     const forged = await client.goto(endpoint + '?t=1.1893456000.' + 'a'.repeat(64));

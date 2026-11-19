@@ -12,6 +12,8 @@ define('SCM_BASE_URL', 'http://127.0.0.1:8774/public');
 define('SCM_VERSION', 'test');
 define('SCM_PUBLIC_PATH', dirname(__DIR__, 2) . '/public');
 define('SCM_APP_SECRET', str_repeat('x', 40));
+define('SCM_UPLOAD_PATH', sys_get_temp_dir() . '/scm-calls-uploads');
+define('SCM_UPLOAD_MAX_BYTES', 10485760);
 
 session_start();
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'GET') {
@@ -35,7 +37,7 @@ if (isset($_GET['t'])) {
   // Vista pública real (public/tarea.php) sobre la base de prueba.
   session_write_close();
   $limiter = new SCM\Support\FileRateLimiter(sys_get_temp_dir() . '/scm-calls-limits-' . getmypid());
-  (new SCM\Http\Controller\PublicTaskPageController($db, $settings, $limiter, 'http://127.0.0.1:8774/tests/Fixtures/commercial-calls.php'))->handle($_GET, $_POST, (string) $_SERVER['REQUEST_METHOD'], '127.0.0.1');
+  (new SCM\Http\Controller\PublicTaskPageController($db, $settings, $limiter, 'http://127.0.0.1:8774/tests/Fixtures/commercial-calls.php'))->handle($_GET, $_POST, (string) $_SERVER['REQUEST_METHOD'], '127.0.0.1', $_FILES, (int) ($_SERVER['CONTENT_LENGTH'] ?? 0));
   exit;
 }
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
