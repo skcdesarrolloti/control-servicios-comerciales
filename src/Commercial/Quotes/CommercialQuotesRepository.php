@@ -235,6 +235,15 @@ final class CommercialQuotesRepository
     return (int) $this->db->lastInsertId();
   }
 
+  /** Solo las columnas que existen: url_cotizacion y url_pdf se crean con bin/add-quote-link-fields.php. @param array<string,mixed> $data */
+  public function updateQuote(int $id, array $data): void
+  {
+    $data = $this->existing(self::TABLE, $data);
+    if ($data !== []) {
+      $this->db->update($this->db->table(self::TABLE), $data, ['_ID' => $id]);
+    }
+  }
+
   /** @param array<string,mixed> $data */
   public function insertPropertyHistory(array $data): void
   {

@@ -23,7 +23,7 @@ use SCM\Support\SharedNotificationsBridge;
 final class CommercialQuotesNotifier
 {
   /** Encabezado de documento: el PDF de la cotización. */
-  public const TEMPLATE = 'scm_cotizacion_inmuebles_pdf_v1';
+  public const TEMPLATE = 'scm_cotizacion_inmuebles_v1';
   public const EVENT = 'cotizacion_creada';
 
   private const BROCHURE = 'https://sucasainmobiliaria.com.co/brochure-skc-sucasa-inmobiliaria/';

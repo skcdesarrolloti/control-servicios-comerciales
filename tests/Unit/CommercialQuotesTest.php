@@ -18,6 +18,7 @@ use SCM\Core\Database;
 use SCM\Core\Settings;
 use SCM\Http\Api\CommercialActionRouter;
 use SCM\Http\Controller\PublicQuotePageController;
+use SCM\Support\CctFieldInstaller;
 use SCM\Support\FileRateLimiter;
 use SCM\Support\PublicQuoteAccess;
 use SCM\Views\CommercialDashboardView;
@@ -209,6 +210,9 @@ final class CommercialQuotesTest extends TestCase
     self::assertSame('700', $quote['id_ticket']);
     self::assertSame('Arriendo', $quote['tipo']);
     self::assertSame('55', $quote['id_cliente']);
+    self::assertSame(PublicQuoteAccess::verify(substr((string) $quote['url_cotizacion'], strpos((string) $quote['url_cotizacion'], '?c=') + 3)), $result['id'], 'El enlace firmado queda guardado en la cotización.');
+    self::assertSame($quote['url_cotizacion'] . '&formato=pdf', $quote['url_pdf']);
+    self::assertStringStartsWith('https://panel.test/public/cotizacion.php?c=', $quote['url_cotizacion']);
 
     $history = $this->db->getResults('SELECT * FROM wp_jet_cct_historial_del_inmueble ORDER BY _ID');
     self::assertCount(2, $history, 'Un registro por inmueble, no uno con todos.');
@@ -307,6 +311,22 @@ final class CommercialQuotesTest extends TestCase
     array_map('unlink', glob($limits . '/*') ?: []);
     @rmdir($limits);
     self::assertSame('%PDF-1.4 guardado', $body);
+  }
+
+  public function testLinkFieldsGoInTheComplementariosTab(): void
+  {
+    // Definición real de cotizacion_inmuebles (JetEngine): los campos nuevos quedan dentro de Complementarios.
+    $definition = [
+      ['name' => 'datos_generales_tab', 'object_type' => 'accordion'],
+      ['name' => 'tipo', 'object_type' => 'field', 'isNested' => true],
+      ['name' => 'complementarios_tab', 'object_type' => 'accordion'],
+      ['name' => 'id_ticket', 'object_type' => 'field', 'isNested' => true],
+      ['name' => 'url_cotizacion', 'object_type' => 'field', 'isNested' => true],
+      ['name' => 'url_pdf', 'object_type' => 'field', 'isNested' => true],
+    ];
+    $organized = CctFieldInstaller::organize($definition, ['complementarios_tab' => ['url_cotizacion', 'url_pdf']]);
+    self::assertSame(array_column($definition, 'name'), array_column($organized, 'name'), 'Ya están en su pestaña: no se mueve nada.');
+    self::assertSame(['text', 'text DEFAULT NULL', []], CctFieldInstaller::TYPES['text']);
   }
 
   public function testCreateRejectsExpiredNonPublicAndEmptySelections(): void

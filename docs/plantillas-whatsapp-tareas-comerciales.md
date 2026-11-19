@@ -92,7 +92,7 @@ Ejemplos: `{{1}}` Luis Prada · `{{2}}` 1686 · `{{3}}` Jocabeth Cantillo · Cor
 
 Botón `Ver y responder`. URL del sitio web `https://sucasainmobiliaria.com.co/dashboard-comercial/public/tarea.php?t=`. URL de muestra `https://sucasainmobiliaria.com.co/dashboard-comercial/public/tarea.php?t=1686.1893456000.ejemplo`.
 
-## 5. `scm_cotizacion_inmuebles_pdf_v1`
+## 5. `scm_cotizacion_inmuebles_v1`
 
 Para el cliente, al crear una cotización de inmuebles desde el popup de la tarea. **Encabezado:** en "Muestra de contenido multimedia" elige **Documento** y sube un PDF de ejemplo (por ejemplo, una cotización descargada del panel). El panel envía el PDF de la cotización (`cotizacion-inmuebles-<número>.pdf`), que Meta descarga de `cotizacion.php?c=…&formato=pdf`.
 
@@ -101,7 +101,7 @@ Hola *{{1}}.*
 
 Te compartimos la cotización de inmuebles *#{{2}}* con *{{3}}*, de acuerdo con lo que buscas.
 
-*Te atiende:* {{4}}.
+*Su consultor/a asignado es* {{4}}.
 
 Desde el botón puedes ver las fotos, los precios y la comparación de los inmuebles.
 

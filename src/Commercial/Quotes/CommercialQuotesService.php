@@ -271,6 +271,8 @@ final class CommercialQuotesService
         throw new \RuntimeException('No se pudo guardar la cotización.');
       }
       $url = PublicQuoteAccess::url($id);
+      // Los enlaces quedan en la cotización para el portal del cliente y los demás paneles (bin/add-quote-link-fields.php).
+      $this->repository->updateQuote($id, ['url_cotizacion' => $url, 'url_pdf' => $url . '&formato=pdf']);
       foreach ($codes as $code) {
         // Un registro por inmueble: cada uno queda en su propio historial.
         $this->repository->insertPropertyHistory($common + [
