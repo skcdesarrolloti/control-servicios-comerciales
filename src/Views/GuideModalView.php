@@ -423,7 +423,7 @@ final class GuideModalView
         'titulo' => 'Trasladado',
         'icono'  => 'fa-exchange-alt',
         'color'  => 'scm-gc-gray',
-        'desc'   => 'El cliente solicita cambio en la destinación o cambio de asesor.',
+        'desc'   => 'El cliente solicita cambio en la destinación o cambio de consultor/a.',
       ],
       [
         'titulo' => 'Rechazado',

@@ -23,7 +23,7 @@ final class StaffCardsView
   public static function render(array $context, string $baseUrl): string
   {
     $e = [PromotionUi::class, 'e'];
-    $html = PromotionUi::hero('badge', 'Fichas de funcionarios', 'La imagen de presentación de cada funcionario. Llega en el WhatsApp con el que el cliente conoce a su asesor.')
+    $html = PromotionUi::hero('badge', 'Fichas de funcionarios', 'La imagen de presentación de cada funcionario. Llega en el WhatsApp con el que el cliente conoce a su consultor/a asignado.')
       . '<div class="cpr-live" data-cpr-live role="status" aria-live="polite"></div>';
     if (!$context['available']) {
       return $html . '<p class="cpr-alert is-error">Falta la columna <code>ficha</code> en <code>wp_jet_cct_funcionarios</code>. Créala como texto: guarda la dirección de la imagen.</p>';

@@ -113,21 +113,21 @@ final class QuotePdf
     $count = count($items);
     $advisor = $quote['asesor'];
     $type = mb_strtolower((string) $quote['tipo'], 'UTF-8');
-    $header = dirname(__DIR__, 3) . '/public/assets/img/membrete-sucasa-header.jpg';
+    $paper = dirname(__DIR__, 3) . '/resources/assets/membrete-sucasa.jpg';
 
     $html = '<article class="qd">'
-      . (is_readable($header) ? '<div class="qd-letterhead"><img src="data:image/jpeg;base64,' . base64_encode((string) file_get_contents($header)) . '" alt="SKC SuCasa Inmobiliaria"></div>' : '')
+      . (is_readable($paper) ? '<style>html{background:#fff url(data:image/jpeg;base64,' . base64_encode((string) file_get_contents($paper)) . ') repeat-y 0 0/215.9mm 279.4mm}</style>' : '')
       . '<header class="qd-head"><div><p class="qd-eyebrow">Cotización de inmuebles #' . (int) $quote['id'] . ($quote['fecha'] !== '' ? ' · ' . self::e($quote['fecha']) : '') . '</p>'
       . '<h1>' . self::e($quote['cliente'] !== '' ? $quote['cliente'] : 'Apreciado cliente') . '</h1>'
       . '<p>Seleccionamos ' . ($count === 1 ? 'este inmueble' : 'estos ' . $count . ' inmuebles') . ' en ' . self::e($type) . ' de acuerdo con lo que buscas'
       . ($count > 1 ? '. Al final encontrarás la comparación entre ellos.' : '.') . '</p></div>'
-      . '<aside class="qd-advisor"><span>Te atiende</span><strong>' . self::e($advisor['nombre']) . '</strong>'
+      . '<aside class="qd-advisor"><span>Su consultor/a asignado</span><strong>' . self::e($advisor['nombre']) . '</strong>'
       . ($advisor['celular'] !== '' ? '<em>Celular ' . self::e($advisor['celular']) . '</em>' : '')
       . ($advisor['correo'] !== '' ? '<em>' . self::e($advisor['correo']) . '</em>' : '') . '</aside></header>'
       . '<p class="qd-online">Ver en línea, con todas las fotos: <a href="' . self::e($viewUrl) . '">' . self::e(self::shortUrl($viewUrl)) . '</a></p>';
 
     if ($items === []) {
-      $html .= '<p class="qd-empty">Los inmuebles de esta cotización ya no están disponibles. Escríbele a tu asesor para recibir nuevas opciones.</p>';
+      $html .= '<p class="qd-empty">Los inmuebles de esta cotización ya no están disponibles. Escríbele a tu consultor/a para recibir nuevas opciones.</p>';
     }
     $photos = $count > self::MANY_PROPERTIES ? 1 : 3;
     foreach ($items as $index => $item) {
@@ -137,7 +137,7 @@ final class QuotePdf
       $html .= self::comparison($items, $quote['comparacion']);
     }
     if (trim((string) $quote['observaciones']) !== '') {
-      $html .= '<section class="qd-block"><h2>Observaciones de tu asesor</h2><p class="qd-pre">' . self::e($quote['observaciones']) . '</p></section>';
+      $html .= '<section class="qd-block"><h2>Observaciones de tu consultor/a</h2><p class="qd-pre">' . self::e($quote['observaciones']) . '</p></section>';
     }
     if ($quote['notas'] !== []) {
       $html .= '<section class="qd-block qd-notes"><h2>Notas a la presente cotización</h2>';
@@ -148,9 +148,9 @@ final class QuotePdf
     }
     $manager = $quote['gerente'];
     return $html . '<footer class="qd-foot"><p class="qd-motto">Construimos confianza, protegemos su patrimonio.</p>'
-      . '<p>Te atiende <strong>' . self::e($advisor['nombre']) . '</strong>' . ($advisor['celular'] !== '' ? ' · ' . self::e($advisor['celular']) : '') . ($advisor['correo'] !== '' ? ' · ' . self::e($advisor['correo']) : '') . '</p>'
+      . '<p>Su consultor/a asignado: <strong>' . self::e($advisor['nombre']) . '</strong>' . ($advisor['celular'] !== '' ? ' · ' . self::e($advisor['celular']) : '') . ($advisor['correo'] !== '' ? ' · ' . self::e($advisor['correo']) : '') . '</p>'
       . ($manager['nombre'] !== '' ? '<p>Gerencia comercial: ' . self::e($manager['nombre']) . ($manager['celular'] !== '' ? ' · ' . self::e($manager['celular']) : '') . '</p>' : '')
-      . '<p>SKC SuCasa Inmobiliaria · NIT 900623242-4</p></footer></article>';
+      . '</footer></article>';
   }
 
   /** @param array<string,mixed> $item */
@@ -186,7 +186,7 @@ final class QuotePdf
     }
     $html .= '</div></div>';
     if (!$item['disponible']) {
-      $html .= '<p class="qd-unavailable">Este inmueble ya no está disponible. Pregúntale a tu asesor por opciones similares.</p>';
+      $html .= '<p class="qd-unavailable">Este inmueble ya no está disponible. Pregúntale a tu consultor/a por opciones similares.</p>';
     }
     $specs = [];
     if ($item['area'] > 0) $specs[] = ['Área', QuoteComparison::area((float) $item['area'])];

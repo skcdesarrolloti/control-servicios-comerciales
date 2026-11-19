@@ -25,5 +25,8 @@
 - El medio de una llamada no se cambia al editarla porque las estadísticas cuentan por medio: otro medio es otra solicitud (llamada nueva) en el historial del contacto, y la tarea hereda el medio de su llamada.
 - Las acciones destructivas deben pedir confirmación clara y dejar trazabilidad cuando el módulo ya maneja historial.
 - El nombre corporativo visible en vistas, PDFs, correos e informes es `SKC SuCasa Inmobiliaria`.
+- Quien atiende al cliente es **consultor/a**, nunca "asesor": en textos visibles (vistas, PDFs, correos, plantillas) se dice "Su consultor/a asignado" (no "Te atiende" ni "Tu asesor") y "consultor/a" donde iría "asesor".
+- Todo lo que tarde en generarse o cargar (PDF, imágenes, videos, exportaciones) muestra el loader de la marca mientras tanto: `SCMLoader` (`public/assets/js/scm-loader.js` + `scm-loader.css`; en un enlace basta `data-scm-loader-download="archivo.pdf"`). Nunca dejar a la persona esperando sin aviso.
+- Los PDF para clientes llevan el membrete completo de la empresa (`resources/assets/membrete-sucasa.jpg`, el mismo del panel inmobiliario) de fondo en **cada hoja**: con Chromium, `@page{margin:0}`, el membrete en `html` repetido cada 279,4 mm y el relleno del contenido con `box-decoration-break: clone` (ver `QuotePdf` y `quote-document.css`).
 - Al agregar clases de Tailwind en PHP o JS, regenerar `public/assets/css/tailwind.css` con `npm run build:css`.
 - Verificar con `php tools/lint.php`, `phpunit` (`.vendor-test-junction/bin/phpunit`), `phpstan` y, para el calendario y la configuración, `node tools/check-commercial-calendar.cjs` con el servidor `php -S 127.0.0.1:8769 -t .`.

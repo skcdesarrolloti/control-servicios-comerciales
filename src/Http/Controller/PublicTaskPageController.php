@@ -15,7 +15,7 @@ use SCM\Views\PublicTaskView;
 /** public/tarea.php: sin sesión. El permiso es el enlace firmado y hay límites por IP y por tarea. */
 final class PublicTaskPageController
 {
-  private const INVALID = 'Este enlace no es válido o venció. Pide a tu asesor de SKC SuCasa Inmobiliaria un enlace nuevo.';
+  private const INVALID = 'Este enlace no es válido o venció. Pide a tu consultor/a de SKC SuCasa Inmobiliaria un enlace nuevo.';
 
   private PublicTaskConversation $conversation;
   private FileRateLimiter $limiter;

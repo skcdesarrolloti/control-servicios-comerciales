@@ -10,10 +10,11 @@ a:focus-visible,summary:focus-visible,[tabindex]:focus-visible { outline:3px sol
 .pq-sr { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
 .pq-pre { white-space:pre-line; overflow-wrap:anywhere; }
 
-.pq-top { background:#fff; border-bottom:1px solid var(--pq-line); }
+/* El logo del portal (portal_logo_url) es blanco: el encabezado va en el azul de la marca para que se vea. */
+.pq-top { background:var(--pq-navy); border-bottom:1px solid rgba(255,255,255,.12); }
 .pq-top-in { display:flex; align-items:center; gap:12px; min-height:64px; }
 .pq-logo { height:40px; width:auto; }
-.pq-brand { font-weight:700; color:var(--pq-navy); }
+.pq-brand { font-weight:700; color:#fff; }
 
 .pq-hero { background:linear-gradient(135deg,var(--pq-navy),var(--pq-blue)); color:#fff; padding:32px 0; }
 .pq-hero-in { display:grid; grid-template-columns:minmax(0,1fr) 320px; gap:24px; align-items:start; }

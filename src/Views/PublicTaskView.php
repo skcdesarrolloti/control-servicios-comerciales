@@ -27,7 +27,7 @@ final class PublicTaskView
     if ($task === null) {
       return $html . '<div class="ptk-body"><p class="ptk-alert" role="alert">' . self::e($error) . '</p></div></article></main></body></html>';
     }
-    $details = ['Motivo' => $task['tema_ayuda'] ?? '', 'Asunto' => $task['asunto'] ?? '', 'Te atiende' => trim((string) ($task['nombre_empleado'] ?? '')) . (trim((string) ($task['celular_empleado'] ?? '')) !== '' ? ' · ' . trim((string) $task['celular_empleado']) : '')];
+    $details = ['Motivo' => $task['tema_ayuda'] ?? '', 'Asunto' => $task['asunto'] ?? '', 'Su consultor/a asignado' => trim((string) ($task['nombre_empleado'] ?? '')) . (trim((string) ($task['celular_empleado'] ?? '')) !== '' ? ' · ' . trim((string) $task['celular_empleado']) : '')];
     $html .= '<div class="ptk-body"><p class="ptk-hello">Hola, ' . self::e($task['solicitante'] ?? '') . '. Aquí puedes ver tu solicitud y escribirnos.</p><dl class="ptk-details">';
     foreach ($details as $label => $value) {
       if (trim((string) $value) !== '') {
@@ -36,7 +36,7 @@ final class PublicTaskView
     }
     $html .= '</dl>';
     if ($sent) {
-      $html .= '<p class="ptk-ok" role="status">Recibimos tu mensaje. Tu asesor ya fue avisado.</p>';
+      $html .= '<p class="ptk-ok" role="status">Recibimos tu mensaje. Tu consultor/a asignado ya recibió el aviso.</p>';
     }
     if ($error !== '') {
       $html .= '<p class="ptk-alert" role="alert">' . self::e($error) . '</p>';

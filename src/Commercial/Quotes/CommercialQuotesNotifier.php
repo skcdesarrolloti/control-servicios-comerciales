@@ -16,7 +16,7 @@ use SCM\Support\SharedNotificationsBridge;
 
 /**
  * Envío de una cotización de inmuebles: correo (con el PDF adjunto) y WhatsApp (con el PDF como documento) al cliente,
- * ambos con el enlace público, y correo al asesor que la hizo con copia a los funcionarios de Configuración ›
+ * ambos con el enlace público, y correo al consultor/a que la hizo con copia a los funcionarios de Configuración ›
  * Notificaciones internas (evento cotizacion_creada). Todo va por shared-notifications, siempre activo y con la plantilla
  * fija en el código (docs/plantillas-whatsapp-tareas-comerciales.md). Quien bloqueó un canal en su ficha no lo recibe.
  */

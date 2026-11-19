@@ -10,7 +10,7 @@ use SCM\Commercial\Quotes\QuotePdf;
 
 /**
  * Cotización de inmuebles pública (public/cotizacion.php): la ve el cliente desde el enlace del correo o del WhatsApp.
- * Fotos de cada inmueble, sus datos, sus ventajas frente a los demás, la comparación completa y el contacto del asesor.
+ * Fotos de cada inmueble, sus datos, sus ventajas frente a los demás, la comparación completa y el contacto del consultor/a asignado.
  * Funciona sin JavaScript (las galerías se deslizan con CSS) y no muestra datos internos del inmueble.
  */
 final class PublicQuoteView
@@ -23,13 +23,15 @@ final class PublicQuoteView
   /**
    * @param array<string,mixed>|null $quote PublicQuote data de CommercialQuotesService::publicData().
    * @param string $pdfUrl Enlace firmado del PDF (PublicQuoteAccess::pdfUrl).
+   * @param array{css?:string,js?:string} $loader Hoja y script del loader (scm-loader) que se muestra mientras se genera el PDF.
    */
-  public static function render(?array $quote, string $css, string $logo, string $error = '', string $pdfUrl = ''): string
+  public static function render(?array $quote, string $css, string $logo, string $error = '', string $pdfUrl = '', array $loader = []): string
   {
     $title = $quote !== null ? 'Cotización de inmuebles #' . (int) $quote['id'] : 'Cotización no disponible';
     $html = '<!doctype html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">'
       . '<title>' . self::e($title) . ' · SKC SuCasa Inmobiliaria</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
-      . '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&amp;display=swap"><link rel="stylesheet" href="' . self::e($css) . '"></head><body>'
+      . '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&amp;display=swap"><link rel="stylesheet" href="' . self::e($css) . '">'
+      . (!empty($loader['css']) ? '<link rel="stylesheet" href="' . self::e($loader['css']) . '">' : '') . (!empty($loader['js']) ? '<script src="' . self::e($loader['js']) . '" defer></script>' : '') . '</head><body>'
       . '<header class="pq-top"><div class="pq-wrap pq-top-in"><img src="' . self::e(self::https($logo)) . '" alt="SKC SuCasa Inmobiliaria" class="pq-logo"><span class="pq-brand">SKC SuCasa Inmobiliaria</span></div></header><main>';
     if ($quote === null) {
       return $html . '<section class="pq-wrap pq-empty"><h1>' . self::e($title) . '</h1><p role="alert">' . self::e($error) . '</p></section></main></body></html>';
@@ -54,7 +56,7 @@ final class PublicQuoteView
     $html .= '</div>' . self::advisorCard($advisor, $whatsapp, (int) $quote['id'], $pdfUrl) . '</div></section>';
 
     if ($items === []) {
-      $html .= '<section class="pq-wrap pq-empty"><p>Los inmuebles de esta cotización ya no están disponibles. Escríbele a tu asesor para recibir nuevas opciones.</p></section>';
+      $html .= '<section class="pq-wrap pq-empty"><p>Los inmuebles de esta cotización ya no están disponibles. Escríbele a tu consultor/a para recibir nuevas opciones.</p></section>';
     }
     $html .= '<div class="pq-wrap pq-list">';
     foreach ($items as $index => $item) {
@@ -65,7 +67,7 @@ final class PublicQuoteView
       $html .= self::comparison($items, $quote['comparacion']);
     }
     if (trim((string) $quote['observaciones']) !== '') {
-      $html .= '<section class="pq-wrap pq-block"><h2>Observaciones de tu asesor</h2><p class="pq-pre">' . self::e($quote['observaciones']) . '</p></section>';
+      $html .= '<section class="pq-wrap pq-block"><h2>Observaciones de tu consultor/a</h2><p class="pq-pre">' . self::e($quote['observaciones']) . '</p></section>';
     }
     if ($quote['notas'] !== []) {
       $html .= '<section class="pq-wrap pq-block pq-notes"><h2>Notas a la presente cotización</h2>';
@@ -76,7 +78,7 @@ final class PublicQuoteView
     }
     $manager = $quote['gerente'];
     $html .= '</main><footer class="pq-foot"><div class="pq-wrap"><p class="pq-motto">Construimos confianza, protegemos su patrimonio.</p>'
-      . '<p>Te atiende <strong>' . self::e($advisor['nombre']) . '</strong>' . ($advisor['celular'] !== '' ? ' · ' . self::e($advisor['celular']) : '') . ($advisor['correo'] !== '' ? ' · ' . self::e($advisor['correo']) : '') . '</p>'
+      . '<p>Su consultor/a asignado: <strong>' . self::e($advisor['nombre']) . '</strong>' . ($advisor['celular'] !== '' ? ' · ' . self::e($advisor['celular']) : '') . ($advisor['correo'] !== '' ? ' · ' . self::e($advisor['correo']) : '') . '</p>'
       . ($manager['nombre'] !== '' ? '<p>Gerencia comercial: ' . self::e($manager['nombre']) . ($manager['celular'] !== '' ? ' · ' . self::e($manager['celular']) : '') . '</p>' : '')
       . '<p class="pq-copy">© ' . date('Y') . ' SKC SuCasa Inmobiliaria</p></div></footer></body></html>';
     return $html;
@@ -85,7 +87,7 @@ final class PublicQuoteView
   /** @param array{nombre:string,correo:string,celular:string} $advisor */
   private static function advisorCard(array $advisor, string $whatsapp, int $id, string $pdfUrl): string
   {
-    $html = '<aside class="pq-advisor" aria-label="Tu asesor"><p class="pq-eyebrow">Tu asesor</p><p class="pq-advisor-name">' . self::e($advisor['nombre']) . '</p><div class="pq-actions">';
+    $html = '<aside class="pq-advisor" aria-label="Su consultor/a asignado"><p class="pq-eyebrow">Su consultor/a asignado</p><p class="pq-advisor-name">' . self::e($advisor['nombre']) . '</p><div class="pq-actions">';
     if ($whatsapp !== '') {
       $html .= '<a class="pq-btn pq-btn-wa" href="' . self::e($whatsapp . '?text=' . rawurlencode('Hola ' . $advisor['nombre'] . ', vi la cotización #' . $id . ' y quiero más información.')) . '" target="_blank" rel="noopener">Escribir por WhatsApp</a>';
     }
@@ -96,7 +98,7 @@ final class PublicQuoteView
       $html .= '<a class="pq-btn pq-btn-ghost" href="mailto:' . self::e($advisor['correo']) . '?subject=' . rawurlencode('Cotización #' . $id) . '">' . self::e($advisor['correo']) . '</a>';
     }
     if ($pdfUrl !== '') {
-      $html .= '<a class="pq-btn pq-btn-ghost" href="' . self::e($pdfUrl) . '" download="' . self::e(QuotePdf::filename($id)) . '">Descargar en PDF</a>';
+      $html .= '<a class="pq-btn pq-btn-ghost" href="' . self::e($pdfUrl) . '" download="' . self::e(QuotePdf::filename($id)) . '" data-scm-loader-download="' . self::e(QuotePdf::filename($id)) . '" data-scm-loader-title="Generando tu PDF" data-scm-loader-detail="Estamos preparando la cotización con las fotos de cada inmueble. Puede tardar unos segundos.">Descargar en PDF</a>';
     }
     return $html . '</div></aside>';
   }
@@ -136,7 +138,7 @@ final class PublicQuoteView
     }
     $html .= '</div></div>';
     if (!$item['disponible']) {
-      $html .= '<p class="pq-unavailable" role="status">Este inmueble ya no está disponible. Pregúntale a tu asesor por opciones similares.</p>';
+      $html .= '<p class="pq-unavailable" role="status">Este inmueble ya no está disponible. Pregúntale a tu consultor/a por opciones similares.</p>';
     }
     $specs = [];
     if ($item['area'] > 0) $specs[] = ['Área', QuoteComparison::area((float) $item['area'])];
@@ -225,7 +227,7 @@ final class PublicQuoteView
     return $html . '</section>';
   }
 
-  /** Enlace de WhatsApp del asesor, o '' si su celular no sirve. */
+  /** Enlace de WhatsApp del consultor/a, o '' si su celular no sirve. */
   private static function whatsapp(string $phone): string
   {
     $international = CommercialCallsNotifier::phone($phone);

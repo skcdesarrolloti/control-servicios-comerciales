@@ -379,7 +379,7 @@ final class CommercialTicketModalView
           </div>
         <?php endif; ?>
 
-        <!-- Asesor Asignado -->
+        <!-- Consultor/a asignado -->
         <div class="flex items-center justify-between pt-1 text-xs">
           <div class="flex items-center gap-2">
             <div class="w-7 h-7 rounded-full bg-slate-200 flex items-center justify-center font-bold text-slate-700 text-xs">

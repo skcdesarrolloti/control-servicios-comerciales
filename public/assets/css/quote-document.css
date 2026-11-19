@@ -1,17 +1,16 @@
 /* PDF de la cotización de inmuebles (QuotePdf, Chromium). Colores de la vista pública (public-quote.css). */
 @font-face { font-family:'SCM Acta Sans'; src:url('../fonts/noto-sans.ttf') format('truetype'); font-style:normal; font-weight:100 900; }
-@page {
-  size:letter; margin:14mm 14mm 16mm;
-  @bottom-left { content:'SKC SuCasa Inmobiliaria'; color:#7a8499; font:8.5px 'SCM Acta Sans',Arial,sans-serif; }
-  @bottom-right { content:'Página ' counter(page) ' de ' counter(pages); color:#7a8499; font:8.5px 'SCM Acta Sans',Arial,sans-serif; }
-}
-html,body.qd-page { margin:0; padding:0; background:#fff; print-color-adjust:exact; -webkit-print-color-adjust:exact; }
+/* Membrete de la empresa (resources/assets/membrete-sucasa.jpg) de fondo en cada hoja, como las cartas del panel
+   inmobiliario. La hoja no tiene márgenes: el fondo (en <html>, desde QuotePdf) se repite cada 279,4 mm y el relleno
+   de .qd se repite en cada hoja (box-decoration-break: clone) para dejar libres el logo y el NIT y los contactos. */
+@page { size:letter; margin:0; }
+html,body.qd-page { margin:0; padding:0; print-color-adjust:exact; -webkit-print-color-adjust:exact; }
+body.qd-page { background:transparent; }
+.qd { padding:46mm 18mm 40mm; -webkit-box-decoration-break:clone; box-decoration-break:clone; }
 .qd { --navy:#061d49; --blue:#1e3c76; --gold:#f8cf4a; --ink:#1f2a3d; --muted:#5b6780; --line:#e2e6ef; --soft:#f4f6fb; --green:#0f7a45; --green-bg:#e8f6ee; color:var(--ink); font:10.5px/1.5 Poppins,'SCM Acta Sans',Arial,sans-serif; }
 .qd * { box-sizing:border-box; }
 .qd a { color:var(--blue); text-decoration:none; }
 .qd h1,.qd h2,.qd h3 { color:var(--navy); line-height:1.25; break-after:avoid; }
-.qd-letterhead { margin-bottom:3mm; }
-.qd-letterhead img { display:block; width:46%; height:auto; }
 .qd-eyebrow { margin:0; font-size:8.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
 .qd-head { display:grid; grid-template-columns:1fr 62mm; gap:6mm; align-items:start; padding:5mm 6mm; border-radius:4mm; background:var(--navy); color:#fff; }
 .qd-head .qd-eyebrow { color:var(--gold); }
@@ -28,9 +27,9 @@ html,body.qd-page { margin:0; padding:0; background:#fff; print-color-adjust:exa
 .qd-break { break-before:page; margin-top:0; }
 .qd-photos { display:grid; gap:2mm; margin-bottom:3.5mm; break-inside:avoid; }
 .qd-photos img { display:block; width:100%; height:100%; object-fit:cover; border-radius:2.5mm; background:var(--soft); }
-.qd-photos-1 { grid-template-columns:1fr; height:58mm; }
-.qd-photos-2 { grid-template-columns:2fr 1fr; height:66mm; }
-.qd-photos-3 { grid-template-columns:2fr 1fr; grid-template-rows:1fr 1fr; height:74mm; }
+.qd-photos-1 { grid-template-columns:1fr; height:52mm; }
+.qd-photos-2 { grid-template-columns:2fr 1fr; height:58mm; }
+.qd-photos-3 { grid-template-columns:2fr 1fr; grid-template-rows:1fr 1fr; height:64mm; }
 .qd-photos-3 img:first-child { grid-row:1 / span 2; }
 .qd-photos-2 img,.qd-photos-3 img { min-height:0; }
 .qd-card-head { display:grid; grid-template-columns:1fr auto; gap:5mm; align-items:start; break-inside:avoid; }
@@ -41,7 +40,7 @@ html,body.qd-page { margin:0; padding:0; background:#fff; print-color-adjust:exa
 .qd-price strong { font-size:18px; color:var(--navy); line-height:1.2; }
 .qd-price em { font-style:normal; font-size:9.5px; color:var(--muted); }
 .qd-unavailable { margin:3mm 0 0; padding:2mm 3mm; border-radius:2mm; background:#fff4e5; color:#8a4b00; font-weight:700; }
-.qd-specs { display:grid; grid-template-columns:repeat(4,1fr); gap:2mm; margin:3.5mm 0 0; break-inside:avoid; }
+.qd-specs { display:grid; grid-template-columns:repeat(auto-fit,minmax(22mm,1fr)); gap:2mm; margin:3.5mm 0 0; break-inside:avoid; }
 .qd-specs div { padding:2mm 2.5mm; border-radius:2mm; background:var(--soft); }
 .qd-specs dt { font-size:8.5px; color:var(--muted); font-weight:600; }
 .qd-specs dd { margin:.3mm 0 0; font-size:12px; font-weight:700; color:var(--navy); }

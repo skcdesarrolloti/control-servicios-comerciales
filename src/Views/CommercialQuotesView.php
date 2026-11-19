@@ -156,7 +156,7 @@ final class CommercialQuotesView
       . '<ul class="cqt-channels">' . implode('', $channels) . '</ul>'
       . '<div class="cqt-done-actions"><button type="button" class="cqt-primary" data-cqt-view="' . $id . '" data-ticket-pk="' . $ticketPk . '">' . self::icon('visibility') . 'Ver cotización</button>'
       . '<button type="button" class="cqt-secondary" data-cqt-copy="' . self::e($result['url']) . '">' . self::icon('content_copy') . 'Copiar enlace</button>'
-      . '<a class="cqt-secondary" href="' . self::e($result['url'] . '&formato=pdf') . '" download="' . self::e(QuotePdf::filename($id)) . '">' . self::icon('picture_as_pdf') . 'Descargar PDF</a>'
+      . '<a class="cqt-secondary" href="' . self::e($result['url'] . '&formato=pdf') . '" download="' . self::e(QuotePdf::filename($id)) . '" data-scm-loader-download="' . self::e(QuotePdf::filename($id)) . '" data-scm-loader-title="Generando el PDF" data-scm-loader-detail="Estamos preparando la cotización con las fotos de cada inmueble. Puede tardar unos segundos.">' . self::icon('picture_as_pdf') . 'Descargar PDF</a>'
       . '<button type="button" class="cqt-secondary" data-commercial-return-case="' . $ticketPk . '">' . self::icon('arrow_back') . 'Volver a la tarea</button></div>'
       . '</div></section>';
   }
@@ -166,7 +166,7 @@ final class CommercialQuotesView
   {
     return '<div class="cqt-viewer-box" role="document"><header class="cqt-viewer-head"><h2 id="cqt-viewer-title">Cotización #' . $id . '</h2><div class="cqt-viewer-actions">'
       . '<button type="button" class="cqt-secondary" data-cqt-copy="' . self::e($url) . '">' . self::icon('content_copy') . 'Copiar enlace</button>'
-      . '<a class="cqt-secondary" href="' . self::e($url . '&formato=pdf') . '" download="' . self::e(QuotePdf::filename($id)) . '">' . self::icon('picture_as_pdf') . 'PDF</a>'
+      . '<a class="cqt-secondary" href="' . self::e($url . '&formato=pdf') . '" download="' . self::e(QuotePdf::filename($id)) . '" data-scm-loader-download="' . self::e(QuotePdf::filename($id)) . '" data-scm-loader-title="Generando el PDF" data-scm-loader-detail="Estamos preparando la cotización con las fotos de cada inmueble. Puede tardar unos segundos.">' . self::icon('picture_as_pdf') . 'PDF</a>'
       . '<a class="cqt-secondary" href="' . self::e($url) . '" target="_blank" rel="noopener">' . self::icon('open_in_new') . 'Abrir</a>'
       . '<button type="button" class="cqt-icon" data-cqt-viewer-close aria-label="Cerrar">' . self::icon('close') . '</button></div></header>'
       . '<iframe class="cqt-frame" src="' . self::e($url) . '" title="Cotización #' . $id . ' como la ve el cliente"></iframe></div>';
@@ -189,7 +189,7 @@ final class CommercialQuotesView
       . ($listing['mine'] ? '<input type="hidden" name="portafolio" value="1">' : '')
       . '<label class="cqt-field cqt-wide"><span>Buscar</span><input type="search" name="cq_q" value="' . self::e($f['q']) . '" placeholder="Cliente, celular, correo, número, tarea o código"></label>'
       . self::select('cq_tipo', 'Tipo', self::pairs(CommercialQuotesService::TYPES), $f['tipo'], 'Todos')
-      . ($listing['team'] && !$listing['mine'] ? self::select('cq_empleado', 'Asesor', $service->creators(), $f['empleado'], 'Todo el equipo') : '')
+      . ($listing['team'] && !$listing['mine'] ? self::select('cq_empleado', 'Consultor/a', $service->creators(), $f['empleado'], 'Todo el equipo') : '')
       . '<label class="cqt-field"><span>Desde</span><input type="date" name="cq_desde" value="' . self::e($f['desde']) . '"></label>'
       . '<label class="cqt-field"><span>Hasta</span><input type="date" name="cq_hasta" value="' . self::e($f['hasta']) . '"></label>'
       . '<div class="cqt-filter-actions"><button type="submit" class="cqt-primary">Filtrar</button><button type="button" class="cqt-secondary" data-cqt-list-clear>Limpiar</button></div>'
@@ -206,7 +206,7 @@ final class CommercialQuotesView
       return $html . '<p class="cqt-empty">No hay cotizaciones con estos filtros.</p>';
     }
     $canOpenTask = $policy->canAct('ver_ticket');
-    $html .= '<div class="cqt-table-wrap"><table class="cqt-table"><thead><tr><th>Cotización</th><th>Cliente</th><th>Inmuebles</th><th>Tarea</th><th>Asesor</th><th><span class="sr-only">Acciones</span></th></tr></thead><tbody>';
+    $html .= '<div class="cqt-table-wrap"><table class="cqt-table"><thead><tr><th>Cotización</th><th>Cliente</th><th>Inmuebles</th><th>Tarea</th><th>Consultor/a</th><th><span class="sr-only">Acciones</span></th></tr></thead><tbody>';
     foreach ($listing['rows'] as $row) {
       $codes = $row['codigos'];
       $shown = array_slice($codes, 0, 4);
@@ -216,7 +216,7 @@ final class CommercialQuotesView
         . '<td data-label="Cliente"><strong>' . self::e($row['cliente'] ?: 'Sin nombre') . '</strong><small>' . self::e($row['celular']) . '</small><small>' . self::e($row['email']) . '</small></td>'
         . '<td data-label="Inmuebles"><span class="cqt-count">' . count($codes) . '</span> ' . self::e(implode(', ', $shown)) . (count($codes) > count($shown) ? ' y ' . (count($codes) - count($shown)) . ' más' : '') . '</td>'
         . '<td data-label="Tarea">' . $task . '</td>'
-        . '<td data-label="Asesor">' . self::e($row['asesor'] ?: 'Sin asesor') . '</td>'
+        . '<td data-label="Consultor/a">' . self::e($row['asesor'] ?: 'Sin consultor/a') . '</td>'
         . '<td data-label="Acciones"><div class="cqt-row-actions"><button type="button" class="cqt-secondary cqt-small" data-cqt-view="' . (int) $row['id'] . '">' . self::icon('visibility') . 'Ver</button></div></td>'
         . '</tr>';
     }

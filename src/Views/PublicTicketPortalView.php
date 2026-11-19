@@ -81,7 +81,7 @@ final class PublicTicketPortalView
             <p><?php echo esc_html($subtitle); ?></p>
           </div>
           <?php if ($mascotImage !== ''): ?>
-            <img src="<?php echo esc_url($mascotImage); ?>" alt="Castor asesor SK&C" class="hero-castor" loading="lazy" onerror="this.style.display='none'">
+            <img src="<?php echo esc_url($mascotImage); ?>" alt="Castor consultor SK&C" class="hero-castor" loading="lazy" onerror="this.style.display='none'">
           <?php endif; ?>
         </section>
         <?php if ($showSuccess): ?>

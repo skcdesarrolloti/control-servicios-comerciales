@@ -3,10 +3,11 @@
 body { margin:0; background:#f1f4f9; color:#24334c; font-family:Poppins,Arial,sans-serif; line-height:1.5; }
 .ptk { min-height:100vh; display:flex; justify-content:center; align-items:flex-start; padding:24px 16px; }
 .ptk-card { width:min(720px,100%); background:#fff; border:1px solid var(--line); border-radius:20px; overflow:hidden; box-shadow:0 16px 40px rgba(6,29,73,.12); }
-.ptk-head { display:flex; align-items:center; gap:16px; padding:20px 24px; border-bottom:1px solid var(--line); }
+/* El logo del portal (portal_logo_url) es blanco: el encabezado va en el azul de la marca para que se vea. */
+.ptk-head { display:flex; align-items:center; gap:16px; padding:20px 24px; background:var(--navy); border-bottom:1px solid var(--line); }
 .ptk-logo { max-height:48px; max-width:140px; width:auto; }
-.ptk-brand { margin:0; font-size:12px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
-.ptk-head h1 { margin:0; font-size:22px; color:var(--navy); }
+.ptk-brand { margin:0; font-size:12px; font-weight:700; color:#f8cf4a; text-transform:uppercase; letter-spacing:.04em; }
+.ptk-head h1 { margin:0; font-size:22px; color:#fff; }
 .ptk-body { padding:20px 24px 28px; display:flex; flex-direction:column; gap:16px; }
 .ptk-hello { margin:0; }
 .ptk-details { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin:0; padding:14px 16px; background:#f6f7fb; border-radius:14px; }

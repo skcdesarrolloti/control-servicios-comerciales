@@ -457,6 +457,7 @@ final class CommercialDashboardView
   <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/commercial-calendar.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/commercial-calendar.css')); ?>">
   <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/commercial-calls.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/commercial-calls.css')); ?>">
   <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/commercial-quotes.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/commercial-quotes.css')); ?>">
+  <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/scm-loader.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/scm-loader.css')); ?>">
   <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/commercial-signs.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/commercial-signs.css')); ?>">
   <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/commercial-tools.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/commercial-tools.css')); ?>">
   <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/commercial-property-entry.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/commercial-property-entry.css')); ?>">
@@ -706,6 +707,7 @@ final class CommercialDashboardView
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-settings.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-settings.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-reports.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-reports.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-calls.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-calls.js')); ?>"></script>
+  <script src="<?php echo esc_url($baseUrl . '/assets/js/scm-loader.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/scm-loader.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-quotes.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-quotes.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-calendar-form.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-calendar-form.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-calendar-schedule.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-calendar-schedule.js')); ?>"></script>
@@ -1913,7 +1915,7 @@ final class CommercialDashboardView
           </div>
           <div class="pt-space-md mt-space-sm flex items-center justify-between">
             <button type="button" class="font-label-md text-label-md text-error font-semibold flex items-center gap-1 hover:underline cursor-pointer" onclick="document.getElementById('side-drawer').classList.remove('translate-x-full')">
-              <span>Ver desglose por asesor</span>
+              <span>Ver desglose por consultor/a</span>
               <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
             </button>
             <div class="flex items-center gap-2">
@@ -2174,7 +2176,7 @@ final class CommercialDashboardView
               <div class="space-y-1">
                 <label class="block font-label-sm text-label-sm text-secondary font-medium">Responsable</label>
                 <select name="id_empleado" class="w-full px-3 py-2 bg-surface-container-low focus:bg-surface-container-lowest rounded-xl font-body-sm text-body-sm text-on-surface outline-none transition-all cursor-pointer border border-transparent focus:border-outline-variant">
-                  <option value="">Todos los asesores</option>
+                  <option value="">Todos los consultores</option>
                   <?php foreach ($ticketEmployees as $employee): ?>
                     <?php $empVal = (string) ($employee['id'] ?? ''); ?>
                     <option value="<?php echo esc_attr($empVal); ?>"<?php selected((string) ($filters['id_empleado'] ?? ''), $empVal); ?>><?php echo esc_html((string) ($employee['name'] ?? '')); ?></option>
@@ -2339,7 +2341,7 @@ final class CommercialDashboardView
     $requester = trim((string) ($row['solicitante'] ?? '')) ?: 'Sin solicitante';
     $requesterPhone = trim((string) ($row['celular_solicitante'] ?? $row['celular'] ?? ''));
     $assigned = trim((string) ($row['nombre_empleado'] ?? 'Sin asignar')) ?: 'Sin asignar';
-    $assignedCargo = trim((string) ($row['cargo_empleado'] ?? 'Asesor Comercial'));
+    $assignedCargo = trim((string) ($row['cargo_empleado'] ?? 'Consultor comercial'));
 
     $propertyTitle = trim((string) ($row['inmueble'] ?? ''));
     if ($propertyTitle === '') {
@@ -2625,12 +2627,12 @@ final class CommercialDashboardView
 
         <div class="space-y-space-xs">
           <h4 class="font-label-md text-label-md uppercase tracking-wider text-secondary font-semibold">
-            Distribución por Asesor Comercial
+            Distribución por consultor comercial
           </h4>
           <div class="space-y-2 pt-1">
             <?php if (empty($overdueAdvisors)): ?>
               <div class="p-space-md rounded-xl bg-surface-container-low text-center text-secondary font-body-sm">
-                No hay asesores con tareas atrasadas actualmente.
+                No hay consultores con tareas atrasadas actualmente.
               </div>
             <?php else: ?>
               <?php foreach ($overdueAdvisors as $advisor): ?>
@@ -2640,7 +2642,7 @@ final class CommercialDashboardView
                       <?php echo esc_html((string) ($advisor['initials'] ?? 'KY')); ?>
                     </div>
                     <div>
-                      <span class="block font-label-md text-label-md font-semibold text-on-surface"><?php echo esc_html((string) ($advisor['name'] ?? 'Asesor')); ?></span>
+                      <span class="block font-label-md text-label-md font-semibold text-on-surface"><?php echo esc_html((string) ($advisor['name'] ?? 'Consultor/a')); ?></span>
                       <span class="block font-body-sm text-body-sm text-secondary"><?php echo esc_html((string) ($advisor['count'] ?? 0)); ?> tareas atrasadas</span>
                     </div>
                   </div>
@@ -4550,7 +4552,7 @@ final class CommercialDashboardView
           </div>
           <div class="space-y-2 text-xs">
             <div>
-              <span class="text-secondary block">Asesor / Consultor Asignado:</span>
+              <span class="text-secondary block">Consultor/a asignado:</span>
               <strong class="text-on-surface text-sm block"><?php echo esc_html($funcionario !== '' ? $funcionario : 'Sin asignar'); ?></strong>
               <div class="text-xs text-secondary space-y-0.5 mt-1">
                 <?php if ($funcionarioCel !== ''): ?>
