@@ -634,6 +634,28 @@ final class CommercialCallsTest extends TestCase
     self::assertStringContainsString('ya terminó', $closed);
   }
 
+  public function testFollowUpAndPostponeReachClientWithPublicView(): void
+  {
+    [$notifier, $log] = $this->recorder();
+    $id = $this->taskFromCall($notifier);
+    $task = $this->db->getRow('SELECT * FROM wp_jet_cct_tickets WHERE _ID = ?', [$id]);
+    [$notifier, $log] = $this->recorder();
+    $notifier->clientUpdate($id, $task, 'seguimiento', 'Te envío opciones <b>mañana</b>', 'Consultora Uno', '101');
+    $notifier->clientUpdate($id, $task, 'postergada', 'Viaja hasta enero', 'Consultora Uno', '101');
+    self::assertSame(['laura@example.test', 'laura@example.test'], array_column($log->mail, 0));
+    self::assertSame(['Seguimiento de tu tarea #' . $id, 'Tu tarea #' . $id . ' fue postergada'], array_column($log->mail, 1));
+    foreach ($log->mail as $mail) {
+      self::assertStringContainsString('tarea.php?t=' . $id . '.', $mail[2], 'El cliente va a la vista pública de su tarea.');
+      self::assertStringNotContainsString('sucasainmobiliaria.com.co/ticket/', $mail[2], 'Nunca la página de tickets anterior.');
+      self::assertStringNotContainsString('ticket_id=', $mail[2], 'Nunca el enlace del panel.');
+    }
+    self::assertStringNotContainsString('<b>mañana', $log->mail[0][2]);
+    $this->db->insert('wp_jet_cct_clientes', ['nombre' => 'Laura', 'celular' => '3001234567', 'bloqueo_email' => '1']);
+    [$notifier, $log] = $this->recorder();
+    $notifier->clientUpdate($id, $task, 'seguimiento', 'Otro', 'Consultora Uno', '101');
+    self::assertSame([], $log->mail, 'Quien bloqueó el correo no lo recibe.');
+  }
+
   public function testOfficerReplyNotifiesClientWithContactLine(): void
   {
     [$notifier, $log] = $this->recorder();

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SCM\Commercial\Calendar;
 
 use SCM\Support\EmailTemplate;
+use SCM\Support\PublicTaskAccess;
 use SCM\Support\SharedNotificationsBridge;
 
 /**
@@ -95,11 +96,9 @@ class CalendarMailer
     $employee = $this->store->employee((string) $event['id_empleado']) ?? [];
     $intro = 'Apreciado/a <strong>' . self::e((string) ($ticket['solicitante'] ?? '')) . '</strong>, nuestro funcionario <strong>' . self::e((string) ($employee['nombre'] ?? '')) . '</strong> '
       . ($moved ? 'reprogramó su cita.' : 'le ha agendado una cita.');
-    $link = trim((string) ($this->config['ticket_url'] ?? ''));
-    $body = $this->paragraph($intro) . $this->eventDetails($event);
-    if ($link !== '') {
-      $body .= $this->paragraph('<a style="' . self::ORANGE_LINK . '" href="' . self::e($link . (strpos($link, '?') === false ? '?' : '&') . 'id_ticket=' . $pk) . '">Ver el detalle de su solicitud</a>');
-    }
+    // El cliente siempre va a la vista pública de su tarea (tarea.php), nunca a la página de tickets anterior.
+    $body = $this->paragraph($intro) . $this->eventDetails($event)
+      . $this->paragraph('<a style="' . self::ORANGE_LINK . '" href="' . self::e(PublicTaskAccess::url($pk)) . '">Ver el detalle de su tarea</a>');
     $this->sendEmail([(string) $ticket['correo_solicitante']], ($moved ? 'Evento reprogramado de ' : 'Tienes evento programado de ') . $this->categoryName($event), $moved ? 'Cita reprogramada' : 'Cita agendada', $body,
       $moved ? 'cita-trasladada-solicitante-email' : 'cita-solicitante-email',
       'calendario:' . ($moved ? 'cita-trasladada-solicitante:' : 'cita-solicitante:') . $pk . ':' . (string) $event['fecha_inicio'], ['id_ticket' => $pk, 'id_empleado' => $event['id_empleado']]);

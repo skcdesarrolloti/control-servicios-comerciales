@@ -136,7 +136,6 @@ final class CommercialDashboardController
       'property_options' => $propertyOptions,
       'runtime' => $runtime,
       'base_url' => (string) SCM_BASE_URL,
-      'ticket_url' => (string) ($this->config['ticket_url'] ?? ''),
     ]);
   }
 

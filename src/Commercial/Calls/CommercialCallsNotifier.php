@@ -169,6 +169,30 @@ final class CommercialCallsNotifier
   }
 
   /**
+   * Seguimiento o postergación que el funcionario decidió contarle al cliente (casilla "Notificar al solicitante"): le llega
+   * por correo con el enlace a la vista pública de su tarea, nunca a la página de tickets anterior.
+   * @param array<string,mixed> $task
+   */
+  public function clientUpdate(int $id, array $task, string $kind, string $message, string $author, string $employee = ''): void
+  {
+    $text = trim($message);
+    if ($text === '' || $this->blocked($this->clientPreferences($task), 'email')) {
+      return;
+    }
+    $e = static fn($value): string => EmailTemplate::e((string) $value);
+    $staff = $this->repository->employee($employee) ?? [];
+    $replyTo = trim((string) ($staff['correo'] ?? '')) ?: (string) ($task['correo_empleado'] ?? '');
+    $postponed = $kind === 'postergada';
+    $this->send($task['correo_solicitante'] ?? '', $postponed ? 'Tu tarea #' . $id . ' fue postergada' : 'Seguimiento de tu tarea #' . $id,
+      $postponed ? 'Tarea postergada' : 'Seguimiento de tu tarea',
+      '<p>Estimado/a <strong>' . $e($task['solicitante'] ?? '') . '</strong>, <strong>' . $e($author !== '' ? $author : ($task['nombre_empleado'] ?? '')) . '</strong> '
+      . ($postponed ? 'postergó tu tarea <strong>#' . $id . '</strong>:' : 'registró un seguimiento en tu tarea <strong>#' . $id . '</strong>:') . '</p>'
+      . '<blockquote style="margin:12px 0;padding:12px 16px;background:#f1f5f9;border-left:4px solid #1e3c76;">' . nl2br($e($text)) . '</blockquote>'
+      . '<p>Desde el botón puedes ver tu tarea y escribirnos.</p>',
+      $this->buttons(PublicTaskAccess::url($id), 'Ver y responder'), 'llamadas:tarea:' . $id . ':' . $kind . ':' . substr(hash('sha256', $text), 0, 16), $replyTo);
+  }
+
+  /**
    * Nombre, correo y celular de un funcionario en una sola variable de la plantilla (como en el panel inmobiliario): la
    * plantilla no necesita una variable por dato. Lo que falte no se escribe.
    * @param array<string,mixed> $task

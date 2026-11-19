@@ -26,6 +26,13 @@ use SCM\Views\CommercialTicketModalView;
 
 final class CommercialApiController
 {
+  /**
+   * El flujo heredado del panel inmobiliario (SeguimientoService) manda sus propios correos con la página de tickets
+   * anterior, y con la lista vacía avisa a todos. En el panel comercial no manda ninguno: el cliente recibe solo los
+   * avisos de CommercialCallsNotifier, con la vista pública de su tarea.
+   */
+  private const NO_LEGACY_EMAILS = ['none'];
+
   private Database $db;
   private CommercialTicketsRepository $tickets;
   private CommercialTaskAnalysisRepository $analyses;
@@ -491,13 +498,13 @@ final class CommercialApiController
       JsonResponse::error('La respuesta no puede estar vacía.', 422);
     }
     // El aviso al cliente lo envía la conversación pública, con su enlace para responder.
-    $notifyClient = $this->notifyTargets($input) !== [];
+    $notifyClient = $this->notifyClient($input);
     $result = $this->workflow->saveTicketResponse(
       $ticketPk,
       $message,
       '__keep__',
       false,
-      [],
+      self::NO_LEGACY_EMAILS,
       $this->uploadedImages('evidencia'),
       $this->uploadedDocuments()
     );
@@ -553,20 +560,20 @@ final class CommercialApiController
     if ($message === '') {
       JsonResponse::error('El seguimiento no puede estar vacío.', 422);
     }
-    $this->workflowResponse(
-      $this->workflow->save(
-        $ticketPk,
-        $message,
-        '__keep__',
-        '__keep__',
-        '__keep__',
-        false,
-        $this->notifyTargets($input),
-        $this->uploadedImages('evidencia'),
-        $this->uploadedDocuments()
-      ),
-      'Seguimiento guardado.'
+    $result = $this->workflow->save(
+      $ticketPk,
+      $message,
+      '__keep__',
+      '__keep__',
+      '__keep__',
+      false,
+      self::NO_LEGACY_EMAILS,
+      $this->uploadedImages('evidencia'),
+      $this->uploadedDocuments()
     );
+    $this->ensureWorkflowSucceeded($result);
+    $notice = $this->notifyClient($input) ? $this->clientUpdate($ticketPk, 'seguimiento', $message) : '';
+    JsonResponse::success(['message' => 'Seguimiento guardado.' . $notice, 'refresh' => true]);
   }
 
   /** @param array<string,mixed> $input */
@@ -583,13 +590,14 @@ final class CommercialApiController
     $result = $this->workflow->postponeTicket(
       $ticketPk,
       $message,
-      $this->notifyTargets($input),
+      self::NO_LEGACY_EMAILS,
       $this->uploadedImages('evidencia'),
       $this->uploadedDocuments()
     );
     $this->ensureWorkflowSucceeded($result);
     $this->tickets->changeStatus($ticketPk, 'Postergado');
-    JsonResponse::success(['message' => (string) ($result['message'] ?? 'Tarea postergada.'), 'refresh' => true]);
+    $notice = $this->notifyClient($input) ? $this->clientUpdate($ticketPk, 'postergada', $message) : '';
+    JsonResponse::success(['message' => 'Tarea postergada.' . $notice, 'refresh' => true]);
   }
 
   /** @param array<string,mixed> $input */
@@ -1166,9 +1174,28 @@ final class CommercialApiController
   }
 
   /** @param array<string,mixed> $input @return array<int,string> */
-  private function notifyTargets(array $input): array
+  private function notifyClient(array $input): bool
   {
-    return !empty($input['notificar_solicitante']) ? ['solicitante'] : [];
+    return !empty($input['notificar_solicitante']);
+  }
+
+  /**
+   * Aviso al cliente de un seguimiento o una postergación, con el enlace a la vista pública de su tarea.
+   * @return string Lo que se agrega al mensaje de la acción.
+   */
+  private function clientUpdate(int $ticketPk, string $kind, string $message): string
+  {
+    try {
+      $task = $this->db->getRow('SELECT * FROM `' . $this->db->table('jet_cct_tickets') . '` WHERE `_ID` = ? LIMIT 1', [$ticketPk]);
+      if ($task === null) {
+        return '';
+      }
+      (new \SCM\Commercial\Calls\CommercialCallsNotifier($this->db, $this->settings))->clientUpdate($ticketPk, $task, $kind, wp_strip_all_tags($message, true), \SCM\Core\Auth::user(), \SCM\Core\Auth::employeeId());
+      return ' Se avisó al cliente.';
+    } catch (\Throwable $exception) {
+      error_log('[tareas:aviso-cliente] ' . $exception->getMessage());
+      return ' No se pudo avisar al cliente.';
+    }
   }
 
   /** @param array<string,mixed> $input @return array<string,mixed> */
