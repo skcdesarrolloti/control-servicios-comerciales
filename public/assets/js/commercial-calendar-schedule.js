@@ -1,6 +1,7 @@
 /*
  * Agenda comercial dentro de la tarea: agendar citas vinculadas a la tarea en el calendario
- * de actividades, ver la agenda del responsable y sus eventos pendientes por cerrar.
+ * de actividades (en la agenda del asignado), ver la semana del calendario propio o, con permiso
+ * de equipo, la del asignado, y los eventos pendientes por cerrar del asignado.
  * Usa la misma API del calendario que el módulo "Calendario" (Mi calendario / equipo).
  */
 (function () {
@@ -18,6 +19,8 @@
   }
   var config = runtime.config || {};
   var currentEmployeeId = String(config.calendar_current_employee_id || "").trim();
+  // Con "Calendario del equipo" se puede leer la agenda de otro funcionario; sin él, solo la propia.
+  var canSeeTeam = !!config.calendar_can_assign_others;
   var employees = Array.isArray(config.calendar_allowed_funcionarios) ? config.calendar_allowed_funcionarios : [];
   var baseUrl = String(runtime.ajaxUrl || "").replace(/\/api\.php$/, "");
   var form = window.SCMCommercialCalendarForm || {};
@@ -56,13 +59,6 @@
   function timeLabel(value) {
     var match = String(value || "").match(/(\d{2}):(\d{2})/);
     return match ? match[1] + ":" + match[2] : "";
-  }
-
-  function dayLabel(key) {
-    var parts = String(key || "").slice(0, 10).split("-");
-    if (parts.length !== 3) return key;
-    var date = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-    return date.toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" });
   }
 
   function employeeName(id) {
@@ -110,15 +106,6 @@
     return String((row && row.estado) || "").toLowerCase() === "si";
   }
 
-  function eventLineHtml(row, highlightTicket) {
-    var linked = highlightTicket && String(row.id_ticket || "") === String(highlightTicket);
-    return '<div class="flex items-start gap-2 px-2.5 py-2 rounded-xl border ' + (linked ? "border-amber-300 bg-amber-50" : "border-slate-200 bg-white") + ' text-left">' +
-      '<i class="mt-1 inline-block w-2.5 h-2.5 rounded-full shrink-0" style="background:' + esc(row.color || "#1E3C76") + '"></i>' +
-      '<div class="min-w-0"><strong class="block text-xs text-slate-800 truncate">' + esc(row.titulo || "Evento") + '</strong>' +
-      '<span class="block text-[11px] text-slate-500">' + esc(timeLabel(row.fecha_inicio)) + (row.fecha_fin ? " - " + esc(timeLabel(row.fecha_fin)) : "") +
-      (row.categoria ? " · " + esc(row.categoria) : "") + (isDone(row) ? " · Realizado" : "") + (linked ? " · Esta tarea" : "") + "</span></div></div>";
-  }
-
   function openSchedule(card) {
     var task = taskData(card);
     form.open({
@@ -134,50 +121,141 @@
     });
   }
 
+  var WEEKDAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+
+  function weekStart(date) {
+    var copy = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    copy.setDate(copy.getDate() - ((copy.getDay() + 6) % 7));
+    return copy;
+  }
+
+  function weekLabel(start) {
+    var end = addDays(start, 6);
+    var month = function (date) { return date.toLocaleDateString("es-CO", { month: "short" }).replace(".", ""); };
+    return start.getDate() + (start.getMonth() !== end.getMonth() ? " " + month(start) : "") + " – " + end.getDate() + " " + month(end) + " " + end.getFullYear();
+  }
+
+  /** Calendarios que la persona puede ver desde la tarea: el propio y, con permiso de equipo, el del asignado. */
+  function agendaOwners(task) {
+    var owners = [];
+    if (currentEmployeeId) owners.push({ id: currentEmployeeId, label: "Mi calendario", name: employeeName(currentEmployeeId) });
+    var assignee = assigneeId(task);
+    if (canSeeTeam && assignee && assignee !== currentEmployeeId) {
+      owners.push({ id: assignee, label: assigneeName(task) + " · asignado", name: assigneeName(task) });
+    }
+    return owners;
+  }
+
+  function agendaChipHtml(row, ticketPk) {
+    var linked = ticketPk && String(row.id_ticket || "") === String(ticketPk);
+    var reminder = String(row.tipo_item || "") === "recordatorio";
+    var start = timeLabel(row.fecha_inicio);
+    var end = reminder ? "" : timeLabel(row.fecha_fin);
+    var time = start + (end && end !== start ? " – " + end : "");
+    var meta = [row.categoria, linked ? "Esta tarea" : "", isDone(row) ? "Realizado" : ""].filter(Boolean).join(" · ");
+    return '<article class="scm-task-agenda-chip' + (linked ? " is-task" : "") + (isDone(row) ? " is-done" : "") + '" style="--chip:' + esc(row.color || "#1E3C76") + '">' +
+      '<span class="scm-task-agenda-chip-time">' + esc(time) + (reminder ? " · Recordatorio" : "") + "</span>" +
+      "<strong>" + esc(row.titulo || "Evento") + "</strong>" +
+      (meta ? "<small>" + esc(meta) + "</small>" : "") +
+      "</article>";
+  }
+
+  function agendaWeekHtml(start, rows, ticketPk) {
+    var today = dateKey(new Date());
+    var byDay = {};
+    rows.forEach(function (row) {
+      var key = String(row.fecha_inicio || "").slice(0, 10);
+      (byDay[key] = byDay[key] || []).push(row);
+    });
+    var days = [];
+    for (var i = 0; i < 7; i++) {
+      var date = addDays(start, i);
+      var key = dateKey(date);
+      var dayRows = (byDay[key] || []).sort(function (a, b) { return String(a.fecha_inicio).localeCompare(String(b.fecha_inicio)); });
+      days.push('<section class="scm-task-agenda-day' + (key === today ? " is-today" : "") + (key < today ? " is-past" : "") + '">' +
+        "<header><span>" + WEEKDAYS[i] + "</span><b>" + date.getDate() + "</b></header>" +
+        '<div class="scm-task-agenda-day-body">' + (dayRows.length ? dayRows.map(function (row) { return agendaChipHtml(row, ticketPk); }).join("") : '<p class="scm-task-agenda-free">Libre</p>') + "</div></section>");
+    }
+    return days.join("");
+  }
+
+  // Calendario semanal: el propio y, para quien ve el equipo, también el del funcionario asignado a la tarea.
   function openAgenda(card) {
     if (!window.Swal) return;
     var task = taskData(card);
-    var employeeId = assigneeId(task);
-    var name = assigneeName(task);
-    if (!employeeId) {
-      notify("warning", "La tarea no tiene un funcionario asignado.", "Agenda");
+    var owners = agendaOwners(task);
+    if (!owners.length) {
+      notify("warning", "Tu usuario no tiene un funcionario vinculado en el calendario comercial.", "Agenda");
       return;
     }
-    var from = dateKey(new Date());
-    var to = dateKey(addDays(new Date(), 14));
-    var calendarUrl = baseUrl + "/index.php?tab=calendario&subtab=" + (employeeId === currentEmployeeId ? "mine" : "team");
+    var state = { owner: owners[0], start: weekStart(new Date()), request: 0 };
+    var tabs = owners.length > 1
+      ? '<div class="scm-task-agenda-tabs" role="tablist">' + owners.map(function (owner, index) {
+        return '<button type="button" role="tab" aria-selected="' + (index === 0) + '" data-agenda-owner="' + esc(owner.id) + '">' + esc(owner.label) + "</button>";
+      }).join("") + "</div>"
+      : "";
     window.Swal.fire({
       title: "",
-      html: '<div class="text-left"><div class="mb-3">' +
-        '<span class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Agenda de los próximos 14 días</span>' +
-        '<h3 class="text-lg font-bold text-[#061D49]">Agenda de ' + esc(name) + "</h3>" +
-        '<p class="text-xs text-slate-500">Funcionario asignado a la tarea #' + esc(task.ticket) + ".</p></div>" +
-        '<div data-commercial-agenda-body class="space-y-3 max-h-[55vh] overflow-y-auto"><p class="scm-calendar-popup-agenda-empty">Cargando agenda de ' + esc(name) + "...</p></div>" +
-        '<a class="inline-flex items-center gap-1.5 mt-3 text-sm font-semibold text-[#1E3C76] hover:underline" href="' + esc(calendarUrl) + '">Abrir calendario comercial</a></div>',
-      width: 760,
+      html: '<div class="scm-task-agenda">' +
+        '<div class="scm-task-agenda-head"><div><span class="scm-task-agenda-kicker">Agenda · Tarea #' + esc(task.ticket) + "</span>" +
+        "<h3 data-agenda-title></h3></div>" + tabs + "</div>" +
+        '<div class="scm-task-agenda-toolbar"><div class="scm-task-agenda-nav">' +
+        '<button type="button" data-agenda-move="-1" aria-label="Semana anterior"><span class="material-symbols-outlined" aria-hidden="true">chevron_left</span></button>' +
+        '<button type="button" data-agenda-today>Hoy</button>' +
+        '<button type="button" data-agenda-move="1" aria-label="Semana siguiente"><span class="material-symbols-outlined" aria-hidden="true">chevron_right</span></button>' +
+        '</div><strong data-agenda-range></strong><span class="scm-task-agenda-count" data-agenda-count></span></div>' +
+        '<div class="scm-task-agenda-week" data-agenda-week aria-live="polite"></div>' +
+        '<div class="scm-task-agenda-foot"><span><i></i>Citas de esta tarea</span>' +
+        '<a href="#" data-agenda-link>Abrir calendario comercial</a></div></div>',
+      width: 1080,
       showConfirmButton: false,
       showCloseButton: true,
-      customClass: { popup: "scm-calendar-swal-popup" },
+      customClass: { popup: "scm-calendar-swal-popup scm-task-agenda-swal" },
       didOpen: function () {
-        var body = window.Swal.getPopup().querySelector("[data-commercial-agenda-body]");
-        employeeEvents(employeeId, from, to, 200).then(function (rows) {
-          if (!rows.length) {
-            body.innerHTML = '<p class="scm-calendar-popup-agenda-empty">Sin eventos programados en los próximos 14 días.</p>';
-            return;
-          }
-          var groups = {};
-          rows.forEach(function (row) {
-            var key = String(row.fecha_inicio || "").slice(0, 10);
-            (groups[key] = groups[key] || []).push(row);
+        var popup = window.Swal.getPopup();
+        var week = popup.querySelector("[data-agenda-week]");
+        var count = popup.querySelector("[data-agenda-count]");
+        function load() {
+          var request = ++state.request;
+          var owner = state.owner;
+          popup.querySelector("[data-agenda-title]").textContent = owner.id === currentEmployeeId ? "Mi calendario" : "Calendario de " + owner.name;
+          popup.querySelector("[data-agenda-range]").textContent = weekLabel(state.start);
+          popup.querySelector("[data-agenda-link]").href = baseUrl + "/index.php?tab=calendario&subtab=" + (owner.id === currentEmployeeId ? "mine" : "team");
+          popup.querySelectorAll("[data-agenda-owner]").forEach(function (button) {
+            button.setAttribute("aria-selected", String(button.getAttribute("data-agenda-owner") === owner.id));
           });
-          body.innerHTML = Object.keys(groups).sort().map(function (key) {
-            var dayRows = groups[key].sort(function (a, b) { return String(a.fecha_inicio).localeCompare(String(b.fecha_inicio)); });
-            return '<section><p class="text-xs font-bold text-slate-600 capitalize mb-1">' + esc(dayLabel(key)) + " · " + dayRows.length + " evento(s)</p>" +
-              '<div class="space-y-1.5">' + dayRows.map(function (row) { return eventLineHtml(row, task.pk); }).join("") + "</div></section>";
-          }).join("");
-        }).catch(function () {
-          body.innerHTML = '<p class="scm-calendar-popup-agenda-empty">No se pudo consultar la agenda.</p>';
+          count.textContent = "Cargando…";
+          week.classList.add("is-loading");
+          week.innerHTML = agendaWeekHtml(state.start, [], "");
+          employeeEvents(owner.id, dateKey(state.start), dateKey(addDays(state.start, 6)), 300).then(function (rows) {
+            if (request !== state.request) return;
+            week.classList.remove("is-loading");
+            week.innerHTML = agendaWeekHtml(state.start, rows, task.pk);
+            // En pantallas angostas los días van uno debajo del otro: se abre en el de hoy.
+            var today = week.querySelector(".scm-task-agenda-day.is-today");
+            if (today && window.matchMedia && window.matchMedia("(max-width: 900px)").matches) week.scrollTop = today.offsetTop - week.offsetTop;
+            count.textContent = rows.length ? rows.length + (rows.length === 1 ? " evento" : " eventos") : "Semana libre";
+          }).catch(function () {
+            if (request !== state.request) return;
+            week.classList.remove("is-loading");
+            count.textContent = "";
+            week.innerHTML = '<p class="scm-calendar-popup-agenda-empty">No se pudo consultar la agenda.</p>';
+          });
+        }
+        popup.addEventListener("click", function (event) {
+          var target = event.target.closest("[data-agenda-owner],[data-agenda-move],[data-agenda-today]");
+          if (!target) return;
+          if (target.hasAttribute("data-agenda-owner")) {
+            var id = target.getAttribute("data-agenda-owner");
+            state.owner = owners.find(function (owner) { return owner.id === id; }) || owners[0];
+          } else if (target.hasAttribute("data-agenda-move")) {
+            state.start = addDays(state.start, 7 * Number(target.getAttribute("data-agenda-move")));
+          } else {
+            state.start = weekStart(new Date());
+          }
+          load();
         });
+        load();
       },
     });
   }

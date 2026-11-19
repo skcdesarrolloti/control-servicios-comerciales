@@ -2325,3 +2325,54 @@
 .swal2-popup.scm-calendar-create-swal .scm-calendar-full-agenda-btn { font-weight: 600 !important; }
 .swal2-popup.scm-calendar-create-swal .scm-calendar-create-title strong { font-size: 18px; }
 .swal2-popup.scm-calendar-create-swal .swal2-actions { gap: 10px !important; }
+
+/* Agenda de la tarea (commercial-calendar-schedule.js): semana del calendario propio o del asignado. */
+.swal2-popup.scm-task-agenda-swal .swal2-html-container { padding: 0 !important; }
+.scm-task-agenda { text-align: left; color: #0f172a; }
+.scm-task-agenda-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px;
+  padding: 22px 56px 16px 24px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; }
+.scm-task-agenda-kicker { display: block; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #64748b; }
+.scm-task-agenda-head h3 { margin: 2px 0 0; font-size: 20px; font-weight: 700; color: #061D49; }
+.scm-task-agenda-tabs { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; border-radius: 999px; background: #e9eef6; }
+.scm-task-agenda-tabs button { border: 0; border-radius: 999px; padding: 7px 14px; font-size: 12px; font-weight: 600; color: #475569; background: transparent; cursor: pointer; }
+.scm-task-agenda-tabs button[aria-selected="true"] { background: #fff; color: #061D49; box-shadow: 0 1px 3px rgba(15, 23, 42, .12); }
+.scm-task-agenda-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 14px 24px; }
+.scm-task-agenda-toolbar > strong { font-size: 15px; color: #061D49; text-transform: capitalize; }
+.scm-task-agenda-count { margin-left: auto; font-size: 12px; color: #64748b; }
+.scm-task-agenda-nav { display: inline-flex; gap: 6px; }
+.scm-task-agenda-nav button { display: inline-flex; align-items: center; justify-content: center; min-width: 34px; height: 34px; padding: 0 10px;
+  border: 1px solid #e2e8f0; border-radius: 10px; background: #fff; color: #1E3C76; font-size: 13px; font-weight: 600; cursor: pointer; }
+.scm-task-agenda-nav button:hover { background: #EBF1FB; }
+.scm-task-agenda-nav .material-symbols-outlined { font-size: 20px; }
+.scm-task-agenda-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; padding: 0 24px; max-height: 60vh; overflow-y: auto; }
+.scm-task-agenda-week.is-loading { opacity: .55; }
+.scm-task-agenda-day { display: flex; flex-direction: column; min-height: 220px; border: 1px solid #e2e8f0; border-radius: 14px; background: #fff; overflow: hidden; }
+.scm-task-agenda-day header { display: flex; align-items: baseline; gap: 6px; padding: 8px 10px; border-bottom: 1px solid #f1f5f9; background: #f8fafc; }
+.scm-task-agenda-day header span { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #64748b; }
+.scm-task-agenda-day header b { font-size: 16px; color: #061D49; }
+.scm-task-agenda-day.is-today { border-color: #1E3C76; box-shadow: 0 0 0 1px #1E3C76; }
+.scm-task-agenda-day.is-today header { background: #1E3C76; }
+.scm-task-agenda-day.is-today header span,
+.scm-task-agenda-day.is-today header b { color: #fff; }
+.scm-task-agenda-day.is-past { background: #fbfcfd; }
+.scm-task-agenda-day.is-past header b { color: #94a3b8; }
+.scm-task-agenda-day-body { display: flex; flex-direction: column; gap: 6px; padding: 8px; }
+.scm-task-agenda-free { margin: 6px 0 0; font-size: 11px; color: #94a3b8; text-align: center; }
+.scm-task-agenda-chip { display: flex; flex-direction: column; gap: 2px; padding: 6px 8px; border-radius: 9px; border: 1px solid #e2e8f0;
+  border-left: 4px solid var(--chip, #1E3C76); background: #fff; min-width: 0; }
+.scm-task-agenda-chip strong { font-size: 12px; font-weight: 600; color: #0f172a; line-height: 1.3; overflow-wrap: anywhere; }
+.scm-task-agenda-chip small { font-size: 10.5px; color: #64748b; line-height: 1.3; }
+.scm-task-agenda-chip-time { font-size: 11px; font-weight: 700; color: #1E3C76; }
+.scm-task-agenda-chip.is-task { background: #fffbeb; border-color: #fcd34d; }
+.scm-task-agenda-chip.is-done { opacity: .6; }
+.scm-task-agenda-chip.is-done strong { text-decoration: line-through; }
+.scm-task-agenda-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 24px 20px; font-size: 12px; color: #64748b; }
+.scm-task-agenda-foot i { display: inline-block; width: 12px; height: 12px; margin-right: 6px; vertical-align: -2px; border-radius: 4px; background: #fffbeb; border: 1px solid #fcd34d; }
+.scm-task-agenda-foot a { font-size: 13px; font-weight: 600; color: #1E3C76; text-decoration: none; }
+.scm-task-agenda-foot a:hover { text-decoration: underline; }
+@media (max-width: 900px) {
+  .scm-task-agenda-week { grid-template-columns: minmax(0, 1fr); }
+  .scm-task-agenda-day { min-height: 0; }
+  .scm-task-agenda-head, .scm-task-agenda-toolbar, .scm-task-agenda-week, .scm-task-agenda-foot { padding-left: 16px; padding-right: 16px; }
+  .scm-task-agenda-head { padding-right: 52px; }
+}

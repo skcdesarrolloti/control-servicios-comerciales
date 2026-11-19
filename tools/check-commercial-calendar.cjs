@@ -285,12 +285,32 @@ async function closeSwal(page) {
   // Agendar desde la tarea: solo cita, en la agenda del asignado, sin tocar los estados de la tarea.
   await page.goto(endpoint + '?tab=tarea');
   await page.locator('[data-commercial-calendar-task] [data-commercial-calendar-agenda]').click();
-  await page.locator('.swal2-popup:has-text("Agenda de Administrador")').waitFor();
-  assert(!(await page.locator('[data-commercial-agenda-employee]').count()), 'Ver agenda no debe permitir elegir otro funcionario');
+  // Ver agenda: semana del calendario propio; quien es el asignado no ve otra pestaña.
+  await page.locator('.scm-task-agenda [data-agenda-title]:has-text("Mi calendario")').waitFor();
+  await page.locator('.scm-task-agenda-week .scm-task-agenda-chip.is-task').first().waitFor();
+  assert(await page.locator('.scm-task-agenda-day').count() === 7, 'Ver agenda no muestra la semana');
+  assert(!(await page.locator('[data-agenda-owner]').count()), 'Quien es el asignado no necesita pestañas de calendario');
   const agendaCall = calls.filter(call => call.action === 'filtrar_eventos_admin').pop();
-  assert(agendaCall && agendaCall.body.id_empleado === '999', 'Ver agenda no consulta al funcionario asignado');
+  assert(agendaCall && agendaCall.body.id_empleado === '999', 'Ver agenda no consulta el calendario propio');
+  const nextWeekRequest = page.waitForRequest(request => /action=filtrar_eventos_admin/.test(request.url()));
+  await page.locator('[data-agenda-move="1"]').click();
+  await nextWeekRequest;
+  await page.locator('.scm-task-agenda-week:not(.is-loading)').waitFor();
+  const nextWeek = calls.filter(call => call.action === 'filtrar_eventos_admin').pop();
+  assert(nextWeek.body.fecha_inicio > agendaCall.body.fecha_inicio, 'La flecha no pasa a la semana siguiente');
   await page.locator('.swal2-close').click();
   await page.locator('.swal2-container').waitFor({ state: 'detached', timeout: 5000 });
+  // Con Calendario del equipo, en la tarea de otro funcionario también se ve el calendario del asignado.
+  await page.goto(endpoint + '?tab=tarea&ticket=2');
+  await page.locator('[data-commercial-calendar-task] [data-commercial-calendar-agenda]').click();
+  await page.locator('.scm-task-agenda [data-agenda-title]:has-text("Mi calendario")').waitFor();
+  const ownerTabs = await page.locator('[data-agenda-owner]').allTextContents();
+  assert(ownerTabs.join('|') === 'Mi calendario|Ana Pérez · asignado', 'Faltan las pestañas del calendario propio y del asignado: ' + ownerTabs.join(', '));
+  const assigneeRequest = page.waitForRequest(request => /action=filtrar_eventos_admin/.test(request.url()) && (request.postData() || '').includes('"900"'));
+  await page.locator('[data-agenda-owner="900"]').click();
+  await assigneeRequest;
+  await page.locator('.scm-task-agenda [data-agenda-title]:has-text("Calendario de Ana Pérez")').waitFor();
+  await page.goto(endpoint + '?tab=tarea');
   await page.locator('[data-commercial-calendar-task] [data-commercial-calendar-schedule]').click();
   await page.locator('[data-commercial-schedule-form]').waitFor();
   assert(!(await page.locator('.scm-cal-kinds').count()), 'Desde la tarea no se ofrece crear evento');

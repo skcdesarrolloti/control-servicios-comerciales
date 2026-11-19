@@ -92,7 +92,7 @@ $html = SCM\Views\CommercialDashboardView::render([
 ]);
 if ($tab !== 'calendario') {
   // Tarjeta de agenda de una tarea, tal como la muestra el modal de la tarea.
-  $detail = ['ticket' => $db->getRow('SELECT * FROM wp_jet_cct_tickets WHERE _ID = 1'), 'timeline' => [], 'analyses' => []];
+  $detail = ['ticket' => $db->getRow('SELECT * FROM wp_jet_cct_tickets WHERE _ID = ' . max(1, (int) ($_GET['ticket'] ?? 1))), 'timeline' => [], 'analyses' => []];
   $html = str_replace(SCM\Views\CommercialDashboardView::renderAccessDenied(SCM_BASE_URL), '<section class="p-8" data-fixture-task>' . SCM\Views\CommercialTicketModalView::render($detail, $policy, []) . '</section>', $html);
 }
 $self = 'http://127.0.0.1:8769/tests/Fixtures/commercial-calendar.php';
