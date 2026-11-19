@@ -2,7 +2,7 @@
 :root { --pq-navy:#061d49; --pq-blue:#1e3c76; --pq-gold:#f8cf4a; --pq-orange:#f59120; --pq-ink:#1f2a3d; --pq-muted:#5b6780; --pq-line:#e2e6ef; --pq-soft:#f4f6fb; --pq-green:#0f7a45; --pq-green-bg:#e8f6ee; }
 * { box-sizing:border-box; }
 html { scroll-behavior:smooth; }
-body { margin:0; background:var(--pq-soft); color:var(--pq-ink); font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; -webkit-text-size-adjust:100%; }
+body { margin:0; background:var(--pq-soft); color:var(--pq-ink); font:16px/1.55 Poppins,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; -webkit-text-size-adjust:100%; }
 img { max-width:100%; }
 a { color:var(--pq-blue); }
 a:focus-visible,summary:focus-visible,[tabindex]:focus-visible { outline:3px solid var(--pq-orange); outline-offset:2px; }

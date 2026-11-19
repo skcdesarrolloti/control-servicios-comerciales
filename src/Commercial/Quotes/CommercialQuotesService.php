@@ -401,28 +401,29 @@ final class CommercialQuotesService
   // ── Vista pública ───────────────────────────────────
 
   /**
-   * Ruta del PDF de la cotización: el guardado o, si no existe (Chromium no respondió al crearla), uno nuevo con los
-   * datos de hoy. null si no se puede generar.
+   * Ruta del PDF de la cotización con los datos de hoy: el guardado si sigue al día; si falta o algún inmueble cambió,
+   * uno nuevo. Si Chromium no responde, el anterior (aunque esté desactualizado) o null si nunca se pudo generar.
    */
   public function pdfPath(int $id): ?string
   {
     if ($this->pdfs === null || $id < 1) {
       return null;
     }
-    $existing = $this->pdfs->existing($id);
-    if ($existing !== null) {
-      return $existing;
-    }
     $quote = $this->publicData($id);
     if ($quote === null) {
       return null;
     }
+    $current = $this->pdfs->current($id, $quote);
+    if ($current !== null) {
+      return $current;
+    }
     try {
-      return $this->pdfs->store($id, $quote, PublicQuoteAccess::url($id));
+      $stored = $this->pdfs->store($id, $quote, PublicQuoteAccess::url($id));
     } catch (\Throwable $exception) {
       error_log('[cotizaciones:pdf] ' . $exception->getMessage());
-      return null;
+      $stored = null;
     }
+    return $stored ?? $this->pdfs->existing($id);
   }
 
   /**

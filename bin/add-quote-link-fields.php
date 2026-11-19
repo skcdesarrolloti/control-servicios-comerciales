@@ -44,14 +44,21 @@ if (!$fill || !$apply) {
   echo $pending > 0 ? "Para llenarlas: php bin/add-quote-link-fields.php --aplicar --rellenar\n" : '';
   exit(0);
 }
+// Por lotes y en una transacción por lote: fila por fila, la base remota tarda y corta la conexión.
 $done = 0;
+$pdo = $db->pdo();
+$update = $pdo->prepare("UPDATE `{$table}` SET `url_cotizacion` = ?, `url_pdf` = ? WHERE `_ID` = ?");
 do {
   $ids = $db->getResults("SELECT `_ID` FROM `{$table}` WHERE {$empty} ORDER BY `_ID` LIMIT 500");
+  $pdo->beginTransaction();
   foreach ($ids as $row) {
     $id = (int) $row['_ID'];
     $url = PublicQuoteAccess::url($id);
-    $db->update($table, ['url_cotizacion' => $url, 'url_pdf' => $url . '&formato=pdf'], ['_ID' => $id]);
+    $update->execute([$url, $url . '&formato=pdf', $id]);
     $done++;
   }
+  $pdo->commit();
 } while ($ids !== []);
-echo "Enlaces llenados: {$done}\n";
+$left = (int) $db->getVar("SELECT COUNT(*) FROM `{$table}` WHERE {$empty}");
+echo "Enlaces llenados: {$done}\n" . ($left > 0 ? "Quedan {$left} sin enlace: vuelve a correr el comando.\n" : "Todas las cotizaciones tienen enlace.\n");
+exit($left > 0 ? 1 : 0);

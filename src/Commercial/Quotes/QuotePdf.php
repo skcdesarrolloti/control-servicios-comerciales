@@ -10,7 +10,8 @@ use SCM\Support\HtmlPdfRenderer;
  * PDF de la cotización de inmuebles: lo que ve el cliente en public/cotizacion.php, en hojas carta con el membrete. Se
  * genera con Chromium (HtmlPdfRenderer, Gotenberg del VPS) al crear la cotización y se guarda en
  * storage/uploads/cotizaciones: va adjunto al correo, como documento en el WhatsApp y se descarga desde la vista pública.
- * Es la foto de lo que se envió ese día; la vista en línea muestra los datos actuales.
+ * Junto al PDF se guarda la huella de los datos y del diseño con que se hizo: si el inmueble cambia (precio, área, fotos…)
+ * o cambia el diseño, el PDF se vuelve a generar al pedirlo, así siempre coincide con la vista en línea.
  */
 final class QuotePdf
 {
@@ -47,11 +48,35 @@ final class QuotePdf
     return $this->directory . '/cotizacion-' . $id . '.pdf';
   }
 
-  /** Ruta del PDF guardado, o null si todavía no existe. */
+  /** Ruta del PDF guardado, o null si todavía no existe (aunque esté desactualizado). */
   public function existing(int $id): ?string
   {
     $path = $this->path($id);
     return $id > 0 && is_file($path) && filesize($path) > 0 ? $path : null;
+  }
+
+  /**
+   * Ruta del PDF guardado si se hizo con estos mismos datos y este diseño; null si falta o quedó desactualizado.
+   * @param array<string,mixed> $quote CommercialQuotesService::publicData()
+   */
+  public function current(int $id, array $quote): ?string
+  {
+    $path = $this->existing($id);
+    return $path !== null && @file_get_contents($path . '.huella') === self::fingerprint($quote) ? $path : null;
+  }
+
+  /**
+   * Huella de lo que muestra el PDF: los datos de la cotización y la hoja de estilos. Cambia si cambia un inmueble o el diseño.
+   * @param array<string,mixed> $quote
+   */
+  public static function fingerprint(array $quote): string
+  {
+    return hash('sha256', (string) json_encode($quote, JSON_UNESCAPED_UNICODE | JSON_PARTIAL_OUTPUT_ON_ERROR) . '|' . (string) @hash_file('sha256', self::stylesheet()) . '|' . (string) @hash_file('sha256', __FILE__));
+  }
+
+  private static function stylesheet(): string
+  {
+    return dirname(__DIR__, 3) . '/public/assets/css/quote-document.css';
   }
 
   /**
@@ -61,8 +86,9 @@ final class QuotePdf
   public function store(int $id, array $quote, string $viewUrl): ?string
   {
     $bytes = ($this->renderer)(self::html($quote, $viewUrl), 'Cotización de inmuebles #' . $id, [
-      'stylesheets' => [dirname(__DIR__, 3) . '/public/assets/css/quote-document.css'],
-      'external_fonts' => false, 'body_class' => 'qd-page', 'wrapper_class' => 'qd-root', 'container_class' => 'qd-main',
+      // Poppins de Google Fonts como en el panel; si el servicio de PDF no la descarga, usa Noto Sans incluida en el PDF.
+      'stylesheets' => [self::stylesheet()],
+      'external_fonts' => true, 'body_class' => 'qd-page', 'wrapper_class' => 'qd-root', 'container_class' => 'qd-main',
     ]);
     if (!is_string($bytes) || !str_starts_with($bytes, '%PDF-')) {
       return null;
@@ -76,6 +102,7 @@ final class QuotePdf
       @unlink($temporary);
       return null;
     }
+    file_put_contents($path . '.huella', self::fingerprint($quote), LOCK_EX);
     return $path;
   }
 

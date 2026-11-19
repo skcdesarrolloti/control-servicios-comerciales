@@ -87,7 +87,7 @@ final class PublicQuotePageController
     header('Referrer-Policy: no-referrer');
     header('X-Content-Type-Options: nosniff');
     header('X-Robots-Tag: noindex, nofollow');
-    header("Content-Security-Policy: default-src 'none'; style-src 'self'; img-src 'self' https:; base-uri 'none'; form-action 'none'; frame-ancestors 'self'");
+    header("Content-Security-Policy: default-src 'none'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' https:; base-uri 'none'; form-action 'none'; frame-ancestors 'self'");
     $css = rtrim((string) SCM_BASE_URL, '/') . '/assets/css/public-quote.css?v=' . substr((string) @hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/public-quote.css'), 0, 12);
     echo PublicQuoteView::render($quote, $css, function_exists('system_image') ? system_image('portal_logo_url') : '', $error, $quote !== null ? PublicQuoteAccess::pdfUrl((int) $quote['id']) : '');
   }

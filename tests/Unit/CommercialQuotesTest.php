@@ -60,6 +60,13 @@ final class CommercialQuotesTest extends TestCase
     @rmdir($this->pdfDir);
   }
 
+  /** Número de la cotización de un enlace firmado de PDF (…/cotizacion.php?c=<ref>&formato=pdf); 0 si no es válido. */
+  private static function linkedQuote(string $url): int
+  {
+    parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
+    return str_starts_with($url, 'https://panel.test/public/cotizacion.php?c=') && ($query['formato'] ?? '') === 'pdf' ? PublicQuoteAccess::verify((string) ($query['c'] ?? '')) : 0;
+  }
+
   private function pdfs(): QuotePdf
   {
     return new QuotePdf($this->pdfDir, function (string $html, string $title, array $options): ?string {
@@ -245,7 +252,7 @@ final class CommercialQuotesTest extends TestCase
     $components = array_column($this->whatsapps[0]['components'], null, 'type');
     $document = $components['header']['parameters'][0];
     self::assertSame('document', $document['type'], 'El WhatsApp lleva el PDF como documento.');
-    self::assertSame(PublicQuoteAccess::pdfUrl($result['id']), $document['document']['link']);
+    self::assertSame($result['id'], self::linkedQuote($document['document']['link']), 'Enlace firmado del PDF de esta cotización.');
     self::assertStringEndsWith('&formato=pdf', $document['document']['link']);
     self::assertSame('cotizacion-inmuebles-' . $result['id'] . '.pdf', $document['document']['filename']);
     self::assertSame(['Laura Cliente', (string) $result['id'], '2 inmuebles en arriendo', 'Consultora Uno · Correo: 101@example.test · Celular: 3000000101'], array_column($components['body']['parameters'], 'text'));
@@ -261,14 +268,25 @@ final class CommercialQuotesTest extends TestCase
     self::assertStringContainsString('El PDF no se pudo generar ahora', $result['message']);
     self::assertArrayNotHasKey('attachments', $this->emails[0]['options']['payload'], 'Sin PDF el correo sale con el enlace.');
     $components = array_column($this->whatsapps[0]['components'], null, 'type');
-    self::assertSame(PublicQuoteAccess::pdfUrl($result['id']), $components['header']['parameters'][0]['document']['link'], 'Meta pide el PDF a cotizacion.php, que lo intenta generar de nuevo.');
+    self::assertSame($result['id'], self::linkedQuote($components['header']['parameters'][0]['document']['link']), 'Meta pide el PDF a cotizacion.php, que lo intenta generar de nuevo.');
 
     $this->pdfFails = false;
     $path = $this->service()->pdfPath($result['id']);
     self::assertSame($this->pdfDir . '/cotizacion-' . $result['id'] . '.pdf', $path, 'Se genera cuando se pide.');
     $this->pdfHtml = null;
     self::assertSame($path, $this->service()->pdfPath($result['id']));
-    self::assertNull($this->pdfHtml, 'Ya guardado, no se vuelve a generar.');
+    self::assertNull($this->pdfHtml, 'Ya guardado y al día, no se vuelve a generar.');
+
+    // Si un inmueble cambia, el PDF se rehace para que coincida con la vista en línea.
+    $this->db->update('wp_jet_cct_inmuebles', ['area_construida' => '141'], ['codigo' => '502']);
+    self::assertSame($path, $this->service()->pdfPath($result['id']));
+    self::assertStringContainsString('141 m²', (string) $this->pdfHtml, 'Se generó de nuevo con el área actual.');
+    self::assertStringNotContainsString('140 m²', (string) $this->pdfHtml);
+
+    // Si Chromium no responde, se entrega el anterior antes que nada.
+    $this->db->update('wp_jet_cct_inmuebles', ['area_construida' => '150'], ['codigo' => '502']);
+    $this->pdfFails = true;
+    self::assertSame($path, $this->service()->pdfPath($result['id']));
   }
 
   public function testPdfHasEveryPropertyTheComparisonAndNoPrivateData(): void
@@ -302,12 +320,14 @@ final class CommercialQuotesTest extends TestCase
     $stored = (new QuotePdf(SCM_UPLOAD_PATH . '/cotizaciones'))->path($result['id']);
     @mkdir(dirname($stored), 0777, true);
     file_put_contents($stored, '%PDF-1.4 guardado');
+    file_put_contents($stored . '.huella', QuotePdf::fingerprint((array) $this->service()->publicData($result['id'])));
     $limits = sys_get_temp_dir() . '/scm-quotes-limits-' . bin2hex(random_bytes(4));
     $controller = new PublicQuotePageController($this->db, new Settings($this->db), new FileRateLimiter($limits));
     ob_start();
     $controller->handle(['c' => PublicQuoteAccess::reference($result['id']), 'formato' => 'pdf'], 'GET', '127.0.0.1');
     $body = (string) ob_get_clean();
     @unlink($stored);
+    @unlink($stored . '.huella');
     array_map('unlink', glob($limits . '/*') ?: []);
     @rmdir($limits);
     self::assertSame('%PDF-1.4 guardado', $body);

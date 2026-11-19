@@ -6,7 +6,7 @@
   @bottom-right { content:'Página ' counter(page) ' de ' counter(pages); color:#7a8499; font:8.5px 'SCM Acta Sans',Arial,sans-serif; }
 }
 html,body.qd-page { margin:0; padding:0; background:#fff; print-color-adjust:exact; -webkit-print-color-adjust:exact; }
-.qd { --navy:#061d49; --blue:#1e3c76; --gold:#f8cf4a; --ink:#1f2a3d; --muted:#5b6780; --line:#e2e6ef; --soft:#f4f6fb; --green:#0f7a45; --green-bg:#e8f6ee; color:var(--ink); font:10.5px/1.5 'SCM Acta Sans',Arial,sans-serif; }
+.qd { --navy:#061d49; --blue:#1e3c76; --gold:#f8cf4a; --ink:#1f2a3d; --muted:#5b6780; --line:#e2e6ef; --soft:#f4f6fb; --green:#0f7a45; --green-bg:#e8f6ee; color:var(--ink); font:10.5px/1.5 Poppins,'SCM Acta Sans',Arial,sans-serif; }
 .qd * { box-sizing:border-box; }
 .qd a { color:var(--blue); text-decoration:none; }
 .qd h1,.qd h2,.qd h3 { color:var(--navy); line-height:1.25; break-after:avoid; }

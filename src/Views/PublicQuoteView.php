@@ -28,7 +28,8 @@ final class PublicQuoteView
   {
     $title = $quote !== null ? 'Cotización de inmuebles #' . (int) $quote['id'] : 'Cotización no disponible';
     $html = '<!doctype html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">'
-      . '<title>' . self::e($title) . ' · SKC SuCasa Inmobiliaria</title><link rel="stylesheet" href="' . self::e($css) . '"></head><body>'
+      . '<title>' . self::e($title) . ' · SKC SuCasa Inmobiliaria</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
+      . '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&amp;display=swap"><link rel="stylesheet" href="' . self::e($css) . '"></head><body>'
       . '<header class="pq-top"><div class="pq-wrap pq-top-in"><img src="' . self::e(self::https($logo)) . '" alt="SKC SuCasa Inmobiliaria" class="pq-logo"><span class="pq-brand">SKC SuCasa Inmobiliaria</span></div></header><main>';
     if ($quote === null) {
       return $html . '<section class="pq-wrap pq-empty"><h1>' . self::e($title) . '</h1><p role="alert">' . self::e($error) . '</p></section></main></body></html>';
