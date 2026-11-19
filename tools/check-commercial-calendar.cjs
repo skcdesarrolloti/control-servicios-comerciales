@@ -10,7 +10,7 @@ const pad = n => String(n).padStart(2, '0');
 const now = new Date();
 const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 const categories = [
-  { id: 3, nombre: 'Visita comercial', color: '#2563eb' },
+  { id: 3, nombre: 'Cita con cliente', color: '#2563eb' },
   { id: 26, nombre: 'Captación', color: '#16a34a' },
   { id: 40, nombre: 'Avalúo', color: '#f59e0b' },
   { id: 12, nombre: 'Preventiva', color: '#7c3aed' },
@@ -18,7 +18,7 @@ const categories = [
 let overdue = [{ id: 77, titulo: 'Visita sin cerrar', fecha_inicio: '2026-10-20 10:00:00', fecha_fin: '2026-10-20 11:00:00', id_ticket: '1', id_empleado: '999' }];
 let toClose = [];
 const events = [
-  { id: 501, tipo_item: 'evento', titulo: 'Visita apartamento Manga', fecha_inicio: `${today} 09:00:00`, fecha_fin: `${today} 10:00:00`, id_empleado: '999', id_categoria: 3, categoria: 'Visita comercial', color: '#2563eb', estado: 'No', ubicacion: 'Manga calle 25', id_ticket: '1' },
+  { id: 501, tipo_item: 'evento', titulo: 'Visita apartamento Manga', fecha_inicio: `${today} 09:00:00`, fecha_fin: `${today} 10:00:00`, id_empleado: '999', id_categoria: 3, categoria: 'Cita con cliente', color: '#2563eb', estado: 'No', ubicacion: 'Manga calle 25', id_ticket: '1' },
   { id: 502, tipo_item: 'recordatorio', titulo: 'Llamar propietario', fecha_inicio: `${today} 11:00:00`, fecha_fin: `${today} 11:00:00`, recordatorio_at: `${today} 11:00:00`, id_empleado: '999', id_categoria: 26, categoria: 'Captación', color: '#16a34a', estado: 'pendiente' },
 ];
 
@@ -143,7 +143,7 @@ async function closeSwal(page) {
   assert(await page.locator('.scm-cal-form [name="hora_inicio"]').evaluate(input => input.required), 'La hora debe ser obligatoria');
   assert(!(await page.locator('[data-commercial-schedule-agenda]').textContent()).trim(), 'Sin hora no se debe mostrar disponibilidad');
   const createCategories =await page.locator('.scm-calendar-create-form [name="id_categoria"] option').allTextContents();
-  assert(createCategories.join('|') === 'Selecciona categoría|Visita comercial|Captación', 'El popup de crear no respeta las categorías comerciales: ' + createCategories.join(', '));
+  assert(createCategories.join('|') === 'Selecciona categoría|Cita con cliente|Captación', 'El popup de crear no respeta las categorías comerciales: ' + createCategories.join(', '));
   // Formulario corto: un solo paso, con lo opcional recogido.
   assert(await page.locator('.scm-cal-kinds input').count() === 2, 'Crear desde el calendario solo debe ofrecer evento y recordatorio');
   assert(await page.locator('[data-commercial-schedule-form] [name="id_empleado"]').getAttribute('type') === 'hidden', 'Mi calendario no debe pedir funcionario');
@@ -282,11 +282,26 @@ async function closeSwal(page) {
   await page.locator('[data-scm-calendar-week-grid].scm-calendar-time-grid--day').waitFor();
   await assertSlotLimits();
 
-  // Agendar desde la tarea conserva el estado administrativo y vincula la tarea.
+  // Agendar desde la tarea: solo cita, en la agenda del asignado, sin tocar los estados de la tarea.
   await page.goto(endpoint + '?tab=tarea');
+  await page.locator('[data-commercial-calendar-task] [data-commercial-calendar-agenda]').click();
+  await page.locator('.swal2-popup:has-text("Agenda de Administrador")').waitFor();
+  assert(!(await page.locator('[data-commercial-agenda-employee]').count()), 'Ver agenda no debe permitir elegir otro funcionario');
+  const agendaCall = calls.filter(call => call.action === 'filtrar_eventos_admin').pop();
+  assert(agendaCall && agendaCall.body.id_empleado === '999', 'Ver agenda no consulta al funcionario asignado');
+  await page.locator('.swal2-close').click();
+  await page.locator('.swal2-container').waitFor({ state: 'detached', timeout: 5000 });
   await page.locator('[data-commercial-calendar-task] [data-commercial-calendar-schedule]').click();
   await page.locator('[data-commercial-schedule-form]').waitFor();
-  assert(await page.locator('.scm-cal-kinds label:has-text("Cita con cliente") input').isChecked(), 'Desde la tarea debe abrir como cita con cliente');
+  assert(!(await page.locator('.scm-cal-kinds').count()), 'Desde la tarea no se ofrece crear evento');
+  assert(await page.locator('[data-commercial-schedule-form] [name="id_empleado"]').getAttribute('type') === 'hidden', 'Desde la tarea no debe pedir responsable');
+  assert(await page.locator('[data-commercial-schedule-form] [name="id_empleado"]').inputValue() === '999', 'La cita no queda en la agenda del asignado');
+  assert(!(await page.locator('[data-commercial-schedule-form] [name="estado_comercial"]').count()), 'Desde la tarea no se debe cambiar el estado comercial');
+  const taskCategories = await page.locator('[data-commercial-schedule-form] [name="id_categoria"] option').allTextContents();
+  assert(taskCategories.join('|') === 'Selecciona categoría|Cita con cliente|Captación', 'Desde la tarea solo van las categorías de cita: ' + taskCategories.join(', '));
+  assert((await page.locator('[name="titulo"]').inputValue()).startsWith('Cita con cliente · Tarea #1'), 'El título no toma la categoría');
+  await page.locator('[data-commercial-schedule-form] [name="id_categoria"]').selectOption('26');
+  assert((await page.locator('[name="titulo"]').inputValue()).startsWith('Captación · Tarea #1'), 'El título no cambia con la categoría');
   // La simulación tiene un evento de 09:00 a 10:00 y la hora la coloca la persona.
   await page.locator('[data-commercial-schedule-form] [name="hora_inicio"]').fill('09:30');
   await page.locator('[data-commercial-schedule-agenda] .scm-calendar-availability-status.is-busy').waitFor();
@@ -296,7 +311,7 @@ async function closeSwal(page) {
   const created = calls.filter(call => call.action === 'crear_evento').pop();
   assert(created, 'No se creó la cita');
   assert(created.body.id_ticket === '1' && created.body.es_cita === 'si', 'La cita no queda vinculada a la tarea');
-  assert(created.body.estado_comercial === 'Contactado', 'La cita cambia el estado comercial de la tarea');
+  assert(!created.body.estado_comercial, 'La cita desde la tarea no debe cambiar el estado comercial');
   assert(!('estado_administrativo' in created.body) && !('creado_por' in created.body), 'El navegador no debe decidir el estado administrativo ni el autor');
   await closeSwal(page);
 

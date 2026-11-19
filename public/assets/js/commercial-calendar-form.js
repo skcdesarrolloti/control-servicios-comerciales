@@ -129,6 +129,18 @@
     });
   }
 
+  // Desde una tarea solo se agendan citas con el cliente en estas categorías (por nombre, sin tildes ni mayúsculas), en este orden.
+  var TASK_CATEGORY_PATTERNS = [/^cita con cliente/, /^precaptacion en campo/, /^captacion/];
+
+  function taskCategories(categories) {
+    var picked = [];
+    TASK_CATEGORY_PATTERNS.forEach(function (pattern) {
+      var match = categories.find(function (row) { return pattern.test(normalized(row.nombre).trim()) && picked.indexOf(row) === -1; });
+      if (match) picked.push(match);
+    });
+    return picked;
+  }
+
   function citaCategoryId(categories) {
     var configured = String(config().calendar_cita_category_id || "");
     if (configured && categories.some(function (row) { return String(row.id) === configured; })) return configured;
@@ -201,7 +213,8 @@
     var duration = options.end && minutesOf(options.end) > minutesOf(start) ? minutesOf(options.end) - minutesOf(start) : 60;
     var hasResponsible = !options.multiple && !options.lockEmployee;
     var taskRow = task
-      ? '<div><div class="scm-cal-label">Tarea relacionada</div><p class="scm-cal-task"><span class="material-symbols-outlined" aria-hidden="true">link</span>Tarea #' + esc(task.ticket) + (task.requester ? " · " + esc(task.requester) : "") + "</p></div>"
+      ? '<div><div class="scm-cal-label">Tarea relacionada</div><p class="scm-cal-task"><span class="material-symbols-outlined" aria-hidden="true">link</span>Tarea #' + esc(task.ticket) + (task.requester ? " · " + esc(task.requester) : "") + "</p>" +
+        '<small class="scm-cal-hint">Queda en la agenda de ' + esc(task.employee || employeeName(state.employee)) + ", asignado a la tarea.</small></div>"
       : ticketComboHtml();
     return '<div class="scm-calendar-create-shell scm-cal-shell">' +
       '<div class="scm-cal-head"><strong data-form-title>' + esc(TITLES[state.kind]) + '</strong><span data-form-subtitle>' + esc(SUBTITLES[state.kind]) + "</span></div>" +
@@ -230,7 +243,8 @@
       "</div>" +
       '<div class="scm-cal-more"><strong class="scm-cal-more-title">Más opciones</strong><div class="scm-cal-more-body">' +
       field("Descripción", '<textarea class="scm-textarea" name="descripcion" rows="3">' + esc(options.description || "") + "</textarea>") +
-      '<div data-form-status hidden>' + field("Estado comercial de la tarea", '<select class="scm-select" name="estado_comercial">' + statusOptionsHtml(task ? task.commercialStatus : "") + "</select>") + "</div>" +
+      // Agendar desde la tarea no cambia su estado comercial.
+      (task ? "" : '<div data-form-status hidden>' + field("Estado comercial de la tarea", '<select class="scm-select" name="estado_comercial">' + statusOptionsHtml("") + "</select>") + "</div>") +
       '<div class="scm-cal-only-repeat"><div class="scm-cal-grid">' +
       field("Repetir", '<select class="scm-select" name="repetir"><option value="">No se repite</option><option value="diario">Todos los días</option><option value="semanal">Algunos días de la semana</option></select>') +
       '<div data-form-repeat-end hidden>' + field("Hasta", '<input class="scm-input" type="date" name="repetir_hasta">') + "</div></div>" +
@@ -542,7 +556,7 @@
       var ticket = options.task ? { number: options.task.ticket, requester: options.task.requester } : (selectedTicket() ? { number: selectedTicket().id_ticket || selectedTicket()._ID, requester: selectedTicket().solicitante } : null);
       if (kind === "recordatorio") return;
       els.titulo.value = ticket
-        ? (kind === "cita" ? "Cita" : category || "Evento") + " · Tarea #" + ticket.number + (ticket.requester ? " · " + ticket.requester : "")
+        ? (options.task ? category || "Cita" : (kind === "cita" ? "Cita" : category || "Evento")) + " · Tarea #" + ticket.number + (ticket.requester ? " · " + ticket.requester : "")
         : category;
     }
 
@@ -555,7 +569,8 @@
       var linkedTicket = kind !== "recordatorio" && !!state.ticketId();
       form.classList.toggle("no-repeat", kind === "cita" || linkedTicket);
       if (els.ubicacion) els.ubicacion.required = kind !== "recordatorio";
-      popup.querySelector("[data-form-status]").hidden = !linkedTicket;
+      var statusField = popup.querySelector("[data-form-status]");
+      if (statusField) statusField.hidden = !linkedTicket;
       var hint = popup.querySelector("[data-form-ticket-hint]");
       if (hint) hint.textContent = kind === "cita" && !state.ticketId() ? "Sin tarea no se avisa al cliente." : "";
       if (kind === "cita" && (!els.id_categoria.value || !isInitial)) {
@@ -672,10 +687,20 @@
       options.multiple = false;
       employee = me;
     }
+    if (task) {
+      // Desde la tarea la cita va siempre en la agenda del funcionario asignado.
+      options.lockEmployee = true;
+      options.multiple = false;
+      employee = String(task.employeeId || me || "");
+    }
     if (options.lockEmployee && !employee) employee = me;
-    var kinds = options.multiple ? ["evento"] : (task ? ["cita", "evento"] : ["evento", "recordatorio"]);
+    var kinds = options.multiple ? ["evento"] : (task ? ["cita"] : ["evento", "recordatorio"]);
     var state = { kinds: kinds, kind: kinds.indexOf(options.kind) !== -1 ? options.kind : kinds[0], employee: employee, ticketId: function () { return ""; } };
     loadCategories().then(function (categories) {
+      if (task) {
+        categories = taskCategories(categories);
+        if (!categories.length) throw new Error("No están habilitadas las categorías Cita con cliente, Precaptación en campo ni Captación. Revisa Configuración › Calendario comercial.");
+      }
       if (!categories.length) throw new Error("No hay categorías habilitadas para el calendario comercial. Revisa Configuración › Calendario comercial.");
       return window.Swal.fire({
         title: "",

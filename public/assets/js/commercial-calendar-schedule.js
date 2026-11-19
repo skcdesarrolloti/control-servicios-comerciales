@@ -87,11 +87,13 @@
     };
   }
 
-  function defaultEmployeeId(task) {
-    var ids = employees.map(function (row) { return String(row.id_empleado || ""); });
-    if (task.employeeId && ids.indexOf(task.employeeId) !== -1) return task.employeeId;
-    if (currentEmployeeId && ids.indexOf(currentEmployeeId) !== -1) return currentEmployeeId;
-    return task.employeeId || currentEmployeeId || ids[0] || "";
+  // La agenda, los pendientes y las citas de la tarea son siempre del funcionario asignado.
+  function assigneeId(task) {
+    return task.employeeId || "";
+  }
+
+  function assigneeName(task) {
+    return task.employee || employeeName(task.employeeId);
   }
 
   function employeeEvents(employeeId, from, to, limit) {
@@ -117,22 +119,14 @@
       (row.categoria ? " · " + esc(row.categoria) : "") + (isDone(row) ? " · Realizado" : "") + (linked ? " · Esta tarea" : "") + "</span></div></div>";
   }
 
-  function employeeOptionsHtml(selected) {
-    return employees.map(function (row) {
-      var id = String(row.id_empleado || "");
-      return id ? '<option value="' + esc(id) + '"' + (id === selected ? " selected" : "") + ">" + esc(row.nombre || "Funcionario #" + id) + "</option>" : "";
-    }).join("");
-  }
-
   function openSchedule(card) {
     var task = taskData(card);
     form.open({
       kind: "cita",
       task: task,
-      title: "Cita · Tarea #" + task.ticket + (task.topic ? " · " + task.topic : ""),
       description: "Cita de la tarea comercial #" + task.ticket + (task.subject ? " (" + task.subject + ")" : "") + "." + (task.requester ? "\nSolicitante: " + task.requester + "." : "") + (task.property ? "\nInmueble: #" + task.property + "." : ""),
       date: dateKey(addDays(new Date(), 1)),
-      employeeId: defaultEmployeeId(task),
+      employeeId: assigneeId(task),
       onSaved: function () {
         refreshCard(card);
         app.dispatchEvent(new CustomEvent("scm:task-updated", { bubbles: true }));
@@ -143,53 +137,47 @@
   function openAgenda(card) {
     if (!window.Swal) return;
     var task = taskData(card);
-    var employeeId = defaultEmployeeId(task);
+    var employeeId = assigneeId(task);
+    var name = assigneeName(task);
+    if (!employeeId) {
+      notify("warning", "La tarea no tiene un funcionario asignado.", "Agenda");
+      return;
+    }
     var from = dateKey(new Date());
     var to = dateKey(addDays(new Date(), 14));
     var calendarUrl = baseUrl + "/index.php?tab=calendario&subtab=" + (employeeId === currentEmployeeId ? "mine" : "team");
     window.Swal.fire({
       title: "",
-      html: '<div class="text-left"><div class="flex flex-wrap items-end justify-between gap-3 mb-3">' +
-        '<div><span class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Agenda de los próximos 14 días</span>' +
-        '<h3 class="text-lg font-bold text-[#061D49]">Calendario del funcionario</h3></div>' +
-        '<label class="scm-seg-field min-w-[220px]"><span>Funcionario</span><select class="scm-select" data-commercial-agenda-employee>' + employeeOptionsHtml(employeeId) + "</select></label></div>" +
-        '<div data-commercial-agenda-body class="space-y-3 max-h-[55vh] overflow-y-auto"><p class="scm-calendar-popup-agenda-empty">Cargando agenda...</p></div>' +
-        '<a class="inline-flex items-center gap-1.5 mt-3 text-sm font-semibold text-[#1E3C76] hover:underline" href="' + esc(calendarUrl) + '" data-commercial-agenda-link>Abrir calendario comercial</a></div>',
+      html: '<div class="text-left"><div class="mb-3">' +
+        '<span class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Agenda de los próximos 14 días</span>' +
+        '<h3 class="text-lg font-bold text-[#061D49]">Agenda de ' + esc(name) + "</h3>" +
+        '<p class="text-xs text-slate-500">Funcionario asignado a la tarea #' + esc(task.ticket) + ".</p></div>" +
+        '<div data-commercial-agenda-body class="space-y-3 max-h-[55vh] overflow-y-auto"><p class="scm-calendar-popup-agenda-empty">Cargando agenda de ' + esc(name) + "...</p></div>" +
+        '<a class="inline-flex items-center gap-1.5 mt-3 text-sm font-semibold text-[#1E3C76] hover:underline" href="' + esc(calendarUrl) + '">Abrir calendario comercial</a></div>',
       width: 760,
       showConfirmButton: false,
       showCloseButton: true,
       customClass: { popup: "scm-calendar-swal-popup" },
       didOpen: function () {
-        var popup = window.Swal.getPopup();
-        var select = popup.querySelector("[data-commercial-agenda-employee]");
-        var body = popup.querySelector("[data-commercial-agenda-body]");
-        var link = popup.querySelector("[data-commercial-agenda-link]");
-        function load() {
-          var selected = select.value;
-          link.href = baseUrl + "/index.php?tab=calendario&subtab=" + (selected === currentEmployeeId ? "mine" : "team");
-          body.innerHTML = '<p class="scm-calendar-popup-agenda-empty">Cargando agenda de ' + esc(employeeName(selected)) + "...</p>";
-          employeeEvents(selected, from, to, 200).then(function (rows) {
-            if (select.value !== selected) return;
-            if (!rows.length) {
-              body.innerHTML = '<p class="scm-calendar-popup-agenda-empty">Sin eventos programados en los próximos 14 días.</p>';
-              return;
-            }
-            var groups = {};
-            rows.forEach(function (row) {
-              var key = String(row.fecha_inicio || "").slice(0, 10);
-              (groups[key] = groups[key] || []).push(row);
-            });
-            body.innerHTML = Object.keys(groups).sort().map(function (key) {
-              var dayRows = groups[key].sort(function (a, b) { return String(a.fecha_inicio).localeCompare(String(b.fecha_inicio)); });
-              return '<section><p class="text-xs font-bold text-slate-600 capitalize mb-1">' + esc(dayLabel(key)) + " · " + dayRows.length + " evento(s)</p>" +
-                '<div class="space-y-1.5">' + dayRows.map(function (row) { return eventLineHtml(row, task.pk); }).join("") + "</div></section>";
-            }).join("");
-          }).catch(function () {
-            body.innerHTML = '<p class="scm-calendar-popup-agenda-empty">No se pudo consultar la agenda.</p>';
+        var body = window.Swal.getPopup().querySelector("[data-commercial-agenda-body]");
+        employeeEvents(employeeId, from, to, 200).then(function (rows) {
+          if (!rows.length) {
+            body.innerHTML = '<p class="scm-calendar-popup-agenda-empty">Sin eventos programados en los próximos 14 días.</p>';
+            return;
+          }
+          var groups = {};
+          rows.forEach(function (row) {
+            var key = String(row.fecha_inicio || "").slice(0, 10);
+            (groups[key] = groups[key] || []).push(row);
           });
-        }
-        select.addEventListener("change", load);
-        load();
+          body.innerHTML = Object.keys(groups).sort().map(function (key) {
+            var dayRows = groups[key].sort(function (a, b) { return String(a.fecha_inicio).localeCompare(String(b.fecha_inicio)); });
+            return '<section><p class="text-xs font-bold text-slate-600 capitalize mb-1">' + esc(dayLabel(key)) + " · " + dayRows.length + " evento(s)</p>" +
+              '<div class="space-y-1.5">' + dayRows.map(function (row) { return eventLineHtml(row, task.pk); }).join("") + "</div></section>";
+          }).join("");
+        }).catch(function () {
+          body.innerHTML = '<p class="scm-calendar-popup-agenda-empty">No se pudo consultar la agenda.</p>';
+        });
       },
     });
   }
@@ -197,9 +185,13 @@
   function openPending(card) {
     if (!window.Swal) return;
     var task = taskData(card);
-    var employeeId = defaultEmployeeId(task);
+    var employeeId = assigneeId(task);
+    if (!employeeId) {
+      notify("warning", "La tarea no tiene un funcionario asignado.", "Pendientes");
+      return;
+    }
     window.Swal.fire({
-      title: "Pendientes de " + employeeName(employeeId),
+      title: "Pendientes de " + assigneeName(task),
       html: '<div data-commercial-pending-body class="text-left space-y-1.5 max-h-[55vh] overflow-y-auto"><p class="scm-calendar-popup-agenda-empty">Cargando eventos vencidos...</p></div>' +
         '<p class="text-xs text-slate-500 mt-3 text-left">Los eventos vencidos se cierran desde el calendario comercial (Mi calendario → Pendientes).</p>',
       width: 680,
@@ -226,7 +218,7 @@
   // Resumen dentro de la tarjeta: próximas citas de esta tarea y pendientes vencidos del responsable.
   function refreshCard(card) {
     var task = taskData(card);
-    var employeeId = defaultEmployeeId(task);
+    var employeeId = assigneeId(task);
     var eventsWrap = card.querySelector("[data-commercial-calendar-task-events]");
     var countEl = card.querySelector("[data-commercial-calendar-pending-count]");
     if (task.pk && eventsWrap) {
