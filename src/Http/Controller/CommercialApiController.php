@@ -34,7 +34,6 @@ final class CommercialApiController
   private Csrf $csrf;
   private SeguimientoService $workflow;
   private string $baseUrl;
-  private string $ticketUrl;
   /** @var array<string,mixed> */
   private array $config;
   /** @var array<int,string> */
@@ -55,7 +54,6 @@ final class CommercialApiController
     $this->workflow = new SeguimientoService($db, new SchemaInspector($db));
     $this->workflow->setQueue(new EmailQueue($db));
     $this->baseUrl = rtrim((string) SCM_BASE_URL, '/');
-    $this->ticketUrl = (string) ($config['ticket_url'] ?? '');
     $this->config = $config;
   }
 
@@ -282,8 +280,7 @@ final class CommercialApiController
       'html' => CommercialTicketModalView::render(
         $detail,
         $this->policy,
-        $this->tickets->activeEmployeesByCargos($this->commercialCargos),
-        $this->ticketUrl
+        $this->tickets->activeEmployeesByCargos($this->commercialCargos)
       ),
     ]);
   }

@@ -292,6 +292,15 @@ async function closeSwal(page) {
   assert(!(await page.locator('[data-agenda-owner]').count()), 'Quien es el asignado no necesita pestañas de calendario');
   const agendaCall = calls.filter(call => call.action === 'filtrar_eventos_admin').pop();
   assert(agendaCall && agendaCall.body.id_empleado === '999', 'Ver agenda no consulta el calendario propio');
+  assert(!(await page.locator('[data-fixture-task] a:has-text("Ver en portal")').count()), 'La tarea sigue mostrando Ver en portal');
+  // Clic en un evento: su detalle en la misma ventana y vuelta a la semana.
+  await page.locator('.scm-task-agenda-chip.is-task').first().click();
+  await page.locator('.scm-task-agenda-detail h4:has-text("Visita apartamento Manga")').waitFor();
+  const detailText = await page.locator('.scm-task-agenda-detail').textContent();
+  assert(detailText.includes('Manga calle 25') && detailText.includes('Esta tarea') && detailText.includes('09:00 – 10:00'), 'El detalle del evento no muestra hora, ubicación y tarea: ' + detailText);
+  assert(await page.locator('[data-agenda-week]').isHidden(), 'El detalle no reemplaza la semana');
+  await page.locator('[data-agenda-back]').click();
+  await page.locator('[data-agenda-week] .scm-task-agenda-chip.is-task').waitFor();
   const nextWeekRequest = page.waitForRequest(request => /action=filtrar_eventos_admin/.test(request.url()));
   await page.locator('[data-agenda-move="1"]').click();
   await nextWeekRequest;

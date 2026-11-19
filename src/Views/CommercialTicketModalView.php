@@ -13,7 +13,7 @@ final class CommercialTicketModalView
    * @param array{ticket:array<string,mixed>,timeline:array<int,array<string,mixed>>,analyses?:array<int,array<string,mixed>>} $detail
    * @param array<int,array<string,string>> $employees
    */
-  public static function render(array $detail, CommercialAccessPolicy $policy, array $employees, string $ticketUrl = ''): string
+  public static function render(array $detail, CommercialAccessPolicy $policy, array $employees): string
   {
     $ticket = $detail['ticket'];
     $timeline = $detail['timeline'];
@@ -30,7 +30,6 @@ final class CommercialTicketModalView
     $requester = trim((string) ($ticket['solicitante'] ?? '')) ?: 'Sin solicitante';
     $assignee = trim((string) ($ticket['nombre_empleado'] ?? $ticket['empleado'] ?? '')) ?: 'Sin asignar';
     $assigneeId = trim((string) ($ticket['id_empleado'] ?? ''));
-    $external = $ticketUrl !== '' ? $ticketUrl . rawurlencode($logicalId) : '';
     $email = trim((string) ($ticket['correo_solicitante'] ?? $ticket['correo'] ?? ''));
     $phone = trim((string) ($ticket['celular_solicitante'] ?? $ticket['celular'] ?? ''));
     $cleanPhone = preg_replace('/[^0-9]/', '', $phone);
@@ -96,12 +95,6 @@ final class CommercialTicketModalView
       </div>
       <!-- Top-right Action Buttons and Close Modal Button -->
       <div class="flex items-center gap-2">
-        <?php if ($external !== ''): ?>
-          <a class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-700 transition-all hover:text-[#061D49]" href="<?php echo esc_url($external); ?>" target="_blank" rel="noopener noreferrer">
-            <span class="material-symbols-outlined text-[15px] text-slate-500">open_in_new</span>
-            <span>Ver en portal</span>
-          </a>
-        <?php endif; ?>
         <button aria-label="Cerrar modal" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-all ml-1 cursor-pointer" type="button" data-commercial-close-case>
           <span class="material-symbols-outlined text-[18px]">close</span>
         </button>

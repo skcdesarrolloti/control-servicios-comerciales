@@ -159,6 +159,7 @@ final class CommercialPropertyEntryTest extends TestCase
     $html = CommercialTicketModalView::render(['ticket'=>$task,'timeline'=>[]], $this->policy, []);
     self::assertStringContainsString('data-commercial-task-form="sign"', $html);
     self::assertStringContainsString('data-commercial-task-form="property"', $html);
+    self::assertStringNotContainsString('Ver en portal', $html, 'La tarea se gestiona en el panel: sin enlace al portal.');
     $form = CommercialPropertyEntryView::render($this->service, 100);
     self::assertStringContainsString('Completar un código adelantado', $form);
     self::assertStringContainsString('value="117"', $form);

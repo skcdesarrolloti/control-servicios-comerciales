@@ -153,10 +153,50 @@
     var end = reminder ? "" : timeLabel(row.fecha_fin);
     var time = start + (end && end !== start ? " – " + end : "");
     var meta = [row.categoria, linked ? "Esta tarea" : "", isDone(row) ? "Realizado" : ""].filter(Boolean).join(" · ");
-    return '<article class="scm-task-agenda-chip' + (linked ? " is-task" : "") + (isDone(row) ? " is-done" : "") + '" style="--chip:' + esc(row.color || "#1E3C76") + '">' +
+    return '<button type="button" class="scm-task-agenda-chip' + (linked ? " is-task" : "") + (isDone(row) ? " is-done" : "") + '" style="--chip:' + esc(row.color || "#1E3C76") + '" data-agenda-event="' + esc(row.id) + '" aria-label="Ver detalle de ' + esc(row.titulo || "Evento") + '">' +
       '<span class="scm-task-agenda-chip-time">' + esc(time) + (reminder ? " · Recordatorio" : "") + "</span>" +
       "<strong>" + esc(row.titulo || "Evento") + "</strong>" +
       (meta ? "<small>" + esc(meta) + "</small>" : "") +
+      "</button>";
+  }
+
+  function longDate(value) {
+    var parts = String(value || "").slice(0, 10).split("-");
+    if (parts.length !== 3) return "";
+    return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2])).toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  }
+
+  function eventStatus(row) {
+    if (isDone(row)) return { label: "Realizado", tone: "is-done" };
+    var end = String(row.fecha_fin || row.fecha_inicio || "").replace(" ", "T");
+    return end && new Date(end) < new Date() ? { label: "Vencido sin cerrar", tone: "is-late" } : { label: "Pendiente", tone: "is-open" };
+  }
+
+  /** Detalle de un evento dentro de la misma ventana, para no perder la semana ni la tarea. */
+  function agendaDetailHtml(row, ticketPk, ticketNumber) {
+    var reminder = String(row.tipo_item || "") === "recordatorio";
+    var start = timeLabel(row.fecha_inicio);
+    var end = reminder ? "" : timeLabel(row.fecha_fin);
+    var linked = ticketPk && String(row.id_ticket || "") === String(ticketPk);
+    var status = eventStatus(row);
+    var item = function (icon, label, value) {
+      return value ? '<div class="scm-task-agenda-detail-row"><span class="material-symbols-outlined" aria-hidden="true">' + icon + "</span><div><small>" + label + "</small><p>" + value + "</p></div></div>" : "";
+    };
+    return '<button type="button" class="scm-task-agenda-back" data-agenda-back><span class="material-symbols-outlined" aria-hidden="true">arrow_back</span>Volver a la semana</button>' +
+      '<article class="scm-task-agenda-detail" style="--chip:' + esc(row.color || "#1E3C76") + '">' +
+      '<header><span class="scm-task-agenda-detail-cat">' + esc(reminder ? "Recordatorio" : row.categoria || "Evento") + "</span>" +
+      "<h4>" + esc(row.titulo || "Evento") + "</h4>" +
+      '<span class="scm-task-agenda-detail-status ' + status.tone + '">' + esc(status.label) + "</span>" +
+      (linked ? '<span class="scm-task-agenda-detail-status is-task">Esta tarea</span>' : "") + "</header>" +
+      '<div class="scm-task-agenda-detail-grid">' +
+      item("calendar_today", "Fecha", esc(longDate(row.fecha_inicio))) +
+      item("schedule", "Hora", esc(start + (end && end !== start ? " – " + end : ""))) +
+      item("location_on", "Ubicación", esc(row.ubicacion || "")) +
+      item("person", "Funcionario", esc(row.funcionario || employeeName(row.id_empleado))) +
+      // id_ticket del evento es el _ID interno: solo se muestra el número visible cuando es esta tarea.
+      item("link", "Tarea relacionada", linked ? "Tarea #" + esc(ticketNumber) + " (esta tarea)" : (row.id_ticket && String(row.id_ticket) !== "0" ? "Otra tarea comercial" : "")) +
+      "</div>" +
+      (String(row.descripcion || "").trim() ? '<div class="scm-task-agenda-detail-desc"><small>Descripción</small><p>' + esc(String(row.descripcion).trim()) + "</p></div>" : "") +
       "</article>";
   }
 
@@ -205,6 +245,7 @@
         '<button type="button" data-agenda-move="1" aria-label="Semana siguiente"><span class="material-symbols-outlined" aria-hidden="true">chevron_right</span></button>' +
         '</div><strong data-agenda-range></strong><span class="scm-task-agenda-count" data-agenda-count></span></div>' +
         '<div class="scm-task-agenda-week" data-agenda-week aria-live="polite"></div>' +
+        '<div class="scm-task-agenda-detail-wrap" data-agenda-detail hidden></div>' +
         '<div class="scm-task-agenda-foot"><span><i></i>Citas de esta tarea</span>' +
         '<a href="#" data-agenda-link>Abrir calendario comercial</a></div></div>',
       width: 1080,
@@ -215,8 +256,31 @@
         var popup = window.Swal.getPopup();
         var week = popup.querySelector("[data-agenda-week]");
         var count = popup.querySelector("[data-agenda-count]");
+        var toolbar = popup.querySelector(".scm-task-agenda-toolbar");
+        var detail = popup.querySelector("[data-agenda-detail]");
+        var rows = [];
+        function showWeek() {
+          detail.hidden = true;
+          detail.innerHTML = "";
+          week.hidden = false;
+          toolbar.hidden = false;
+        }
+        function showDetail(id) {
+          var row = rows.find(function (item) { return String(item.id) === String(id); });
+          if (!row) return;
+          state.lastEvent = String(id);
+          state.weekScroll = week.scrollTop;
+          detail.innerHTML = agendaDetailHtml(row, task.pk, task.ticket);
+          week.hidden = true;
+          toolbar.hidden = true;
+          detail.hidden = false;
+          var back = detail.querySelector("[data-agenda-back]");
+          if (back) back.focus();
+        }
         function load() {
           var request = ++state.request;
+          showWeek();
+          rows = [];
           var owner = state.owner;
           popup.querySelector("[data-agenda-title]").textContent = owner.id === currentEmployeeId ? "Mi calendario" : "Calendario de " + owner.name;
           popup.querySelector("[data-agenda-range]").textContent = weekLabel(state.start);
@@ -227,8 +291,9 @@
           count.textContent = "Cargando…";
           week.classList.add("is-loading");
           week.innerHTML = agendaWeekHtml(state.start, [], "");
-          employeeEvents(owner.id, dateKey(state.start), dateKey(addDays(state.start, 6)), 300).then(function (rows) {
+          employeeEvents(owner.id, dateKey(state.start), dateKey(addDays(state.start, 6)), 300).then(function (loaded) {
             if (request !== state.request) return;
+            rows = loaded;
             week.classList.remove("is-loading");
             week.innerHTML = agendaWeekHtml(state.start, rows, task.pk);
             // En pantallas angostas los días van uno debajo del otro: se abre en el de hoy.
@@ -243,8 +308,21 @@
           });
         }
         popup.addEventListener("click", function (event) {
-          var target = event.target.closest("[data-agenda-owner],[data-agenda-move],[data-agenda-today]");
+          var target = event.target.closest("[data-agenda-owner],[data-agenda-move],[data-agenda-today],[data-agenda-event],[data-agenda-back]");
           if (!target) return;
+          if (target.hasAttribute("data-agenda-event")) {
+            showDetail(target.getAttribute("data-agenda-event"));
+            return;
+          }
+          if (target.hasAttribute("data-agenda-back")) {
+            showWeek();
+            week.scrollTop = state.weekScroll || 0;
+            var chip = Array.prototype.find.call(week.querySelectorAll("[data-agenda-event]"), function (node) {
+              return node.getAttribute("data-agenda-event") === state.lastEvent;
+            });
+            if (chip) chip.focus({ preventScroll: true });
+            return;
+          }
           if (target.hasAttribute("data-agenda-owner")) {
             var id = target.getAttribute("data-agenda-owner");
             state.owner = owners.find(function (owner) { return owner.id === id; }) || owners[0];
