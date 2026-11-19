@@ -2,7 +2,7 @@
 
 Crea estas cinco plantillas en **Meta Business Suite → Administrador de WhatsApp → Plantillas de mensajes → Crear plantilla**, en la misma cuenta que usa el panel.
 
-Para todas: categoría **Utilidad**, idioma **Spanish (COL)** (`es_CO`), tipo de variable **Número**, pie de página `SKC SuCasa Inmobiliaria` y un botón **Ir al sitio web** con URL **Dinámica**. Usa los nombres exactos. Solo la 2 y la 5 llevan encabezado (imagen).
+Para todas: categoría **Utilidad**, idioma **Spanish (COL)** (`es_CO`), tipo de variable **Número**, pie de página `SKC SuCasa Inmobiliaria` y un botón **Ir al sitio web** con URL **Dinámica**. Usa los nombres exactos. La 2 lleva encabezado de imagen y la 5 de documento (PDF).
 
 Cada dato es una sola variable: el contacto de un funcionario (nombre, correo y celular) lo arma el sistema en una línea, como en el panel inmobiliario. Meta no acepta cuerpos que empiecen o terminen con una variable ni dos variables seguidas: por eso el cuerpo siempre cierra con la línea `*Construimos confianza, protegemos su patrimonio.*` (la 1 ya estaba creada y queda como está).
 
@@ -92,9 +92,9 @@ Ejemplos: `{{1}}` Luis Prada · `{{2}}` 1686 · `{{3}}` Jocabeth Cantillo · Cor
 
 Botón `Ver y responder`. URL del sitio web `https://sucasainmobiliaria.com.co/dashboard-comercial/public/tarea.php?t=`. URL de muestra `https://sucasainmobiliaria.com.co/dashboard-comercial/public/tarea.php?t=1686.1893456000.ejemplo`.
 
-## 5. `scm_cotizacion_inmuebles_v1`
+## 5. `scm_cotizacion_inmuebles_pdf_v1`
 
-Para el cliente, al crear una cotización de inmuebles desde el popup de la tarea. **Encabezado:** en "Muestra de contenido multimedia" elige **Imagen** y sube una foto de ejemplo de un inmueble (JPG o PNG). El panel envía la foto de portada del primer inmueble cotizado o, si no tiene, la ficha del asesor o el banner de los correos.
+Para el cliente, al crear una cotización de inmuebles desde el popup de la tarea. **Encabezado:** en "Muestra de contenido multimedia" elige **Documento** y sube un PDF de ejemplo (por ejemplo, una cotización descargada del panel). El panel envía el PDF de la cotización (`cotizacion-inmuebles-<número>.pdf`), que Meta descarga de `cotizacion.php?c=…&formato=pdf`.
 
 ```text
 Hola *{{1}}.*

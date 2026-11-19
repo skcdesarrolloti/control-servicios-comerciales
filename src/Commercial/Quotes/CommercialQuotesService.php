@@ -35,15 +35,18 @@ final class CommercialQuotesService
   private Settings $settings;
   private CommercialAccessPolicy $policy;
   private ?CommercialQuotesNotifier $notifier;
+  private ?QuotePdf $pdfs;
   /** @var array<string,array{alerta:int,vencido:int}>|null */
   private ?array $limits = null;
 
-  public function __construct(CommercialQuotesRepository $repository, Settings $settings, CommercialAccessPolicy $policy, ?CommercialQuotesNotifier $notifier = null)
+  /** @param QuotePdf|null $pdfs PDF guardado de cada cotización; por defecto, en storage/uploads/cotizaciones. */
+  public function __construct(CommercialQuotesRepository $repository, Settings $settings, CommercialAccessPolicy $policy, ?CommercialQuotesNotifier $notifier = null, ?QuotePdf $pdfs = null)
   {
     $this->repository = $repository;
     $this->settings = $settings;
     $this->policy = $policy;
     $this->notifier = $notifier;
+    $this->pdfs = $pdfs ?? QuotePdf::fromRuntime();
   }
 
   // ── Configuración ───────────────────────────────────
@@ -303,12 +306,14 @@ final class CommercialQuotesService
       throw $exception;
     }
 
+    // El PDF se genera antes de avisar: va adjunto al correo y como documento en el WhatsApp. Si Chromium no responde,
+    // el correo sale con el enlace y el WhatsApp pide el PDF a cotizacion.php, que lo intenta generar de nuevo.
+    $pdf = $this->pdfPath($id);
     $sent = ['correo' => false, 'whatsapp' => false];
     if ($this->notifier !== null) {
-      $photos = $this->photos($rows, false);
-      $properties = array_map(fn(array $row): array => QuoteComparison::normalize($row, $type) + ['foto' => $photos[trim((string) $row['codigo'])][0] ?? ''], $rows);
+      $properties = array_map(static fn(array $row): array => QuoteComparison::normalize($row, $type), $rows);
       try {
-        $sent = $this->notifier->quoteCreated($id, $quote, $advisor, $properties, trim((string) ($task['indicativo'] ?? '')) ?: '57');
+        $sent = $this->notifier->quoteCreated($id, $quote, $advisor, $properties, trim((string) ($task['indicativo'] ?? '')) ?: '57', $pdf);
       } catch (\Throwable $exception) {
         error_log('[cotizaciones:aviso] ' . $exception->getMessage());
       }
@@ -317,8 +322,10 @@ final class CommercialQuotesService
     return [
       'id' => $id,
       'url' => $url,
+      'pdf' => $pdf !== null,
       'enviado' => $sent,
-      'message' => 'Cotización #' . $id . ' creada. ' . ($channels === [] ? 'No se pudo enviar al cliente: revisa su correo y celular y comparte el enlace.' : 'Se envió al cliente por ' . implode(' y ', array_map(static fn(string $channel): string => $channel === 'correo' ? 'correo' : 'WhatsApp', $channels)) . '.'),
+      'message' => 'Cotización #' . $id . ' creada. ' . ($channels === [] ? 'No se pudo enviar al cliente: revisa su correo y celular y comparte el enlace.' : 'Se envió al cliente por ' . implode(' y ', array_map(static fn(string $channel): string => $channel === 'correo' ? 'correo' : 'WhatsApp', $channels)) . ($pdf !== null ? ', con el PDF.' : '.'))
+        . ($pdf === null && $this->pdfs !== null ? ' El PDF no se pudo generar ahora; el correo lleva el enlace y el PDF se generará cuando se abra.' : ''),
     ];
   }
 
@@ -390,6 +397,31 @@ final class CommercialQuotesService
   }
 
   // ── Vista pública ───────────────────────────────────
+
+  /**
+   * Ruta del PDF de la cotización: el guardado o, si no existe (Chromium no respondió al crearla), uno nuevo con los
+   * datos de hoy. null si no se puede generar.
+   */
+  public function pdfPath(int $id): ?string
+  {
+    if ($this->pdfs === null || $id < 1) {
+      return null;
+    }
+    $existing = $this->pdfs->existing($id);
+    if ($existing !== null) {
+      return $existing;
+    }
+    $quote = $this->publicData($id);
+    if ($quote === null) {
+      return null;
+    }
+    try {
+      return $this->pdfs->store($id, $quote, PublicQuoteAccess::url($id));
+    } catch (\Throwable $exception) {
+      error_log('[cotizaciones:pdf] ' . $exception->getMessage());
+      return null;
+    }
+  }
 
   /**
    * Todo lo que ve el cliente en su enlace. No incluye datos internos (dirección exacta, propietario, llaves).

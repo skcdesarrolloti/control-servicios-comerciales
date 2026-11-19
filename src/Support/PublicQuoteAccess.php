@@ -27,6 +27,12 @@ final class PublicQuoteAccess
     return rtrim((string) SCM_BASE_URL, '/') . '/cotizacion.php?c=' . self::reference($id);
   }
 
+  /** El PDF de la cotización con el mismo enlace firmado: lo descarga Meta para el WhatsApp y el cliente desde la vista. */
+  public static function pdfUrl(int $id): string
+  {
+    return self::url($id) . '&formato=pdf';
+  }
+
   /** Número de la cotización si el enlace es auténtico y está vigente; 0 si no. */
   public static function verify(string $reference): int
   {

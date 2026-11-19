@@ -6,6 +6,7 @@ namespace SCM\Views;
 
 use SCM\Commercial\Calls\CommercialCallsNotifier;
 use SCM\Commercial\Quotes\QuoteComparison;
+use SCM\Commercial\Quotes\QuotePdf;
 
 /**
  * Cotización de inmuebles pública (public/cotizacion.php): la ve el cliente desde el enlace del correo o del WhatsApp.
@@ -19,8 +20,11 @@ final class PublicQuoteView
     return htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
   }
 
-  /** @param array<string,mixed>|null $quote PublicQuote data de CommercialQuotesService::publicData(). */
-  public static function render(?array $quote, string $css, string $logo, string $error = ''): string
+  /**
+   * @param array<string,mixed>|null $quote PublicQuote data de CommercialQuotesService::publicData().
+   * @param string $pdfUrl Enlace firmado del PDF (PublicQuoteAccess::pdfUrl).
+   */
+  public static function render(?array $quote, string $css, string $logo, string $error = '', string $pdfUrl = ''): string
   {
     $title = $quote !== null ? 'Cotización de inmuebles #' . (int) $quote['id'] : 'Cotización no disponible';
     $html = '<!doctype html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">'
@@ -46,7 +50,7 @@ final class PublicQuoteView
       }
       $html .= '</nav>';
     }
-    $html .= '</div>' . self::advisorCard($advisor, $whatsapp, (int) $quote['id']) . '</div></section>';
+    $html .= '</div>' . self::advisorCard($advisor, $whatsapp, (int) $quote['id'], $pdfUrl) . '</div></section>';
 
     if ($items === []) {
       $html .= '<section class="pq-wrap pq-empty"><p>Los inmuebles de esta cotización ya no están disponibles. Escríbele a tu asesor para recibir nuevas opciones.</p></section>';
@@ -78,7 +82,7 @@ final class PublicQuoteView
   }
 
   /** @param array{nombre:string,correo:string,celular:string} $advisor */
-  private static function advisorCard(array $advisor, string $whatsapp, int $id): string
+  private static function advisorCard(array $advisor, string $whatsapp, int $id, string $pdfUrl): string
   {
     $html = '<aside class="pq-advisor" aria-label="Tu asesor"><p class="pq-eyebrow">Tu asesor</p><p class="pq-advisor-name">' . self::e($advisor['nombre']) . '</p><div class="pq-actions">';
     if ($whatsapp !== '') {
@@ -89,6 +93,9 @@ final class PublicQuoteView
     }
     if ($advisor['correo'] !== '') {
       $html .= '<a class="pq-btn pq-btn-ghost" href="mailto:' . self::e($advisor['correo']) . '?subject=' . rawurlencode('Cotización #' . $id) . '">' . self::e($advisor['correo']) . '</a>';
+    }
+    if ($pdfUrl !== '') {
+      $html .= '<a class="pq-btn pq-btn-ghost" href="' . self::e($pdfUrl) . '" download="' . self::e(QuotePdf::filename($id)) . '">Descargar en PDF</a>';
     }
     return $html . '</div></aside>';
   }

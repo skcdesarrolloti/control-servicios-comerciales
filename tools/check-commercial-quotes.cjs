@@ -80,6 +80,12 @@ async function routePhotos(context) {
     assert.ok((await page.locator('[data-cqt-done] h1').innerText()).startsWith('Cotización #'));
     // En SQLite la cola compartida no existe: el envío real lo cubre PHPUnit. Aquí solo se muestra el estado de cada canal.
     assert.equal(await page.locator('[data-cqt-done] .cqt-channels li').count(), 2, 'Estado del correo y del WhatsApp');
+    // El PDF se genera con el Chrome o Edge local al crearla y se descarga con el mismo enlace firmado.
+    const pdfHref = await page.locator('[data-cqt-done] a[href*="formato=pdf"]').getAttribute('href');
+    const pdf = await page.request.get(endpoint + '?' + new URL(pdfHref).searchParams.toString(), { timeout: 90000 });
+    assert.equal(pdf.status(), 200, 'El PDF se descarga');
+    assert.equal(pdf.headers()['content-type'], 'application/pdf');
+    assert.ok((await pdf.body()).subarray(0, 5).toString() === '%PDF-', 'Es un PDF');
 
     // Visor con la vista pública dentro del panel.
     await page.locator('[data-cqt-done] [data-cqt-view]').click();
@@ -88,6 +94,8 @@ async function routePhotos(context) {
     assert.equal(await frame.locator('.pq-card').count(), 2);
     assert.ok((await frame.locator('.pq-adv').first().innerText()).includes('El canon más bajo'));
     assert.ok((await frame.locator('.pq-block').filter({ hasText: 'Observaciones de tu asesor' }).innerText()).includes('sábado'));
+    assert.equal(await frame.locator('.pq-advisor a[href*="formato=pdf"]').count(), 1, 'El cliente puede descargar el PDF');
+    assert.equal(await page.locator('#cqt-viewer a[href*="formato=pdf"]').count(), 1, 'El visor del panel ofrece el PDF');
     await page.keyboard.press('Escape');
     assert.equal(await page.locator('#cqt-viewer').count(), 0, 'Escape cierra el visor');
 

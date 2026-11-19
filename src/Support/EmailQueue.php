@@ -34,7 +34,10 @@ final class EmailQueue
     $scheduledAt = trim((string) ($options['scheduled_at'] ?? ''));
     $destinationName = trim((string) ($options['destination_name'] ?? ''));
     $dedupeKey = trim((string) ($options['dedupe_key'] ?? ''));
+    // reply_to, cc, bcc y attachments ({path, name}) los lee el proveedor de correo de shared-notifications del payload.
+    $payload = is_array($options['payload'] ?? null) ? $options['payload'] : [];
     $meta = $this->buildMeta($options, [
+      'payload',
       'source',
       'source_module',
       'priority',
@@ -62,6 +65,7 @@ final class EmailQueue
           'subject' => $subject,
           'message_html' => $html,
           'message_text' => trim(html_entity_decode(strip_tags($html), ENT_QUOTES, 'UTF-8')),
+          'payload' => $payload,
           'meta' => $meta,
           'priority' => $priority,
           'max_attempts' => $maxAttempts,

@@ -20,6 +20,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'GET' && !isset($_GET['c'])) {
   $_SESSION = ['scm_logged_in' => true, 'scm_user_id' => (int) $employee, 'scm_employee_id' => $employee, 'scm_user_cargo' => $employee === '303' ? '13' : '9', 'scm_user' => 'Prueba', 'db' => $_SESSION['db'] ?? bin2hex(random_bytes(6))];
 }
 $db = Tests\Fixtures\CommercialQuotesDatabase::create('sqlite:' . sys_get_temp_dir() . '/scm-quotes-' . ($_SESSION['db'] ?? 'publico') . '.sqlite');
+// PDF con el Chrome o Edge local (HtmlPdfRenderer), guardado fuera del repositorio y aparte por cada base de prueba.
+define('SCM_UPLOAD_PATH', sys_get_temp_dir() . '/scm-quotes-uploads-' . ($_SESSION['db'] ?? 'publico'));
 $db->pdo()->sqliteCreateFunction('CONCAT', static fn(...$parts): string => implode('', array_map('strval', $parts)));
 $settings = new SCM\Core\Settings($db);
 $csrf = new SCM\Core\Csrf(str_repeat('x', 40));

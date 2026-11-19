@@ -13,9 +13,12 @@ use SCM\Commercial\Quotes\CommercialQuotesNotifier;
 use SCM\Commercial\Quotes\CommercialQuotesRepository;
 use SCM\Commercial\Quotes\CommercialQuotesService;
 use SCM\Commercial\Quotes\QuoteComparison;
+use SCM\Commercial\Quotes\QuotePdf;
 use SCM\Core\Database;
 use SCM\Core\Settings;
 use SCM\Http\Api\CommercialActionRouter;
+use SCM\Http\Controller\PublicQuotePageController;
+use SCM\Support\FileRateLimiter;
 use SCM\Support\PublicQuoteAccess;
 use SCM\Views\CommercialDashboardView;
 use SCM\Views\CommercialQuotesView;
@@ -30,6 +33,10 @@ final class CommercialQuotesTest extends TestCase
   private array $emails = [];
   /** @var list<array{phone:string,template:string,components:array<int,mixed>}> */
   private array $whatsapps = [];
+  private string $pdfDir = '';
+  /** HTML que recibió el generador de PDF; null = Chromium no responde. */
+  private ?string $pdfHtml = '';
+  private bool $pdfFails = false;
 
   protected function setUp(): void
   {
@@ -40,11 +47,25 @@ final class CommercialQuotesTest extends TestCase
     if (!defined('SCM_BASE_URL')) define('SCM_BASE_URL', 'https://panel.test/public');
     $this->db = CommercialQuotesDatabase::create();
     $this->login('101', '9');
+    $this->pdfDir = sys_get_temp_dir() . '/scm-quotes-test-' . bin2hex(random_bytes(4));
   }
 
   protected function tearDown(): void
   {
     $_SESSION = $this->previousSession;
+    foreach (glob($this->pdfDir . '/*') ?: [] as $file) {
+      @unlink($file);
+    }
+    @rmdir($this->pdfDir);
+  }
+
+  private function pdfs(): QuotePdf
+  {
+    return new QuotePdf($this->pdfDir, function (string $html, string $title, array $options): ?string {
+      $this->pdfHtml = $html;
+      self::assertStringEndsWith('quote-document.css', $options['stylesheets'][0]);
+      return $this->pdfFails ? null : '%PDF-1.4 cotización de prueba';
+    });
   }
 
   private function login(string $employee, string $cargo): void
@@ -59,7 +80,7 @@ final class CommercialQuotesTest extends TestCase
       function ($to, string $subject, string $html, array $options): void { $this->emails[] = ['to' => $to, 'subject' => $subject, 'options' => $options]; },
       function (string $phone, string $template, array $components, array $options): void { $this->whatsapps[] = ['phone' => $phone, 'template' => $template, 'components' => $components]; }
     );
-    return new CommercialQuotesService(new CommercialQuotesRepository($this->db), $settings, CommercialQuotesDatabase::policy($this->db), $notifier);
+    return new CommercialQuotesService(new CommercialQuotesRepository($this->db), $settings, CommercialQuotesDatabase::policy($this->db), $notifier, $this->pdfs());
   }
 
   /** @param array<string,mixed> $override */
@@ -206,14 +227,86 @@ final class CommercialQuotesTest extends TestCase
     self::assertSame('SI', $taskHistory['fue_editada']);
 
     self::assertSame(['correo' => true, 'whatsapp' => true], $result['enviado']);
+    self::assertTrue($result['pdf']);
+    self::assertStringContainsString('con el PDF', $result['message']);
     self::assertSame('laura@example.test', $this->emails[0]['to']);
     self::assertSame(['101@example.test'], $this->emails[1]['to'], 'Quien la hizo recibe la copia; sin correos fijos.');
+    $pdf = $this->pdfDir . '/cotizacion-' . $result['id'] . '.pdf';
+    self::assertSame('%PDF-1.4 cotización de prueba', file_get_contents($pdf), 'El PDF queda guardado para el adjunto y la descarga.');
+    self::assertSame([['path' => $pdf, 'name' => 'cotizacion-inmuebles-' . $result['id'] . '.pdf']], $this->emails[0]['options']['payload']['attachments'], 'El correo del cliente lleva el PDF adjunto.');
+    self::assertSame('101@example.test', $this->emails[0]['options']['payload']['reply_to'], 'Si responde el correo, le llega al asesor.');
+    self::assertSame($this->emails[0]['options']['payload']['attachments'], $this->emails[1]['options']['payload']['attachments']);
     self::assertSame('+573001234567', $this->whatsapps[0]['phone']);
     self::assertSame(CommercialQuotesNotifier::TEMPLATE, $this->whatsapps[0]['template']);
     $components = array_column($this->whatsapps[0]['components'], null, 'type');
-    self::assertSame('https://img.example.test/9001.jpg', $components['header']['parameters'][0]['image']['link'], 'El encabezado es la foto del primer inmueble en https.');
+    $document = $components['header']['parameters'][0];
+    self::assertSame('document', $document['type'], 'El WhatsApp lleva el PDF como documento.');
+    self::assertSame(PublicQuoteAccess::pdfUrl($result['id']), $document['document']['link']);
+    self::assertStringEndsWith('&formato=pdf', $document['document']['link']);
+    self::assertSame('cotizacion-inmuebles-' . $result['id'] . '.pdf', $document['document']['filename']);
     self::assertSame(['Laura Cliente', (string) $result['id'], '2 inmuebles en arriendo', 'Consultora Uno · Correo: 101@example.test · Celular: 3000000101'], array_column($components['body']['parameters'], 'text'));
     self::assertSame($result['id'], PublicQuoteAccess::verify($components['button']['parameters'][0]['text']));
+  }
+
+  public function testWithoutChromiumTheQuoteIsStillSentWithTheLink(): void
+  {
+    $this->pdfFails = true;
+    $result = $this->create();
+    self::assertFalse($result['pdf']);
+    self::assertSame(['correo' => true, 'whatsapp' => true], $result['enviado']);
+    self::assertStringContainsString('El PDF no se pudo generar ahora', $result['message']);
+    self::assertArrayNotHasKey('attachments', $this->emails[0]['options']['payload'], 'Sin PDF el correo sale con el enlace.');
+    $components = array_column($this->whatsapps[0]['components'], null, 'type');
+    self::assertSame(PublicQuoteAccess::pdfUrl($result['id']), $components['header']['parameters'][0]['document']['link'], 'Meta pide el PDF a cotizacion.php, que lo intenta generar de nuevo.');
+
+    $this->pdfFails = false;
+    $path = $this->service()->pdfPath($result['id']);
+    self::assertSame($this->pdfDir . '/cotizacion-' . $result['id'] . '.pdf', $path, 'Se genera cuando se pide.');
+    $this->pdfHtml = null;
+    self::assertSame($path, $this->service()->pdfPath($result['id']));
+    self::assertNull($this->pdfHtml, 'Ya guardado, no se vuelve a generar.');
+  }
+
+  public function testPdfHasEveryPropertyTheComparisonAndNoPrivateData(): void
+  {
+    $this->db->update('wp_jet_cct_inmuebles', ['fecha_actualizacion' => (string) time()], ['codigo' => '503']);
+    $this->db->insert('wp_jet_cct_inmuebles', ['codigo' => '506', 'estado' => 'Publico', 'tipo_negocio' => 'Arriendo', 'tipo_inmueble' => 'Casa', 'barrio' => 'Pie de la Popa', 'ciudad' => 'Cartagena', 'precio_arriendo' => '1.900.000', 'area_construida' => '90', 'fecha_actualizacion' => (string) time(), 'direccion' => 'Calle secreta 506', 'propietario' => 'Propietario reservado']);
+    $this->db->insert('wp_jet_cct_inmuebles', ['codigo' => '507', 'estado' => 'Publico', 'tipo_negocio' => 'Arriendo', 'tipo_inmueble' => 'Apartamento', 'barrio' => 'Getsemaní', 'ciudad' => 'Cartagena', 'precio_arriendo' => '2.100.000', 'area_construida' => '65', 'fecha_actualizacion' => (string) time()]);
+    $result = $this->create(['inmuebles' => ['501', '502', '503', '506', '507'], 'observaciones' => 'Podemos visitar el sábado.']);
+    $html = (string) $this->pdfHtml;
+    foreach (['501', '502', '503', '506', '507'] as $code) {
+      self::assertStringContainsString('Código ' . $code, $html);
+    }
+    self::assertStringContainsString('Laura Cliente', $html);
+    self::assertStringContainsString('Cotización de inmuebles #' . $result['id'], $html);
+    self::assertStringContainsString('Sus ventajas frente a las otras opciones', $html);
+    self::assertSame(2, substr_count($html, '<th>Ubicación</th>'), 'Cinco inmuebles: la comparación va en dos tablas (4 + 1) para que quepa en la hoja.');
+    self::assertStringContainsString('Opción 5', $html);
+    self::assertStringContainsString('https://img.example.test/9001.jpg', $html, 'Las fotos van en https.');
+    self::assertStringContainsString('Podemos visitar el sábado.', $html);
+    self::assertStringContainsString(CommercialQuotesService::DEFAULT_RENT_NOTE, $html);
+    self::assertStringContainsString('/cotizacion.php?c=' . $result['id'] . '.', $html, 'Lleva el enlace a la vista en línea.');
+    self::assertStringContainsString('Construimos confianza, protegemos su patrimonio.', $html);
+    self::assertStringNotContainsString('Calle secreta', $html, 'La dirección exacta no va en el PDF.');
+    self::assertStringNotContainsString('Propietario reservado', $html);
+  }
+
+  public function testPublicLinkServesTheStoredPdf(): void
+  {
+    if (!defined('SCM_UPLOAD_PATH')) define('SCM_UPLOAD_PATH', sys_get_temp_dir() . '/scm-quotes-uploads-' . bin2hex(random_bytes(4)));
+    $result = $this->create();
+    $stored = (new QuotePdf(SCM_UPLOAD_PATH . '/cotizaciones'))->path($result['id']);
+    @mkdir(dirname($stored), 0777, true);
+    file_put_contents($stored, '%PDF-1.4 guardado');
+    $limits = sys_get_temp_dir() . '/scm-quotes-limits-' . bin2hex(random_bytes(4));
+    $controller = new PublicQuotePageController($this->db, new Settings($this->db), new FileRateLimiter($limits));
+    ob_start();
+    $controller->handle(['c' => PublicQuoteAccess::reference($result['id']), 'formato' => 'pdf'], 'GET', '127.0.0.1');
+    $body = (string) ob_get_clean();
+    @unlink($stored);
+    array_map('unlink', glob($limits . '/*') ?: []);
+    @rmdir($limits);
+    self::assertSame('%PDF-1.4 guardado', $body);
   }
 
   public function testCreateRejectsExpiredNonPublicAndEmptySelections(): void
@@ -295,8 +388,10 @@ final class CommercialQuotesTest extends TestCase
     self::assertNotNull($data);
     self::assertSame(['https://img.example.test/9002.jpg'], array_values(array_diff(array_map(static fn(string $url): string => str_replace('http://', 'https://', $url), $data['inmuebles'][0]['fotos']), ['https://img.example.test/9001.jpg'])));
     self::assertSame(CommercialQuotesService::DEFAULT_RENT_NOTE, $data['notas'][0]);
-    $html = PublicQuoteView::render($data, '/q.css', 'https://logo.test/l.png');
+    $html = PublicQuoteView::render($data, '/q.css', 'https://logo.test/l.png', '', PublicQuoteAccess::pdfUrl($quote['id']));
     self::assertStringContainsString('Comparación de los inmuebles', $html);
+    self::assertStringContainsString('Descargar en PDF', $html);
+    self::assertStringContainsString('&amp;formato=pdf', $html);
     self::assertStringContainsString('https://img.example.test/9001.jpg', $html, 'Las fotos http se muestran en https.');
     self::assertStringContainsString('Sus ventajas frente a las otras opciones', $html);
     self::assertStringContainsString('Podemos visitar el sábado.', $html);

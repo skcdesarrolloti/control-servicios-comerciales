@@ -1,0 +1,76 @@
+/* PDF de la cotización de inmuebles (QuotePdf, Chromium). Colores de la vista pública (public-quote.css). */
+@font-face { font-family:'SCM Acta Sans'; src:url('../fonts/noto-sans.ttf') format('truetype'); font-style:normal; font-weight:100 900; }
+@page {
+  size:letter; margin:14mm 14mm 16mm;
+  @bottom-left { content:'SKC SuCasa Inmobiliaria'; color:#7a8499; font:8.5px 'SCM Acta Sans',Arial,sans-serif; }
+  @bottom-right { content:'Página ' counter(page) ' de ' counter(pages); color:#7a8499; font:8.5px 'SCM Acta Sans',Arial,sans-serif; }
+}
+html,body.qd-page { margin:0; padding:0; background:#fff; print-color-adjust:exact; -webkit-print-color-adjust:exact; }
+.qd { --navy:#061d49; --blue:#1e3c76; --gold:#f8cf4a; --ink:#1f2a3d; --muted:#5b6780; --line:#e2e6ef; --soft:#f4f6fb; --green:#0f7a45; --green-bg:#e8f6ee; color:var(--ink); font:10.5px/1.5 'SCM Acta Sans',Arial,sans-serif; }
+.qd * { box-sizing:border-box; }
+.qd a { color:var(--blue); text-decoration:none; }
+.qd h1,.qd h2,.qd h3 { color:var(--navy); line-height:1.25; break-after:avoid; }
+.qd-letterhead { margin-bottom:3mm; }
+.qd-letterhead img { display:block; width:46%; height:auto; }
+.qd-eyebrow { margin:0; font-size:8.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
+.qd-head { display:grid; grid-template-columns:1fr 62mm; gap:6mm; align-items:start; padding:5mm 6mm; border-radius:4mm; background:var(--navy); color:#fff; }
+.qd-head .qd-eyebrow { color:var(--gold); }
+.qd-head h1 { margin:1mm 0 1.5mm; font-size:20px; color:#fff; }
+.qd-head p { margin:0; }
+.qd-advisor { display:flex; flex-direction:column; gap:.5mm; padding:3.5mm 4mm; border-radius:3mm; background:#fff; color:var(--ink); }
+.qd-advisor span { font-size:8.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
+.qd-advisor strong { font-size:12.5px; color:var(--navy); }
+.qd-advisor em { font-style:normal; font-size:9.5px; color:var(--muted); word-break:break-all; }
+.qd-online { margin:3mm 0 0; font-size:9.5px; color:var(--muted); }
+.qd-empty { margin:6mm 0; padding:4mm; border:1px solid var(--line); border-radius:3mm; }
+
+.qd-card { margin-top:6mm; break-inside:auto; }
+.qd-break { break-before:page; margin-top:0; }
+.qd-photos { display:grid; gap:2mm; margin-bottom:3.5mm; break-inside:avoid; }
+.qd-photos img { display:block; width:100%; height:100%; object-fit:cover; border-radius:2.5mm; background:var(--soft); }
+.qd-photos-1 { grid-template-columns:1fr; height:58mm; }
+.qd-photos-2 { grid-template-columns:2fr 1fr; height:66mm; }
+.qd-photos-3 { grid-template-columns:2fr 1fr; grid-template-rows:1fr 1fr; height:74mm; }
+.qd-photos-3 img:first-child { grid-row:1 / span 2; }
+.qd-photos-2 img,.qd-photos-3 img { min-height:0; }
+.qd-card-head { display:grid; grid-template-columns:1fr auto; gap:5mm; align-items:start; break-inside:avoid; }
+.qd-card-head h2 { margin:.8mm 0 0; font-size:16px; }
+.qd-sub { margin:.5mm 0 0; color:var(--muted); }
+.qd-price { display:flex; flex-direction:column; align-items:flex-end; text-align:right; }
+.qd-price span { font-size:8.5px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--muted); }
+.qd-price strong { font-size:18px; color:var(--navy); line-height:1.2; }
+.qd-price em { font-style:normal; font-size:9.5px; color:var(--muted); }
+.qd-unavailable { margin:3mm 0 0; padding:2mm 3mm; border-radius:2mm; background:#fff4e5; color:#8a4b00; font-weight:700; }
+.qd-specs { display:grid; grid-template-columns:repeat(4,1fr); gap:2mm; margin:3.5mm 0 0; break-inside:avoid; }
+.qd-specs div { padding:2mm 2.5mm; border-radius:2mm; background:var(--soft); }
+.qd-specs dt { font-size:8.5px; color:var(--muted); font-weight:600; }
+.qd-specs dd { margin:.3mm 0 0; font-size:12px; font-weight:700; color:var(--navy); }
+.qd-adv { margin-top:3.5mm; padding:3mm 4mm; border-radius:2.5mm; background:var(--green-bg); border:1px solid #bfe3cd; break-inside:avoid; }
+.qd-adv h3 { margin:0 0 1mm; font-size:11px; color:var(--green); }
+.qd-adv ul { margin:0; padding-left:4.5mm; }
+.qd-text h3 { margin:3.5mm 0 1mm; font-size:11px; }
+.qd-text p { margin:0; }
+.qd-pre { white-space:pre-line; }
+.qd-features { margin:2mm 0 0; }
+.qd-features strong { color:var(--navy); }
+.qd-portal { margin:.8mm 0 0; font-size:9px; color:var(--muted); }
+
+.qd-block { margin-top:6mm; }
+.qd-block h2 { margin:0 0 2mm; font-size:15px; }
+.qd-hint { margin:0 0 3mm; color:var(--muted); }
+.qd-best { display:inline-block; padding:.2mm 1.6mm; border-radius:99px; background:var(--green); color:#fff; font-size:7.5px; font-weight:700; letter-spacing:.03em; text-transform:uppercase; vertical-align:middle; }
+.qd-table { width:100%; border-collapse:collapse; table-layout:fixed; margin:0 0 3mm; font-size:9.5px; line-height:1.3; }
+.qd-table th,.qd-table td { padding:1.1mm 2mm; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+.qd-table thead th { background:var(--navy); color:#fff; font-weight:700; }
+.qd-table thead th small { display:block; font-weight:400; opacity:.85; }
+.qd-table thead th:first-child { width:30%; }
+.qd-table tbody th { width:30%; color:var(--muted); font-weight:600; }
+.qd-table tr { break-inside:avoid; }
+.qd-table td.is-best { background:var(--green-bg); font-weight:700; color:var(--green); }
+.qd-check td { text-align:center; }
+.qd-check td.is-yes { color:var(--green); font-weight:700; }
+.qd-check td.is-no { color:#a6aec0; }
+.qd-notes p { margin:0 0 2mm; color:var(--muted); }
+.qd-foot { margin-top:5mm; padding-top:3mm; border-top:2px solid var(--gold); text-align:center; color:var(--muted); break-inside:avoid; }
+.qd-foot p { margin:.8mm 0; }
+.qd-motto { font-size:12px; font-weight:700; color:var(--navy); }

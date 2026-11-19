@@ -7,6 +7,7 @@ namespace SCM\Views;
 use SCM\Commercial\CommercialAccessPolicy;
 use SCM\Commercial\Quotes\CommercialQuotesService;
 use SCM\Commercial\Quotes\QuoteComparison;
+use SCM\Commercial\Quotes\QuotePdf;
 
 /**
  * Cotizaciones de inmuebles en el panel: formulario del popup de la tarea (datos del cliente, buscador de inmuebles y
@@ -155,6 +156,7 @@ final class CommercialQuotesView
       . '<ul class="cqt-channels">' . implode('', $channels) . '</ul>'
       . '<div class="cqt-done-actions"><button type="button" class="cqt-primary" data-cqt-view="' . $id . '" data-ticket-pk="' . $ticketPk . '">' . self::icon('visibility') . 'Ver cotización</button>'
       . '<button type="button" class="cqt-secondary" data-cqt-copy="' . self::e($result['url']) . '">' . self::icon('content_copy') . 'Copiar enlace</button>'
+      . '<a class="cqt-secondary" href="' . self::e($result['url'] . '&formato=pdf') . '" download="' . self::e(QuotePdf::filename($id)) . '">' . self::icon('picture_as_pdf') . 'Descargar PDF</a>'
       . '<button type="button" class="cqt-secondary" data-commercial-return-case="' . $ticketPk . '">' . self::icon('arrow_back') . 'Volver a la tarea</button></div>'
       . '</div></section>';
   }
@@ -164,6 +166,7 @@ final class CommercialQuotesView
   {
     return '<div class="cqt-viewer-box" role="document"><header class="cqt-viewer-head"><h2 id="cqt-viewer-title">Cotización #' . $id . '</h2><div class="cqt-viewer-actions">'
       . '<button type="button" class="cqt-secondary" data-cqt-copy="' . self::e($url) . '">' . self::icon('content_copy') . 'Copiar enlace</button>'
+      . '<a class="cqt-secondary" href="' . self::e($url . '&formato=pdf') . '" download="' . self::e(QuotePdf::filename($id)) . '">' . self::icon('picture_as_pdf') . 'PDF</a>'
       . '<a class="cqt-secondary" href="' . self::e($url) . '" target="_blank" rel="noopener">' . self::icon('open_in_new') . 'Abrir</a>'
       . '<button type="button" class="cqt-icon" data-cqt-viewer-close aria-label="Cerrar">' . self::icon('close') . '</button></div></header>'
       . '<iframe class="cqt-frame" src="' . self::e($url) . '" title="Cotización #' . $id . ' como la ve el cliente"></iframe></div>';
