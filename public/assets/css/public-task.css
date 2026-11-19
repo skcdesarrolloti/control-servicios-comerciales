@@ -1,4 +1,4 @@
-/* Vista pública de una solicitud (public/tarea.php, PublicTaskView). Copia adaptada de
+/* Vista pública de una tarea (public/tarea.php, PublicTaskView). Copia adaptada de
    control-servicios-inmobiliarios/public/assets/css/public-case.css: mantener ambas iguales. */
 :root { color-scheme:light; --navy:#061d49; --blue:#1e3c76; --orange:#f59120; --line:#e2e8f0; --ink:#0f172a; --text:#334155; --muted:#64748b; }
 * { box-sizing:border-box; }

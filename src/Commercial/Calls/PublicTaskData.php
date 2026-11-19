@@ -8,7 +8,7 @@ use SCM\Core\Database;
 use SCM\Support\StoredFileService;
 
 /**
- * Datos que la vista pública de una solicitud (public/tarea.php) puede mostrarle al cliente: lista explícita de campos.
+ * Datos que la vista pública de una tarea (public/tarea.php) puede mostrarle al cliente: lista explícita de campos.
  * Copia adaptada de control-servicios-inmobiliarios/src/Support/PublicCaseData.php (mantener ambas iguales).
  *
  * El historial sale de jet_cct_historial_del_ticket (las respuestas, que el panel marca "Respuesta al cliente"); las notas
@@ -41,7 +41,7 @@ final class PublicTaskData
   }
 
   /**
-   * Historial de la solicitud para el cliente: autor, fecha, texto y adjuntos permitidos.
+   * Historial de la tarea para el cliente: autor, fecha, texto y adjuntos permitidos.
    * Nunca publica correo, celular ni identificadores internos de la fila.
    * @param array<string,mixed> $ticket
    * @return list<array{author:string,date:string,text:string,external:bool,images:list<string>,documents:list<array{url:string,name:string}>}>

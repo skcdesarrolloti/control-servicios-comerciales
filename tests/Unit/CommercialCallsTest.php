@@ -559,7 +559,7 @@ final class CommercialCallsTest extends TestCase
     self::assertSame([$photo], $history[0]['images'], 'Solo adjuntos firmados o de la empresa.');
     $html = PublicTaskView::render(\SCM\Commercial\Calls\PublicTaskData::fromTicket($task), $history, 'tarea.php?t=x', self::assets());
     self::assertStringContainsString('<link rel="icon" href="https://panel.test/favicon.png"', $html);
-    self::assertStringContainsString('Historial de la solicitud', $html);
+    self::assertStringContainsString('Historial de la tarea', $html);
     self::assertStringContainsString('Te espero', $html);
     self::assertStringContainsString('Puedo el lunes', $html);
     self::assertStringContainsString('data-title="Ficha.pdf"', $html);

@@ -108,9 +108,9 @@ final class CommercialCallsNotifier
       $signature = $manager !== ''
         ? '<p>Cordialmente:<br><strong>' . $e($manager) . '</strong> · Coordinación comercial' . (trim((string) ($branch['celular_ge_comercial'] ?? '')) !== '' ? ' · ' . $e($branch['celular_ge_comercial']) : '') . '</p>'
         : '<p>Cordialmente,<br><strong>Equipo comercial</strong></p>';
-      $this->send($task['correo_solicitante'] ?? '', 'Solicitud #' . $id . ' agendada', 'Registramos tu solicitud',
-        '<p>Estimado/a <strong>' . $e($task['solicitante'] ?? '') . '</strong>, registramos tu solicitud de <strong>' . $topic . '</strong> y la asignamos a <strong>' . $employee
-        . '</strong>' . (trim((string) ($task['celular_empleado'] ?? '')) !== '' ? ' (' . $e($task['celular_empleado']) . ')' : '') . '.</p><p>Desde el botón puedes ver tu solicitud y escribirnos. Su atención será evaluada para garantizar un servicio óptimo.</p>' . $signature,
+      $this->send($task['correo_solicitante'] ?? '', 'Tarea #' . $id . ' agendada', 'Registramos tu tarea',
+        '<p>Estimado/a <strong>' . $e($task['solicitante'] ?? '') . '</strong>, registramos tu tarea de <strong>' . $topic . '</strong> y la asignamos a <strong>' . $employee
+        . '</strong>' . (trim((string) ($task['celular_empleado'] ?? '')) !== '' ? ' (' . $e($task['celular_empleado']) . ')' : '') . '.</p><p>Desde el botón puedes ver tu tarea y escribirnos. Su atención será evaluada para garantizar un servicio óptimo.</p>' . $signature,
         $this->buttons(PublicTaskAccess::url($id), 'Ver y responder'), 'llamadas:tarea:' . $id . ':solicitante', (string) ($task['correo_empleado'] ?? ''));
     }
     if (!$this->blocked($client, 'whatsapp')) {
@@ -154,8 +154,8 @@ final class CommercialCallsNotifier
     $key = 'llamadas:tarea:' . $id . ':funcionario:' . substr(hash('sha256', $message), 0, 16);
     $client = $this->clientPreferences($task);
     if (!$this->blocked($client, 'email')) {
-      $this->send($task['correo_solicitante'] ?? '', 'Respuesta a tu solicitud #' . $id, 'Tienes una respuesta',
-        '<p>Estimado/a <strong>' . $e($task['solicitante'] ?? '') . '</strong>, <strong>' . $e($author) . '</strong> respondió tu solicitud <strong>#' . $id . '</strong>:</p><blockquote style="margin:12px 0;padding:12px 16px;background:#f1f5f9;border-left:4px solid #1e3c76;">' . nl2br($e($message)) . '</blockquote>',
+      $this->send($task['correo_solicitante'] ?? '', 'Respuesta a tu tarea #' . $id, 'Tienes una respuesta',
+        '<p>Estimado/a <strong>' . $e($task['solicitante'] ?? '') . '</strong>, <strong>' . $e($author) . '</strong> respondió tu tarea <strong>#' . $id . '</strong>:</p><blockquote style="margin:12px 0;padding:12px 16px;background:#f1f5f9;border-left:4px solid #1e3c76;">' . nl2br($e($message)) . '</blockquote>',
         $this->buttons(PublicTaskAccess::url($id), 'Ver y responder'), $key, (string) ($task['correo_empleado'] ?? ''));
     }
     if (!$this->blocked($client, 'whatsapp')) {

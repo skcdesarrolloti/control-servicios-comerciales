@@ -1,4 +1,4 @@
-/* Vista pública de una solicitud (public/tarea.php). Copia adaptada de
+/* Vista pública de una tarea (public/tarea.php). Copia adaptada de
  * control-servicios-inmobiliarios/public/assets/js/public-case.js: mantener ambas iguales. */
 (function () {
   'use strict';

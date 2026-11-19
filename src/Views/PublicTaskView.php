@@ -7,7 +7,7 @@ namespace SCM\Views;
 use SCM\Commercial\Calls\PublicTaskConversation;
 
 /**
- * Vista pública de una solicitud comercial (public/tarea.php): datos de la solicitud, su historial con adjuntos y el
+ * Vista pública de una tarea comercial (public/tarea.php): datos de la tarea, su historial con adjuntos y el
  * formulario para responder con fotos y PDF. Copia adaptada de control-servicios-inmobiliarios/src/Views/PublicCaseView.php
  * (estilos en public-task.css y comportamiento en public-task.js, copias de public-case.css/.js): mantener ambas iguales.
  * Solo recibe los datos de PublicTaskData, nunca la fila completa de la tarea.
@@ -27,7 +27,7 @@ final class PublicTaskView
   public static function render(?array $task, array $history, string $action, array $assets, string $error = '', bool $sent = false, string $draft = '', bool $canReply = true): string
   {
     $e = static fn($value): string => self::e($value);
-    $title = $task !== null ? 'Solicitud #' . $task['id'] : 'Solicitud no disponible';
+    $title = $task !== null ? 'Tarea #' . $task['id'] : 'Tarea no disponible';
     $html = '<!doctype html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">'
       . '<title>' . $e($title) . ' · SKC SuCasa Inmobiliaria</title>'
       . (($assets['favicon'] ?? '') !== '' ? '<link rel="icon" href="' . $e($assets['favicon']) . '" sizes="32x32">' : '')
@@ -52,9 +52,9 @@ final class PublicTaskView
     }
 
     if ($task['solicitante'] !== '') {
-      $html .= '<p class="ptk-hello">Hola, <b>' . $e($task['solicitante']) . '</b>. Aquí puedes ver tu solicitud, su historial y respondernos.</p>';
+      $html .= '<p class="ptk-hello">Hola, <b>' . $e($task['solicitante']) . '</b>. Aquí puedes ver tu tarea, su historial y respondernos.</p>';
     }
-    $html .= '<section class="ptk-summary"><div class="ptk-summary-head"><h2>' . $e($task['asunto'] !== '' ? $task['asunto'] : 'Solicitud comercial') . '</h2>'
+    $html .= '<section class="ptk-summary"><div class="ptk-summary-head"><h2>' . $e($task['asunto'] !== '' ? $task['asunto'] : 'Tarea comercial') . '</h2>'
       . ($task['estado'] !== '' ? '<span class="ptk-badge">' . $e($task['estado']) . '</span>' : '') . '</div><dl class="ptk-details">';
     $consultor = $task['consultor'] . ($task['celular_consultor'] !== '' ? ' · ' . $task['celular_consultor'] : '');
     foreach (['Motivo' => $task['motivo'], 'Inmueble' => $task['inmueble'], 'Fecha de registro' => $task['fecha'], 'Su consultor/a asignado' => $task['consultor'] !== '' ? $consultor : ''] as $label => $value) {
@@ -64,9 +64,9 @@ final class PublicTaskView
     }
     $html .= '</dl></section>';
 
-    $html .= '<section class="ptk-history" aria-labelledby="ptk-history-title"><h2 id="ptk-history-title" class="ptk-title">Historial de la solicitud</h2>';
+    $html .= '<section class="ptk-history" aria-labelledby="ptk-history-title"><h2 id="ptk-history-title" class="ptk-title">Historial de la tarea</h2>';
     if ($history === []) {
-      $html .= '<p class="ptk-muted">Aún no hay respuestas registradas en esta solicitud. Puedes escribirnos abajo.</p>';
+      $html .= '<p class="ptk-muted">Aún no hay respuestas registradas en esta tarea. Puedes escribirnos abajo.</p>';
     } else {
       $html .= '<ol class="ptk-timeline">';
       foreach ($history as $entry) {
@@ -95,8 +95,8 @@ final class PublicTaskView
       $html .= '<p role="status" class="ptk-alert is-success"><b>Recibimos tu mensaje.</b> Ya le avisamos a tu consultor/a asignado.</p>';
     }
     if ($canReply) {
-      $html .= '<section class="ptk-reply" aria-labelledby="ptk-reply-title"><h2 id="ptk-reply-title" class="ptk-title">Responder la solicitud</h2>'
-        . '<p class="ptk-hint">Tu mensaje queda registrado en la solicitud y le avisamos de inmediato a tu consultor/a asignado.</p>'
+      $html .= '<section class="ptk-reply" aria-labelledby="ptk-reply-title"><h2 id="ptk-reply-title" class="ptk-title">Responder la tarea</h2>'
+        . '<p class="ptk-hint">Tu mensaje queda registrado en la tarea y le avisamos de inmediato a tu consultor/a asignado.</p>'
         . ($error !== '' ? '<p role="alert" class="ptk-alert is-error">' . $e($error) . '</p>' : '')
         . '<form method="post" action="' . $e($action) . '" enctype="multipart/form-data" data-reply-form class="ptk-reply-form">'
         . '<label class="ptk-field"><span>Tu mensaje</span><textarea name="mensaje" rows="5" required maxlength="' . PublicTaskConversation::MAX_LENGTH . '" placeholder="Escribe aquí tu mensaje o la información que te solicitaron.">' . $e($draft) . '</textarea></label>'
@@ -112,7 +112,7 @@ final class PublicTaskView
         . '<div><button type="submit" data-reply-submit class="ptk-submit">Enviar mensaje</button></div></form></section>';
     } else {
       $html .= ($error !== '' ? '<p role="alert" class="ptk-alert is-error">' . $e($error) . '</p>' : '')
-        . '<p class="ptk-alert">Esta solicitud ya terminó. Si necesitas algo más, comunícate con SKC SuCasa Inmobiliaria.</p>';
+        . '<p class="ptk-alert">Esta tarea ya terminó. Si necesitas algo más, comunícate con SKC SuCasa Inmobiliaria.</p>';
     }
 
     if ($task['consultor'] !== '') {

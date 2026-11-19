@@ -165,7 +165,7 @@ async function fillCall(modal, values) {
     assert.ok((await client.locator('h1').innerText()).includes('#1'));
     assert.ok(!(await client.locator('body').innerText()).includes('Quiere arrendar en enero'), 'El resumen interno no se muestra al cliente');
     assert.equal(await client.locator('link[rel="icon"]').count(), 1, 'La vista pública lleva el favicon de la marca');
-    assert.ok((await client.locator('.ptk-history').innerText()).includes('Historial de la solicitud'));
+    assert.ok((await client.locator('.ptk-history').innerText()).includes('Historial de la tarea'));
     // Responde con una foto y un PDF, como en la vista del caso inmobiliario.
     const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
     const pdf = Buffer.from('%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[]/Count 0>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF');

@@ -73,10 +73,10 @@ final class PublicTaskConversation
   {
     $task = $this->task($id);
     if ($task === null) {
-      throw new \InvalidArgumentException('La solicitud no está disponible.');
+      throw new \InvalidArgumentException('La tarea no está disponible.');
     }
     if (self::isClosed($task)) {
-      throw new \InvalidArgumentException('Esta solicitud ya terminó. Si necesitas algo más, comunícate con nosotros.');
+      throw new \InvalidArgumentException('Esta tarea ya terminó. Si necesitas algo más, comunícate con nosotros.');
     }
     $text = self::clean($message);
     if ($text === '') {
