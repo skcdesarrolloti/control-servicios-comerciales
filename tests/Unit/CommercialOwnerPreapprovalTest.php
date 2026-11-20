@@ -202,6 +202,10 @@ final class CommercialOwnerPreapprovalTest extends TestCase
     self::assertStringContainsString('Se paga en 1 pago: se descuenta completo en el mes 1.', $html);
     self::assertStringContainsString('Lo que recibe mes a mes</h3>', $html);
     self::assertSame(1, substr_count($html, '<tr class="is-policy">'));
+    // Los descuentos van desglosados: solo las columnas que tiene (sin garantía ni otros aquí).
+    self::assertStringContainsString('<th>Mes</th><th>Canon</th><th>Comisión</th><th>Cuota de la póliza</th><th>Recibe</th>', $html);
+    self::assertStringContainsString('<th scope="row">Mes 1</th><td class="is-money">$1.000.000</td><td class="is-money is-deduction">− $119.000</td><td class="is-money is-deduction">− $60.000</td><td class="is-money">$821.000</td>', $html);
+    self::assertEquals(['comision'=>119000, 'garantia'=>0, 'otros'=>0, 'descuentos'=>119000, 'poliza'=>0, 'neto'=>881000, 'canon'=>1000000], array_intersect_key($single['months'][1], array_flip(['comision', 'garantia', 'otros', 'descuentos', 'poliza', 'neto', 'canon'])));
     self::assertStringContainsString('<th scope="row">Mes 12</th>', $html);
 
     // 2 cuotas en dos inmuebles: los meses 1 y 2 llevan las cuotas de los dos; la tabla suma lo que recibe con todos.

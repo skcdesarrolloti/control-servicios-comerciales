@@ -48,7 +48,11 @@ const { chromium } = require(process.env.SCM_PLAYWRIGHT_MODULE || 'playwright');
     // mandato: 95.200 + 20.000 = 115.200 es menos del 15 %, así que descuenta el mínimo de 120.000 → 680.000. El Por
     // entregar aún no suma.
     assert.match(await contract.locator('[data-pre-breakdown]').innerText(), /Póliza de servicios públicos\s+Le faltan 2 de 4 cuotas de \$15\.000: se descuentan en los meses 1 y 2\s+\$15\.000 \/ mes/);
-    assert.match(await contract.locator('[data-pre-months]').innerText(), /Mes 1\s+− \$15\.000\s+\$1\.685\.000\s+Mes 2\s+− \$15\.000\s+\$1\.685\.000\s+Mes 3\s+—\s+\$1\.700\.000/);
+    // Mes a mes con cada descuento en su columna: canon, comisión, garantía, cuota de la póliza y lo que recibe.
+    assert.match(await contract.locator('[data-pre-months] thead').innerText(), /Mes\s+Canon\s+Comisión\s+Garantía\s+Cuota de la póliza\s+Recibe/i);
+    assert.match(await contract.locator('[data-pre-months]').innerText(), /Mes 1\s+\$2\.000\.000\s+− \$250\.000\s+− \$50\.000\s+− \$15\.000\s+\$1\.685\.000\s+Mes 2\s+\$2\.000\.000\s+− \$250\.000\s+− \$50\.000\s+− \$15\.000\s+\$1\.685\.000\s+Mes 3\s+\$2\.000\.000\s+− \$250\.000\s+− \$50\.000\s+—\s+\$1\.700\.000/);
+    assert.equal(await page.locator('.scm-loader .scm-loader-title').innerText(), 'Buscando contratos');
+    assert.equal(await page.locator('.scm-loader').isVisible(), false);
     assert.equal(await tool.locator('[data-pre-net]').innerText(), '$2.377.500');
     assert.equal(await tool.locator('[data-pre-total]').innerText(), '$7.132.500');
     assert.equal(await noMandate.locator('[data-pre-months]').isVisible(), false);
@@ -69,10 +73,12 @@ const { chromium } = require(process.env.SCM_PLAYWRIGHT_MODULE || 'playwright');
     assert.equal(await tool.locator('[data-pre-gross]').innerText(), '$3.800.000');
     await page.screenshot({ path: 'output/commercial-tools-preapproval.png', fullPage: true });
 
-    // Primero la vista previa del PDF (popup interno) y desde ahí la descarga.
+    // Primero la vista previa del PDF (popup interno) y desde ahí la descarga; mientras se genera sale el loader de la marca.
     await tool.locator('[data-pre-pdf]').click();
     const viewer = tool.locator('[data-pre-viewer]');
     await page.waitForFunction(() => document.querySelector('[data-pre-viewer]').open, null, { timeout: 30000 });
+    assert.equal(await page.locator('.scm-loader .scm-loader-title').innerText(), 'Generando el PDF');
+    assert.equal(await page.locator('.scm-loader').isVisible(), false);
     assert.match(await viewer.locator('[data-pre-viewer-frame]').getAttribute('src'), /^blob:/);
     await page.waitForTimeout(800);
     await page.screenshot({ path: 'output/commercial-tools-pdf-preview.png' });
