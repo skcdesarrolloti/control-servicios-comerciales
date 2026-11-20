@@ -6,7 +6,8 @@ namespace SCM\Support;
 
 /**
  * Botón de las plantillas de WhatsApp que comparte este panel con control-servicios-inmobiliarios
- * (pqr_trasladada_funcionario_v2, scm_cita_funcionario_v2, scm_cita_solicitante_v2).
+ * (pqr_trasladada_funcionario_v1, scm_cita_funcionario_v1, scm_cita_solicitante_v1).
+ * Copia en control-servicios-inmobiliarios/src/Support/SharedButtonUrl.php: mantener ambas iguales.
  *
  * En Meta su URL fija es solo el dominio, `https://sucasainmobiliaria.com.co/{{1}}`, y cada panel completa el resto con su
  * propia dirección: aquí `dashboard-comercial/public/...` (tarea del panel o vista pública) y en el inmobiliario

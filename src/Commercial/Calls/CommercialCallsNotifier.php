@@ -31,7 +31,7 @@ final class CommercialCallsNotifier
   public const TEMPLATE_CLIENT_REPLY = 'scm_tarea_comercial_respuesta_cliente_v1';
   public const TEMPLATE_OFFICER_REPLY = 'scm_tarea_comercial_respuesta_funcionario_v1';
   /** Compartida con control-servicios-inmobiliarios: su botón es el dominio + {{1}} (SharedButtonUrl). */
-  public const TEMPLATE_TRANSFERRED = 'pqr_trasladada_funcionario_v2';
+  public const TEMPLATE_TRANSFERRED = 'pqr_trasladada_funcionario_v1';
   public const TEMPLATE_LANGUAGE = 'es_CO';
 
   private const BROCHURE = 'https://sucasainmobiliaria.com.co/brochure-skc-sucasa-inmobiliaria/';

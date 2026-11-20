@@ -116,11 +116,13 @@ Botón `Ver cotización`. URL del sitio web `https://sucasainmobiliaria.com.co/d
 
 ## Plantillas compartidas con el panel inmobiliario (6, 7 y 8)
 
-Las usan este panel y `control-servicios-inmobiliarios`. Reemplazan a `pqr_trasladada_funcionario_v1`, `scm_cita_funcionario_v1` y `scm_cita_solicitante_v1`, cuyo botón tiene fija la página de tickets anterior (`https://sucasainmobiliaria.com.co/ticket/?id_ticket={{1}}`). No edites las v1: si cambias su botón, los WhatsApp del panel que todavía las use quedan con un enlace roto. Crea estas v2 y, cuando los dos paneles usen las v2, las v1 se pueden borrar.
+Las usan este panel y `control-servicios-inmobiliarios`, con los mismos nombres de siempre. Se **editan** en Meta (texto y botón); no se crean nuevas. Tenían fija en el botón la página de tickets anterior (`https://sucasainmobiliaria.com.co/ticket/?id_ticket={{1}}`) y el texto decía "solicitud" o "ticket".
 
-Para que el mismo botón sirva en los dos paneles, la **URL del sitio web** es solo el dominio, `https://sucasainmobiliaria.com.co/`, y cada panel completa el resto (`SharedButtonUrl::suffix`): este, `dashboard-comercial/public/...`, y el inmobiliario, `control-servicios-inmobiliarios/public/?scm_case=...`. La referencia va en una sola variable con su nombre (`Tarea #11459` aquí, `Caso #10245` en el inmobiliario), así el texto sirve para los dos. Botón **Ver detalle** en las tres.
+Para que el mismo botón sirva en los dos paneles, la **URL del sitio web** queda solo con el dominio, `https://sucasainmobiliaria.com.co/`, y cada panel completa el resto (`SharedButtonUrl::suffix`, igual en los dos repositorios): este, `dashboard-comercial/public/...`, y el inmobiliario, `control-servicios-inmobiliarios/public/?scm_case=...`. La referencia va en una sola variable con su nombre (`Tarea #11459` aquí, `Caso #10245` en el inmobiliario), así el texto sirve para los dos. Cada plantilla conserva su cantidad de variables. Botón **Ver detalle** en las tres.
 
-## 6. `pqr_trasladada_funcionario_v2`
+Orden del cambio: publicar el código de los dos paneles y editar las tres plantillas en Meta el mismo día. Mientras uno de los dos va adelantado, el botón de esa plantilla abre una dirección incompleta (el texto llega bien).
+
+## 6. `pqr_trasladada_funcionario_v1` (editar)
 
 Para el nuevo responsable cuando se reasigna (traslada) una tarea o un caso. Código: `CommercialCallsNotifier::TEMPLATE_TRANSFERRED`.
 
@@ -141,7 +143,7 @@ Ejemplos: `{{1}}` Royner Guardo · `{{2}}` Tarea #11459 · `{{3}}` Venta de inmu
 
 Botón `Ver detalle`. URL del sitio web `https://sucasainmobiliaria.com.co/`. URL de muestra `https://sucasainmobiliaria.com.co/dashboard-comercial/public/index.php?tab=abiertos&ticket_id=11459.1893456000.101.ejemplo`.
 
-## 7. `scm_cita_funcionario_v2`
+## 7. `scm_cita_funcionario_v1` (editar)
 
 Para el funcionario cuando se le agenda una cita. Código: `CommercialCalendarNotifier::TEMPLATE_EMPLOYEE`.
 
@@ -162,7 +164,7 @@ Ejemplos: `{{1}}` Alvaro Florez De Oro · `{{2}}` Visita · `{{3}}` Tarea #11459
 
 Botón `Ver detalle`. URL del sitio web `https://sucasainmobiliaria.com.co/`. URL de muestra `https://sucasainmobiliaria.com.co/dashboard-comercial/public/index.php?tab=abiertos&ticket_id=11459.1893456000.101.ejemplo`.
 
-## 8. `scm_cita_solicitante_v2`
+## 8. `scm_cita_solicitante_v1` (editar)
 
 Para el cliente cuando se le agenda una cita. Código: `CommercialCalendarNotifier::TEMPLATE_REQUESTER`. Como la comparte el panel inmobiliario, quien agendó va como "Agendada por" y no como consultor/a.
 

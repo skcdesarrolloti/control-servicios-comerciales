@@ -531,7 +531,7 @@ final class CommercialCallsTest extends TestCase
     self::assertStringNotContainsString('sucasainmobiliaria.com.co/ticket/', $log->mail[0][2], 'Nada de la página de tickets anterior.');
     preg_match('#ticket_id=([0-9.]+202\.[a-f0-9]{64})#', $log->mail[0][2], $own);
     self::assertSame(['id' => $id, 'employee' => '202'], StaffTaskLink::verify($own[1] ?? ''));
-    self::assertSame(['+573000000202', 'pqr_trasladada_funcionario_v2'], [$log->whatsapp[0][0], $log->whatsapp[0][1]]);
+    self::assertSame(['+573000000202', 'pqr_trasladada_funcionario_v1'], [$log->whatsapp[0][0], $log->whatsapp[0][1]]);
     self::assertSame(['Consultor Dos', 'Tarea #' . $id, 'Arriendo', 'Consultora Uno'], array_column($log->whatsapp[0][2][0]['parameters'], 'text'));
     $suffix = end($log->whatsapp[0][2])['parameters'][0]['text'];
     self::assertStringStartsWith('public/index.php?tab=abiertos&ticket_id=', $suffix, 'El botón compartido lleva la ruta del panel, sin el dominio fijo de la plantilla.');
@@ -569,7 +569,7 @@ final class CommercialCallsTest extends TestCase
     $result = $notifier->notify([['es_cita' => 'si', 'id_ticket' => (string) $id, 'id_empleado' => '101', 'categoria' => 'Visita', 'fecha_inicio' => '2026-11-25 10:00:00', 'fecha_fin' => '2026-11-25 11:00:00', 'ubicacion' => 'Cra 1 # 2-3']]);
     self::assertSame(2, $result['queued']);
     self::assertSame([\SCM\Commercial\CommercialCalendarNotifier::TEMPLATE_EMPLOYEE, \SCM\Commercial\CommercialCalendarNotifier::TEMPLATE_REQUESTER], array_column($sent, 'template_name'));
-    self::assertSame(['scm_cita_funcionario_v2', 'scm_cita_solicitante_v2'], array_column($sent, 'template_name'));
+    self::assertSame(['scm_cita_funcionario_v1', 'scm_cita_solicitante_v1'], array_column($sent, 'template_name'));
     self::assertSame('Tarea #' . $id, $sent[0]['template_components'][0]['parameters'][2]['text'], 'La referencia va en una sola variable.');
     $staff = $sent[0]['template_components'][1]['parameters'][0]['text'];
     $client = $sent[1]['template_components'][1]['parameters'][0]['text'];

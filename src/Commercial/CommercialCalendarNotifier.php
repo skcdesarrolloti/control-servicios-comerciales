@@ -20,8 +20,8 @@ use SCM\Support\StaffTaskLink;
  */
 final class CommercialCalendarNotifier
 {
-  public const TEMPLATE_EMPLOYEE = 'scm_cita_funcionario_v2';
-  public const TEMPLATE_REQUESTER = 'scm_cita_solicitante_v2';
+  public const TEMPLATE_EMPLOYEE = 'scm_cita_funcionario_v1';
+  public const TEMPLATE_REQUESTER = 'scm_cita_solicitante_v1';
 
   private Database $db;
   private SchemaInspector $schema;
