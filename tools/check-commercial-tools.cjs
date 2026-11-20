@@ -90,6 +90,21 @@ const { chromium } = require(process.env.SCM_PLAYWRIGHT_MODULE || 'playwright');
     await download.saveAs('output/commercial-tools-preapproval.pdf');
     assert.equal(fs.readFileSync('output/commercial-tools-preapproval.pdf').subarray(0, 5).toString(), '%PDF-');
 
+    // Propietaria registrada sin contratos ni mandato: llegan sus inmuebles con canon y administración (el vendido no).
+    await tool.locator('[data-pre-document]').fill('22.334.455');
+    await tool.locator('[data-pre-document]').press('Enter');
+    await page.waitForFunction(() => document.querySelector('[data-pre-status]').textContent.includes('Marta Registrada'));
+    assert.match(await tool.locator('[data-pre-status]').innerText(), /Marta Registrada es propietario en 2 inmuebles registrados sin contrato\./);
+    assert.equal(await tool.locator('[data-pre-source]').count(), 2);
+    assert.equal(await tool.locator('[data-pre-owner="email"]').inputValue(), 'marta@example.test');
+    const included = tool.locator('[data-pre-source]', { hasText: 'Inmueble registrado 951' });
+    assert.equal(await included.locator('[data-pre-field="canon"]').inputValue(), '$1.000.000');
+    assert.equal(await included.locator('[data-pre-sim="administracion"]').inputValue(), '$200.000');
+    assert.match(await included.locator('[data-pre-source-policy]').innerText(), /Inmueble registrado sin contrato ni mandato.+administración, que viene incluida/);
+    // 1.000.000 − comisión 10 % + IVA de 1.200.000 (142.800) − garantía 2,5 % (30.000) = 827.200; sin el mínimo del 15 %.
+    assert.equal(await included.locator('[data-pre-source-net]').innerText(), '$827.200');
+    assert.equal(await tool.locator('[data-pre-source]', { hasText: 'Inmueble registrado 950' }).locator('[data-pre-source-net]').innerText(), '$756.000');
+
     // Propietario aún no registrado: el inmueble se simula con las tarifas de confi_sistema (plugin de la calculadora).
     await tool.locator('[data-pre-mode="manual"]').click();
     assert.equal(await tool.locator('[data-pre-search]').isVisible(), false);

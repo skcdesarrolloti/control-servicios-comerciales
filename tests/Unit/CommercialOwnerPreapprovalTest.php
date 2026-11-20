@@ -84,6 +84,34 @@ final class CommercialOwnerPreapprovalTest extends TestCase
     self::assertSame(1, $result['active_credits']);
   }
 
+  public function testRegisteredOwnerWithoutContractsBringsTheirPropertiesWithCanon(): void
+  {
+    // Solo inmuebles registrados: llegan con canon y administración (incluida: el canon es el precio menos la
+    // administración); el vendido no cuenta y los datos del propietario salen de su ficha.
+    $result = $this->service()->lookup('22334455');
+    self::assertSame(['name'=>'Marta Registrada', 'document'=>'22.334.455', 'email'=>'marta@example.test', 'phone'=>'573001234567'], $result['owner']);
+    self::assertSame(['951', '950'], array_column($result['contracts'], 'inmueble'));
+    self::assertSame([true, true], array_column($result['contracts'], 'registrado'));
+    self::assertEquals([[1000000, 200000, true], [900000, 100000, false]], array_map(static fn(array $item): array => [$item['canon'], $item['administracion'], $item['administracion_incluida']], $result['contracts']));
+    self::assertSame(['', ''], array_column($result['contracts'], 'contrato'));
+    self::assertNull($result['contracts'][0]['servicios']);
+
+    // Con contratos, sus inmuebles no se repiten (código del contrato) y los demás se agregan al final.
+    $this->db->insert('wp_jet_cct_propietarios', ['_ID'=>21,'id_propietario'=>'P-1','nombre'=>'Ana Ficha','documento'=>'1143415938']);
+    $this->db->insert('wp_jet_cct_inmuebles', ['codigo'=>'500','estado'=>'Arrendado','precio_arriendo'=>'2000000','id_propietario'=>'21']);
+    $this->db->insert('wp_jet_cct_inmuebles', ['codigo'=>'960','direccion'=>'Calle 60','estado'=>'Disponible','precio_arriendo'=>'1100000','id_propietario'=>'21']);
+    $this->db->insert('wp_jet_cct_inmuebles', ['codigo'=>'961','estado'=>'Disponible','precio_arriendo'=>'','id_propietario'=>'21']);
+    $ana = $this->service()->lookup('1143415938');
+    self::assertSame('Ana Propietaria', $ana['owner']['name']);
+    self::assertSame(['800', '500', '600', '960'], array_column($ana['contracts'], 'inmueble'));
+    self::assertSame([false, false, false, true], array_map(static fn(array $item): bool => !empty($item['registrado']), $ana['contracts']));
+
+    // Registrado sin contratos ni inmuebles con canon: se conocen sus datos, sin inmuebles.
+    $this->db->insert('wp_jet_cct_propietarios', ['_ID'=>22,'nombre_juridico'=>'Rentas SAS','documento_juridico'=>'900123456-7','correo'=>'rentas@example.test']);
+    $company = $this->service()->lookup('900.123.456-7');
+    self::assertSame(['Rentas SAS', '900123456-7', []], [$company['owner']['name'], $company['owner']['document'], $company['contracts']]);
+  }
+
   public function testUnknownDocumentReturnsNoContractsAndShortDocumentsAreRejected(): void
   {
     self::assertSame(['owner'=>null, 'contracts'=>[], 'active_credits'=>0], $this->service()->lookup('99999999'));

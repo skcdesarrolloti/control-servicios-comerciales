@@ -17,7 +17,8 @@ final class CommercialOwnerContractsDatabase
     $tables = [
       'jet_cct_contratos_arrendamiento'=>['contrato','inmueble','id_inmueble','id_inmueble_data','direccion','estado','arrendatario','propietario','correo_propietario','celular_propietario','indicativo_propietario','documento_propietario','id_propietario','id_contrato_mandato','id_carta_aumento_canon','valor_canon','inicio_contrato','fin_contrato'],
       'jet_cct_contrato_mandato'=>['propietarios','total_comision','incluye_garantia','precio_mes_garantia','incluye_garantia_servicios','precio_mes_servicios','pago_servicios','precio_anual_servicios','precio_garantia_sevicios','tipo_1','nombre_1','empresa_1','documento_1','nit_1','correo_1','celular_1','indicativo_1','id_propietario_nuevo_1','tipo_2','nombre_2','empresa_2','documento_2','nit_2','correo_2','celular_2','indicativo_2','id_propietario_nuevo_2'],
-      'jet_cct_propietarios'=>['id_propietario','documento','documento_juridico'],
+      'jet_cct_propietarios'=>['id_propietario','nombre','documento','nombre_juridico','documento_juridico','correo','celular','indicativo'],
+      'jet_cct_inmuebles'=>['codigo','direccion','estado','tipo_negocio','precio_arriendo','precio_administracion','administracion_incluida','id_propietario'],
       'jet_cct_cartas_aumento'=>['canon'],
     ];
     foreach ($tables as $name => $columns) {
@@ -36,6 +37,11 @@ final class CommercialOwnerContractsDatabase
     $db->insert('wp_jet_cct_contratos_arrendamiento', ['_ID'=>4,'contrato'=>'C-400','inmueble'=>'800','direccion'=>'Avenida 3','estado'=>'Entregado','propietario'=>'Ana Propietaria','documento_propietario'=>'1143415938','id_propietario'=>'P-1','valor_canon'=>'800000']);
     // Terminado: no debe aparecer.
     $db->insert('wp_jet_cct_contratos_arrendamiento', ['_ID'=>3,'contrato'=>'C-300','inmueble'=>'700','estado'=>'Terminado','documento_propietario'=>'1143415938','valor_canon'=>'900000']);
+    // Propietaria registrada sin contratos ni mandato: solo inmuebles con canon (uno vendido no cuenta).
+    $db->insert('wp_jet_cct_propietarios', ['_ID'=>20,'nombre'=>'Marta Registrada','documento'=>'22.334.455','correo'=>'marta@example.test','celular'=>'3001234567','indicativo'=>'57']);
+    $db->insert('wp_jet_cct_inmuebles', ['_ID'=>30,'codigo'=>'950','direccion'=>'Calle 50 # 1-2','estado'=>'Arrendado','tipo_negocio'=>'Arriendo','precio_arriendo'=>'900000','precio_administracion'=>'100000','administracion_incluida'=>'No','id_propietario'=>'20']);
+    $db->insert('wp_jet_cct_inmuebles', ['_ID'=>31,'codigo'=>'951','direccion'=>'Calle 51','estado'=>'Disponible','tipo_negocio'=>'Arriendo','precio_arriendo'=>'1.200.000','precio_administracion'=>'200.000','administracion_incluida'=>'Si','id_propietario'=>'20']);
+    $db->insert('wp_jet_cct_inmuebles', ['_ID'=>32,'codigo'=>'952','estado'=>'Vendido','precio_arriendo'=>'700000','id_propietario'=>'20']);
     // Tarifas del simulador de ingreso neto, con los formatos que se guardan en producción.
     foreach (['iva'=>'19','tasa_administracion_arriendo'=>'10','tasa_libertador_seguro'=>'2,5','tasa_libertador_servicios'=>'2','tasa_suramericana_seguro'=>'2.2','tasa_prestamo_garantias_servicios'=>'1,5','tasa_berkley'=>'2','gasto_expedicion_berkley'=>'15.000','tasa_seguros_mundial'=>'2,2','gasto_expedicion_seguros_mundial'=>'20000'] as $function => $value) {
       $db->insert('wp_jet_cct_confi_sistema', ['funcion'=>$function,'valor'=>$value]);
