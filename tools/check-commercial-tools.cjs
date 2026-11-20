@@ -43,11 +43,15 @@ const { chromium } = require(process.env.SCM_PLAYWRIGHT_MODULE || 'playwright');
     assert.equal(await contract.locator('[data-pre-sim="cuotas"]').inputValue(), '4');
     assert.match(await contract.locator('[data-pre-source-policy]').innerText(), /lleva 2 y le faltan 2/);
     assert.equal(await contract.locator('[data-pre-source-warning]').isVisible(), false);
-    // C-100: 2.000.000 − 250.000 − garantía 50.000 − seguro 60.000 / 12 = 1.695.000. C-400 sin mandato: 95.200 + 20.000 =
-    // 115.200 es menos del 15 %, así que descuenta el mínimo de 120.000 → 680.000. El Por entregar aún no suma.
-    assert.equal(await tool.locator('[data-pre-net]').innerText(), '$2.375.000');
-    assert.equal(await tool.locator('[data-pre-total]').innerText(), '$7.125.000');
     const noMandate = tool.locator('[data-pre-source]', { hasText: 'Contrato C-400' });
+    // C-100: 2.000.000 − 250.000 − garantía 50.000 − las 2 cuotas de $15.000 que le faltan / 12 = 1.697.500. C-400 sin
+    // mandato: 95.200 + 20.000 = 115.200 es menos del 15 %, así que descuenta el mínimo de 120.000 → 680.000. El Por
+    // entregar aún no suma.
+    assert.match(await contract.locator('[data-pre-breakdown]').innerText(), /Póliza de servicios públicos\s+Le faltan 2 de 4 cuotas de \$15\.000: se descuentan en los meses 1 y 2\s+\$15\.000 \/ mes/);
+    assert.match(await contract.locator('[data-pre-months]').innerText(), /Mes 1\s+− \$15\.000\s+\$1\.685\.000\s+Mes 2\s+− \$15\.000\s+\$1\.685\.000\s+Mes 3\s+—\s+\$1\.700\.000/);
+    assert.equal(await tool.locator('[data-pre-net]').innerText(), '$2.377.500');
+    assert.equal(await tool.locator('[data-pre-total]').innerText(), '$7.132.500');
+    assert.equal(await noMandate.locator('[data-pre-months]').isVisible(), false);
     assert.equal(await noMandate.locator('[data-pre-source-net]').innerText(), '$680.000');
     assert.match(await noMandate.locator('[data-pre-breakdown]').innerText(), /Ajuste al descuento mínimo\s+Los contratos descuentan como mínimo el 15 % del canon\s+\$4\.800/);
     // Por entregar: se pide canon + administración y se simula como inmueble nuevo (sin mandato ni mínimo del 15 %).
@@ -60,7 +64,7 @@ const { chromium } = require(process.env.SCM_PLAYWRIGHT_MODULE || 'playwright');
     await pending.locator('[data-pre-field="canon"]').fill('1000000');
     await pending.locator('[data-pre-sim="administracion"]').fill('200000');
     assert.equal(await pending.locator('[data-pre-source-net]').innerText(), '$827.200');
-    assert.equal(await tool.locator('[data-pre-net]').innerText(), '$3.202.200');
+    assert.equal(await tool.locator('[data-pre-net]').innerText(), '$3.204.700');
     assert.match(await tool.locator('[data-pre-term]').innerText(), /^Hasta 1[12] cuotas$/);
     assert.equal(await tool.locator('[data-pre-gross]').innerText(), '$3.800.000');
     await page.screenshot({ path: 'output/commercial-tools-preapproval.png', fullPage: true });
@@ -98,9 +102,18 @@ const { chromium } = require(process.env.SCM_PLAYWRIGHT_MODULE || 'playwright');
     await first.locator('[data-pre-sim="valor"]').fill('3000000');
     await first.locator('[data-pre-sim="cuotas"]').selectOption('2');
     assert.equal(await first.locator('[data-pre-source-net]').innerText(), '$1.279.000');
-    assert.match(await first.locator('[data-pre-source-detail]').innerText(), /\$1\.254\.000 en los 2 meses con cuota del seguro y \$1\.284\.000 en los demás/);
-    // La fila de la póliza dice que es un promedio mensual: $60.000 en 2 cuotas de $30.000 / 12.
-    assert.match(await first.locator('[data-pre-breakdown]').innerText(), /Póliza de servicios públicos\s+Promedio mensual: \$60\.000 en 2 cuotas de \$30\.000, repartido en 12 meses\s+\$5\.000 \/ mes/);
+    assert.match(await first.locator('[data-pre-source-detail]').innerText(), /Promedio de 12 meses: meses 1 y 2: \$1\.254\.000; meses 3 a 12: \$1\.284\.000/);
+    // La fila de la póliza dice en qué meses se descuenta cada cuota, y la tabla muestra lo que recibe mes a mes.
+    assert.match(await first.locator('[data-pre-breakdown]').innerText(), /Póliza de servicios públicos\s+2 cuotas de \$30\.000: se descuentan en los meses 1 y 2\s+\$30\.000 \/ mes/);
+    assert.equal(await first.locator('[data-pre-months] tbody tr.is-policy').count(), 2);
+    assert.match(await first.locator('[data-pre-months] tfoot').innerText(), /Promedio\s+\$1\.279\.000/);
+    // En 1 pago se descuenta completo en el mes 1.
+    await first.locator('[data-pre-sim="cuotas"]').selectOption('1');
+    assert.match(await first.locator('[data-pre-breakdown]').innerText(), /1 pago: se descuenta completo en el mes 1\s+\$60\.000/);
+    assert.match(await first.locator('[data-pre-source-detail]').innerText(), /mes 1: \$1\.224\.000; meses 2 a 12: \$1\.284\.000/);
+    assert.equal(await first.locator('[data-pre-months] tbody tr.is-policy').count(), 1);
+    await first.locator('[data-pre-months]').screenshot({ path: 'output/commercial-tools-months.png' });
+    await first.locator('[data-pre-sim="cuotas"]').selectOption('2');
     // Berkley: 2 % del canon anual + expedición, sin aseguradora ni valor asegurado de servicios.
     await first.locator('.ctl-switch', { hasText: 'seguro de servicios' }).click();
     await first.locator('[data-pre-sim="modalidad"]').selectOption('berkley');

@@ -175,9 +175,10 @@ final class CommercialOwnerPreapprovalTest extends TestCase
     self::assertStringNotContainsString('meses de su ingreso neto', $html);
     self::assertStringContainsString('Ana &lt;b&gt;Propietaria&lt;/b&gt;', $html);
     self::assertStringContainsString('$5.202.000', $html);
-    self::assertStringContainsString('<td class="is-unit">12 meses</td>', $html);
-    self::assertStringContainsString('Permanece mientras la vigencia del contrato continúa.', $html);
-    self::assertStringContainsString('Aplica si el seguro se difiere en cuotas.', $html);
+    // Sin simulación el seguro va en 12 cuotas (con intereses): se descuenta todos los meses.
+    self::assertStringContainsString('<td class="is-unit">Meses 1 a 12</td>', $html);
+    self::assertStringContainsString('Se paga en 12 cuotas de $16.000 con intereses: se descuentan todos los meses. Permanece mientras la vigencia del contrato continúa.', $html);
+    self::assertStringContainsString('Aplica porque el seguro se difiere en cuotas', $html);
     self::assertStringNotContainsString('Garantía inmobiliaria', $html);
     self::assertStringContainsString(CommercialToolsView::DISCLAIMER, $html);
     // Sin necesidades del propietario no sale la sección; las condiciones del crédito siempre salen, enumeradas.
@@ -185,6 +186,42 @@ final class CommercialOwnerPreapprovalTest extends TestCase
     self::assertStringContainsString('<h2>4. Condiciones para la aprobación del crédito</h2>', $html);
     foreach (CommercialOwnerPreapprovalService::CONDITIONS as $condition) self::assertStringContainsString('<li>' . $condition . '</li>', $html);
     self::assertSame('simulacion-ingreso-neto-1-143-415-938-' . date('Y-m-d') . '.pdf', CommercialOwnerPreapprovalPdf::filename($estimate));
+  }
+
+  public function testPolicyIsDiscountedOnlyInTheMonthsOfItsInstallments(): void
+  {
+    $sim = ['calc'=>'sim', 'canon'=>1000000, 'servicios'=>true, 'valor_asegurado'=>3000000, 'aseguradora'=>'El Libertador'];
+    // 1 pago: los $60.000 de la póliza salen completos en el mes 1; el promedio de 12 meses es el ingreso neto.
+    $single = $this->service()->estimate(['owner'=>['name'=>'Ana'] + self::OWNER, 'sources'=>[['cuotas'=>1] + $sim]]);
+    $months = array_column($single['months'], 'neto');
+    self::assertEquals([821000, 881000, 881000], array_slice($months, 0, 3));
+    self::assertEquals([60000, 0], array_slice(array_column($single['months'], 'poliza'), 0, 2));
+    self::assertEqualsWithDelta($single['net'], array_sum($months) / 12, 0.01);
+    $html = CommercialOwnerPreapprovalPdf::html($single, ['name'=>'Prueba']);
+    self::assertStringContainsString('<td class="is-unit">Mes 1</td>', $html);
+    self::assertStringContainsString('Se paga en 1 pago: se descuenta completo en el mes 1.', $html);
+    self::assertStringContainsString('Lo que recibe mes a mes</h3>', $html);
+    self::assertSame(1, substr_count($html, '<tr class="is-policy">'));
+    self::assertStringContainsString('<th scope="row">Mes 12</th>', $html);
+
+    // 2 cuotas en dos inmuebles: los meses 1 y 2 llevan las cuotas de los dos; la tabla suma lo que recibe con todos.
+    $two = $this->service()->estimate(['owner'=>['name'=>'Ana'] + self::OWNER, 'sources'=>[['cuotas'=>2] + $sim, ['cuotas'=>2] + $sim]]);
+    self::assertEquals([1702000, 1702000, 1762000], array_slice(array_column($two['months'], 'neto'), 0, 3));
+    $html = CommercialOwnerPreapprovalPdf::html($two, ['name'=>'Prueba']);
+    self::assertStringContainsString('<td class="is-unit">Meses 1 y 2</td>', $html);
+    self::assertStringContainsString('Lo que recibe mes a mes <span>Todos los inmuebles</span>', $html);
+    self::assertSame(2, substr_count($html, '<tr class="is-policy">'));
+
+    // Póliza del mandato que ya va pagando (lleva 2 de 4): solo cuentan las 2 cuotas que le faltan.
+    $pending = $this->service()->estimate(['owner'=>['name'=>'Ana'] + self::OWNER, 'sources'=>[['cuotas'=>4, 'cuotas_pagadas'=>2] + $sim]]);
+    self::assertSame([2, 2, 30000.0], [$pending['sources'][0]['pagadas'], $pending['sources'][0]['poliza_meses'], $pending['sources'][0]['poliza_total']]);
+    self::assertEquals(878500, $pending['net']);
+    self::assertEquals([866000, 866000, 881000], array_slice(array_column($pending['months'], 'neto'), 0, 3));
+    self::assertStringContainsString('Le faltan 2 de 4 cuotas de $15.000: se descuentan en los meses 1 y 2.', CommercialOwnerPreapprovalPdf::html($pending, ['name'=>'Prueba']));
+    // Sin póliza no hay tabla mes a mes.
+    $none = $this->service()->estimate(['owner'=>['name'=>'Ana'] + self::OWNER, 'sources'=>[['calc'=>'sim', 'canon'=>1000000, 'cuotas_pagadas'=>3]]]);
+    self::assertSame(0, $none['sources'][0]['pagadas']);
+    self::assertStringNotContainsString('Lo que recibe mes a mes', CommercialOwnerPreapprovalPdf::html($none, ['name'=>'Prueba']));
   }
 
   public function testRatesComeFromTheSystemConfigurationLikeThePlugin(): void
