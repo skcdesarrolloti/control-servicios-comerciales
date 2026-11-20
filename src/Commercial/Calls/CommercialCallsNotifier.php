@@ -11,6 +11,7 @@ use SCM\Core\Settings;
 use SCM\Support\EmailQueue;
 use SCM\Support\EmailTemplate;
 use SCM\Support\PublicTaskAccess;
+use SCM\Support\SharedButtonUrl;
 use SCM\Support\SharedNotificationsBridge;
 use SCM\Support\StaffTaskLink;
 
@@ -29,6 +30,8 @@ final class CommercialCallsNotifier
   public const TEMPLATE_REGISTERED = 'scm_tarea_comercial_registrada_v1';
   public const TEMPLATE_CLIENT_REPLY = 'scm_tarea_comercial_respuesta_cliente_v1';
   public const TEMPLATE_OFFICER_REPLY = 'scm_tarea_comercial_respuesta_funcionario_v1';
+  /** Compartida con control-servicios-inmobiliarios: su botón es el dominio + {{1}} (SharedButtonUrl). */
+  public const TEMPLATE_TRANSFERRED = 'pqr_trasladada_funcionario_v2';
   public const TEMPLATE_LANGUAGE = 'es_CO';
 
   private const BROCHURE = 'https://sucasainmobiliaria.com.co/brochure-skc-sucasa-inmobiliaria/';
@@ -217,7 +220,7 @@ final class CommercialCallsNotifier
 
   /**
    * La tarea pasó a otro funcionario (Reasignar en el panel). Al nuevo responsable le llegan correo y WhatsApp con su
-   * enlace individual; usa la plantilla de tarea asignada, que ya está aprobada en Meta.
+   * enlace individual; el WhatsApp usa la plantilla de traslado que comparte con el panel inmobiliario.
    * @param array<string,mixed> $task La tarea con el nuevo responsable.
    */
   public function taskReassigned(int $id, array $task, string $previous, string $reason, string $by, bool $email = true, bool $whatsapp = true): void
@@ -234,9 +237,9 @@ final class CommercialCallsNotifier
         $this->buttons(StaffTaskLink::url($id, $employee), 'Ver tarea'), $key);
     }
     if ($whatsapp) {
-      $this->whatsappTo((string) ($task['celular_empleado'] ?? ''), '57', self::TEMPLATE_ASSIGNED,
-        [$task['nombre_empleado'] ?? '', (string) $id, $task['solicitante'] ?? '', $task['tema_ayuda'] ?? '', $task['medio'] ?? '', self::contactLine($task)],
-        StaffTaskLink::reference($id, $employee), $key . ':whatsapp');
+      $this->whatsappTo((string) ($task['celular_empleado'] ?? ''), '57', self::TEMPLATE_TRANSFERRED,
+        [$task['nombre_empleado'] ?? '', 'Tarea #' . $id, trim((string) ($task['tema_ayuda'] ?? '')) ?: (trim((string) ($task['asunto'] ?? '')) ?: 'Tarea comercial'), $previous !== '' ? $previous : 'Sin asignar'],
+        SharedButtonUrl::suffix(StaffTaskLink::url($id, $employee)), $key . ':whatsapp');
     }
   }
 

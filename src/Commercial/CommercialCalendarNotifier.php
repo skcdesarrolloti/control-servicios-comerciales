@@ -6,24 +6,44 @@ namespace SCM\Commercial;
 
 use SCM\Core\Auth;
 use SCM\Core\Database;
+use SCM\Support\PublicTaskAccess;
 use SCM\Support\SchemaInspector;
+use SCM\Support\SharedButtonUrl;
 use SCM\Support\SmsQueue;
+use SCM\Support\StaffTaskLink;
 
 /**
- * Encola los WhatsApp de una cita agendada desde el calendario comercial: al funcionario
- * asignado y al solicitante de la tarea. Usa las mismas plantillas que administrativo.
+ * Encola los WhatsApp de una cita agendada desde el calendario comercial: al funcionario asignado y al solicitante de la
+ * tarea. Las plantillas las comparte con control-servicios-inmobiliarios: su botón es `https://sucasainmobiliaria.com.co/{{1}}`
+ * y aquí se completa con la tarea en el panel (enlace individual que inicia sesión) o con la vista pública del cliente
+ * (SharedButtonUrl). La referencia va en una sola variable ("Tarea #123"; en el inmobiliario, "Caso #123").
  */
 final class CommercialCalendarNotifier
 {
+  public const TEMPLATE_EMPLOYEE = 'scm_cita_funcionario_v2';
+  public const TEMPLATE_REQUESTER = 'scm_cita_solicitante_v2';
+
   private Database $db;
   private SchemaInspector $schema;
-  private SmsQueue $queue;
+  private SmsQueue|\Closure $queue;
 
-  public function __construct(Database $db, ?SmsQueue $queue = null)
+  /** @param \Closure|null $enqueue Para pruebas: fn(string $phone, string $name, string $message, array $meta): bool */
+  public function __construct(Database $db, ?SmsQueue $queue = null, ?\Closure $enqueue = null)
   {
     $this->db = $db;
     $this->schema = new SchemaInspector($db);
-    $this->queue = $queue ?? new SmsQueue($db);
+    $this->queue = $enqueue ?? $queue ?? new SmsQueue($db);
+  }
+
+  /** @param array<string,mixed> $meta */
+  private function enqueue(string $phone, string $name, string $message, array $meta): bool
+  {
+    return $this->queue instanceof SmsQueue ? $this->queue->enqueue($phone, $name, $message, $meta) : (bool) ($this->queue)($phone, $name, $message, $meta);
+  }
+
+  private function lastError(): string
+  {
+    return $this->queue instanceof SmsQueue ? $this->queue->lastError() : '';
   }
 
   /**
@@ -53,6 +73,8 @@ final class CommercialCalendarNotifier
 
       $ticket = $this->ticketRow($ticketLookup);
       $logicalTicket = trim((string) ($ticket['id_ticket'] ?? '')) ?: $ticketLookup;
+      $taskId = (int) ($ticket['_ID'] ?? $ticketLookup);
+      $reference = 'Tarea #' . $taskId;
       $category = trim(strip_tags((string) ($appointment['categoria'] ?? '')));
       if ($category === '') {
         $category = trim((string) ($ticket['tema_ayuda'] ?? $ticket['asunto'] ?? '')) ?: 'cita';
@@ -73,27 +95,28 @@ final class CommercialCalendarNotifier
         'creado_por_telefono' => $creator['phone'],
         'template_language' => 'es_CO',
       ];
-      $button = ['type' => 'button', 'sub_type' => 'url', 'index' => '0', 'parameters' => [['type' => 'text', 'text' => $logicalTicket]]];
+      $button = static fn(string $url): array => ['type' => 'button', 'sub_type' => 'url', 'index' => '0', 'parameters' => [['type' => 'text', 'text' => SharedButtonUrl::suffix($url)]]];
 
       if ($employeeId !== '') {
         $employee = $this->employeeRow($employeeId, 'id_empleado');
         $employeeName = $employee['name'] !== '' ? $employee['name'] : 'Funcionario';
         if ($employee['phone'] !== '') {
-          $ok = $this->queue->enqueue($employee['phone'], $employeeName, $this->employeeMessage($employeeName, $category, $logicalTicket, $dateLabel, $timeLabel, $location), $baseMeta + [
+          $ok = $this->enqueue($employee['phone'], $employeeName, $this->employeeMessage($employeeName, $category, $reference, $dateLabel, $timeLabel, $location), $baseMeta + [
             'source_module' => 'calendar_cita_funcionario',
             'campaign_tag' => 'calendar_cita_funcionario',
             'id_funcionario' => is_numeric($employeeId) ? (int) $employeeId : 0,
             'dedupe_key' => 'calendar_cita_funcionario:' . $logicalTicket . ':' . $employeeId . ':' . $start,
-            'template_name' => 'scm_cita_funcionario_v1',
+            'template_name' => self::TEMPLATE_EMPLOYEE,
             'template_components' => [
-              ['type' => 'body', 'parameters' => $this->textParameters([$employeeName, $category, $logicalTicket, $dateLabel, $timeLabel, $location !== '' ? $location : '-'])],
-              $button,
+              ['type' => 'body', 'parameters' => $this->textParameters([$employeeName, $category, $reference, $dateLabel, $timeLabel, $location !== '' ? $location : '-'])],
+              // El funcionario entra con su enlace individual y la tarea se abre en su ventana.
+              $button(StaffTaskLink::url($taskId, $employeeId)),
             ],
           ]);
           if ($ok) {
             $queued++;
           } else {
-            $detail = trim($this->queue->lastError());
+            $detail = trim($this->lastError());
             $errors[] = 'No se pudo encolar WhatsApp al funcionario de la tarea #' . $logicalTicket . ($detail !== '' ? ': ' . $detail : '.');
           }
         } else {
@@ -113,20 +136,21 @@ final class CommercialCalendarNotifier
       }
       $requesterDedupe[$requesterKey] = true;
       $creatorContact = $this->creatorLabel($creator);
-      $ok = $this->queue->enqueue($requesterPhone, $requesterName, $this->requesterMessage($requesterName, $category, $logicalTicket, $dateLabel, $timeLabel, $location, $creatorContact), $baseMeta + [
+      $ok = $this->enqueue($requesterPhone, $requesterName, $this->requesterMessage($requesterName, $category, $reference, $dateLabel, $timeLabel, $location, $creatorContact), $baseMeta + [
         'source_module' => 'calendar_cita_solicitante',
         'campaign_tag' => 'calendar_cita_solicitante',
         'dedupe_key' => 'calendar_cita_solicitante:' . $logicalTicket . ':' . $start,
-        'template_name' => 'scm_cita_solicitante_v1',
+        'template_name' => self::TEMPLATE_REQUESTER,
         'template_components' => [
-          ['type' => 'body', 'parameters' => $this->textParameters([$requesterName, $category, $logicalTicket, $dateLabel, $timeLabel, $location !== '' ? $location : '-', $creatorContact])],
-          $button,
+          ['type' => 'body', 'parameters' => $this->textParameters([$requesterName, $category, $reference, $dateLabel, $timeLabel, $location !== '' ? $location : '-', $creatorContact])],
+          // El cliente va a la vista pública de su tarea, nunca a la página de tickets anterior.
+          $button(PublicTaskAccess::url($taskId)),
         ],
       ]);
       if ($ok) {
         $queued++;
       } else {
-        $detail = trim($this->queue->lastError());
+        $detail = trim($this->lastError());
         $errors[] = 'No se pudo encolar WhatsApp al solicitante de la tarea #' . $logicalTicket . ($detail !== '' ? ': ' . $detail : '.');
       }
     }
@@ -225,11 +249,11 @@ final class CommercialCalendarNotifier
 
   private function employeeMessage(string $name, string $category, string $ticket, string $date, string $time, string $location): string
   {
-    return "Hola {$name}, se te ha agendado una cita de {$category}.\n\nTarea: #{$ticket}\nFecha: {$date}\nHora: {$time}\nDirección: " . ($location !== '' ? $location : '-');
+    return "Hola {$name}, se te ha agendado una cita de {$category}.\n\nReferencia: {$ticket}\nFecha: {$date}\nHora: {$time}\nDirección: " . ($location !== '' ? $location : '-');
   }
 
   private function requesterMessage(string $name, string $category, string $ticket, string $date, string $time, string $location, string $creatorContact): string
   {
-    return "Hola {$name}, se te ha agendado una cita de {$category}.\n\nTarea: #{$ticket}\nFecha: {$date}\nHora: {$time}\nLugar: " . ($location !== '' ? $location : '-') . "\n\nSi no puedes atenderla, contacta a {$creatorContact}.";
+    return "Hola {$name}, se te ha agendado una cita de {$category}.\n\nReferencia: {$ticket}\nFecha: {$date}\nHora: {$time}\nLugar: " . ($location !== '' ? $location : '-') . "\n\nSi no puedes atenderla, contacta a {$creatorContact}.";
   }
 }

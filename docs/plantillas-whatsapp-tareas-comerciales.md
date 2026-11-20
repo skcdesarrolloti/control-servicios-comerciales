@@ -114,6 +114,76 @@ Ejemplos: `{{1}}` Luis Prada · `{{2}}` 5868 · `{{3}}` 3 inmuebles en arriendo 
 
 Botón `Ver cotización`. URL del sitio web `https://sucasainmobiliaria.com.co/dashboard-comercial/public/cotizacion.php?c=`. URL de muestra `https://sucasainmobiliaria.com.co/dashboard-comercial/public/cotizacion.php?c=5868.1893456000.ejemplo`.
 
+## Plantillas compartidas con el panel inmobiliario (6, 7 y 8)
+
+Las usan este panel y `control-servicios-inmobiliarios`. Reemplazan a `pqr_trasladada_funcionario_v1`, `scm_cita_funcionario_v1` y `scm_cita_solicitante_v1`, cuyo botón tiene fija la página de tickets anterior (`https://sucasainmobiliaria.com.co/ticket/?id_ticket={{1}}`). No edites las v1: si cambias su botón, los WhatsApp del panel que todavía las use quedan con un enlace roto. Crea estas v2 y, cuando los dos paneles usen las v2, las v1 se pueden borrar.
+
+Para que el mismo botón sirva en los dos paneles, la **URL del sitio web** es solo el dominio, `https://sucasainmobiliaria.com.co/`, y cada panel completa el resto (`SharedButtonUrl::suffix`): este, `dashboard-comercial/public/...`, y el inmobiliario, `control-servicios-inmobiliarios/public/?scm_case=...`. La referencia va en una sola variable con su nombre (`Tarea #11459` aquí, `Caso #10245` en el inmobiliario), así el texto sirve para los dos. Botón **Ver detalle** en las tres.
+
+## 6. `pqr_trasladada_funcionario_v2`
+
+Para el nuevo responsable cuando se reasigna (traslada) una tarea o un caso. Código: `CommercialCallsNotifier::TEMPLATE_TRANSFERRED`.
+
+```text
+Hola *{{1}}*.
+
+Se trasladó a tu gestión: *{{2}}*.
+
+*Tipo:* {{3}}.
+*Responsable anterior:* {{4}}.
+
+Consulta los detalles en el botón.
+
+*Construimos confianza, protegemos su patrimonio.*
+```
+
+Ejemplos: `{{1}}` Royner Guardo · `{{2}}` Tarea #11459 · `{{3}}` Venta de inmueble · `{{4}}` Daniela Hernandez Buelvas
+
+Botón `Ver detalle`. URL del sitio web `https://sucasainmobiliaria.com.co/`. URL de muestra `https://sucasainmobiliaria.com.co/dashboard-comercial/public/index.php?tab=abiertos&ticket_id=11459.1893456000.101.ejemplo`.
+
+## 7. `scm_cita_funcionario_v2`
+
+Para el funcionario cuando se le agenda una cita. Código: `CommercialCalendarNotifier::TEMPLATE_EMPLOYEE`.
+
+```text
+Hola *{{1}}*, se te agendó una cita de *{{2}}*.
+
+*Referencia:* {{3}}.
+*Fecha:* {{4}}.
+*Hora:* {{5}}.
+*Dirección:* {{6}}.
+
+Consulta los detalles en el botón.
+
+*Construimos confianza, protegemos su patrimonio.*
+```
+
+Ejemplos: `{{1}}` Alvaro Florez De Oro · `{{2}}` Visita · `{{3}}` Tarea #11459 · `{{4}}` 25/11/2026 · `{{5}}` 10:00 a. m. a 11:00 a. m. · `{{6}}` Urb Simón Bolívar Mz 20 lote 7
+
+Botón `Ver detalle`. URL del sitio web `https://sucasainmobiliaria.com.co/`. URL de muestra `https://sucasainmobiliaria.com.co/dashboard-comercial/public/index.php?tab=abiertos&ticket_id=11459.1893456000.101.ejemplo`.
+
+## 8. `scm_cita_solicitante_v2`
+
+Para el cliente cuando se le agenda una cita. Código: `CommercialCalendarNotifier::TEMPLATE_REQUESTER`. Como la comparte el panel inmobiliario, quien agendó va como "Agendada por" y no como consultor/a.
+
+```text
+Hola *{{1}}*, se te agendó una cita de *{{2}}*.
+
+*Referencia:* {{3}}.
+*Fecha:* {{4}}.
+*Hora:* {{5}}.
+*Lugar:* {{6}}.
+*Agendada por:* {{7}}.
+
+Si no puedes asistir, comunícate con quien agendó la cita. Consulta los detalles en el botón.
+
+*Construimos confianza, protegemos su patrimonio.*
+```
+
+Ejemplos: `{{1}}` Roy Guardo · `{{2}}` Visita · `{{3}}` Tarea #11459 · `{{4}}` 25/11/2026 · `{{5}}` 10:00 a. m. a 11:00 a. m. · `{{6}}` Urb Simón Bolívar Mz 20 lote 7 · `{{7}}` Alvaro Florez De Oro - 3001234567
+
+Botón `Ver detalle`. URL del sitio web `https://sucasainmobiliaria.com.co/`. URL de muestra `https://sucasainmobiliaria.com.co/dashboard-comercial/public/tarea.php?t=11459.1893456000.ejemplo`.
+
 ## Si Meta exige otro nombre
 
-Cámbialo en la constante `TEMPLATE_*` de `src/Commercial/Calls/CommercialCallsNotifier.php` (o `TEMPLATE` de `src/Commercial/Quotes/CommercialQuotesNotifier.php` para la cotización). No borres una plantilla para volver a crearla: Meta no deja reusar ese nombre por varias semanas.
+Cámbialo en la constante `TEMPLATE_*` de `src/Commercial/Calls/CommercialCallsNotifier.php` (o `TEMPLATE` de `src/Commercial/Quotes/CommercialQuotesNotifier.php` para la cotización, y `TEMPLATE_EMPLOYEE`/`TEMPLATE_REQUESTER` de `src/Commercial/CommercialCalendarNotifier.php` para las citas). No borres una plantilla para volver a crearla: Meta no deja reusar ese nombre por varias semanas.

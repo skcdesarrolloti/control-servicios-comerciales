@@ -531,8 +531,51 @@ final class CommercialCallsTest extends TestCase
     self::assertStringNotContainsString('sucasainmobiliaria.com.co/ticket/', $log->mail[0][2], 'Nada de la página de tickets anterior.');
     preg_match('#ticket_id=([0-9.]+202\.[a-f0-9]{64})#', $log->mail[0][2], $own);
     self::assertSame(['id' => $id, 'employee' => '202'], StaffTaskLink::verify($own[1] ?? ''));
-    self::assertSame(['+573000000202', CommercialCallsNotifier::TEMPLATE_ASSIGNED], [$log->whatsapp[0][0], $log->whatsapp[0][1]]);
-    self::assertSame('202', StaffTaskLink::verify(end($log->whatsapp[0][2])['parameters'][0]['text'])['employee'] ?? '');
+    self::assertSame(['+573000000202', 'pqr_trasladada_funcionario_v2'], [$log->whatsapp[0][0], $log->whatsapp[0][1]]);
+    self::assertSame(['Consultor Dos', 'Tarea #' . $id, 'Arriendo', 'Consultora Uno'], array_column($log->whatsapp[0][2][0]['parameters'], 'text'));
+    $suffix = end($log->whatsapp[0][2])['parameters'][0]['text'];
+    self::assertStringStartsWith('public/index.php?tab=abiertos&ticket_id=', $suffix, 'El botón compartido lleva la ruta del panel, sin el dominio fijo de la plantilla.');
+    self::assertSame('202', StaffTaskLink::verify(substr($suffix, strlen('public/index.php?tab=abiertos&ticket_id=')))['employee'] ?? '');
+  }
+
+  public function testSharedTemplateButtonKeepsOnlyThePathAfterTheDomain(): void
+  {
+    self::assertSame('dashboard-comercial/public/tarea.php?t=1.2.abc', \SCM\Support\SharedButtonUrl::suffix('https://sucasainmobiliaria.com.co/dashboard-comercial/public/tarea.php?t=1.2.abc'));
+    self::assertSame('control-servicios-inmobiliarios/public/?scm_case=9', \SCM\Support\SharedButtonUrl::suffix('https://sucasainmobiliaria.com.co/control-servicios-inmobiliarios/public/?scm_case=9'));
+    self::assertSame('public/index.php?tab=abiertos', \SCM\Support\SharedButtonUrl::suffix('https://panel.test/public/index.php?tab=abiertos'));
+  }
+
+  public function testAppointmentWhatsappUsesSharedTemplatesWithTaskLinks(): void
+  {
+    $this->uploadConstants();
+    $id = $this->taskFromCall();
+    // SchemaInspector consulta information_schema (MySQL): aquí se simula sobre SQLite.
+    $pdo = $this->db->pdo();
+    $pdo->exec("ATTACH DATABASE ':memory:' AS information_schema");
+    $pdo->exec('CREATE TABLE information_schema.TABLES (TABLE_SCHEMA TEXT, TABLE_NAME TEXT)');
+    $pdo->exec('CREATE TABLE information_schema.COLUMNS (TABLE_SCHEMA TEXT, TABLE_NAME TEXT, COLUMN_NAME TEXT)');
+    $pdo->sqliteCreateFunction('DATABASE', static fn(): string => 'main');
+    foreach (['wp_jet_cct_tickets', 'wp_jet_cct_funcionarios'] as $table) {
+      $pdo->prepare('INSERT INTO information_schema.TABLES VALUES (?, ?)')->execute(['main', $table]);
+      foreach ($pdo->query("PRAGMA table_info('{$table}')")->fetchAll(\PDO::FETCH_ASSOC) as $column) {
+        $pdo->prepare('INSERT INTO information_schema.COLUMNS VALUES (?, ?, ?)')->execute(['main', $table, $column['name']]);
+      }
+    }
+    $sent = [];
+    $notifier = new \SCM\Commercial\CommercialCalendarNotifier($this->db, null, static function (string $phone, string $name, string $message, array $meta) use (&$sent): bool {
+      $sent[] = $meta;
+      return true;
+    });
+    $result = $notifier->notify([['es_cita' => 'si', 'id_ticket' => (string) $id, 'id_empleado' => '101', 'categoria' => 'Visita', 'fecha_inicio' => '2026-11-25 10:00:00', 'fecha_fin' => '2026-11-25 11:00:00', 'ubicacion' => 'Cra 1 # 2-3']]);
+    self::assertSame(2, $result['queued']);
+    self::assertSame([\SCM\Commercial\CommercialCalendarNotifier::TEMPLATE_EMPLOYEE, \SCM\Commercial\CommercialCalendarNotifier::TEMPLATE_REQUESTER], array_column($sent, 'template_name'));
+    self::assertSame(['scm_cita_funcionario_v2', 'scm_cita_solicitante_v2'], array_column($sent, 'template_name'));
+    self::assertSame('Tarea #' . $id, $sent[0]['template_components'][0]['parameters'][2]['text'], 'La referencia va en una sola variable.');
+    $staff = $sent[0]['template_components'][1]['parameters'][0]['text'];
+    $client = $sent[1]['template_components'][1]['parameters'][0]['text'];
+    self::assertSame('101', StaffTaskLink::verify(substr($staff, strlen('public/index.php?tab=abiertos&ticket_id=')))['employee'] ?? '', 'El funcionario entra con su enlace individual.');
+    self::assertStringStartsWith('public/tarea.php?t=', $client);
+    self::assertSame($id, PublicTaskAccess::verify(substr($client, strlen('public/tarea.php?t='))), 'El cliente va a la vista pública de su tarea.');
   }
 
   public function testClientReplyReachesAssigneeCopiesAndTaskHistory(): void
