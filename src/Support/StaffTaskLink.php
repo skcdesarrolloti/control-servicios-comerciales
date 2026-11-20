@@ -45,6 +45,15 @@ final class StaffTaskLink
     return $reference === (string) $id ? self::openUrl($id) : self::base() . '/index.php?tab=abiertos&ticket_id=' . $reference;
   }
 
+  /**
+   * Base a la que se agrega el número de la tarea para abrirla en el panel (código heredado del panel inmobiliario que arma
+   * el enlace por partes). Reemplaza la página de tickets anterior, que ya no existe.
+   */
+  public static function openBase(): string
+  {
+    return self::base() . '/index.php?tab=abiertos&abrir_tarea=';
+  }
+
   public static function openUrl(int $id): string
   {
     return self::base() . '/index.php?tab=abiertos&ticket_id=' . $id . '&abrir_tarea=' . $id;

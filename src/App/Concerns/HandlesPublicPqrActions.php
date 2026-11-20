@@ -219,7 +219,7 @@ trait HandlesPublicPqrActions
     $publicService = new \SCM\Modules\PublicTickets\PublicTicketsService($this->db, $appConfig);
     $publicRequestsUrl = $publicService->buildResponsiblePublicPqrUrl($employeeId, 2592000, 'assigned');
     $logicalTicket = trim((string) ($ticket['id_ticket'] ?? $ticket['_ID'] ?? ''));
-    $ticketUrl = self::DEFAULT_TICKET_URL . rawurlencode($logicalTicket);
+    $ticketUrl = \SCM\Support\StaffTaskLink::openBase() . rawurlencode($logicalTicket);
     $contractLabel = trim((string) ($ticket['contrato'] ?? $ticket['id_contrato'] ?? ''));
     $subject = 'Solicitud web trasladada #' . $logicalTicket;
     $displayName = $employeeName !== '' ? $employeeName : ('Funcionario #' . $employeeId);
@@ -364,7 +364,7 @@ trait HandlesPublicPqrActions
     $html = $this->render_public_pqr_tab(
       $result,
       $funcionarios,
-      self::DEFAULT_TICKET_URL,
+      \SCM\Support\StaffTaskLink::openBase(),
       $employeeIdFilter,
       false,
       [],

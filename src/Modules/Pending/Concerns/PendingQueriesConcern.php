@@ -228,7 +228,7 @@ trait PendingQueriesConcern
       $row = (array) $row;
       $ticketRef = trim((string) ($row['id_ticket'] ?? ''));
       $ticketUrl = $ticketRef !== ''
-        ? 'https://sucasainmobiliaria.com.co/ticket/?id_ticket=' . rawurlencode($ticketRef)
+        ? \SCM\Support\StaffTaskLink::openBase() . rawurlencode($ticketRef)
         : '';
 
       $items[] = [

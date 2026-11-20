@@ -42,7 +42,7 @@ trait PublicTicketNotificationsConcern
     $solicitanteEmail = trim((string) ($contact['email'] ?? ''));
     $solicitantePhone = trim((string) ($contact['phone'] ?? ''));
 
-    $ticketUrl = 'https://sucasainmobiliaria.com.co/ticket/?id_ticket=' . rawurlencode($logicalTicket);
+    $ticketUrl = \SCM\Support\StaffTaskLink::openBase() . rawurlencode($logicalTicket);
     $subject = 'Nueva Solicitud #' . $logicalTicket . ' asignada';
     $contractLabel = '';
     if (is_array($contract)) {

@@ -671,7 +671,7 @@ trait RendersPublicPqr
       }
       if (!empty($ticketIds)) {
         $caseCardConfig = [
-          'ticket_url' => $ticketUrl !== '' ? $ticketUrl : self::DEFAULT_TICKET_URL,
+          'ticket_url' => $ticketUrl !== '' ? $ticketUrl : \SCM\Support\StaffTaskLink::openBase(),
           'preventiva_url' => self::DEFAULT_PREVENTIVA_URL,
           'correctiva_url' => self::DEFAULT_CORRECTIVA_URL,
           'cotizacion_url' => self::DEFAULT_COTIZACION_URL,
@@ -915,7 +915,7 @@ trait RendersPublicPqr
   public function renderPublicPqrReadonlyPage(string $employeeIdFilter = '', array $overrideConfig = []): string
   {
     $config = array_merge([
-      'ticket_url' => self::DEFAULT_TICKET_URL,
+      'ticket_url' => \SCM\Support\StaffTaskLink::openBase(),
     ], $overrideConfig);
 
     $employeeIdFilter = preg_replace('/[^A-Za-z0-9_-]/', '', trim($employeeIdFilter));
@@ -928,7 +928,7 @@ trait RendersPublicPqr
     $contentHtml = $this->render_public_pqr_tab(
       $result,
       [],
-      (string) ($config['ticket_url'] ?? self::DEFAULT_TICKET_URL),
+      \SCM\Support\StaffTaskLink::openBase(),
       $employeeIdFilter,
       true,
       [],
@@ -982,7 +982,7 @@ trait RendersPublicPqr
   public function renderPublicPqrSignedAccessPage(string $employeeIdFilter = '', string $expiresAt = '', string $signature = '', array $overrideConfig = [], string $flashMessage = '', string $flashType = 'success', string $accessScope = 'assigned', string $accessToken = ''): string
   {
     $config = array_merge([
-      'ticket_url' => self::DEFAULT_TICKET_URL,
+      'ticket_url' => \SCM\Support\StaffTaskLink::openBase(),
     ], $overrideConfig);
 
     $employeeIdFilter = preg_replace('/[^A-Za-z0-9_-]/', '', trim($employeeIdFilter));
@@ -999,7 +999,7 @@ trait RendersPublicPqr
     $contentHtml = $this->render_public_pqr_tab(
       $result,
       $this->get_public_pqr_corresponsable_candidates(),
-      (string) ($config['ticket_url'] ?? self::DEFAULT_TICKET_URL),
+      \SCM\Support\StaffTaskLink::openBase(),
       $accessScope === 'all' ? '' : $employeeIdFilter,
       false,
       [

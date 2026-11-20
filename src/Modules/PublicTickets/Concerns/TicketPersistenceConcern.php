@@ -402,7 +402,7 @@ trait TicketPersistenceConcern
       return '';
     }
 
-    return 'https://sucasainmobiliaria.com.co/ticket/?id_ticket=' . rawurlencode($logicalTicket);
+    return ctype_digit($logicalTicket) && (int) $logicalTicket > 0 ? \SCM\Support\PublicTaskAccess::url((int) $logicalTicket) : '';
   }
 
   private function buildClientQuoteUrl(string $quoteNumero): string

@@ -12,7 +12,7 @@ trait RendersDashboard
   public function renderPanel(array $overrideConfig = []): string
   {
     $config = array_merge([
-      'ticket_url'     => self::DEFAULT_TICKET_URL,
+      'ticket_url'     => \SCM\Support\StaffTaskLink::openBase(),
       'preventiva_url' => self::DEFAULT_PREVENTIVA_URL,
       'correctiva_url' => self::DEFAULT_CORRECTIVA_URL,
       'cotizacion_url' => self::DEFAULT_COTIZACION_URL,
@@ -1899,7 +1899,7 @@ trait RendersDashboard
     $contacto = trim((string) ($row['celular_destinatario'] ?? '-'));
     $empleado = trim((string) ($row['coordinador'] ?? $row['creador'] ?? $row['id_empleado'] ?? '-'));
     $direccion = trim((string) ($row['direccion'] ?? '-'));
-    $ticketUrl = $ticket !== '' ? self::DEFAULT_TICKET_URL . rawurlencode($ticket) : '';
+    $ticketUrl = $ticket !== '' ? \SCM\Support\StaffTaskLink::openBase() . rawurlencode($ticket) : '';
     $cotUrl = $id !== '' ? self::DEFAULT_COTIZACION_URL . rawurlencode($id) : '';
     $noteUrl = 'https://sucasainmobiliaria.com.co/mi-cuenta/anadir-nota-a-cotizacion-de-mantenimiento/?id_cotizacion=' . rawurlencode($id) . '&id_inmueble=' . rawurlencode($idInmueble) . '&id_sucursal=' . rawurlencode($sucursal) . '&id_contrato=' . rawurlencode($idContrato);
     $orderUrl = 'https://sucasainmobiliaria.com.co/mi-cuenta/anadir-orden-de-mantenimiento/?id_cotizacion=' . rawurlencode($id) . '&id_inmueble=' . rawurlencode($idInmueble);

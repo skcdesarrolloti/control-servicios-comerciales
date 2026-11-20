@@ -538,6 +538,25 @@ final class CommercialCallsTest extends TestCase
     self::assertSame('202', StaffTaskLink::verify(substr($suffix, strlen('public/index.php?tab=abiertos&ticket_id=')))['employee'] ?? '');
   }
 
+  public function testNoLinkPointsToTheOldTicketPage(): void
+  {
+    // La página de tickets de WordPress (sucasainmobiliaria.com.co/ticket/) ya no existe.
+    $root = dirname(__DIR__, 2);
+    $legacy = [];
+    foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($root . '/src', \FilesystemIterator::SKIP_DOTS)) as $file) {
+      if ($file->getExtension() === 'php' && str_contains((string) file_get_contents($file->getPathname()), 'sucasainmobiliaria.com.co/ticket/')) {
+        $legacy[] = $file->getFilename();
+      }
+    }
+    foreach (array_merge(glob($root . '/public/*.php') ?: [], glob($root . '/public/assets/js/*.js') ?: [], [$root . '/config/app.php', $root . '/.env.example']) as $file) {
+      if (is_file($file) && str_contains((string) file_get_contents($file), 'sucasainmobiliaria.com.co/ticket/')) {
+        $legacy[] = basename($file);
+      }
+    }
+    self::assertSame([], $legacy);
+    self::assertSame('https://panel.test/public/index.php?tab=abiertos&abrir_tarea=', StaffTaskLink::openBase());
+  }
+
   public function testSharedTemplateButtonKeepsOnlyThePathAfterTheDomain(): void
   {
     self::assertSame('dashboard-comercial/public/tarea.php?t=1.2.abc', \SCM\Support\SharedButtonUrl::suffix('https://sucasainmobiliaria.com.co/dashboard-comercial/public/tarea.php?t=1.2.abc'));

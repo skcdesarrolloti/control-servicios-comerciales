@@ -654,7 +654,7 @@ trait WorkflowCommandsConcern
     string $newEmpId = ''
   ): int {
     $logicalTicket = $this->firstNonEmpty([$ticket['id_ticket'] ?? '', $ticket['_ID'] ?? '']);
-    $ticketUrl = 'https://sucasainmobiliaria.com.co/ticket/?id_ticket=' . rawurlencode($logicalTicket);
+    $ticketUrl = \SCM\Support\StaffTaskLink::openBase() . rawurlencode($logicalTicket);
     $subject   = 'Traslado del caso — ticket #' . $logicalTicket;
     $sent      = 0;
     $fecha     = date('Y-m-d H:i');

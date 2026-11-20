@@ -435,7 +435,7 @@ final class PendingView
           . 'Contrato recibido</button>';
       }
       if ($ticketId !== '') {
-        $viewUrl = esc_attr('https://sucasainmobiliaria.com.co/ticket/?id_ticket=' . rawurlencode($ticketId));
+        $viewUrl = esc_attr(\SCM\Support\StaffTaskLink::openBase() . rawurlencode($ticketId));
         $html .= '<button type="button" class="scm-pending-action-btn"'
           . ' data-scm-open-iframe data-no-emp-check data-iframe-url="' . $viewUrl . '" data-iframe-title="Ver ticket">'
           . 'Ver ticket</button>';

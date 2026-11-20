@@ -75,7 +75,6 @@ final class SuCasaControlServiciosInmobiliarios
 
   const NONCE_KEY            = 'scm_nonce';
 
-  const DEFAULT_TICKET_URL = 'https://sucasainmobiliaria.com.co/ticket/?id_ticket=';
   const DEFAULT_PREVENTIVA_URL = 'https://sucasainmobiliaria.com.co/revision-preventiva/?numero=';
   const DEFAULT_CORRECTIVA_URL = 'https://sucasainmobiliaria.com.co/revision-correctiva/?numero=';
   const DEFAULT_COTIZACION_URL = 'https://sucasainmobiliaria.com.co/cotizacion-de-mantenimiento/?numero=';

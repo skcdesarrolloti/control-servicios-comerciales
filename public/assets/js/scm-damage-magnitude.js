@@ -36,7 +36,7 @@
   const magnitudeSelect = root.querySelector('#scmDamageMagnitude');
   const limitSelect = root.querySelector('#scmDamageLimit');
   const refreshBtn = root.querySelector('#scmDamageRefresh');
-  const ticketBaseUrl = (runtime.config && runtime.config.ticket_url) || 'https://sucasainmobiliaria.com.co/ticket/?id_ticket=';
+  const ticketBaseUrl = (runtime.config && runtime.config.ticket_url) || '';
 
   if (!grid || !summary || !state) return;
 

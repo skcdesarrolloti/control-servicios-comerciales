@@ -61,7 +61,7 @@ trait HandlesTicketWorkflowActions
       }
     }
     $config = [
-      'ticket_url'     => self::sanitizeUrl($rawConfig['ticket_url']     ?? self::DEFAULT_TICKET_URL),
+      'ticket_url'     => \SCM\Support\StaffTaskLink::openBase(),
       'preventiva_url' => self::sanitizeUrl($rawConfig['preventiva_url'] ?? self::DEFAULT_PREVENTIVA_URL),
       'correctiva_url' => self::sanitizeUrl($rawConfig['correctiva_url'] ?? self::DEFAULT_CORRECTIVA_URL),
       'cotizacion_url' => self::sanitizeUrl($rawConfig['cotizacion_url'] ?? self::DEFAULT_COTIZACION_URL),
@@ -231,7 +231,7 @@ trait HandlesTicketWorkflowActions
     $rawConfig = json_decode(stripslashes((string)($_POST['config'] ?? '{}')), true);
     $rawConfig = is_array($rawConfig) ? $rawConfig : [];
     $config = [
-      'ticket_url'     => self::sanitizeUrl($rawConfig['ticket_url']     ?? self::DEFAULT_TICKET_URL),
+      'ticket_url'     => \SCM\Support\StaffTaskLink::openBase(),
       'preventiva_url' => self::sanitizeUrl($rawConfig['preventiva_url'] ?? self::DEFAULT_PREVENTIVA_URL),
       'correctiva_url' => self::sanitizeUrl($rawConfig['correctiva_url'] ?? self::DEFAULT_CORRECTIVA_URL),
       'cotizacion_url' => self::sanitizeUrl($rawConfig['cotizacion_url'] ?? self::DEFAULT_COTIZACION_URL),

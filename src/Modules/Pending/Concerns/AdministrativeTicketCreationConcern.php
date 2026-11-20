@@ -238,7 +238,7 @@ trait AdministrativeTicketCreationConcern
       'ok' => '1',
       'message' => $message,
       'ticket_id' => (string) $ticketId,
-      'ticket_url' => 'https://sucasainmobiliaria.com.co/ticket/?id_ticket=' . rawurlencode((string) $ticketId),
+      'ticket_url' => \SCM\Support\StaffTaskLink::openBase() . rawurlencode((string) $ticketId),
       'emails_queued' => (string) $queued,
       'warnings' => $warnings,
     ];

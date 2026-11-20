@@ -24,7 +24,7 @@ trait PendingNotificationsAndDatesConcern
       return 0;
     }
 
-    $ticketUrl = 'https://sucasainmobiliaria.com.co/ticket/?id_ticket=' . rawurlencode((string) $ticketId);
+    $ticketUrl = \SCM\Support\StaffTaskLink::openBase() . rawurlencode((string) $ticketId);
     $subject = $mode === 'preventiva'
       ? 'Aviso de revision preventiva del contrato ' . (string) ($ticketPayload['contrato'] ?? '')
       : 'Ticket administrativo #' . $ticketId . ' creado';

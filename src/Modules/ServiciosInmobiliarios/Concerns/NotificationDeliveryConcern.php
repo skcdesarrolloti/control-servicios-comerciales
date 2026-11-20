@@ -16,7 +16,7 @@ trait NotificationDeliveryConcern
     if (!$this->queue instanceof EmailQueue) {
       return 0;
     }
-    $ticketUrl = 'https://sucasainmobiliaria.com.co/ticket/?id_ticket=' . rawurlencode($logicalTicket);
+    $ticketUrl = \SCM\Support\StaffTaskLink::openBase() . rawurlencode($logicalTicket);
     $subject = $estado === 'Cerrado' ? 'Ticket #' . $logicalTicket . ' cerrado' : 'Ticket #' . $logicalTicket . ' con nueva respuesta';
     $sent = 0;
     foreach ($this->emailRecipientsForTargets($ticket, $notifyTargets) as $recipient) {
@@ -89,7 +89,7 @@ trait NotificationDeliveryConcern
       return 0;
     }
     $logicalTicket = $this->firstNonEmpty([$ticket['id_ticket'] ?? '', $ticket['_ID'] ?? '']);
-    $ticketUrl = 'https://sucasainmobiliaria.com.co/ticket/?id_ticket=' . rawurlencode($logicalTicket);
+    $ticketUrl = \SCM\Support\StaffTaskLink::openBase() . rawurlencode($logicalTicket);
     $subject = 'Nuevo seguimiento del ticket #' . $logicalTicket;
     $sent = 0;
     foreach ($this->emailRecipientsForTargets($ticket, $notifyTargets) as $recipient) {
