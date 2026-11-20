@@ -35,7 +35,7 @@ Botón `Ver tarea`. URL del sitio web `https://sucasainmobiliaria.com.co/dashboa
 
 ## 2. `scm_tarea_comercial_registrada_v1`
 
-Para el cliente, al crear la tarea (desde Llamadas o desde Precaptación). **Encabezado:** en "Muestra de contenido multimedia" elige **Imagen** y sube una ficha de ejemplo (JPG o PNG, datos inventados). El panel envía la ficha del funcionario asignado (Promoción › Fichas de funcionarios) o, si no tiene, el banner de los correos.
+Para el cliente, al crear la tarea (desde Llamadas o desde Precaptación). El panel inmobiliario también la envía al cliente de una retención de contrato (tarea comercial que crea ese panel), con `{{3}}` = `tu contrato 280 (inmueble 10523)`. **Encabezado:** en "Muestra de contenido multimedia" elige **Imagen** y sube una ficha de ejemplo (JPG o PNG, datos inventados). El panel envía la ficha del funcionario asignado (Promoción › Fichas de funcionarios) o, si no tiene, el banner de los correos.
 
 ```text
 Hola *{{1}}.*
