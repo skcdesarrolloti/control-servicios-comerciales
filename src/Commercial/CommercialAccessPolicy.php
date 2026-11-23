@@ -40,6 +40,7 @@ final class CommercialAccessPolicy
     'cerrar' => 'Cerrar tareas',
     'cambiar_estado' => 'Cambiar estado comercial',
     'reasignar' => 'Reasignar responsable',
+    'respuestas_guia_editar' => 'Respuestas guía: crear, editar y eliminar las respuestas comerciales desde la tarea',
     'enviar_notificacion' => 'Enviar notificaciones comerciales',
     'eliminar_notificacion' => 'Eliminar notificaciones comerciales (solo administradores)',
     'editar_actor' => 'Editar datos de actores y registros relacionados',
@@ -73,7 +74,7 @@ final class CommercialAccessPolicy
   ];
 
   /** Acciones que un cargo sin configurar no recibe por defecto: hay que marcarlas. */
-  public const OPT_IN_ACTIONS = ['editar_actor', 'mercado_vista_completa', 'aseo_vista_interna', 'promocion_ver_ip', 'plan_estrategico_editar', 'pop_gestionar', 'pop_anular', 'pop_ver_costos', 'redes_ver_inversion', 'redes_sincronizar', 'piezas_gestionar', 'piezas_archivar', 'fichas_gestionar', 'campanas_enviar', 'campanas_eliminar', 'plantillas_editar', 'reportes_pagar', 'reportes_editar_valor'];
+  public const OPT_IN_ACTIONS = ['editar_actor', 'mercado_vista_completa', 'aseo_vista_interna', 'promocion_ver_ip', 'plan_estrategico_editar', 'pop_gestionar', 'pop_anular', 'pop_ver_costos', 'redes_ver_inversion', 'redes_sincronizar', 'piezas_gestionar', 'piezas_archivar', 'fichas_gestionar', 'campanas_enviar', 'campanas_eliminar', 'plantillas_editar', 'reportes_pagar', 'reportes_editar_valor', 'respuestas_guia_editar'];
 
   /**
    * Vistas que un cargo sin configurar no recibe por defecto: hay que marcarlas en Permisos. Los cargos con acceso total

@@ -283,13 +283,12 @@ final class CommercialApiController
       error_log('[commercial-analysis:list] ' . $exception->getMessage());
       $detail['analyses'] = [];
     }
+    // Ventana de guías de la tarea: la consulta quien ve la tarea; usar y editar dependen de sus permisos.
     $detail['reply_guides'] = [];
-    if ($this->policy->canAct('responder')) {
-      try {
-        $detail['reply_guides'] = (new \SCM\Commercial\CommercialReplyGuides($this->db))->forStatus((string) ($detail['ticket']['estado_comercial'] ?? ''));
-      } catch (\Throwable $exception) {
-        error_log('[tareas:respuestas-guia] ' . $exception->getMessage());
-      }
+    try {
+      $detail['reply_guides'] = (new \SCM\Commercial\CommercialReplyGuides($this->db))->forStatus((string) ($detail['ticket']['estado_comercial'] ?? ''));
+    } catch (\Throwable $exception) {
+      error_log('[tareas:respuestas-guia] ' . $exception->getMessage());
     }
     JsonResponse::success([
       'html' => CommercialTicketModalView::render(
@@ -297,6 +296,67 @@ final class CommercialApiController
         $this->policy,
         $this->tickets->activeEmployeesByCargos($this->commercialCargos)
       ),
+    ]);
+  }
+
+  /**
+   * Crea o edita una respuesta guía comercial desde la ventana de guías de la tarea y devuelve las tarjetas actualizadas.
+   * @param array<string,mixed> $input
+   */
+  public function replyGuideSave(array $input): never
+  {
+    $this->verify($input);
+    $guides = $this->replyGuidesForEditor();
+    try {
+      $id = $guides->saveOne([
+        'id' => $input['id'] ?? 0,
+        'estado' => $input['estado'] ?? '',
+        'situacion' => $input['situacion'] ?? '',
+        'respuesta' => $input['respuesta'] ?? '',
+      ], \SCM\Core\Auth::employeeId());
+    } catch (\InvalidArgumentException $exception) {
+      JsonResponse::error($exception->getMessage(), 422);
+    } catch (\RuntimeException $exception) {
+      JsonResponse::error($exception->getMessage(), 409);
+    }
+    $this->replyGuidesResponse($guides, $input, (int) ($input['id'] ?? 0) > 0 ? 'Respuesta guía actualizada.' : 'Respuesta guía creada.', $id);
+  }
+
+  /**
+   * Elimina una respuesta guía comercial (la ventana pide confirmarlo) y deja constancia en el log del servidor.
+   * @param array<string,mixed> $input
+   */
+  public function replyGuideDelete(array $input): never
+  {
+    $this->verify($input);
+    $guides = $this->replyGuidesForEditor();
+    $id = (int) ($input['id'] ?? 0);
+    try {
+      $situation = $guides->delete($id);
+    } catch (\InvalidArgumentException $exception) {
+      JsonResponse::error($exception->getMessage(), 422);
+    } catch (\RuntimeException $exception) {
+      JsonResponse::error($exception->getMessage(), 409);
+    }
+    error_log('[tareas:respuestas-guia] Eliminada #' . $id . ' "' . $situation . '" por el funcionario ' . \SCM\Core\Auth::employeeId());
+    $this->replyGuidesResponse($guides, $input, 'Respuesta guía eliminada.', 0);
+  }
+
+  private function replyGuidesForEditor(): \SCM\Commercial\CommercialReplyGuides
+  {
+    $this->authorize('ver_ticket', 'No tienes permiso para ver las guías.');
+    $this->authorize('respuestas_guia_editar', 'No tienes permiso para editar las respuestas guía.');
+    return new \SCM\Commercial\CommercialReplyGuides($this->db);
+  }
+
+  /** @param array<string,mixed> $input */
+  private function replyGuidesResponse(\SCM\Commercial\CommercialReplyGuides $guides, array $input, string $message, int $id): never
+  {
+    $rows = $guides->forStatus((string) ($input['estado_actual'] ?? ''));
+    JsonResponse::success([
+      'message' => $message,
+      'id' => $id,
+      'html' => CommercialTicketModalView::guideCards($rows, $this->policy->canAct('responder'), true),
     ]);
   }
 

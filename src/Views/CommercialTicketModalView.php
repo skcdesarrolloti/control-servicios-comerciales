@@ -211,6 +211,10 @@ final class CommercialTicketModalView
               <span>Responder</span>
             </button>
           <?php endif; ?>
+          <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-[#EBF1FB] hover:text-[#1E3C76] text-slate-700 border border-slate-200 text-xs font-semibold transition-all group cursor-pointer" data-commercial-open-guides>
+            <span class="material-symbols-outlined text-[16px] text-slate-500 group-hover:text-[#1E3C76]">menu_book</span>
+            <span>Guías</span>
+          </button>
           <?php if ($policy->canAct('agregar_nota')): ?>
             <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold transition-all group cursor-pointer" data-commercial-open-workflow="note">
               <span class="material-symbols-outlined text-[16px] text-slate-500 group-hover:text-[#061D49]">lock</span>
@@ -547,6 +551,8 @@ final class CommercialTicketModalView
   </footer>
   <!-- END: ModalFooter -->
 
+  <?php echo self::guidesModal($guides, $status, $policy->canAct('responder'), $policy->canAct('respuestas_guia_editar')); ?>
+
   <!-- Modal Interno de Análisis IA -->
   <div class="fixed inset-0 z-[60] items-center justify-center p-3 sm:p-5 bg-[#061D49]/60 backdrop-blur-md commercial-analysis-modal overflow-y-auto" data-commercial-analysis-modal role="dialog" aria-modal="true" aria-labelledby="commercial-analysis-title" hidden>
     <div class="bg-white rounded-3xl shadow-modal w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col relative border border-slate-100" role="document" data-commercial-analysis-modal-content></div>
@@ -675,7 +681,7 @@ final class CommercialTicketModalView
         <p class="text-[11px] text-slate-500">Para postergar o cerrar la tarea usa su botón: piden la fecha o el resultado y le avisan al cliente.</p>
       </div>
 
-      <?php echo self::guidesPanel($guides); ?>
+      <?php echo self::guidesLauncher($guides); ?>
 
       <!-- Barra de herramientas de enlaces y contenido enriquecido -->
       <div class="space-y-1.5">
@@ -846,31 +852,155 @@ final class CommercialTicketModalView
   }
 
   /**
-   * Respuestas guía comerciales (Configuración › Respuestas guía): primero las del estado de la tarea. "Usar" pone el
-   * texto en la respuesta para ajustarlo antes de enviar.
+   * Acceso a las respuestas guía dentro de Responder: abre la ventana de guías con el estado elegido en la lista.
    * @param array<int,array<string,mixed>> $guides
    */
-  private static function guidesPanel(array $guides): string
+  private static function guidesLauncher(array $guides): string
   {
-    if ($guides === []) {
-      return '';
-    }
     $matches = count(array_filter($guides, static fn(array $guide): bool => !empty($guide['match'])));
+    $count = $guides === [] ? 'Aún no hay respuestas guía' : (count($guides) === 1 ? '1 respuesta guía' : count($guides) . ' respuestas guía') . ($matches > 0 ? ', ' . $matches . ' para este estado' : '');
+    return '<div class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50/70 p-3">'
+      . '<div class="min-w-0"><p class="text-xs font-bold text-slate-700 flex items-center gap-1.5"><span class="material-symbols-outlined text-[16px] text-[#1E3C76]" aria-hidden="true">menu_book</span>¿Qué responder?</p>'
+      . '<p class="text-[11px] text-slate-500">' . esc_html($count) . '. Elige una y queda en el mensaje para que la ajustes antes de enviar.</p></div>'
+      . '<button type="button" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#061D49] hover:bg-[#1E3C76] text-white text-xs font-semibold cursor-pointer" data-commercial-open-guides="reply"><span class="material-symbols-outlined text-[15px]" aria-hidden="true">menu_book</span>Ver respuestas guía</button></div>';
+  }
+
+  /**
+   * Ventana de guías de la tarea (botón Guías y Responder): al elegir un estado muestra qué significa y sus respuestas
+   * guía. Con responder, "Usar" pone el texto en la respuesta; con respuestas_guia_editar se crean, editan y eliminan
+   * (solo la categoría Comercial, CommercialReplyGuides).
+   * @param array<int,array<string,mixed>> $guides
+   */
+  private static function guidesModal(array $guides, string $status, bool $canUse, bool $canEdit): string
+  {
+    $descriptions = CommercialStatusCatalog::descriptions();
+    $groups = ['Gestión activa' => CommercialStatusCatalog::OPEN, 'Postergada' => CommercialStatusCatalog::POSTPONED, 'Cerrada' => CommercialStatusCatalog::CLOSED];
+    $known = [];
+    foreach (CommercialStatusCatalog::all() as $knownStatus) {
+      $known[CommercialReplyGuides::key($knownStatus)] = true;
+    }
+    $others = [];
+    foreach ($guides as $guide) {
+      $label = trim((string) ($guide['estado'] ?? ''));
+      $key = CommercialReplyGuides::key($label);
+      if ($key !== '' && !isset($known[$key])) {
+        $others[$key] = $label;
+      }
+    }
+    if ($others !== []) {
+      $groups['Otros estados de las respuestas'] = array_values($others);
+    }
+    $current = CommercialReplyGuides::key($status);
+    $options = '';
+    foreach ($groups as $label => $statuses) {
+      $options .= '<optgroup label="' . esc_attr($label) . '">';
+      foreach ($statuses as $item) {
+        $key = CommercialReplyGuides::key($item);
+        $help = $descriptions[$item] ?? 'Estado usado en las respuestas guía; no está en la lista de estados comerciales del panel.';
+        $options .= '<option value="' . esc_attr($key) . '" data-label="' . esc_attr($item) . '" data-help="' . esc_attr($help) . '"' . ($key === $current ? ' selected' : '') . '>' . esc_html($item . ($key === $current ? ' (estado actual)' : '')) . '</option>';
+      }
+      $options .= '</optgroup>';
+    }
+    $field = 'w-full text-xs sm:text-sm rounded-xl border border-slate-200 focus:border-[#1E3C76] focus:ring focus:ring-[#1E3C76]/20 p-2.5 outline-none bg-white text-slate-800';
+    ob_start();
+?>
+  <!-- Ventana de guías: estados y respuestas guía -->
+  <div class="commercial-analysis-modal" data-commercial-guides-modal data-current-status="<?php echo esc_attr($current); ?>" role="dialog" aria-modal="true" aria-labelledby="commercial-guides-title" hidden>
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[88vh] overflow-hidden flex flex-col border border-slate-100" role="document">
+      <div class="px-5 py-4 bg-slate-50 flex items-center justify-between gap-3 border-b border-slate-200">
+        <div>
+          <span class="text-[11px] uppercase tracking-wider font-semibold text-slate-500">Guías de la tarea</span>
+          <h2 class="text-base sm:text-lg font-bold text-[#061D49]" id="commercial-guides-title">Estados y respuestas guía</h2>
+        </div>
+        <button type="button" class="w-8 h-8 rounded-full hover:bg-slate-200 text-slate-500 flex items-center justify-center cursor-pointer" data-commercial-close-guides aria-label="Cerrar guías">
+          <span class="material-symbols-outlined text-[20px]">close</span>
+        </button>
+      </div>
+      <div class="overflow-y-auto p-5 space-y-4 flex-1">
+        <label class="block space-y-1">
+          <span class="block text-xs font-bold text-slate-700">Estado comercial</span>
+          <select data-commercial-guides-state class="<?php echo esc_attr($field); ?> font-medium">
+            <option value="" data-label="Todos los estados" data-help="Todas las respuestas guía comerciales, de todos los estados.">Todos los estados</option>
+            <?php echo $options; ?>
+          </select>
+        </label>
+        <div class="rounded-xl border border-[#1E3C76]/20 bg-[#EBF1FB]/60 p-3" data-commercial-guides-meaning aria-live="polite">
+          <p class="text-[11px] font-bold uppercase tracking-wider text-[#1E3C76] flex items-center gap-1"><span class="material-symbols-outlined text-[15px]" aria-hidden="true">info</span>Qué significa <span data-commercial-guides-meaning-title></span></p>
+          <p class="text-xs sm:text-sm text-slate-700 mt-1" data-commercial-guides-meaning-text></p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <input type="search" data-commercial-guide-search placeholder="Buscar por situación o texto" aria-label="Buscar respuestas guía" class="flex-1 min-w-[12rem] text-xs rounded-xl border border-slate-200 focus:border-[#1E3C76] p-2.5 outline-none bg-white">
+          <?php if ($canEdit): ?>
+            <button type="button" class="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-[#061D49] hover:bg-[#1E3C76] text-white text-xs font-semibold cursor-pointer" data-commercial-guide-new><span class="material-symbols-outlined text-[15px]" aria-hidden="true">add</span>Nueva respuesta</button>
+          <?php endif; ?>
+        </div>
+        <?php if ($canEdit): ?>
+          <form class="rounded-xl border border-[#1E3C76]/30 bg-white p-4 space-y-3 shadow-sm" data-commercial-guide-editor hidden>
+            <p class="text-xs font-bold text-[#061D49]" data-commercial-guide-editor-title>Nueva respuesta guía</p>
+            <input type="hidden" name="id" value="">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label class="block space-y-1">
+                <span class="block text-xs font-semibold text-slate-700">Estado</span>
+                <select name="estado" class="<?php echo esc_attr($field); ?>">
+                  <option value="">Sin estado (sirve para todos)</option>
+                  <?php foreach ($groups as $label => $statuses): ?>
+                    <optgroup label="<?php echo esc_attr($label); ?>">
+                      <?php foreach ($statuses as $item): ?>
+                        <option value="<?php echo esc_attr($item); ?>" data-key="<?php echo esc_attr(CommercialReplyGuides::key($item)); ?>"><?php echo esc_html($item); ?></option>
+                      <?php endforeach; ?>
+                    </optgroup>
+                  <?php endforeach; ?>
+                </select>
+              </label>
+              <label class="block space-y-1">
+                <span class="block text-xs font-semibold text-slate-700">Situación <em class="text-rose-600">*</em></span>
+                <input type="text" name="situacion" required maxlength="255" placeholder="Ej.: Solicitud de documentos" class="<?php echo esc_attr($field); ?>">
+              </label>
+            </div>
+            <label class="block space-y-1">
+              <span class="block text-xs font-semibold text-slate-700">Respuesta <em class="text-rose-600">*</em></span>
+              <textarea name="respuesta" rows="6" required maxlength="<?php echo (int) CommercialReplyGuides::MAX_TEXT; ?>" placeholder="Texto que el consultor/a envía al cliente en esta situación" class="<?php echo esc_attr($field); ?>"></textarea>
+            </label>
+            <div class="flex flex-wrap items-center justify-end gap-2">
+              <span class="text-xs text-rose-600 mr-auto font-medium" data-commercial-guide-editor-message aria-live="polite"></span>
+              <button type="button" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold cursor-pointer" data-commercial-guide-cancel>Cancelar</button>
+              <button type="submit" class="px-5 py-2 bg-[#061D49] hover:bg-[#1E3C76] text-white rounded-xl text-xs font-semibold cursor-pointer">Guardar respuesta</button>
+            </div>
+          </form>
+        <?php endif; ?>
+        <p class="text-[11px] font-semibold text-slate-500" data-commercial-guides-count></p>
+        <ul class="space-y-2" data-commercial-guides-list><?php echo self::guideCards($guides, $canUse, $canEdit); ?></ul>
+        <p class="text-xs text-slate-500 text-center py-6 rounded-xl border border-dashed border-slate-200" data-commercial-guides-empty hidden>No hay respuestas guía para este estado<?php echo $canEdit ? ': crea una con «Nueva respuesta».' : '.'; ?></p>
+      </div>
+    </div>
+  </div>
+<?php
+    return (string) ob_get_clean();
+  }
+
+  /**
+   * Tarjetas de la ventana de guías (también las devuelve el servidor al guardar o eliminar una).
+   * @param array<int,array<string,mixed>> $guides
+   */
+  public static function guideCards(array $guides, bool $canUse, bool $canEdit): string
+  {
+    $button = 'inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold cursor-pointer border ';
     $cards = '';
     foreach ($guides as $guide) {
-      $text = (string) ($guide['respuesta'] ?? '');
-      $cards .= '<li class="rounded-xl border ' . (!empty($guide['match']) ? 'border-[#1E3C76]/40 bg-[#EBF1FB]/60' : 'border-slate-200 bg-white') . ' p-3 space-y-1.5" data-commercial-guide data-estado="' . esc_attr(CommercialReplyGuides::key((string) ($guide['estado'] ?? ''))) . '">'
-        . '<div class="flex flex-wrap items-center justify-between gap-2"><strong class="text-xs text-[#061D49]">' . esc_html((string) ($guide['situacion'] ?? '')) . '</strong>'
-        . ((string) ($guide['estado'] ?? '') !== '' ? '<span class="text-[10px] font-semibold px-2 py-0.5 rounded-full ' . (!empty($guide['match']) ? 'bg-[#1E3C76] text-white' : 'bg-slate-100 text-slate-600') . '">' . esc_html((string) $guide['estado']) . '</span>' : '') . '</div>'
-        . '<p class="text-xs text-slate-600 whitespace-pre-line line-clamp-4" data-commercial-guide-text>' . esc_html($text) . '</p>'
-        . '<button type="button" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white hover:bg-[#EBF1FB] text-[#1E3C76] border border-[#1E3C76]/25 text-[11px] font-semibold cursor-pointer" data-commercial-use-guide><span class="material-symbols-outlined text-[14px]" aria-hidden="true">edit_note</span>Usar esta respuesta</button></li>';
+      $state = trim((string) ($guide['estado'] ?? ''));
+      $situation = (string) ($guide['situacion'] ?? '');
+      $match = !empty($guide['match']);
+      $cards .= '<li class="rounded-xl border ' . ($match ? 'border-[#1E3C76]/40 bg-[#EBF1FB]/60' : 'border-slate-200 bg-white') . ' p-3 space-y-2" data-commercial-guide data-id="' . (int) ($guide['id'] ?? 0) . '" data-estado="' . esc_attr(CommercialReplyGuides::key($state)) . '" data-estado-label="' . esc_attr($state) . '" data-situacion="' . esc_attr($situation) . '">'
+        . '<div class="flex flex-wrap items-center justify-between gap-2"><strong class="text-xs sm:text-sm text-[#061D49]">' . esc_html($situation) . '</strong>'
+        . '<span class="text-[10px] font-semibold px-2 py-0.5 rounded-full ' . ($match ? 'bg-[#1E3C76] text-white' : 'bg-slate-100 text-slate-600') . '">' . esc_html($state !== '' ? $state : 'Todos los estados') . '</span></div>'
+        . '<p class="text-xs sm:text-[13px] text-slate-700 whitespace-pre-line leading-relaxed" data-commercial-guide-text>' . esc_html((string) ($guide['respuesta'] ?? '')) . '</p>'
+        . '<div class="flex flex-wrap gap-1.5">'
+        . ($canUse ? '<button type="button" class="' . $button . 'bg-white hover:bg-[#EBF1FB] text-[#1E3C76] border-[#1E3C76]/25" data-commercial-use-guide><span class="material-symbols-outlined text-[14px]" aria-hidden="true">edit_note</span>Usar esta respuesta</button>' : '')
+        . ($canEdit ? '<button type="button" class="' . $button . 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200" data-commercial-guide-edit><span class="material-symbols-outlined text-[14px]" aria-hidden="true">edit</span>Editar</button>'
+          . '<button type="button" class="' . $button . 'bg-white hover:bg-rose-50 text-rose-700 border-rose-200" data-commercial-guide-delete><span class="material-symbols-outlined text-[14px]" aria-hidden="true">delete</span>Eliminar</button>' : '')
+        . '</div></li>';
     }
-    return '<details class="rounded-xl border border-slate-200 bg-slate-50/70 p-3" data-commercial-guides' . ($matches > 0 ? ' open' : '') . '>'
-      . '<summary class="cursor-pointer text-xs font-bold text-slate-700 flex items-center gap-1.5"><span class="material-symbols-outlined text-[16px] text-[#1E3C76]" aria-hidden="true">menu_book</span>Respuestas guía'
-      . '<span class="font-normal text-slate-500">· ' . count($guides) . ($matches > 0 ? ', ' . $matches . ' para este estado' : '') . '</span></summary>'
-      . '<p class="text-[11px] text-slate-500 mt-2">Qué responder y por qué según la situación. Al usar una, el texto queda en la respuesta para que lo ajustes antes de enviar.</p>'
-      . '<input type="search" data-commercial-guide-search placeholder="Buscar por situación o texto" aria-label="Buscar respuestas guía" class="mt-2 w-full text-xs rounded-lg border border-slate-200 focus:border-[#1E3C76] p-2 outline-none bg-white">'
-      . '<ul class="mt-2 space-y-2 max-h-72 overflow-y-auto pr-1">' . $cards . '</ul></details>';
+    return $cards;
   }
 
   private static function attachmentFields(): string

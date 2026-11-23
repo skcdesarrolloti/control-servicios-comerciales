@@ -803,6 +803,194 @@
     form.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
 
+  // Ventana de guías de la tarea (CommercialTicketModalView::guidesModal): al elegir un estado muestra qué significa y
+  // sus respuestas guía; "Usar" pone el texto en Responder y, con permiso, se crean, editan y eliminan ahí mismo.
+  function guidesModal() {
+    return caseContent ? caseContent.querySelector("[data-commercial-guides-modal]") : null;
+  }
+
+  function guideKey(value) {
+    return String(value || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim();
+  }
+
+  function filterGuides(modal) {
+    if (!modal) return;
+    var select = modal.querySelector("[data-commercial-guides-state]");
+    var option = select ? select.options[select.selectedIndex] : null;
+    var state = select ? select.value : "";
+    var label = option ? option.getAttribute("data-label") || "" : "";
+    var title = modal.querySelector("[data-commercial-guides-meaning-title]");
+    var meaning = modal.querySelector("[data-commercial-guides-meaning-text]");
+    if (title) title.textContent = state ? "«" + label + "»" : "cada estado";
+    if (meaning) meaning.textContent = option ? option.getAttribute("data-help") || "" : "";
+    var search = modal.querySelector("[data-commercial-guide-search]");
+    var query = guideKey(search ? search.value : "");
+    var visible = 0;
+    modal.querySelectorAll("[data-commercial-guide]").forEach(function (card) {
+      var cardState = card.getAttribute("data-estado") || "";
+      var show = (!state || cardState === state || cardState === "") && (!query || guideKey(card.textContent).indexOf(query) !== -1);
+      card.hidden = !show;
+      if (show) visible++;
+    });
+    var count = modal.querySelector("[data-commercial-guides-count]");
+    if (count) count.textContent = visible + (visible === 1 ? " respuesta guía" : " respuestas guía") + (state ? " para " + label : "") + (query ? " con «" + search.value.trim() + "»" : "");
+    var empty = modal.querySelector("[data-commercial-guides-empty]");
+    if (empty) empty.hidden = visible > 0;
+  }
+
+  function setGuidesModal(open, state) {
+    var modal = guidesModal();
+    if (!modal) return;
+    modal.hidden = !open;
+    modal.classList.toggle("open", open);
+    if (!open) {
+      var editor = modal.querySelector("[data-commercial-guide-editor]");
+      if (editor) editor.hidden = true;
+      return;
+    }
+    var select = modal.querySelector("[data-commercial-guides-state]");
+    if (select && typeof state === "string") {
+      select.value = state;
+      if (select.value !== state) select.value = "";
+    }
+    filterGuides(modal);
+    if (select) select.focus({ preventScroll: true });
+  }
+
+  function openGuideEditor(modal, card) {
+    var editor = modal.querySelector("[data-commercial-guide-editor]");
+    if (!editor) return;
+    var select = modal.querySelector("[data-commercial-guides-state]");
+    var stateKey = card ? card.getAttribute("data-estado") || "" : (select ? select.value : "");
+    editor.reset();
+    editor.elements.id.value = card ? card.getAttribute("data-id") || "" : "";
+    var match = Array.prototype.find.call(editor.elements.estado.options, function (option) { return stateKey !== "" && option.getAttribute("data-key") === stateKey; });
+    editor.elements.estado.value = match ? match.value : "";
+    if (card) {
+      editor.elements.situacion.value = card.getAttribute("data-situacion") || "";
+      editor.elements.respuesta.value = ((card.querySelector("[data-commercial-guide-text]") || {}).textContent || "").trim();
+    }
+    var editorTitle = editor.querySelector("[data-commercial-guide-editor-title]");
+    if (editorTitle) editorTitle.textContent = card ? "Editar: " + (card.getAttribute("data-situacion") || "respuesta guía") : "Nueva respuesta guía";
+    var message = editor.querySelector("[data-commercial-guide-editor-message]");
+    if (message) message.textContent = "";
+    editor.hidden = false;
+    editor.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    editor.elements[card ? "respuesta" : "situacion"].focus({ preventScroll: true });
+  }
+
+  function replaceGuideCards(modal, html) {
+    var list = modal.querySelector("[data-commercial-guides-list]");
+    if (list) list.innerHTML = html || "";
+    filterGuides(modal);
+  }
+
+  function saveGuide(editor) {
+    var modal = guidesModal();
+    var message = editor.querySelector("[data-commercial-guide-editor-message]");
+    var submit = editor.querySelector('button[type="submit"]');
+    if (message) message.textContent = "";
+    if (submit) submit.disabled = true;
+    request("commercial_reply_guide_save", {
+      id: editor.elements.id.value,
+      estado: editor.elements.estado.value,
+      situacion: editor.elements.situacion.value,
+      respuesta: editor.elements.respuesta.value,
+      estado_actual: modal ? modal.getAttribute("data-current-status") || "" : ""
+    }).then(function (response) {
+      editor.hidden = true;
+      if (modal) replaceGuideCards(modal, response.html);
+      notify("success", response.message || "Respuesta guía guardada.");
+    }).catch(function (error) {
+      if (message) message.textContent = error.message;
+    }).finally(function () {
+      if (submit) submit.disabled = false;
+    });
+  }
+
+  function deleteGuide(card) {
+    var modal = guidesModal();
+    var situation = card.getAttribute("data-situacion") || "esta respuesta";
+    var run = function () {
+      request("commercial_reply_guide_delete", { id: card.getAttribute("data-id") || "", estado_actual: modal ? modal.getAttribute("data-current-status") || "" : "" })
+        .then(function (response) {
+          if (modal) replaceGuideCards(modal, response.html);
+          notify("success", response.message || "Respuesta guía eliminada.");
+        })
+        .catch(function (error) { notify("error", error.message); });
+    };
+    if (window.Swal && typeof window.Swal.fire === "function") {
+      window.Swal.fire({
+        title: "¿Eliminar la respuesta guía?",
+        text: "«" + situation + "» se borra para todo el equipo y no se puede deshacer.",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Sí, eliminar",
+        cancelButtonText: "Cancelar",
+        confirmButtonColor: "#e11d48"
+      }).then(function (result) { if (result.isConfirmed) run(); });
+    } else if (window.confirm("¿Eliminar la respuesta guía «" + situation + "»? No se puede deshacer.")) {
+      run();
+    }
+  }
+
+  // Clics de la ventana de guías; devuelve true si el clic era suyo.
+  function handleGuidesClick(event) {
+    var modal = guidesModal();
+    var opener = event.target.closest("[data-commercial-open-guides]");
+    if (opener) {
+      event.preventDefault();
+      var state = modal ? modal.getAttribute("data-current-status") || "" : "";
+      if (opener.getAttribute("data-commercial-open-guides") === "reply") {
+        var replySelect = opener.closest("form") ? opener.closest("form").querySelector("[data-commercial-status-select]") : null;
+        if (replySelect && replySelect.value !== "__keep__") state = guideKey(replySelect.value);
+      }
+      setGuidesModal(true, state);
+      return true;
+    }
+    if (!modal || !modal.contains(event.target)) return false;
+    if (event.target === modal || event.target.closest("[data-commercial-close-guides]")) {
+      setGuidesModal(false);
+      return true;
+    }
+    var card = event.target.closest("[data-commercial-guide]");
+    if (event.target.closest("[data-commercial-use-guide]") && card) {
+      event.preventDefault();
+      var replyForm = caseContent.querySelector('[data-commercial-workflow-form="reply"]');
+      var replyButton = caseContent.querySelector('[data-commercial-open-workflow="reply"]');
+      if (replyForm && replyForm.hidden && replyButton) openWorkflow(replyButton);
+      var area = replyForm ? replyForm.querySelector('textarea[name="respuesta"]') : null;
+      var text = ((card.querySelector("[data-commercial-guide-text]") || {}).textContent || "").trim();
+      if (area && text) {
+        // Si ya hay algo escrito, la respuesta guía se agrega al final.
+        area.value = area.value.trim() ? area.value.replace(/\s+$/, "") + "\n\n" + text : text;
+        area.dispatchEvent(new Event("input", { bubbles: true }));
+        setGuidesModal(false);
+        area.focus({ preventScroll: false });
+        notify("success", "Respuesta guía cargada: ajústala antes de enviar.");
+      }
+      return true;
+    }
+    if (event.target.closest("[data-commercial-guide-new]")) {
+      openGuideEditor(modal, null);
+      return true;
+    }
+    if (event.target.closest("[data-commercial-guide-edit]") && card) {
+      openGuideEditor(modal, card);
+      return true;
+    }
+    if (event.target.closest("[data-commercial-guide-cancel]")) {
+      var editor = modal.querySelector("[data-commercial-guide-editor]");
+      if (editor) editor.hidden = true;
+      return true;
+    }
+    if (event.target.closest("[data-commercial-guide-delete]") && card) {
+      deleteGuide(card);
+      return true;
+    }
+    return true;
+  }
+
   function submitWorkflow(form) {
     var key = form.getAttribute("data-commercial-workflow-form") || "";
     var action = actionMap[key];
@@ -1615,22 +1803,7 @@
         closeWorkflows();
         return;
       }
-      // Respuestas guía: el texto queda en la respuesta para ajustarlo; si ya hay algo escrito, se agrega al final.
-      var useGuide = event.target.closest("[data-commercial-use-guide]");
-      if (useGuide) {
-        event.preventDefault();
-        var guideCard = useGuide.closest("[data-commercial-guide]");
-        var guideForm = useGuide.closest("form");
-        var guideArea = guideForm ? guideForm.querySelector('textarea[name="respuesta"]') : null;
-        var guideText = guideCard ? (guideCard.querySelector("[data-commercial-guide-text]") || {}).textContent || "" : "";
-        if (guideArea && guideText.trim()) {
-          guideArea.value = guideArea.value.trim() ? guideArea.value.replace(/\s+$/, "") + "\n\n" + guideText.trim() : guideText.trim();
-          guideArea.dispatchEvent(new Event("input", { bubbles: true }));
-          guideArea.focus({ preventScroll: false });
-          notify("success", "Respuesta guía cargada: ajústala antes de enviar.");
-        }
-        return;
-      }
+      if (handleGuidesClick(event)) return;
       var insertPropertyBtn = event.target.closest("[data-commercial-insert-property]");
       if (insertPropertyBtn) {
         event.preventDefault();
@@ -1693,6 +1866,10 @@
     });
     // Guía del estado elegido bajo cada lista de estado comercial.
     caseModal.addEventListener("change", function (event) {
+      if (event.target.closest("[data-commercial-guides-state]")) {
+        filterGuides(guidesModal());
+        return;
+      }
       var select = event.target.closest("[data-commercial-status-select]");
       if (!select) return;
       var box = select.parentElement;
@@ -1701,17 +1878,15 @@
       if (help && option) help.textContent = option.getAttribute("data-help") || "";
     });
     caseModal.addEventListener("input", function (event) {
-      var search = event.target.closest("[data-commercial-guide-search]");
-      if (!search) return;
-      var fold = function (value) { return String(value || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, ""); };
-      var query = fold(search.value.trim());
-      var panel = search.closest("[data-commercial-guides]");
-      if (!panel) return;
-      panel.querySelectorAll("[data-commercial-guide]").forEach(function (card) {
-        card.hidden = query !== "" && fold(card.textContent).indexOf(query) === -1;
-      });
+      if (event.target.closest("[data-commercial-guide-search]")) filterGuides(guidesModal());
     });
     caseModal.addEventListener("submit", function (event) {
+      var guideEditor = event.target.closest("[data-commercial-guide-editor]");
+      if (guideEditor) {
+        event.preventDefault();
+        saveGuide(guideEditor);
+        return;
+      }
       var form = event.target.closest("[data-commercial-workflow-form]");
       if (!form) return;
       event.preventDefault();
@@ -1829,7 +2004,9 @@
   document.addEventListener("keydown", function (event) {
     if (event.key !== "Escape") return;
     var modal = analysisModal();
-    if (modal && modal.classList.contains("open")) setAnalysisModal(false);
+    var guides = guidesModal();
+    if (guides && guides.classList.contains("open")) setGuidesModal(false);
+    else if (modal && modal.classList.contains("open")) setAnalysisModal(false);
     else if (document.getElementById("commercial-property-modal") && document.getElementById("commercial-property-modal").classList.contains("open")) setStandaloneModal(document.getElementById("commercial-property-modal"), false);
     else if (document.getElementById("commercial-sign-detail-modal") && document.getElementById("commercial-sign-detail-modal").classList.contains("open")) setStandaloneModal(document.getElementById("commercial-sign-detail-modal"), false);
     else if (document.getElementById("commercial-property-detail-modal") && document.getElementById("commercial-property-detail-modal").classList.contains("open")) setStandaloneModal(document.getElementById("commercial-property-detail-modal"), false);

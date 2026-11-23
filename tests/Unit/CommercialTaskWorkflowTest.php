@@ -197,6 +197,50 @@ final class CommercialTaskWorkflowTest extends TestCase
     $guides->save([['estado' => 'Nuevo', 'situacion' => 'Sin texto', 'respuesta' => '']], true, '101');
   }
 
+  public function testReplyGuidesAreEditedOneByOneFromTheTask(): void
+  {
+    $this->db->insert('wp_jet_cct_respuesta_de_ticket', ['categoria' => 'Cartera', 'estado' => 'Mora', 'situacion' => 'Cobro', 'respuesta' => 'Recuerde pagar']);
+    $cartera = (int) $this->db->getVar("SELECT _ID FROM wp_jet_cct_respuesta_de_ticket WHERE categoria = 'Cartera'");
+    $guides = new CommercialReplyGuides($this->db);
+
+    $id = $guides->saveOne(['estado' => 'En cierre', 'situacion' => 'Solicitud aprobada', 'respuesta' => "Apreciado cliente,\r\n<b>Buenas noticias</b>"], '101');
+    self::assertGreaterThan(0, $id);
+    self::assertSame([['id' => $id, 'estado' => 'En cierre', 'situacion' => 'Solicitud aprobada', 'respuesta' => "Apreciado cliente,\nBuenas noticias"]], $guides->all());
+    self::assertSame('Comercial', $this->db->getVar('SELECT categoria FROM wp_jet_cct_respuesta_de_ticket WHERE _ID = ?', [$id]));
+
+    self::assertSame($id, $guides->saveOne(['id' => $id, 'estado' => 'Mostrando', 'situacion' => 'Solicitud aprobada', 'respuesta' => 'Texto nuevo'], '102'));
+    self::assertSame(['Mostrando', 'Texto nuevo', '102'], array_values($this->db->getRow('SELECT estado, respuesta, cct_author_id FROM wp_jet_cct_respuesta_de_ticket WHERE _ID = ?', [$id]) ?? []));
+
+    foreach ([fn() => $guides->saveOne(['id' => $cartera, 'situacion' => 'Cobro', 'respuesta' => 'Otro'], '101'), fn() => $guides->delete($cartera), fn() => $guides->saveOne(['situacion' => 'Sin texto', 'respuesta' => ' '], '101')] as $attempt) {
+      try {
+        $attempt();
+        self::fail('Solo se edita la categoría Comercial y con situación y respuesta.');
+      } catch (\InvalidArgumentException) {
+      }
+    }
+    self::assertSame('Recuerde pagar', $this->db->getVar('SELECT respuesta FROM wp_jet_cct_respuesta_de_ticket WHERE _ID = ?', [$cartera]));
+
+    self::assertSame('Solicitud aprobada', $guides->delete($id));
+    self::assertSame([], $guides->all());
+  }
+
+  public function testReplyGuideEditingIsAnOptInPermissionWithItsEndpoints(): void
+  {
+    self::assertArrayHasKey('respuestas_guia_editar', \SCM\Commercial\CommercialAccessPolicy::ACTIONS);
+    self::assertContains('respuestas_guia_editar', \SCM\Commercial\CommercialAccessPolicy::OPT_IN_ACTIONS);
+    $groups = (new \ReflectionClassConstant(\SCM\Views\CommercialDashboardView::class, 'PERMISSION_ACTION_GROUPS'))->getValue();
+    self::assertContains('respuestas_guia_editar', $groups['Tareas']);
+    $routes = (new \ReflectionMethod(\SCM\Http\Api\CommercialActionRouter::class, 'controllerMethod'));
+    self::assertSame('replyGuideSave', $routes->invoke(null, 'commercial_reply_guide_save'));
+    self::assertSame('replyGuideDelete', $routes->invoke(null, 'commercial_reply_guide_delete'));
+    $source = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Http/Controller/CommercialApiController.php');
+    self::assertMatchesRegularExpression("/function replyGuidesForEditor\(\).*?authorize\('respuestas_guia_editar'/s", $source, 'El servidor valida el permiso.');
+
+    self::assertTrue(CommercialCallsDatabase::policy($this->db)->canAct('respuestas_guia_editar'), 'El administrador edita.');
+    $_SESSION['scm_user_cargo'] = '9';
+    self::assertFalse(CommercialCallsDatabase::policy($this->db)->canAct('respuestas_guia_editar'), 'Hay que marcarlo en Permisos.');
+  }
+
   public function testModalShowsStatusGuidesReplyGuidesResumeDateAndRequiredReason(): void
   {
     $guides = (new CommercialReplyGuides($this->db));
@@ -212,9 +256,30 @@ final class CommercialTaskWorkflowTest extends TestCase
     self::assertStringContainsString('data-help="' . CommercialStatusCatalog::descriptions()['Contactado'] . '"', $reply[0]);
     self::assertStringContainsString('data-commercial-status-help-text>Se mantiene el estado actual. ' . CommercialStatusCatalog::descriptions()['Mostrando'], $reply[0]);
     self::assertStringContainsString('Ver la guía de todos los estados', $reply[0]);
-    self::assertStringContainsString('data-commercial-use-guide', $reply[0]);
-    self::assertStringContainsString('1 para este estado', $reply[0]);
-    self::assertStringContainsString('&quot;el inmueble&quot; &amp; más', $reply[0], 'El texto de la guía se escapa.');
+    self::assertStringContainsString('data-commercial-open-guides="reply"', $reply[0], 'Responder abre la ventana de guías.');
+    self::assertStringContainsString('1 respuesta guía, 1 para este estado', $reply[0]);
+    self::assertStringNotContainsString('data-commercial-guide ', $reply[0], 'Las respuestas guía ya no van dentro del formulario.');
+
+    // Ventana de guías: botón propio, el estado de la tarea elegido con su significado y las respuestas editables.
+    self::assertStringContainsString('data-commercial-open-guides>', $html);
+    preg_match('/<div class="commercial-analysis-modal" data-commercial-guides-modal.*?<\/ul>/s', $html, $modal);
+    self::assertStringContainsString('data-current-status="mostrando"', $modal[0]);
+    self::assertStringContainsString('<option value="mostrando" data-label="Mostrando" data-help="' . CommercialStatusCatalog::descriptions()['Mostrando'] . '" selected>Mostrando (estado actual)</option>', $modal[0]);
+    self::assertStringContainsString('<option value="finalizado" data-label="Finalizado"', $modal[0], 'Se consultan todos los estados, también los de cierre.');
+    self::assertStringContainsString('&quot;el inmueble&quot; &amp; más', $modal[0], 'El texto de la guía se escapa.');
+    foreach (['data-commercial-use-guide', 'data-commercial-guide-edit', 'data-commercial-guide-delete', 'data-commercial-guide-new', 'data-commercial-guide-editor'] as $control) {
+      self::assertStringContainsString($control, $modal[0], 'El administrador usa y edita: ' . $control);
+    }
+
+    // Sin responder ni respuestas_guia_editar: solo consulta.
+    $_SESSION['scm_user_cargo'] = '9';
+    $reader = CommercialTicketModalView::render(['ticket' => $this->task(), 'timeline' => [], 'reply_guides' => $guides->forStatus('Mostrando')], CommercialCallsDatabase::policy($this->db), []);
+    self::assertStringContainsString('data-commercial-guides-modal', $reader);
+    foreach (['data-commercial-use-guide', 'data-commercial-guide-edit', 'data-commercial-guide-delete', 'data-commercial-guide-new', 'data-commercial-guide-editor'] as $control) {
+      self::assertStringNotContainsString($control, $reader, 'Solo consulta: ' . $control);
+    }
+    $_SESSION['scm_user_cargo'] = '13';
+    $html = CommercialTicketModalView::render(['ticket' => $this->task(), 'timeline' => [], 'reply_guides' => []], $policy, []);
 
     preg_match('/data-commercial-workflow-form="postpone".*?<\/form>/s', $html, $postpone);
     self::assertMatchesRegularExpression('/name="fecha_retomar" required min="\d{4}-\d{2}-\d{2}" max="\d{4}-\d{2}-\d{2}"/', $postpone[0]);

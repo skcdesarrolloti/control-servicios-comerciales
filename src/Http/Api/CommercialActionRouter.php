@@ -186,6 +186,8 @@ final class CommercialActionRouter
       'commercial_ticket_postpone' => 'postpone',
       'commercial_ticket_activate' => 'activate',
       'commercial_ticket_close' => 'close',
+      'commercial_reply_guide_save' => 'replyGuideSave',
+      'commercial_reply_guide_delete' => 'replyGuideDelete',
       'commercial_permissions_save' => 'savePermissions',
       'commercial_calendar_due' => 'calendarDue',
       'commercial_calendar_cita_notify' => 'calendarCitaNotify',

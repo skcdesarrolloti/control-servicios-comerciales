@@ -11,8 +11,9 @@ use SCM\Support\SchemaInspector;
  * Banco de respuestas guía: qué responder y por qué según la situación y el estado de la tarea. Es la tabla
  * jet_cct_respuesta_de_ticket del plugin "Gestor de Respuestas de Tickets" de WordPress (shortcodes [gestor_respuestas] y
  * [btn_gestor_respuestas]), que comparte con el panel inmobiliario (GuideApiController). Este panel solo lee y edita la
- * categoría Comercial: las demás (Administrativo, Servicio al cliente, Cartera) no se tocan. Se muestran en el formulario
- * Responder del popup de la tarea y se editan en Configuración › Actividades comerciales › Respuestas guía.
+ * categoría Comercial: las demás (Administrativo, Servicio al cliente, Cartera) no se tocan. Se consultan en la ventana de
+ * guías de la tarea (botón Guías y Responder), donde también se editan con el permiso respuestas_guia_editar, y en
+ * Configuración › Actividades comerciales › Respuestas guía.
  */
 final class CommercialReplyGuides
 {
@@ -87,21 +88,11 @@ final class CommercialReplyGuides
     }
     $clean = [];
     foreach ($rows as $index => $row) {
-      $item = [
-        'id' => (int) ($row['id'] ?? 0),
-        'estado' => mb_substr(trim(strip_tags((string) ($row['estado'] ?? ''))), 0, 100, 'UTF-8'),
-        'situacion' => mb_substr(trim(strip_tags((string) ($row['situacion'] ?? ''))), 0, 255, 'UTF-8'),
-        'respuesta' => trim(strip_tags(str_replace("\r\n", "\n", (string) ($row['respuesta'] ?? '')))),
-      ];
+      $item = self::clean($row);
       if ($item['id'] === 0 && $item['estado'] === '' && $item['situacion'] === '' && $item['respuesta'] === '') {
         continue;
       }
-      if ($item['situacion'] === '' || $item['respuesta'] === '') {
-        throw new \InvalidArgumentException('La fila ' . ($index + 1) . ' necesita la situación y la respuesta.');
-      }
-      if (mb_strlen($item['respuesta'], 'UTF-8') > self::MAX_TEXT) {
-        throw new \InvalidArgumentException('La respuesta de "' . $item['situacion'] . '" no puede pasar de ' . number_format(self::MAX_TEXT, 0, ',', '.') . ' caracteres.');
-      }
+      self::validate($item, 'La fila ' . ($index + 1));
       if ($item['id'] > 0 && !isset($existing[$item['id']])) {
         throw new \InvalidArgumentException('La respuesta #' . $item['id'] . ' ya no existe o no es comercial. Vuelve a abrir la sección.');
       }
@@ -144,6 +135,78 @@ final class CommercialReplyGuides
       throw $exception;
     }
     return $totals;
+  }
+
+  /**
+   * Crea (sin id) o actualiza una respuesta comercial desde la ventana de guías de la tarea. Devuelve su id.
+   * @param array<string,mixed> $row
+   */
+  public function saveOne(array $row, string $author): int
+  {
+    if (!$this->ready()) {
+      throw new \RuntimeException('La tabla de respuestas guía no existe en esta base.');
+    }
+    $item = self::clean($row);
+    self::validate($item, 'La respuesta');
+    $table = $this->db->table(self::TABLE);
+    $now = date('Y-m-d H:i:s');
+    $data = ['estado' => $item['estado'], 'situacion' => $item['situacion'], 'respuesta' => $item['respuesta']];
+    if ($item['id'] > 0) {
+      $this->existing($item['id']);
+      $this->db->update($table, $data + ['cct_modified' => $now, 'cct_author_id' => $author], ['_ID' => $item['id'], 'categoria' => self::CATEGORY]);
+      return $item['id'];
+    }
+    $this->db->insert($table, $data + ['categoria' => self::CATEGORY, 'cct_status' => 'publish', 'cct_author_id' => $author, 'cct_created' => $now, 'cct_modified' => $now]);
+    return (int) $this->db->lastInsertId();
+  }
+
+  /**
+   * Elimina una respuesta comercial (la ventana pide confirmarlo antes). Devuelve la situación eliminada.
+   */
+  public function delete(int $id): string
+  {
+    if (!$this->ready()) {
+      throw new \RuntimeException('La tabla de respuestas guía no existe en esta base.');
+    }
+    $row = $this->existing($id);
+    $this->db->delete($this->db->table(self::TABLE), ['_ID' => $id, 'categoria' => self::CATEGORY]);
+    return $row['situacion'];
+  }
+
+  /** @return array{id:int,estado:string,situacion:string,respuesta:string} */
+  private function existing(int $id): array
+  {
+    foreach ($this->all() as $row) {
+      if ($row['id'] === $id) {
+        return $row;
+      }
+    }
+    throw new \InvalidArgumentException('La respuesta #' . $id . ' ya no existe o no es comercial. Vuelve a abrir las guías.');
+  }
+
+  /**
+   * @param array<string,mixed> $row
+   * @return array{id:int,estado:string,situacion:string,respuesta:string}
+   */
+  private static function clean(array $row): array
+  {
+    return [
+      'id' => (int) ($row['id'] ?? 0),
+      'estado' => mb_substr(trim(strip_tags((string) ($row['estado'] ?? ''))), 0, 100, 'UTF-8'),
+      'situacion' => mb_substr(trim(strip_tags((string) ($row['situacion'] ?? ''))), 0, 255, 'UTF-8'),
+      'respuesta' => trim(strip_tags(str_replace("\r\n", "\n", (string) ($row['respuesta'] ?? '')))),
+    ];
+  }
+
+  /** @param array{id:int,estado:string,situacion:string,respuesta:string} $item */
+  private static function validate(array $item, string $label): void
+  {
+    if ($item['situacion'] === '' || $item['respuesta'] === '') {
+      throw new \InvalidArgumentException($label . ' necesita la situación y la respuesta.');
+    }
+    if (mb_strlen($item['respuesta'], 'UTF-8') > self::MAX_TEXT) {
+      throw new \InvalidArgumentException('La respuesta de "' . $item['situacion'] . '" no puede pasar de ' . number_format(self::MAX_TEXT, 0, ',', '.') . ' caracteres.');
+    }
   }
 
   /** Comparación de estados sin tildes ni mayúsculas. */

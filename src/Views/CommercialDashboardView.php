@@ -4965,7 +4965,7 @@ final class CommercialDashboardView
   /** Acciones de la configuración de accesos, agrupadas por módulo. Toda acción de CommercialAccessPolicy::ACTIONS va en un grupo. */
   private const PERMISSION_ACTION_GROUPS = [
     'Reportes comerciales' => ['reportes_pagar', 'reportes_editar_valor'],
-    'Tareas' => ['ver_ticket', 'responder', 'agregar_nota', 'seguimiento', 'postergar', 'activar', 'cerrar', 'cambiar_estado', 'reasignar'],
+    'Tareas' => ['ver_ticket', 'responder', 'agregar_nota', 'seguimiento', 'postergar', 'activar', 'cerrar', 'cambiar_estado', 'reasignar', 'respuestas_guia_editar'],
     'Notificaciones' => ['enviar_notificacion', 'eliminar_notificacion', 'campanas_enviar', 'campanas_eliminar', 'plantillas_editar'],
     'Llamadas' => ['llamadas_crear', 'llamadas_editar', 'llamadas_tarea'],
     'Cotizaciones' => ['cotizacion_crear'],

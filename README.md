@@ -80,7 +80,7 @@ Los botones de inmueble y cotización dependen además del tema de la tarea (`Co
 
 Los botones generales (`CommercialApiController`) avisan siempre, sin casillas, y nunca cambian `estado_administrativo`:
 
-- **Responder**: la respuesta queda en el historial y le llega al cliente por correo y WhatsApp. Solo puede mantener el estado o pasarlo a otro estado activo (postergar y cerrar tienen su botón). Muestra las **respuestas guía** de la categoría Comercial (tabla `jet_cct_respuesta_de_ticket`, la del Gestor de Respuestas de WordPress; `CommercialReplyGuides`), primero las del estado de la tarea; se editan en **Configuración › Actividades comerciales › Respuestas guía**.
+- **Responder**: la respuesta queda en el historial y le llega al cliente por correo y WhatsApp. Solo puede mantener el estado o pasarlo a otro estado activo (postergar y cerrar tienen su botón). Su botón **Ver respuestas guía** abre la ventana de guías con el estado elegido en la lista.
 - **Nota interna**: solo para el equipo; no avisa a nadie.
 - **Seguimiento**: gestión con evidencias; le llega al cliente por correo.
 - **Postergar**: pide el motivo y la fecha para retomar (`fecha_retomar`, creada con `php bin/add-task-resume-field.php --aplicar`). Ese día la tarea sale en el calendario de vencimientos (**Tareas postergadas por retomar**). Al cliente le llegan correo y WhatsApp (`scm_tarea_comercial_postergada_v1`). **Activar** borra la fecha.
@@ -88,6 +88,8 @@ Los botones generales (`CommercialApiController`) avisan siempre, sin casillas, 
 - **Cerrar Tarea**: resultado final y observación; al cliente le llegan correo y WhatsApp (`scm_tarea_comercial_cerrada_v1`), salvo en Duplicado y Trasladado.
 
 Cada lista de estado comercial muestra la guía del estado elegido (`CommercialStatusCatalog::descriptions`) y la de todos los estados de esa lista.
+
+**Guías** (botón de Gestión Operativa y desde Responder) abre una ventana dentro de la tarea: al elegir un estado muestra qué significa y sus **respuestas guía** (las de ese estado y las que no tienen estado), con buscador. Son las de la categoría Comercial de la tabla `jet_cct_respuesta_de_ticket` (la del Gestor de Respuestas de WordPress; `CommercialReplyGuides`); las demás categorías no se tocan. **Usar esta respuesta** la pone en Responder. Quien tiene el permiso **Respuestas guía** (`respuestas_guia_editar`, opcional por cargo en Permisos › Tareas) las crea, edita y elimina ahí mismo (`commercial_reply_guide_save` / `commercial_reply_guide_delete`, eliminar pide confirmación); también se editan en **Configuración › Actividades comerciales › Respuestas guía**.
 
 **Ingresar inmueble** requiere **Ver detalle de la tarea** y la nueva acción **Ingresar inmuebles desde una tarea** en **Configurar permisos**. Los cargos con permisos explícitos deben habilitar esa acción. Se aplica la misma restricción de tareas asignadas que en las demás gestiones; los administradores mantienen su alcance general.
 
