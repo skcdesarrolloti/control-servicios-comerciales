@@ -29,9 +29,8 @@ async function routePhotos(context) {
     await page.locator('[data-cqt-page]').waitFor();
     assert.equal(await page.locator('.cqt-head h1').innerText(), 'Cotizaciones de inmuebles');
     assert.equal(await page.locator('[data-commercial-dropdown-menu="comerciales"] [data-commercial-tab="cotizaciones"][href*="tab=cotizaciones"]:not([href*="portafolio"])').count(), 1, 'Falta la entrada del menú');
-    // Cotizaciones va como una entrada más bajo Registros, sin subtítulo propio.
-    assert.equal(await page.locator('[data-commercial-dropdown-menu="comerciales"]').getByText('Registros', { exact: true }).count(), 1, 'Falta el subtítulo Registros');
-    assert.equal(await page.locator('[data-commercial-dropdown-menu="comerciales"] [data-commercial-tab="cotizaciones"]:not([href*="portafolio"]) span:last-child').innerText(), 'Cotizaciones');
+    // Cotizaciones va bajo el subtítulo Registros, aparte de Registrar.
+    assert.equal(await page.locator('[data-commercial-dropdown-menu="comerciales"]').getByText('Registros', { exact: true }).count(), 1, 'Falta el subtítulo Registros');    assert.equal(await page.locator('[data-commercial-dropdown-menu="comerciales"] [data-commercial-tab="cotizaciones"]:not([href*="portafolio"]) span:last-child').innerText(), 'Cotizaciones');
     assert.equal(await page.locator('[data-commercial-dropdown-menu="comerciales"] [data-commercial-tab="cotizaciones"][href*="portafolio=1"]').count(), 1, 'Falta Mis cotizaciones en Mi portafolio');
     assert.ok(await page.locator('[data-commercial-dropdown-menu="mobile"] [data-commercial-tab="cotizaciones"]').count() >= 2, 'Faltan las entradas móviles');
     assert.ok((await page.locator('[data-cqt-list] .cqt-empty').innerText()).includes('No hay cotizaciones'));

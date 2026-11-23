@@ -855,8 +855,8 @@ final class CommercialDashboardView
             <?php endif; ?>
             <?php if (array_intersect(['llamadas', 'precaptacion', 'cotizaciones', 'anadir_aviso', 'actualizaciones', 'avisos'], $views)): ?>
             <div class="min-w-[250px]">
-            <?php if (array_intersect(['llamadas', 'precaptacion', 'anadir_aviso', 'cotizaciones'], $views)): ?>
-              <div class="flex items-center gap-1.5 px-3 pt-2 pb-1 font-label-sm text-[11px] uppercase font-semibold text-secondary"><span class="material-symbols-outlined text-[15px]" aria-hidden="true">edit_note</span><span>Registros</span></div>
+            <?php if (array_intersect(['llamadas', 'precaptacion', 'anadir_aviso'], $views)): ?>
+              <div class="flex items-center gap-1.5 px-3 pt-2 pb-1 font-label-sm text-[11px] uppercase font-semibold text-secondary"><span class="material-symbols-outlined text-[15px]" aria-hidden="true">edit_note</span><span>Registrar</span></div>
               <?php if (in_array('llamadas', $views, true)): ?>
               <a class="flex items-center gap-2 px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="llamadas" href="<?php echo esc_url(self::url($baseUrl, ['tab'=>'llamadas'])); ?>">
                 <span class="material-symbols-outlined text-[18px] text-secondary" aria-hidden="true">call</span><span>Llamadas</span>
@@ -872,11 +872,12 @@ final class CommercialDashboardView
                 <span class="material-symbols-outlined text-[18px] text-secondary" aria-hidden="true">add_photo_alternate</span><span>Añadir aviso</span>
               </a>
               <?php endif; ?>
-              <?php if (in_array('cotizaciones', $views, true)): ?>
+            <?php endif; ?>
+            <?php if (in_array('cotizaciones', $views, true)): ?>
+              <div class="flex items-center gap-1.5 px-3 pt-2 pb-1 font-label-sm text-[11px] uppercase font-semibold text-secondary"><span class="material-symbols-outlined text-[15px]" aria-hidden="true">folder_open</span><span>Registros</span></div>
               <a class="flex items-center gap-2 px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="cotizaciones" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'cotizaciones'])); ?>">
                 <span class="material-symbols-outlined text-[18px] text-secondary" aria-hidden="true">request_quote</span><span>Cotizaciones</span>
               </a>
-              <?php endif; ?>
             <?php endif; ?>
             <?php if (in_array('actualizaciones', $views, true)): ?>
               <div class="flex items-center gap-1.5 px-3 pt-2 pb-1 font-label-sm text-[11px] uppercase font-semibold text-secondary"><span class="material-symbols-outlined text-[15px]" aria-hidden="true">published_with_changes</span><span><?php echo esc_html(self::controlTitle('actualizaciones', $policy)); ?></span></div>
