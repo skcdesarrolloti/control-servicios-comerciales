@@ -27,6 +27,7 @@ final class CommercialCalendarService
     'tarea_atrasada' => ['label' => 'Tareas atrasadas', 'group' => 'Tareas comerciales', 'color' => '#dc2626', 'view' => ''],
     'tarea_por_vencer' => ['label' => 'Tareas por vencer', 'group' => 'Tareas comerciales', 'color' => '#f59e0b', 'view' => ''],
     'tarea_seguimiento' => ['label' => 'Seguimientos programados', 'group' => 'Seguimientos', 'color' => '#2563eb', 'view' => ''],
+    'tarea_retomar' => ['label' => 'Tareas postergadas por retomar', 'group' => 'Tareas comerciales', 'color' => '#9333ea', 'view' => ''],
     'actualizacion_inmueble' => ['label' => 'Actualizaciones de inmuebles', 'group' => 'Actualizaciones', 'color' => '#7c3aed', 'view' => 'actualizaciones'],
     'aviso_retoque' => ['label' => 'Retoques de aviso', 'group' => 'Avisos en fachada', 'color' => '#0f766e', 'view' => 'avisos'],
     'aviso_nuevo' => ['label' => 'Avisos nuevos sin instalar', 'group' => 'Avisos en fachada', 'color' => '#0891b2', 'view' => 'avisos'],
@@ -173,6 +174,9 @@ final class CommercialCalendarService
     if (isset($types['tarea_atrasada']) || isset($types['tarea_por_vencer']) || isset($types['tarea_seguimiento'])) {
       $sources['tareas'] = fn(): array => $this->ticketDueItems($employeeFilter, $fromTs, $toTs);
     }
+    if (isset($types['tarea_retomar'])) {
+      $sources['postergadas'] = fn(): array => $this->resumeDueItems($employeeFilter, $fromTs, $toTs);
+    }
     if (isset($types['actualizacion_inmueble'])) {
       $sources['actualizaciones'] = fn(): array => $this->propertyUpdateDueItems($employeeFilter, $canSeeAll, $fromTs, $toTs);
     }
@@ -271,6 +275,36 @@ final class CommercialCalendarService
         if ($item) {
           $items[] = $item;
         }
+      }
+    }
+    return $items;
+  }
+
+  /**
+   * Tareas postergadas en el día que se deben retomar (Postergar pide esa fecha). Las que ya pasaron se acumulan hoy.
+   * @return array<int,array<string,mixed>>
+   */
+  private function resumeDueItems(string $employeeFilter, int $fromTs, int $toTs): array
+  {
+    $items = [];
+    foreach ($this->tickets->calendarPostponedTickets($employeeFilter !== '' ? ['id_empleado' => $employeeFilter] : []) as $ticket) {
+      $pk = (string) ($ticket['_ID'] ?? '');
+      $number = trim((string) ($ticket['id_ticket'] ?? '')) ?: $pk;
+      $owner = trim((string) ($ticket['nombre_empleado'] ?? ''));
+      $requester = trim((string) ($ticket['solicitante'] ?? ''));
+      $item = $this->dueItem([
+        'id' => 'retomar-' . $pk,
+        'type' => 'tarea_retomar',
+        'title' => 'Retomar tarea #' . $number . ' · ' . (trim((string) ($ticket['tema_ayuda'] ?? '')) ?: 'Tarea comercial'),
+        'description' => implode(' · ', array_values(array_filter([trim((string) ($ticket['asunto'] ?? '')), $requester !== '' ? 'Solicitante: ' . $requester : '', $owner !== '' ? 'Responsable: ' . $owner : '', 'Postergada: actívala para seguir la gestión']))),
+        'base_ts' => (int) ($ticket['fecha_actualizacion'] ?? 0),
+        'due_ts' => (int) ($ticket[CommercialTicketsRepository::RESUME_COLUMN] ?? 0),
+        'employee_id' => (string) ($ticket['id_empleado'] ?? ''),
+        'employee' => $owner,
+        'case' => ['ticket_pk' => $pk, 'ticket' => $number, 'empleado_id' => (string) ($ticket['id_empleado'] ?? '')],
+      ], $fromTs, $toTs);
+      if ($item) {
+        $items[] = $item;
       }
     }
     return $items;

@@ -283,6 +283,14 @@ final class CommercialApiController
       error_log('[commercial-analysis:list] ' . $exception->getMessage());
       $detail['analyses'] = [];
     }
+    $detail['reply_guides'] = [];
+    if ($this->policy->canAct('responder')) {
+      try {
+        $detail['reply_guides'] = (new \SCM\Commercial\CommercialReplyGuides($this->db))->forStatus((string) ($detail['ticket']['estado_comercial'] ?? ''));
+      } catch (\Throwable $exception) {
+        error_log('[tareas:respuestas-guia] ' . $exception->getMessage());
+      }
+    }
     JsonResponse::success([
       'html' => CommercialTicketModalView::render(
         $detail,
@@ -376,6 +384,9 @@ final class CommercialApiController
     $this->authorizeTicketScope($ticketPk);
     $newEmployeeId = trim((string) ($input['id_empleado'] ?? ''));
     $observacion = trim((string) ($input['observacion'] ?? ''));
+    if ($observacion === '') {
+      JsonResponse::error('Escribe el motivo de la reasignación: queda en el historial y le llega al nuevo responsable.', 422);
+    }
 
     try {
       $reassignData = $this->tickets->reassign($ticketPk, $newEmployeeId, $this->commercialCargos, $observacion);
@@ -495,6 +506,11 @@ final class CommercialApiController
     if ($message === '') {
       JsonResponse::error('La respuesta no puede estar vacía.', 422);
     }
+    // Responder solo mueve la tarea entre estados abiertos: postergar y cerrar tienen su propio formulario.
+    $newStatus = trim((string) ($input['estado'] ?? '__keep__'));
+    if ($newStatus !== '__keep__' && $newStatus !== '' && !in_array($newStatus, CommercialStatusCatalog::OPEN, true)) {
+      JsonResponse::error('Desde Responder solo se elige un estado activo. Para postergar o cerrar usa su botón.', 422);
+    }
     $result = $this->workflow->saveTicketResponse(
       $ticketPk,
       $message,
@@ -515,12 +531,12 @@ final class CommercialApiController
       $result['message'] = 'Respuesta guardada, pero no se pudo avisar al cliente.';
     }
 
-    $newStatus = trim((string) ($input['estado'] ?? ''));
     if ($newStatus !== '' && $newStatus !== '__keep__') {
       try {
         $this->tickets->changeStatus($ticketPk, $newStatus);
-      } catch (\InvalidArgumentException $exception) {
-        // Status validation error ignored if response succeeded
+      } catch (\Throwable $exception) {
+        error_log('[tareas:estado] ' . $exception->getMessage());
+        $result['message'] .= ' El estado comercial no se pudo cambiar: vuelve a intentarlo.';
       }
     }
 
@@ -582,17 +598,24 @@ final class CommercialApiController
     if ($message === '') {
       JsonResponse::error('El motivo de postergación es obligatorio.', 422);
     }
+    $resume = self::resumeDate((string) ($input['fecha_retomar'] ?? ''));
+    if ($resume === null) {
+      JsonResponse::error('Elige la fecha para retomar la tarea: desde mañana y hasta un año.', 422);
+    }
     $result = $this->workflow->postponeTicket(
       $ticketPk,
       $message,
       self::NO_LEGACY_EMAILS,
       $this->uploadedImages('evidencia'),
-      $this->uploadedDocuments()
+      $this->uploadedDocuments(),
+      true
     );
     $this->ensureWorkflowSucceeded($result);
     $this->tickets->changeStatus($ticketPk, 'Postergado');
-    $notice = $this->clientUpdate($ticketPk, 'postergada', $message);
-    JsonResponse::success(['message' => 'Tarea postergada.' . $notice, 'refresh' => true]);
+    $this->tickets->setResumeDate($ticketPk, $resume->getTimestamp());
+    $label = self::longDate($resume);
+    $notice = $this->clientNotice($ticketPk, static fn(\SCM\Commercial\Calls\CommercialCallsNotifier $notifier, array $task) => $notifier->taskPostponed($ticketPk, $task, wp_strip_all_tags($message, true), $label, \SCM\Core\Auth::user(), \SCM\Core\Auth::employeeId()));
+    JsonResponse::success(['message' => 'Tarea postergada hasta el ' . $label . '.' . $notice, 'refresh' => true]);
   }
 
   /** @param array<string,mixed> $input */
@@ -611,10 +634,12 @@ final class CommercialApiController
       $ticketPk,
       $message,
       $this->uploadedImages('evidencia'),
-      $this->uploadedDocuments()
+      $this->uploadedDocuments(),
+      true
     );
     $this->ensureWorkflowSucceeded($result);
     $this->tickets->changeStatus($ticketPk, $status);
+    $this->tickets->setResumeDate($ticketPk, null);
     JsonResponse::success(['message' => (string) ($result['message'] ?? 'Tarea activada.'), 'refresh' => true]);
   }
 
@@ -630,10 +655,14 @@ final class CommercialApiController
     if ($message === '' || !in_array($status, CommercialStatusCatalog::CLOSED, true)) {
       JsonResponse::error('Selecciona un estado de cierre e indica el motivo.', 422);
     }
-    $result = $this->workflow->closeTicket($ticketPk, $message);
+    $result = $this->workflow->closeTicket($ticketPk, $message, true);
     $this->ensureWorkflowSucceeded($result);
     $this->tickets->changeStatus($ticketPk, $status);
-    JsonResponse::success(['message' => (string) ($result['message'] ?? 'Tarea cerrada.'), 'refresh' => true]);
+    $this->tickets->setResumeDate($ticketPk, null);
+    $notice = in_array($status, \SCM\Commercial\Calls\CommercialCallsNotifier::SILENT_CLOSURES, true)
+      ? ''
+      : $this->clientNotice($ticketPk, static fn(\SCM\Commercial\Calls\CommercialCallsNotifier $notifier, array $task) => $notifier->taskClosed($ticketPk, $task, $status, wp_strip_all_tags($message, true), \SCM\Core\Auth::user(), \SCM\Core\Auth::employeeId()));
+    JsonResponse::success(['message' => 'Tarea cerrada como ' . $status . '.' . $notice, 'refresh' => true]);
   }
 
   /** @param array<string,mixed> $input */
@@ -1190,17 +1219,49 @@ final class CommercialApiController
    */
   private function clientUpdate(int $ticketPk, string $kind, string $message): string
   {
+    return $this->clientNotice($ticketPk, static fn(\SCM\Commercial\Calls\CommercialCallsNotifier $notifier, array $task) => $notifier->clientUpdate($ticketPk, $task, $kind, wp_strip_all_tags($message, true), \SCM\Core\Auth::user(), \SCM\Core\Auth::employeeId()));
+  }
+
+  /**
+   * Avisa al cliente con la tarea ya guardada; un fallo del aviso no deshace la acción.
+   * @param callable(\SCM\Commercial\Calls\CommercialCallsNotifier,array<string,mixed>):void $send
+   */
+  private function clientNotice(int $ticketPk, callable $send): string
+  {
     try {
       $task = $this->db->getRow('SELECT * FROM `' . $this->db->table('jet_cct_tickets') . '` WHERE `_ID` = ? LIMIT 1', [$ticketPk]);
       if ($task === null) {
         return '';
       }
-      (new \SCM\Commercial\Calls\CommercialCallsNotifier($this->db, $this->settings))->clientUpdate($ticketPk, $task, $kind, wp_strip_all_tags($message, true), \SCM\Core\Auth::user(), \SCM\Core\Auth::employeeId());
+      $send(new \SCM\Commercial\Calls\CommercialCallsNotifier($this->db, $this->settings), $task);
       return ' Se avisó al cliente.';
     } catch (\Throwable $exception) {
       error_log('[tareas:aviso-cliente] ' . $exception->getMessage());
       return ' No se pudo avisar al cliente.';
     }
+  }
+
+  /** Fecha para retomar una tarea postergada (8:00 a. m. de Colombia): desde mañana y hasta un año. */
+  public static function resumeDate(string $value): ?\DateTimeImmutable
+  {
+    $zone = new \DateTimeZone(\SCM\Support\ColombiaBusinessCalendar::TIMEZONE);
+    $date = \DateTimeImmutable::createFromFormat('!Y-m-d', trim($value), $zone);
+    if ($date === false || $date->format('Y-m-d') !== trim($value)) {
+      return null;
+    }
+    $today = new \DateTimeImmutable('today', $zone);
+    if ($date <= $today || $date > $today->modify('+1 year')) {
+      return null;
+    }
+    return $date->setTime(8, 0);
+  }
+
+  /** "lunes 30 de noviembre de 2026", para el cliente. */
+  public static function longDate(\DateTimeInterface $date): string
+  {
+    $days = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+    $months = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+    return $days[(int) $date->format('w')] . ' ' . $date->format('j') . ' de ' . $months[(int) $date->format('n') - 1] . ' de ' . $date->format('Y');
   }
 
   /** @param array<string,mixed> $input @return array<string,mixed> */

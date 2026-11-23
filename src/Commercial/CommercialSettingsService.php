@@ -122,6 +122,7 @@ final class CommercialSettingsService
       'notificaciones_internas' => $section === 'notificaciones_internas' ? $this->internalNotifications() : [],
       'tiempos' => ['topics' => $topics],
       'cotizaciones' => \SCM\Commercial\Quotes\CommercialQuotesService::settingsFrom($this->settings),
+      'respuestas' => $section === 'respuestas' ? $this->replyGuideSettings() : [],
       'avisos' => ['values' => $signs],
       'actualizaciones' => ['limits' => self::propertyUpdateLimits($this->settings)],
       'destacados' => ['portals' => $highlights],
@@ -290,6 +291,8 @@ final class CommercialSettingsService
       case 'cotizaciones':
         \SCM\Commercial\Quotes\CommercialQuotesService::saveSettings($this->settings, $data, Auth::userId());
         return 'Textos de las cotizaciones guardados.';
+      case 'respuestas':
+        return $this->saveReplyGuides($data);
       case 'avisos':
         return $this->saveSigns($data);
       case 'actualizaciones':
@@ -369,6 +372,27 @@ final class CommercialSettingsService
       'api_url' => $base . '/inventory-api.php',
       'category_usage' => $categories,
     ];
+  }
+
+  /** Configuración › Respuestas guía: las de la categoría Comercial y los estados para elegir. @return array<string,mixed> */
+  private function replyGuideSettings(): array
+  {
+    $guides = new CommercialReplyGuides($this->db);
+    return ['ready' => $guides->ready(), 'rows' => $guides->all(), 'estados' => CommercialStatusCatalog::all()];
+  }
+
+  /** La lista completa de respuestas guía comerciales; eliminar exige confirm_delete. @param array<string,mixed> $data */
+  private function saveReplyGuides(array $data): string
+  {
+    // cct_author_id lleva el id_empleado real de quien edita.
+    $author = trim(Auth::employeeId()) !== '' ? trim(Auth::employeeId()) : (string) Auth::userId();
+    $totals = (new CommercialReplyGuides($this->db))->save(array_values(array_filter((array) ($data['rows'] ?? []), 'is_array')), !empty($data['confirm_delete']), $author);
+    $this->lastResult = $totals;
+    $parts = [];
+    foreach (['added' => 'agregadas', 'updated' => 'actualizadas', 'deleted' => 'eliminadas'] as $key => $label) {
+      if ($totals[$key] > 0) $parts[] = $totals[$key] . ' ' . $label;
+    }
+    return 'Respuestas guía guardadas' . ($parts !== [] ? ': ' . implode(', ', $parts) : ' (sin cambios)') . '.';
   }
 
   /** Configuración › Plan estratégico: los catálogos completos; eliminar exige confirm_delete. @param array<string,mixed> $data */

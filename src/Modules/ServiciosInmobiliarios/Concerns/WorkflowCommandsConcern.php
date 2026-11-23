@@ -236,7 +236,8 @@ trait WorkflowCommandsConcern
   /**
    * @return array<string,string>
    */
-  public function postponeTicket(int $ticketPk, string $observacion, array $notifyTargets = [], $evidencias = '', array $documentos = []): array
+  /** @param bool $keepAdministrative El panel comercial no toca estado_administrativo (es del panel inmobiliario). */
+  public function postponeTicket(int $ticketPk, string $observacion, array $notifyTargets = [], $evidencias = '', array $documentos = [], bool $keepAdministrative = false): array
   {
     $ticketsTable = $this->db->table('jet_cct_tickets');
     $seguimientoTable = $this->db->table('jet_cct_seguimiento_ticket');
@@ -297,7 +298,7 @@ trait WorkflowCommandsConcern
       'estado_admin_ticket' => 'Postergado',
       'estado_admin' => 'Postergado',
     ];
-    $ticketUpdate = $this->schema->filterTableData($ticketsTable, $ticketUpdate);
+    $ticketUpdate = $this->schema->filterTableData($ticketsTable, self::administrativeUpdate($ticketUpdate, $keepAdministrative));
     if (!empty($ticketUpdate)) {
       $this->db->update($ticketsTable, $ticketUpdate, ['_ID' => $ticketPk]);
     }
@@ -328,7 +329,7 @@ trait WorkflowCommandsConcern
   /**
    * @return array<string,string>
    */
-  public function activateTicket(int $ticketPk, string $motivo, $evidencias = '', array $documentos = []): array
+  public function activateTicket(int $ticketPk, string $motivo, $evidencias = '', array $documentos = [], bool $keepAdministrative = false): array
   {
     $ticketsTable = $this->db->table('jet_cct_tickets');
     $seguimientoTable = $this->db->table('jet_cct_seguimiento_ticket');
@@ -389,7 +390,7 @@ trait WorkflowCommandsConcern
       'estado_admin_ticket' => 'Nuevo',
       'estado_admin' => 'Nuevo',
     ];
-    $ticketUpdate = $this->schema->filterTableData($ticketsTable, $ticketUpdate);
+    $ticketUpdate = $this->schema->filterTableData($ticketsTable, self::administrativeUpdate($ticketUpdate, $keepAdministrative));
     if (!empty($ticketUpdate)) {
       $this->db->update($ticketsTable, $ticketUpdate, ['_ID' => $ticketPk]);
     }
@@ -552,7 +553,7 @@ trait WorkflowCommandsConcern
   /**
    * @return array<string,string>
    */
-  public function closeTicket(int $ticketPk, string $motivo = ''): array
+  public function closeTicket(int $ticketPk, string $motivo = '', bool $keepAdministrative = false): array
   {
     $ticketsTable = $this->db->table('jet_cct_tickets');
     $seguimientoTable = $this->db->table('jet_cct_seguimiento_ticket');
@@ -589,7 +590,7 @@ trait WorkflowCommandsConcern
     if (isset($ticket['seguimientos'])) {
       $ticketUpdate['seguimientos'] = (string) ((int) $ticket['seguimientos'] + 1);
     }
-    $ticketUpdate = $this->schema->filterTableData($ticketsTable, $ticketUpdate);
+    $ticketUpdate = $this->schema->filterTableData($ticketsTable, self::administrativeUpdate($ticketUpdate, $keepAdministrative));
     if (empty($ticketUpdate)) {
       return ['ok' => '0', 'message' => 'No hay columnas disponibles para cerrar el ticket.'];
     }
@@ -632,6 +633,19 @@ trait WorkflowCommandsConcern
       'seg_saved' => $segSaved ? '1' : '0',
       'hist_saved' => '1',
     ];
+  }
+
+  /**
+   * Sin las columnas del estado administrativo cuando la acción viene del panel comercial.
+   * @param array<string,mixed> $update
+   * @return array<string,mixed>
+   */
+  private static function administrativeUpdate(array $update, bool $keepAdministrative): array
+  {
+    if ($keepAdministrative) {
+      unset($update['estado_administrativo'], $update['estado_admin_ticket'], $update['estado_admin']);
+    }
+    return $update;
   }
 
   /**

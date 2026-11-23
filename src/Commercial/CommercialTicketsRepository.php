@@ -165,6 +165,47 @@ final class CommercialTicketsRepository
     return $this->decorateCommercialSla($rows);
   }
 
+  /** Columna de la fecha para retomar una tarea postergada (bin/add-task-resume-field.php). */
+  public const RESUME_COLUMN = 'fecha_retomar';
+
+  /**
+   * Fecha (timestamp) en que se debe retomar una tarea postergada; null la borra (al activarla). Si la columna todavía
+   * no existe en la base, no hace nada.
+   */
+  public function setResumeDate(int $ticketPk, ?int $timestamp): void
+  {
+    $table = $this->db->table('jet_cct_tickets');
+    if ($ticketPk <= 0 || !$this->schema->columnExists($table, self::RESUME_COLUMN)) {
+      return;
+    }
+    $this->db->update($table, [self::RESUME_COLUMN => $timestamp], ['_ID' => $ticketPk]);
+  }
+
+  /**
+   * Tareas postergadas con fecha para retomar, para el calendario de vencimientos.
+   * @param array<string,mixed> $filters
+   * @return array<int,array<string,mixed>>
+   */
+  public function calendarPostponedTickets(array $filters = []): array
+  {
+    $table = $this->db->table('jet_cct_tickets');
+    if (!$this->schema->columnExists($table, self::RESUME_COLUMN)) {
+      return [];
+    }
+    [$where, $args] = $this->bucketWhere('postergados');
+    [$filterWhere, $filterArgs] = $this->ticketFilterClauses($filters);
+    $where = array_merge($where, $filterWhere, ['COALESCE(t.`' . self::RESUME_COLUMN . '`, 0) > 0']);
+    return $this->db->getResults(
+      "SELECT t.`_ID`, t.`id_ticket`, t.`estado_comercial`, t.`asunto`, t.`solicitante`, t.`id_empleado`, t.`nombre_empleado`,
+              t.`tema_ayuda`, t.`" . self::RESUME_COLUMN . "`, t.`fecha_actualizacion`
+         FROM `{$table}` t
+        WHERE " . implode(' AND ', $where) . "
+        ORDER BY t.`" . self::RESUME_COLUMN . "` ASC
+        LIMIT 2000",
+      array_merge($args, $filterArgs)
+    );
+  }
+
   /**
    * @return array{ticket:array<string,mixed>,timeline:array<int,array<string,mixed>>}
    */

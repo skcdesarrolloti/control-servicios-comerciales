@@ -1615,6 +1615,22 @@
         closeWorkflows();
         return;
       }
+      // Respuestas guía: el texto queda en la respuesta para ajustarlo; si ya hay algo escrito, se agrega al final.
+      var useGuide = event.target.closest("[data-commercial-use-guide]");
+      if (useGuide) {
+        event.preventDefault();
+        var guideCard = useGuide.closest("[data-commercial-guide]");
+        var guideForm = useGuide.closest("form");
+        var guideArea = guideForm ? guideForm.querySelector('textarea[name="respuesta"]') : null;
+        var guideText = guideCard ? (guideCard.querySelector("[data-commercial-guide-text]") || {}).textContent || "" : "";
+        if (guideArea && guideText.trim()) {
+          guideArea.value = guideArea.value.trim() ? guideArea.value.replace(/\s+$/, "") + "\n\n" + guideText.trim() : guideText.trim();
+          guideArea.dispatchEvent(new Event("input", { bubbles: true }));
+          guideArea.focus({ preventScroll: false });
+          notify("success", "Respuesta guía cargada: ajústala antes de enviar.");
+        }
+        return;
+      }
       var insertPropertyBtn = event.target.closest("[data-commercial-insert-property]");
       if (insertPropertyBtn) {
         event.preventDefault();
@@ -1674,6 +1690,26 @@
         return;
       }
       if (event.target.closest("[data-commercial-retry-case]")) loadCase(currentCasePk, false);
+    });
+    // Guía del estado elegido bajo cada lista de estado comercial.
+    caseModal.addEventListener("change", function (event) {
+      var select = event.target.closest("[data-commercial-status-select]");
+      if (!select) return;
+      var box = select.parentElement;
+      var help = box ? box.querySelector("[data-commercial-status-help-text]") : null;
+      var option = select.options[select.selectedIndex];
+      if (help && option) help.textContent = option.getAttribute("data-help") || "";
+    });
+    caseModal.addEventListener("input", function (event) {
+      var search = event.target.closest("[data-commercial-guide-search]");
+      if (!search) return;
+      var fold = function (value) { return String(value || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, ""); };
+      var query = fold(search.value.trim());
+      var panel = search.closest("[data-commercial-guides]");
+      if (!panel) return;
+      panel.querySelectorAll("[data-commercial-guide]").forEach(function (card) {
+        card.hidden = query !== "" && fold(card.textContent).indexOf(query) === -1;
+      });
     });
     caseModal.addEventListener("submit", function (event) {
       var form = event.target.closest("[data-commercial-workflow-form]");

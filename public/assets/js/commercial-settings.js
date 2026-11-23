@@ -330,6 +330,87 @@
         return { notas: form.elements.notas.value, nota_arriendo: form.elements.nota_arriendo.value };
       },
     },
+    // Banco de respuestas guía de la categoría Comercial (tabla jet_cct_respuesta_de_ticket, la del plugin "Gestor de
+    // Respuestas de Tickets"): salen en Responder del popup de la tarea. Se guarda la lista completa; eliminar pide confirmación.
+    respuestas: {
+      title: "Respuestas guía",
+      wide: true,
+      html: function (settings) {
+        if (!settings.ready) return '<p class="text-sm text-secondary text-left">La tabla de respuestas guía no existe en esta base.</p>';
+        var field = 'class="w-full px-2.5 py-1.5 rounded-lg border border-outline-variant bg-surface-container-lowest text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/30"';
+        function line(row) {
+          return '<div class="rounded-xl border border-outline-variant p-3 space-y-2" data-guide-row data-id="' + esc(row.id || "") + '">' +
+            '<div class="grid grid-cols-1 sm:grid-cols-[180px_1fr_auto] gap-2 items-end">' +
+            '<label class="block"><span class="block text-[11px] font-semibold text-secondary mb-1">Estado de la tarea</span><input ' + field + ' list="commercial-guide-states" maxlength="100" data-field="estado" value="' + esc(row.estado || "") + '" placeholder="Cualquiera"></label>' +
+            '<label class="block"><span class="block text-[11px] font-semibold text-secondary mb-1">Situación</span><input ' + field + ' maxlength="255" data-field="situacion" value="' + esc(row.situacion || "") + '" placeholder="Cuándo usar esta respuesta"></label>' +
+            '<button type="button" class="px-2.5 py-1.5 rounded-lg text-error hover:bg-error-container text-xs font-semibold" data-guide-remove>Quitar</button></div>' +
+            '<label class="block"><span class="block text-[11px] font-semibold text-secondary mb-1">Respuesta</span><textarea ' + field + ' rows="3" maxlength="5000" data-field="respuesta" placeholder="Texto que el consultor/a puede usar al responder">' + esc(row.respuesta || "") + "</textarea></label></div>";
+        }
+        return '<form data-config-form class="text-left space-y-3">' +
+          intro("Qué responder y por qué en cada situación. Salen en <strong>Responder</strong> del popup de la tarea; primero las del estado en que está la tarea. Es el mismo banco del Gestor de Respuestas de WordPress: aquí solo se ven y editan las de la categoría <strong>Comercial</strong>.") +
+          '<datalist id="commercial-guide-states">' + (settings.estados || []).map(function (state) { return '<option value="' + esc(state) + '"></option>'; }).join("") + "</datalist>" +
+          '<div class="flex flex-wrap items-center justify-between gap-2"><input type="search" ' + field.replace("w-full ", "") + ' data-guide-filter placeholder="Buscar en las respuestas" aria-label="Buscar en las respuestas guía">' +
+          '<button type="button" class="px-3 py-1.5 rounded-lg bg-surface-container-low text-on-surface text-xs font-semibold" data-guide-add>Agregar respuesta</button></div>' +
+          '<div class="space-y-2 max-h-[55vh] overflow-y-auto pr-1" data-guide-list>' + (settings.rows || []).map(line).join("") + "</div>" +
+          "<template data-guide-template>" + line({}) + "</template>" +
+          '<label class="hidden items-center gap-2 p-3 rounded-xl bg-error-container text-sm text-on-error-container" data-guide-confirm><input type="checkbox" name="confirm_delete" value="1"><span>Confirmo que se eliminarán <b data-guide-removed-count>0</b> respuesta(s).</span></label>' +
+          "</form>";
+      },
+      bind: function (popup) {
+        function refresh() {
+          var removed = popup.querySelectorAll('[data-guide-row][data-removed="1"]').length;
+          var confirm = popup.querySelector("[data-guide-confirm]");
+          if (!confirm) return;
+          confirm.classList.toggle("hidden", !removed);
+          confirm.classList.toggle("flex", removed > 0);
+          popup.querySelector("[data-guide-removed-count]").textContent = String(removed);
+          if (!removed) confirm.querySelector("input").checked = false;
+        }
+        popup.addEventListener("input", function (event) {
+          if (!event.target.matches("[data-guide-filter]")) return;
+          var query = event.target.value.trim().toLowerCase();
+          popup.querySelectorAll("[data-guide-list] [data-guide-row]").forEach(function (row) {
+            var text = Array.prototype.map.call(row.querySelectorAll("[data-field]"), function (field) { return field.value; }).join(" ").toLowerCase();
+            row.hidden = query !== "" && text.indexOf(query) === -1;
+          });
+        });
+        popup.addEventListener("click", function (event) {
+          if (event.target.closest("[data-guide-add]")) {
+            var list = popup.querySelector("[data-guide-list]");
+            list.insertAdjacentHTML("afterbegin", popup.querySelector("[data-guide-template]").innerHTML);
+            list.querySelector("[data-guide-row] [data-field='situacion']").focus();
+            return;
+          }
+          var remove = event.target.closest("[data-guide-remove]");
+          if (!remove) return;
+          var row = remove.closest("[data-guide-row]");
+          if (!row.getAttribute("data-id")) {
+            row.remove();
+            return;
+          }
+          // Las guardadas quedan marcadas hasta guardar: se recuperan con "Deshacer".
+          var marked = row.getAttribute("data-removed") !== "1";
+          row.setAttribute("data-removed", marked ? "1" : "0");
+          row.style.opacity = marked ? "0.45" : "";
+          row.querySelectorAll("[data-field]").forEach(function (field) { field.disabled = marked; });
+          remove.textContent = marked ? "Deshacer" : "Quitar";
+          refresh();
+        });
+      },
+      collect: function (form) {
+        var rows = Array.prototype.filter.call(form.querySelectorAll("[data-guide-list] [data-guide-row]"), function (row) {
+          return row.getAttribute("data-removed") !== "1";
+        }).map(function (row) {
+          var item = { id: Number(row.getAttribute("data-id") || 0) };
+          row.querySelectorAll("[data-field]").forEach(function (field) { item[field.getAttribute("data-field")] = field.value.trim(); });
+          return item;
+        });
+        var removed = form.querySelectorAll('[data-guide-row][data-removed="1"]').length;
+        var confirmed = form.querySelector('[name="confirm_delete"]').checked;
+        if (removed && !confirmed) throw new Error("Marca la confirmación para eliminar " + removed + " respuesta(s).");
+        return { rows: rows, confirm_delete: removed > 0 && confirmed };
+      },
+    },
     actualizaciones: {
       title: "Actualizaciones de inmuebles",
       html: function (settings) {
@@ -1123,7 +1204,7 @@
   // Grupos del menú Configuración (los mismos del menú principal): cada uno abre un solo popup con una pestaña por
   // sección. Una entrada que no es grupo (Notificaciones internas) abre su sección sola, sin pestañas.
   var groups = {
-    actividades: { title: "Actividades comerciales", tabs: [["calendario", "Calendario"], ["tiempos", "Tiempos de atención"], ["cotizaciones", "Cotizaciones"]] },
+    actividades: { title: "Actividades comerciales", tabs: [["calendario", "Calendario"], ["tiempos", "Tiempos de atención"], ["cotizaciones", "Cotizaciones"], ["respuestas", "Respuestas guía"]] },
     inmuebles: { title: "Inmuebles", tabs: [["avisos", "Avisos en fachada"], ["actualizaciones", "Actualizaciones"], ["destacados", "Cupos de destacados"]] },
     herramientas: { title: "Herramientas", tabs: [["aseo", "Calculadora de aseo"], ["utm", "Generador UTM"], ["plan", "Plan estratégico"]] },
     promocion: { title: "Promoción", tabs: [["medios", "Medios"], ["analitica", "Analítica web"], ["material_pop", "Material POP"], ["banner_revista", "Banner y revista"]] },

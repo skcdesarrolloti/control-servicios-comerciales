@@ -30,6 +30,10 @@ final class CommercialCallsNotifier
   public const TEMPLATE_REGISTERED = 'scm_tarea_comercial_registrada_v1';
   public const TEMPLATE_CLIENT_REPLY = 'scm_tarea_comercial_respuesta_cliente_v1';
   public const TEMPLATE_OFFICER_REPLY = 'scm_tarea_comercial_respuesta_funcionario_v1';
+  public const TEMPLATE_POSTPONED = 'scm_tarea_comercial_postergada_v1';
+  public const TEMPLATE_CLOSED = 'scm_tarea_comercial_cerrada_v1';
+  /** Cierres que no se le cuentan al cliente: la gestión sigue en otra tarea o con otro responsable. */
+  public const SILENT_CLOSURES = ['Duplicado', 'Trasladado'];
   /** Compartida con control-servicios-inmobiliarios: su botón es el dominio + {{1}} (SharedButtonUrl). */
   public const TEMPLATE_TRANSFERRED = 'pqr_trasladada_funcionario_v1';
   public const TEMPLATE_LANGUAGE = 'es_CO';
@@ -172,8 +176,65 @@ final class CommercialCallsNotifier
   }
 
   /**
-   * Seguimiento o postergación de la tarea: al cliente siempre le llega (sin casilla en el popup, salvo que haya bloqueado
-   * el correo) por correo con el enlace a la vista pública de su tarea, nunca a la página de tickets anterior.
+   * Postergar en el popup: al cliente le llegan correo y WhatsApp con el motivo y la fecha en que se retoma (salvo que
+   * haya bloqueado ese canal), con el enlace a la vista pública de su tarea. Su consultor/a es el responsable de la tarea.
+   * @param array<string,mixed> $task
+   */
+  public function taskPostponed(int $id, array $task, string $reason, string $resumeLabel, string $author, string $employee = ''): void
+  {
+    $text = trim($reason);
+    if ($text === '') {
+      return;
+    }
+    $e = static fn($value): string => EmailTemplate::e((string) $value);
+    $key = 'llamadas:tarea:' . $id . ':postergada:' . substr(hash('sha256', $text . '|' . $resumeLabel), 0, 16);
+    $client = $this->clientPreferences($task);
+    if (!$this->blocked($client, 'email')) {
+      $staff = $this->repository->employee($employee) ?? [];
+      $this->send($task['correo_solicitante'] ?? '', 'Tu tarea #' . $id . ' quedó en pausa', 'Tarea en pausa',
+        '<p>Estimado/a <strong>' . $e($task['solicitante'] ?? '') . '</strong>, <strong>' . $e($author !== '' ? $author : ($task['nombre_empleado'] ?? '')) . '</strong> dejó en pausa tu tarea <strong>#' . $id . '</strong>'
+        . ($resumeLabel !== '' ? ' hasta el <strong>' . $e($resumeLabel) . '</strong>' : '') . '.</p>'
+        . '<blockquote style="margin:12px 0;padding:12px 16px;background:#f1f5f9;border-left:4px solid #1e3c76;">' . nl2br($e($text)) . '</blockquote>'
+        . '<p><strong>Su consultor/a asignado es</strong> ' . $e(self::contactLine($task)) . '.</p><p>Desde el botón puedes ver tu tarea y escribirnos.</p>',
+        $this->buttons(PublicTaskAccess::url($id), 'Ver y responder'), $key, trim((string) ($staff['correo'] ?? '')) ?: (string) ($task['correo_empleado'] ?? ''));
+    }
+    if (!$this->blocked($client, 'whatsapp')) {
+      $this->whatsappTo(self::clientPhone($task), (string) ($task['indicativo'] ?? ''), self::TEMPLATE_POSTPONED,
+        [$task['solicitante'] ?? '', (string) $id, $resumeLabel !== '' ? $resumeLabel : 'nueva fecha', $text, self::contactLine($task)], PublicTaskAccess::reference($id), $key . ':whatsapp');
+    }
+  }
+
+  /**
+   * Cerrar en el popup: al cliente le llegan correo y WhatsApp con la observación del cierre, salvo los cierres de
+   * SILENT_CLOSURES (duplicada o trasladada) o el canal que haya bloqueado. Ya no puede escribir en su enlace: solo verlo.
+   * @param array<string,mixed> $task
+   */
+  public function taskClosed(int $id, array $task, string $status, string $reason, string $author, string $employee = ''): void
+  {
+    $text = trim($reason);
+    if ($text === '' || in_array($status, self::SILENT_CLOSURES, true)) {
+      return;
+    }
+    $e = static fn($value): string => EmailTemplate::e((string) $value);
+    $key = 'llamadas:tarea:' . $id . ':cerrada:' . substr(hash('sha256', $status . '|' . $text), 0, 16);
+    $client = $this->clientPreferences($task);
+    if (!$this->blocked($client, 'email')) {
+      $staff = $this->repository->employee($employee) ?? [];
+      $this->send($task['correo_solicitante'] ?? '', 'Cerramos tu tarea #' . $id, 'Tarea cerrada',
+        '<p>Estimado/a <strong>' . $e($task['solicitante'] ?? '') . '</strong>, <strong>' . $e($author !== '' ? $author : ($task['nombre_empleado'] ?? '')) . '</strong> cerró tu tarea <strong>#' . $id . '</strong>:</p>'
+        . '<blockquote style="margin:12px 0;padding:12px 16px;background:#f1f5f9;border-left:4px solid #1e3c76;">' . nl2br($e($text)) . '</blockquote>'
+        . '<p><strong>Su consultor/a asignado es</strong> ' . $e(self::contactLine($task)) . '.</p><p>Gracias por confiar en nosotros. Desde el botón puedes ver el detalle de tu tarea.</p>',
+        $this->buttons(PublicTaskAccess::url($id), 'Ver tarea'), $key, trim((string) ($staff['correo'] ?? '')) ?: (string) ($task['correo_empleado'] ?? ''));
+    }
+    if (!$this->blocked($client, 'whatsapp')) {
+      $this->whatsappTo(self::clientPhone($task), (string) ($task['indicativo'] ?? ''), self::TEMPLATE_CLOSED,
+        [$task['solicitante'] ?? '', (string) $id, $text, self::contactLine($task)], PublicTaskAccess::reference($id), $key . ':whatsapp');
+    }
+  }
+
+  /**
+   * Seguimiento de la tarea: al cliente siempre le llega (sin casilla en el popup, salvo que haya bloqueado el correo) por
+   * correo con el enlace a la vista pública de su tarea, nunca a la página de tickets anterior.
    * @param array<string,mixed> $task
    */
   public function clientUpdate(int $id, array $task, string $kind, string $message, string $author, string $employee = ''): void

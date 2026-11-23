@@ -34,8 +34,8 @@ final class SeguimientoService
   /**
    * @return array<string,string>
    */
-  public function activateTicket(int $ticketPk, string $motivo, $evidencias = '', array $documentos = []): array
+  public function activateTicket(int $ticketPk, string $motivo, $evidencias = '', array $documentos = [], bool $keepAdministrative = false): array
   {
-    return $this->activateTicketFromWorkflow($ticketPk, $motivo, $evidencias, $documentos);
+    return $this->activateTicketFromWorkflow($ticketPk, $motivo, $evidencias, $documentos, $keepAdministrative);
   }
 }

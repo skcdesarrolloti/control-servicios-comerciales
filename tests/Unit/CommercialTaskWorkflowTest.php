@@ -1,0 +1,226 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Tests\Unit;
+
+use PHPUnit\Framework\TestCase;
+use SCM\Commercial\Calls\CommercialCallsNotifier;
+use SCM\Commercial\CommercialCalendarService;
+use SCM\Commercial\CommercialReplyGuides;
+use SCM\Commercial\CommercialStatusCatalog;
+use SCM\Commercial\CommercialTicketsRepository;
+use SCM\Core\Database;
+use SCM\Core\Settings;
+use SCM\Http\Controller\CommercialApiController;
+use SCM\Modules\ServiciosInmobiliarios\SeguimientoService;
+use SCM\Support\PublicTaskAccess;
+use SCM\Views\CommercialTicketModalView;
+use Tests\Fixtures\CommercialCallsDatabase;
+
+/**
+ * Botones generales del popup de la tarea: guía de estados, respuestas guía, Postergar con fecha para retomar, Cerrar y
+ * Reasignar con aviso, sin tocar estado_administrativo.
+ */
+final class CommercialTaskWorkflowTest extends TestCase
+{
+  private Database $db;
+  private array $previousSession;
+
+  protected function setUp(): void
+  {
+    $this->previousSession = $_SESSION ?? [];
+    require_once dirname(__DIR__, 2) . '/src/Core/Helpers.php';
+    require_once dirname(__DIR__) . '/Fixtures/CommercialCallsDatabase.php';
+    if (!defined('SCM_APP_SECRET')) define('SCM_APP_SECRET', 'secreto-de-prueba-de-al-menos-32-caracteres');
+    if (!defined('SCM_BASE_URL')) define('SCM_BASE_URL', 'https://panel.test/public');
+    $this->db = CommercialCallsDatabase::create();
+    foreach (['estado_administrativo', 'estado_admin', 'seguimientos', 'fecha_seguimiento', 'fecha_actualizacion', 'id_encargado_seguimiento', 'id_ticket', 'fecha_retomar'] as $column) {
+      $this->db->pdo()->exec('ALTER TABLE wp_jet_cct_tickets ADD COLUMN `' . $column . '` TEXT');
+    }
+    $this->db->pdo()->exec('CREATE TABLE wp_jet_cct_respuesta_de_ticket (_ID INTEGER PRIMARY KEY AUTOINCREMENT, categoria TEXT, estado TEXT, situacion TEXT, respuesta TEXT, cct_status TEXT, cct_author_id TEXT, cct_created TEXT, cct_modified TEXT)');
+    $this->db->insert('wp_jet_cct_tickets', ['_ID' => 900, 'id_ticket' => '900', 'asunto' => 'Busca apartamento', 'tema_ayuda' => 'Arriendo', 'estado' => 'En proceso', 'estado_comercial' => 'Mostrando', 'estado_administrativo' => 'En gestión', 'id_empleado' => '101', 'nombre_empleado' => 'Consultora Uno', 'correo_empleado' => '101@example.test', 'celular_empleado' => '3000000101', 'solicitante' => 'Laura Prueba', 'correo_solicitante' => 'laura@example.test', 'celular_solicitante' => '3001234567', 'indicativo' => '57']);
+    $_SESSION = ['scm_logged_in' => true, 'scm_user_id' => 101, 'scm_employee_id' => '101', 'scm_user_cargo' => '13', 'scm_user' => 'Consultora Uno'];
+    $this->mirrorSchema();
+  }
+
+  /** SchemaInspector consulta information_schema (MySQL): se simula con las tablas y columnas de la base SQLite. */
+  private function mirrorSchema(): void
+  {
+    $pdo = $this->db->pdo();
+    $pdo->sqliteCreateFunction('DATABASE', static fn(): string => 'fixture');
+    $pdo->exec("ATTACH DATABASE ':memory:' AS information_schema");
+    $pdo->exec('CREATE TABLE information_schema.TABLES (TABLE_SCHEMA TEXT, TABLE_NAME TEXT)');
+    $pdo->exec('CREATE TABLE information_schema.COLUMNS (TABLE_SCHEMA TEXT, TABLE_NAME TEXT, COLUMN_NAME TEXT)');
+    foreach ($pdo->query("SELECT name FROM main.sqlite_master WHERE type = 'table'")->fetchAll(\PDO::FETCH_COLUMN) as $table) {
+      $pdo->prepare('INSERT INTO information_schema.TABLES VALUES (?,?)')->execute(['fixture', $table]);
+      foreach ($pdo->query('PRAGMA main.table_info(`' . $table . '`)')->fetchAll(\PDO::FETCH_ASSOC) as $column) {
+        $pdo->prepare('INSERT INTO information_schema.COLUMNS VALUES (?,?,?)')->execute(['fixture', $table, $column['name']]);
+      }
+    }
+  }
+
+  protected function tearDown(): void
+  {
+    $_SESSION = $this->previousSession;
+  }
+
+  private function task(): array
+  {
+    return $this->db->getRow('SELECT * FROM wp_jet_cct_tickets WHERE _ID = 900') ?? [];
+  }
+
+  /** @return array{0:CommercialCallsNotifier,1:object} */
+  private function recorder(): array
+  {
+    $log = new \stdClass();
+    $log->mail = [];
+    $log->whatsapp = [];
+    $notifier = new CommercialCallsNotifier($this->db, new Settings($this->db),
+      static function ($to, string $subject, string $html) use ($log): void { $log->mail[] = [$to, $subject, $html]; },
+      static function (string $phone, string $template, array $components) use ($log): void { $log->whatsapp[] = [$phone, $template, $components]; });
+    return [$notifier, $log];
+  }
+
+  public function testPostponeActivateAndCloseKeepTheAdministrativeStatus(): void
+  {
+    // El flujo compartido escribe con filterTableData (DESCRIBE de MySQL): aquí se prueba la parte que decide qué se escribe.
+    $update = new \ReflectionMethod(SeguimientoService::class, 'administrativeUpdate');
+    $row = ['estado' => 'En proceso', 'estado_administrativo' => 'Postergado', 'estado_admin_ticket' => 'Postergado', 'estado_admin' => 'Postergado'];
+    self::assertSame(['estado' => 'En proceso'], $update->invoke(null, $row, true), 'El panel comercial no toca el estado administrativo.');
+    self::assertSame($row, $update->invoke(null, $row, false), 'Sin la opción (panel inmobiliario heredado) sigue igual.');
+    foreach (['postponeTicket' => 5, 'activateTicket' => 4, 'closeTicket' => 2] as $method => $position) {
+      $parameter = (new \ReflectionMethod(SeguimientoService::class, $method))->getParameters()[$position];
+      self::assertSame('keepAdministrative', $parameter->getName());
+      self::assertFalse($parameter->getDefaultValue());
+    }
+    // El controlador comercial pide conservarlo en las tres acciones.
+    $source = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Http/Controller/CommercialApiController.php');
+    self::assertSame(1, preg_match('/postponeTicket\([^;]*?uploadedDocuments\(\),\s*true\s*\)/s', $source));
+    self::assertSame(1, preg_match('/activateTicket\([^;]*?uploadedDocuments\(\),\s*true\s*\)/s', $source));
+    self::assertStringContainsString('closeTicket($ticketPk, $message, true)', $source);
+  }
+
+  public function testResumeDateIsStoredShownInTheCalendarAndCleared(): void
+  {
+    $tickets = new CommercialTicketsRepository($this->db);
+    $tickets->changeStatus(900, 'Postergado');
+    $resume = CommercialApiController::resumeDate((new \DateTimeImmutable('today', new \DateTimeZone('America/Bogota')))->modify('+3 days')->format('Y-m-d'));
+    self::assertNotNull($resume);
+    $tickets->setResumeDate(900, $resume->getTimestamp());
+    self::assertSame((string) $resume->getTimestamp(), (string) $this->task()['fecha_retomar']);
+    $rows = $tickets->calendarPostponedTickets(['id_empleado' => '101']);
+    self::assertSame(['900'], array_map('strval', array_column($rows, '_ID')));
+
+    $calendar = new CommercialCalendarService($this->db, new Settings($this->db), CommercialCallsDatabase::policy($this->db), []);
+    $due = $calendar->dueCalendar($resume->modify('-1 day')->format('Y-m-d'), $resume->modify('+1 day')->format('Y-m-d'));
+    $items = array_values(array_filter($due['items'], static fn(array $item): bool => $item['tipo_vencimiento'] === 'tarea_retomar'));
+    self::assertCount(1, $items, 'La tarea postergada sale el día que se retoma.');
+    self::assertSame($resume->format('Y-m-d'), $items[0]['fecha_vencimiento']);
+    self::assertStringContainsString('Retomar tarea #900', $items[0]['titulo']);
+
+    $tickets->setResumeDate(900, null);
+    self::assertSame([], $tickets->calendarPostponedTickets());
+  }
+
+  public function testResumeDateMustBeBetweenTomorrowAndOneYear(): void
+  {
+    $today = new \DateTimeImmutable('today', new \DateTimeZone('America/Bogota'));
+    self::assertNull(CommercialApiController::resumeDate($today->format('Y-m-d')), 'Hoy no: desde mañana.');
+    self::assertNull(CommercialApiController::resumeDate($today->modify('+2 years')->format('Y-m-d')));
+    self::assertNull(CommercialApiController::resumeDate('2026-02-30'));
+    self::assertNull(CommercialApiController::resumeDate(''));
+    self::assertSame('08:00', CommercialApiController::resumeDate($today->modify('+1 day')->format('Y-m-d'))?->format('H:i'));
+    self::assertSame('lunes 7 de diciembre de 2026', CommercialApiController::longDate(new \DateTimeImmutable('2026-12-07')));
+  }
+
+  public function testPostponedAndClosedClientNoticesUseTheirTemplates(): void
+  {
+    [$notifier, $log] = $this->recorder();
+    $notifier->taskPostponed(900, $this->task(), "El propietario viaja\ny regresa en diciembre", 'lunes 7 de diciembre de 2026', 'Consultora Uno', '101');
+    self::assertSame([CommercialCallsNotifier::TEMPLATE_POSTPONED], array_column($log->whatsapp, 1));
+    self::assertSame('+573001234567', $log->whatsapp[0][0]);
+    $body = array_column($log->whatsapp[0][2][0]['parameters'], 'text');
+    self::assertSame(['Laura Prueba', '900', 'lunes 7 de diciembre de 2026', 'El propietario viaja y regresa en diciembre', 'Consultora Uno · Correo: 101@example.test · Celular: 3000000101'], $body, 'Sin saltos de línea y el contacto en una sola variable.');
+    self::assertSame(900, PublicTaskAccess::verify(end($log->whatsapp[0][2])['parameters'][0]['text']));
+    self::assertSame('laura@example.test', $log->mail[0][0]);
+    self::assertStringContainsString('lunes 7 de diciembre de 2026', $log->mail[0][2]);
+    self::assertStringContainsString('Su consultor/a asignado es', $log->mail[0][2]);
+
+    [$notifier, $log] = $this->recorder();
+    $notifier->taskClosed(900, $this->task(), 'Finalizado', 'Firmaste el contrato', 'Consultora Uno', '101');
+    self::assertSame([CommercialCallsNotifier::TEMPLATE_CLOSED], array_column($log->whatsapp, 1));
+    self::assertCount(4, $log->whatsapp[0][2][0]['parameters']);
+    self::assertSame('Cerramos tu tarea #900', $log->mail[0][1]);
+
+    foreach (CommercialCallsNotifier::SILENT_CLOSURES as $status) {
+      [$notifier, $log] = $this->recorder();
+      $notifier->taskClosed(900, $this->task(), $status, 'Va en otra tarea', 'Consultora Uno');
+      self::assertSame([[], []], [$log->mail, $log->whatsapp], $status . ' no se le cuenta al cliente.');
+    }
+
+    $this->db->insert('wp_jet_cct_clientes', ['celular' => '3001234567', 'bloqueo_whatsapp' => '1', 'bloqueo_email' => '0']);
+    [$notifier, $log] = $this->recorder();
+    $notifier->taskPostponed(900, $this->task(), 'Pausa', 'martes 8 de diciembre de 2026', 'Consultora Uno');
+    self::assertSame([], $log->whatsapp, 'Quien bloqueó WhatsApp no lo recibe.');
+    self::assertCount(1, $log->mail);
+  }
+
+  public function testReplyGuidesOnlyTouchTheCommercialCategory(): void
+  {
+    $this->db->insert('wp_jet_cct_respuesta_de_ticket', ['categoria' => 'Cartera', 'estado' => 'Mora', 'situacion' => 'Cobro', 'respuesta' => 'Recuerde pagar']);
+    $guides = new CommercialReplyGuides($this->db);
+    $totals = $guides->save([
+      ['estado' => 'Mostrando', 'situacion' => 'Después de la visita', 'respuesta' => 'Gracias por visitar el inmueble.'],
+      ['estado' => '', 'situacion' => 'Saludo general', 'respuesta' => 'Hola, con gusto te ayudo.'],
+      ['estado' => '', 'situacion' => '', 'respuesta' => ''],
+    ], false, '101');
+    self::assertSame(['added' => 2, 'updated' => 0, 'deleted' => 0], $totals);
+    self::assertSame('101', $this->db->getVar("SELECT cct_author_id FROM wp_jet_cct_respuesta_de_ticket WHERE situacion = 'Saludo general'"), 'cct_author_id lleva el id_empleado.');
+
+    $rows = $guides->forStatus('mostrando');
+    self::assertSame(['Después de la visita', 'Saludo general'], array_column($rows, 'situacion'), 'Primero las del estado de la tarea.');
+    self::assertSame([true, false], array_column($rows, 'match'));
+
+    $all = $guides->all();
+    try {
+      $guides->save([$all[0]], false, '101');
+      self::fail('Eliminar sin confirmar no se permite.');
+    } catch (\InvalidArgumentException $exception) {
+      self::assertStringContainsString('confirmación', $exception->getMessage());
+    }
+    $kept = ['id' => $all[0]['id'], 'estado' => 'Mostrando', 'situacion' => 'Después de la visita', 'respuesta' => 'Texto nuevo'];
+    self::assertSame(['added' => 0, 'updated' => 1, 'deleted' => 1], $guides->save([$kept], true, '101'));
+    self::assertSame('Recuerde pagar', $this->db->getVar("SELECT respuesta FROM wp_jet_cct_respuesta_de_ticket WHERE categoria = 'Cartera'"), 'Las demás categorías no se tocan.');
+
+    $this->expectException(\InvalidArgumentException::class);
+    $guides->save([['estado' => 'Nuevo', 'situacion' => 'Sin texto', 'respuesta' => '']], true, '101');
+  }
+
+  public function testModalShowsStatusGuidesReplyGuidesResumeDateAndRequiredReason(): void
+  {
+    $guides = (new CommercialReplyGuides($this->db));
+    $guides->save([['estado' => 'Mostrando', 'situacion' => 'Después de la visita', 'respuesta' => 'Gracias por visitar "el inmueble" & más.']], false, '101');
+    $policy = CommercialCallsDatabase::policy($this->db);
+    $html = CommercialTicketModalView::render(['ticket' => $this->task(), 'timeline' => [], 'reply_guides' => $guides->forStatus('Mostrando')], $policy, []);
+
+    // Responder: solo mantener o un estado activo, con la guía de cada uno.
+    preg_match('/data-commercial-workflow-form="reply".*?<\/form>/s', $html, $reply);
+    foreach (array_merge(CommercialStatusCatalog::POSTPONED, CommercialStatusCatalog::CLOSED) as $status) {
+      self::assertStringNotContainsString('<option value="' . $status . '"', $reply[0], 'Responder no posterga ni cierra: ' . $status);
+    }
+    self::assertStringContainsString('data-help="' . CommercialStatusCatalog::descriptions()['Contactado'] . '"', $reply[0]);
+    self::assertStringContainsString('data-commercial-status-help-text>Se mantiene el estado actual. ' . CommercialStatusCatalog::descriptions()['Mostrando'], $reply[0]);
+    self::assertStringContainsString('Ver la guía de todos los estados', $reply[0]);
+    self::assertStringContainsString('data-commercial-use-guide', $reply[0]);
+    self::assertStringContainsString('1 para este estado', $reply[0]);
+    self::assertStringContainsString('&quot;el inmueble&quot; &amp; más', $reply[0], 'El texto de la guía se escapa.');
+
+    preg_match('/data-commercial-workflow-form="postpone".*?<\/form>/s', $html, $postpone);
+    self::assertMatchesRegularExpression('/name="fecha_retomar" required min="\d{4}-\d{2}-\d{2}" max="\d{4}-\d{2}-\d{2}"/', $postpone[0]);
+    preg_match('/data-commercial-workflow-form="close".*?<\/form>/s', $html, $close);
+    self::assertStringContainsString('data-commercial-status-help-text>' . CommercialStatusCatalog::descriptions()['Finalizado'], $close[0]);
+    preg_match('/data-commercial-workflow-form="reassign".*?<\/form>/s', $html, $reassign);
+    self::assertStringContainsString('name="observacion" rows="2" required', $reassign[0]);
+  }
+}

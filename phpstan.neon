@@ -15,5 +15,8 @@ parameters:
     - src/Views/Promotion
     - src/Views/StrategicPlanView.php
     - src/Http/Controller/StrategicPlanApiController.php
+  # Las clases SCM\ se leen de este repositorio: el vendor de pruebas es el del panel inmobiliario y su autoload apunta a su src.
+  scanDirectories:
+    - src
   bootstrapFiles:
     - tests/phpstan-bootstrap.php

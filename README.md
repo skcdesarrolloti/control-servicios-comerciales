@@ -78,6 +78,17 @@ En el detalle de cada tarea, **Gestión Operativa** incluye **Aviso nuevo** e **
 
 Los botones de inmueble y cotización dependen además del tema de la tarea (`CommercialTaskTools`, fijo en el código): **Aviso nuevo** en Captacion, Recaptacion, Retoque y Ruta; **Ingresar inmueble** en Captacion y Recaptacion; **Multimedia del inmueble** en Captacion, Recaptacion y Actualizacion; **Cotizar inmuebles** en Arriendo, Venta y Arriendo o venta. Avaluo y Retencion de contrato solo tienen los botones generales (Responder, Nota interna, Seguimiento, Postergar, Reasignar y Cerrar), que salen en todos los temas. El servidor rechaza abrir o guardar esos formularios desde una tarea de otro tema.
 
+Los botones generales (`CommercialApiController`) avisan siempre, sin casillas, y nunca cambian `estado_administrativo`:
+
+- **Responder**: la respuesta queda en el historial y le llega al cliente por correo y WhatsApp. Solo puede mantener el estado o pasarlo a otro estado activo (postergar y cerrar tienen su botón). Muestra las **respuestas guía** de la categoría Comercial (tabla `jet_cct_respuesta_de_ticket`, la del Gestor de Respuestas de WordPress; `CommercialReplyGuides`), primero las del estado de la tarea; se editan en **Configuración › Actividades comerciales › Respuestas guía**.
+- **Nota interna**: solo para el equipo; no avisa a nadie.
+- **Seguimiento**: gestión con evidencias; le llega al cliente por correo.
+- **Postergar**: pide el motivo y la fecha para retomar (`fecha_retomar`, creada con `php bin/add-task-resume-field.php --aplicar`). Ese día la tarea sale en el calendario de vencimientos (**Tareas postergadas por retomar**). Al cliente le llegan correo y WhatsApp (`scm_tarea_comercial_postergada_v1`). **Activar** borra la fecha.
+- **Reasignar**: el motivo es obligatorio; al nuevo responsable le llegan WhatsApp y correo.
+- **Cerrar Tarea**: resultado final y observación; al cliente le llegan correo y WhatsApp (`scm_tarea_comercial_cerrada_v1`), salvo en Duplicado y Trasladado.
+
+Cada lista de estado comercial muestra la guía del estado elegido (`CommercialStatusCatalog::descriptions`) y la de todos los estados de esa lista.
+
 **Ingresar inmueble** requiere **Ver detalle de la tarea** y la nueva acción **Ingresar inmuebles desde una tarea** en **Configurar permisos**. Los cargos con permisos explícitos deben habilitar esa acción. Se aplica la misma restricción de tareas asignadas que en las demás gestiones; los administradores mantienen su alcance general.
 
 El formulario unifica los dos exports JetFormBuilder proporcionados en `resources/forms/property-entry.json`: **Nuevo inmueble** genera un código WordPress; **Completar un código adelantado** conserva el código de un inmueble existente, en borrador y asignado al funcionario (o gestionado por un administrador). No permite sobrescribir inmuebles publicados ni códigos de otros funcionarios sin acceso administrativo. Conserva los 98 campos, agrupados en secciones, y sus condiciones para recaptación, propiedad horizontal, precios, horarios, Club PPH, RNT y permutas. Las etiquetas y valores proceden de los glosarios serializados y consultas CCT en `wp_jet_post_types`; las opciones de oferta, tipo y destinación proceden de las taxonomías WordPress correspondientes. Los catálogos de ubicación conservan la dependencia país → departamento → ciudad → barrio; el barrio determina la ruta. El servidor vuelve a validar las opciones y condiciones, y calcula la antigüedad sin confiar en valores enviados por el navegador.

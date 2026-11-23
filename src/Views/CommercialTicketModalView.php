@@ -5,13 +5,14 @@ declare(strict_types=1);
 namespace SCM\Views;
 
 use SCM\Commercial\CommercialAccessPolicy;
+use SCM\Commercial\CommercialReplyGuides;
 use SCM\Commercial\CommercialStatusCatalog;
 use SCM\Commercial\CommercialTaskTools;
 
 final class CommercialTicketModalView
 {
   /**
-   * @param array{ticket:array<string,mixed>,timeline:array<int,array<string,mixed>>,analyses?:array<int,array<string,mixed>>} $detail
+   * @param array{ticket:array<string,mixed>,timeline:array<int,array<string,mixed>>,analyses?:array<int,array<string,mixed>>,reply_guides?:array<int,array<string,mixed>>} $detail
    * @param array<int,array<string,string>> $employees
    */
   public static function render(array $detail, CommercialAccessPolicy $policy, array $employees): string
@@ -19,6 +20,7 @@ final class CommercialTicketModalView
     $ticket = $detail['ticket'];
     $timeline = $detail['timeline'];
     $analyses = is_array($detail['analyses'] ?? null) ? $detail['analyses'] : [];
+    $guides = is_array($detail['reply_guides'] ?? null) ? $detail['reply_guides'] : [];
     $pk = (int) ($ticket['_ID'] ?? 0);
     $logicalId = trim((string) ($ticket['id_ticket'] ?? '')) ?: (string) $pk;
     $status = trim((string) ($ticket['estado_comercial'] ?? '')) ?: 'Sin estado';
@@ -412,7 +414,7 @@ final class CommercialTicketModalView
       <!-- Contenedor de Formularios de Workflow -->
       <div class="commercial-workflow-stack space-y-4" data-commercial-workflow-stack hidden>
         <?php if ($policy->canAct('responder')): ?>
-          <?php echo self::replyForm($pk, $requester, $status, $propertyCode); ?>
+          <?php echo self::replyForm($pk, $requester, $status, $propertyCode, $guides); ?>
         <?php endif; ?>
         <?php if ($policy->canAct('agregar_nota')): ?>
           <?php echo self::messageForm($pk, 'note', 'Agregar nota interna privada', 'Esta nota sólo será visible para el equipo interno y auditoría.', 'observacion', 'Escribe los detalles internos confidenciales de la tarea…', 'Guardar nota interna'); ?>
@@ -421,13 +423,13 @@ final class CommercialTicketModalView
           <?php echo self::messageForm($pk, 'follow_up', 'Registrar gestión de seguimiento', 'Deja constancia de llamadas, acuerdos o gestiones comerciales realizadas. El cliente lo recibe por correo.', 'observacion', 'Describe detalladamente la gestión comercial efectuada…', 'Guardar seguimiento', false, true); ?>
         <?php endif; ?>
         <?php if ($policy->canAct('postergar')): ?>
-          <?php echo self::messageForm($pk, 'postpone', 'Postergar tarea', 'La tarea pasa al estado comercial Postergado. El cliente recibe el motivo por correo.', 'observacion', 'Indica el motivo o justificación de la postergación…', 'Postergar tarea', true, true); ?>
+          <?php echo self::messageForm($pk, 'postpone', 'Postergar tarea', 'La tarea pasa a Postergado hasta la fecha que elijas: ese día aparece en el calendario para retomarla. El cliente recibe el motivo y la fecha por correo y WhatsApp.', 'observacion', 'Indica el motivo o justificación de la postergación…', 'Postergar tarea', true, true, self::resumeField()); ?>
         <?php endif; ?>
         <?php if ($policy->canAct('activar') && $isPostponedOrClosed): ?>
           <?php echo self::statusMessageForm($pk, 'activate', 'Activar tarea', 'Selecciona el estado con el que retoma la gestión activa.', 'motivo', CommercialStatusCatalog::OPEN, 'Nuevo', 'Activar tarea ahora', false, true); ?>
         <?php endif; ?>
         <?php if ($policy->canAct('cerrar')): ?>
-          <?php echo self::statusMessageForm($pk, 'close', 'Cerrar tarea', 'Selecciona el resultado final del negocio o servicio y registra las observaciones.', 'observacion', CommercialStatusCatalog::CLOSED, 'Finalizado', 'Confirmar cierre de tarea', true); ?>
+          <?php echo self::statusMessageForm($pk, 'close', 'Cerrar tarea', 'Selecciona el resultado final y registra las observaciones. El cliente las recibe por correo y WhatsApp, salvo en Duplicado y Trasladado.', 'observacion', CommercialStatusCatalog::CLOSED, 'Finalizado', 'Confirmar cierre de tarea', true); ?>
         <?php endif; ?>
         <?php if ($policy->canAct('reasignar')): ?>
           <?php echo self::employeeForm($pk, $employees, (string) ($ticket['id_empleado'] ?? '')); ?>
@@ -629,7 +631,8 @@ final class CommercialTicketModalView
     return $parts !== [] ? implode(' · ', $parts) : 'Autor registrado en historial';
   }
 
-  private static function replyForm(int $pk, string $requester, string $currentStatus, string $propertyCode): string
+  /** @param array<int,array<string,mixed>> $guides */
+  private static function replyForm(int $pk, string $requester, string $currentStatus, string $propertyCode, array $guides = []): string
   {
     ob_start();
 ?>
@@ -657,31 +660,22 @@ final class CommercialTicketModalView
           </label>
           <span class="text-[11px] font-normal text-slate-500">Actual: <strong class="text-[#061D49]"><?php echo esc_html($currentStatus); ?></strong></span>
         </div>
-        <select name="estado" class="w-full text-xs sm:text-sm rounded-xl border border-slate-200 focus:border-[#1E3C76] focus:ring focus:ring-[#1E3C76]/20 p-2.5 outline-none bg-white font-medium text-slate-800 transition">
-          <option value="__keep__" selected>Mantener estado actual (<?php echo esc_html($currentStatus); ?>)</option>
-          <optgroup label="Gestión Activa (Abiertos)">
+        <?php $descriptions = CommercialStatusCatalog::descriptions(); $keepHelp = 'Se mantiene el estado actual. ' . ($descriptions[$currentStatus] ?? ''); ?>
+        <select name="estado" data-commercial-status-select class="w-full text-xs sm:text-sm rounded-xl border border-slate-200 focus:border-[#1E3C76] focus:ring focus:ring-[#1E3C76]/20 p-2.5 outline-none bg-white font-medium text-slate-800 transition">
+          <option value="__keep__" selected data-help="<?php echo esc_attr(trim($keepHelp)); ?>">Mantener estado actual (<?php echo esc_html($currentStatus); ?>)</option>
+          <optgroup label="Gestión activa">
             <?php foreach (CommercialStatusCatalog::OPEN as $st): ?>
               <?php if ($st !== $currentStatus): ?>
-                <option value="<?php echo esc_attr($st); ?>"><?php echo esc_html($st); ?></option>
-              <?php endif; ?>
-            <?php endforeach; ?>
-          </optgroup>
-          <optgroup label="Postergados">
-            <?php foreach (CommercialStatusCatalog::POSTPONED as $st): ?>
-              <?php if ($st !== $currentStatus): ?>
-                <option value="<?php echo esc_attr($st); ?>"><?php echo esc_html($st); ?></option>
-              <?php endif; ?>
-            <?php endforeach; ?>
-          </optgroup>
-          <optgroup label="Cerrados / Finalizados">
-            <?php foreach (CommercialStatusCatalog::CLOSED as $st): ?>
-              <?php if ($st !== $currentStatus): ?>
-                <option value="<?php echo esc_attr($st); ?>"><?php echo esc_html($st); ?></option>
+                <option value="<?php echo esc_attr($st); ?>" data-help="<?php echo esc_attr($descriptions[$st] ?? ''); ?>"><?php echo esc_html($st); ?></option>
               <?php endif; ?>
             <?php endforeach; ?>
           </optgroup>
         </select>
+        <?php echo self::statusGuide(trim($keepHelp), CommercialStatusCatalog::OPEN); ?>
+        <p class="text-[11px] text-slate-500">Para postergar o cerrar la tarea usa su botón: piden la fecha o el resultado y le avisan al cliente.</p>
       </div>
+
+      <?php echo self::guidesPanel($guides); ?>
 
       <!-- Barra de herramientas de enlaces y contenido enriquecido -->
       <div class="space-y-1.5">
@@ -738,7 +732,8 @@ final class CommercialTicketModalView
     string $placeholder,
     string $submit,
     bool $danger = false,
-    bool $attachments = false
+    bool $attachments = false,
+    string $extra = ''
   ): string {
     ob_start();
 ?>
@@ -753,6 +748,7 @@ final class CommercialTicketModalView
         </button>
       </div>
       <input type="hidden" name="ticket_pk" value="<?php echo esc_attr((string) $pk); ?>">
+      <?php echo $extra; ?>
       <div class="space-y-1">
         <label class="block text-xs font-semibold text-slate-700">Mensaje <em class="text-rose-600">*</em></label>
         <textarea name="<?php echo esc_attr($field); ?>" rows="4" required placeholder="<?php echo esc_attr($placeholder); ?>" class="w-full text-xs sm:text-sm rounded-xl border border-slate-200 focus:border-[#1E3C76] focus:ring focus:ring-[#1E3C76]/20 p-3 placeholder-slate-400 outline-none transition"></textarea>
@@ -799,11 +795,13 @@ final class CommercialTicketModalView
       <input type="hidden" name="ticket_pk" value="<?php echo esc_attr((string) $pk); ?>">
       <div class="space-y-1">
         <label class="block text-xs font-semibold text-slate-700">Estado comercial <em class="text-rose-600">*</em></label>
-        <select name="estado" required class="w-full text-xs sm:text-sm rounded-xl border border-slate-200 focus:border-[#1E3C76] p-2.5 outline-none bg-white font-medium text-slate-700">
+        <?php $descriptions = CommercialStatusCatalog::descriptions(); ?>
+        <select name="estado" required data-commercial-status-select class="w-full text-xs sm:text-sm rounded-xl border border-slate-200 focus:border-[#1E3C76] p-2.5 outline-none bg-white font-medium text-slate-700">
           <?php foreach ($statuses as $st): ?>
-            <option value="<?php echo esc_attr($st); ?>"<?php selected($selected, $st); ?>><?php echo esc_html($st); ?></option>
+            <option value="<?php echo esc_attr($st); ?>" data-help="<?php echo esc_attr($descriptions[$st] ?? ''); ?>"<?php selected($selected, $st); ?>><?php echo esc_html($st); ?></option>
           <?php endforeach; ?>
         </select>
+        <?php echo self::statusGuide($descriptions[$selected] ?? '', $statuses); ?>
       </div>
       <div class="space-y-1">
         <label class="block text-xs font-semibold text-slate-700">Motivo / Observaciones <em class="text-rose-600">*</em></label>
@@ -820,6 +818,59 @@ final class CommercialTicketModalView
     </form>
 <?php
     return (string) ob_get_clean();
+  }
+
+  /** Fecha para retomar la tarea postergada: desde mañana y hasta un año (lo valida también el servidor). */
+  private static function resumeField(): string
+  {
+    $zone = new \DateTimeZone(\SCM\Support\ColombiaBusinessCalendar::TIMEZONE);
+    $today = new \DateTimeImmutable('today', $zone);
+    return '<div class="space-y-1"><label class="block text-xs font-semibold text-slate-700" for="commercial-resume-date">Retomar la tarea el <em class="text-rose-600">*</em></label>'
+      . '<input type="date" id="commercial-resume-date" name="fecha_retomar" required min="' . $today->modify('+1 day')->format('Y-m-d') . '" max="' . $today->modify('+1 year')->format('Y-m-d') . '" class="w-full sm:w-60 text-xs sm:text-sm rounded-xl border border-slate-200 focus:border-[#1E3C76] focus:ring focus:ring-[#1E3C76]/20 p-2.5 outline-none bg-white text-slate-700">'
+      . '<p class="text-[11px] text-slate-500">Ese día la tarea sale en el calendario de vencimientos para retomarla.</p></div>';
+  }
+
+  /**
+   * Guía del estado elegido bajo la lista (la actualiza el JS al cambiar) y la de todos los estados de esa lista.
+   * @param array<int,string> $statuses
+   */
+  private static function statusGuide(string $current, array $statuses): string
+  {
+    $descriptions = CommercialStatusCatalog::descriptions();
+    $items = '';
+    foreach ($statuses as $status) {
+      $items .= '<li><strong class="text-slate-700">' . esc_html($status) . ':</strong> ' . esc_html($descriptions[$status] ?? '') . '</li>';
+    }
+    return '<p class="text-[11px] text-[#1E3C76] flex items-start gap-1" data-commercial-status-help aria-live="polite"><span class="material-symbols-outlined text-[14px]" aria-hidden="true">info</span><span data-commercial-status-help-text>' . esc_html($current) . '</span></p>'
+      . '<details class="text-[11px] text-slate-500"><summary class="cursor-pointer font-semibold text-slate-600">Ver la guía de todos los estados</summary><ul class="mt-1.5 space-y-1 pl-1">' . $items . '</ul></details>';
+  }
+
+  /**
+   * Respuestas guía comerciales (Configuración › Respuestas guía): primero las del estado de la tarea. "Usar" pone el
+   * texto en la respuesta para ajustarlo antes de enviar.
+   * @param array<int,array<string,mixed>> $guides
+   */
+  private static function guidesPanel(array $guides): string
+  {
+    if ($guides === []) {
+      return '';
+    }
+    $matches = count(array_filter($guides, static fn(array $guide): bool => !empty($guide['match'])));
+    $cards = '';
+    foreach ($guides as $guide) {
+      $text = (string) ($guide['respuesta'] ?? '');
+      $cards .= '<li class="rounded-xl border ' . (!empty($guide['match']) ? 'border-[#1E3C76]/40 bg-[#EBF1FB]/60' : 'border-slate-200 bg-white') . ' p-3 space-y-1.5" data-commercial-guide data-estado="' . esc_attr(CommercialReplyGuides::key((string) ($guide['estado'] ?? ''))) . '">'
+        . '<div class="flex flex-wrap items-center justify-between gap-2"><strong class="text-xs text-[#061D49]">' . esc_html((string) ($guide['situacion'] ?? '')) . '</strong>'
+        . ((string) ($guide['estado'] ?? '') !== '' ? '<span class="text-[10px] font-semibold px-2 py-0.5 rounded-full ' . (!empty($guide['match']) ? 'bg-[#1E3C76] text-white' : 'bg-slate-100 text-slate-600') . '">' . esc_html((string) $guide['estado']) . '</span>' : '') . '</div>'
+        . '<p class="text-xs text-slate-600 whitespace-pre-line line-clamp-4" data-commercial-guide-text>' . esc_html($text) . '</p>'
+        . '<button type="button" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white hover:bg-[#EBF1FB] text-[#1E3C76] border border-[#1E3C76]/25 text-[11px] font-semibold cursor-pointer" data-commercial-use-guide><span class="material-symbols-outlined text-[14px]" aria-hidden="true">edit_note</span>Usar esta respuesta</button></li>';
+    }
+    return '<details class="rounded-xl border border-slate-200 bg-slate-50/70 p-3" data-commercial-guides' . ($matches > 0 ? ' open' : '') . '>'
+      . '<summary class="cursor-pointer text-xs font-bold text-slate-700 flex items-center gap-1.5"><span class="material-symbols-outlined text-[16px] text-[#1E3C76]" aria-hidden="true">menu_book</span>Respuestas guía'
+      . '<span class="font-normal text-slate-500">· ' . count($guides) . ($matches > 0 ? ', ' . $matches . ' para este estado' : '') . '</span></summary>'
+      . '<p class="text-[11px] text-slate-500 mt-2">Qué responder y por qué según la situación. Al usar una, el texto queda en la respuesta para que lo ajustes antes de enviar.</p>'
+      . '<input type="search" data-commercial-guide-search placeholder="Buscar por situación o texto" aria-label="Buscar respuestas guía" class="mt-2 w-full text-xs rounded-lg border border-slate-200 focus:border-[#1E3C76] p-2 outline-none bg-white">'
+      . '<ul class="mt-2 space-y-2 max-h-72 overflow-y-auto pr-1">' . $cards . '</ul></details>';
   }
 
   private static function attachmentFields(): string
@@ -1047,8 +1098,8 @@ final class CommercialTicketModalView
         </select>
       </div>
       <div class="space-y-1">
-        <label class="block text-xs font-semibold text-slate-700">Motivo de la reasignación <span class="text-slate-400 font-normal">(Opcional)</span></label>
-        <textarea name="observacion" rows="2" placeholder="Ej: Reasignación por turno, redistribución de carga comercial o rotación de zona…" class="w-full text-xs sm:text-sm rounded-xl border border-slate-200 focus:border-[#1E3C76] p-2.5 outline-none font-medium text-slate-700"></textarea>
+        <label class="block text-xs font-semibold text-slate-700">Motivo de la reasignación <em class="text-rose-600">*</em></label>
+        <textarea name="observacion" rows="2" required placeholder="Ej: Reasignación por turno, redistribución de carga comercial o rotación de zona…" class="w-full text-xs sm:text-sm rounded-xl border border-slate-200 focus:border-[#1E3C76] p-2.5 outline-none font-medium text-slate-700"></textarea>
       </div>
       <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
         <span class="text-xs text-rose-600 mr-auto font-medium" data-commercial-form-message aria-live="polite"></span>

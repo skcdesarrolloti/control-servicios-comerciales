@@ -1,6 +1,6 @@
 # Plantillas de WhatsApp de las tareas comerciales
 
-Crea estas cinco plantillas en **Meta Business Suite → Administrador de WhatsApp → Plantillas de mensajes → Crear plantilla**, en la misma cuenta que usa el panel.
+Crea las plantillas 1 a 5, 9 y 10 en **Meta Business Suite → Administrador de WhatsApp → Plantillas de mensajes → Crear plantilla**, en la misma cuenta que usa el panel.
 
 Para todas: categoría **Utilidad**, idioma **Spanish (COL)** (`es_CO`), tipo de variable **Número**, pie de página `SKC SuCasa Inmobiliaria` y un botón **Ir al sitio web** con URL **Dinámica**. Usa los nombres exactos. La 2 lleva encabezado de imagen y la 5 de documento (PDF).
 
@@ -113,6 +113,50 @@ Desde el botón puedes ver las fotos, los precios y la comparación de los inmue
 Ejemplos: `{{1}}` Luis Prada · `{{2}}` 5868 · `{{3}}` 3 inmuebles en arriendo · `{{4}}` Jocabeth Cantillo · Correo: jocabeth@ejemplo.com · Celular: 3001234567
 
 Botón `Ver cotización`. URL del sitio web `https://sucasainmobiliaria.com.co/dashboard-comercial/public/cotizacion.php?c=`. URL de muestra `https://sucasainmobiliaria.com.co/dashboard-comercial/public/cotizacion.php?c=5868.1893456000.ejemplo`.
+
+## 9. `scm_tarea_comercial_postergada_v1`
+
+Para el cliente, cuando el consultor/a posterga la tarea (botón **Postergar** del popup). Lleva el motivo y la fecha en que se retoma. Código: `CommercialCallsNotifier::TEMPLATE_POSTPONED`.
+
+```text
+Hola *{{1}}.*
+
+Tu tarea *#{{2}}* queda en pausa hasta el *{{3}}*.
+
+*Motivo:* {{4}}.
+
+*Su consultor/a asignado es* {{5}}.
+
+Desde el botón puedes ver tu tarea y escribirnos.
+
+*Construimos confianza, protegemos su patrimonio.*
+```
+
+Ejemplos: `{{1}}` Luis Prada · `{{2}}` 1686 · `{{3}}` lunes 7 de diciembre de 2026 · `{{4}}` El propietario viaja y retomamos las visitas a su regreso · `{{5}}` Jocabeth Cantillo · Correo: jocabeth@ejemplo.com · Celular: 3001234567
+
+Botón `Ver tarea`. URL del sitio web `https://sucasainmobiliaria.com.co/dashboard-comercial/public/tarea.php?t=`. URL de muestra `https://sucasainmobiliaria.com.co/dashboard-comercial/public/tarea.php?t=1686.1893456000.ejemplo`.
+
+## 10. `scm_tarea_comercial_cerrada_v1`
+
+Para el cliente, cuando el consultor/a cierra la tarea (botón **Cerrar Tarea** del popup), salvo los cierres **Duplicado** y **Trasladado** (la gestión sigue en otra tarea). Lleva la observación del cierre. Con la tarea cerrada el cliente ya no puede escribir en su enlace: solo verla. Código: `CommercialCallsNotifier::TEMPLATE_CLOSED`.
+
+```text
+Hola *{{1}}.*
+
+Cerramos tu tarea *#{{2}}*.
+
+*Observación:* {{3}}.
+
+*Su consultor/a asignado es* {{4}}.
+
+Gracias por confiar en nosotros. Desde el botón puedes ver el detalle de tu tarea.
+
+*Construimos confianza, protegemos su patrimonio.*
+```
+
+Ejemplos: `{{1}}` Luis Prada · `{{2}}` 1686 · `{{3}}` Firmaste el contrato de arriendo del apartamento 502 · `{{4}}` Jocabeth Cantillo · Correo: jocabeth@ejemplo.com · Celular: 3001234567
+
+Botón `Ver tarea`. URL del sitio web `https://sucasainmobiliaria.com.co/dashboard-comercial/public/tarea.php?t=`. URL de muestra `https://sucasainmobiliaria.com.co/dashboard-comercial/public/tarea.php?t=1686.1893456000.ejemplo`.
 
 ## Plantillas compartidas con el panel inmobiliario (6, 7 y 8)
 
