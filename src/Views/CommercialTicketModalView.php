@@ -6,6 +6,7 @@ namespace SCM\Views;
 
 use SCM\Commercial\CommercialAccessPolicy;
 use SCM\Commercial\CommercialStatusCatalog;
+use SCM\Commercial\CommercialTaskTools;
 
 final class CommercialTicketModalView
 {
@@ -189,16 +190,17 @@ final class CommercialTicketModalView
           <span class="text-[11px] text-[#1E3C76] font-medium"><?php echo count($timeline); ?> eventos registrados</span>
         </div>
         <div class="grid grid-cols-2 gap-2.5">
-          <?php if ($policy->canView('anadir_aviso') && $policy->canAct('registrar_aviso')): ?>
+          <?php /* Las herramientas de inmueble y cotización solo salen en los temas donde se usan (CommercialTaskTools). */ ?>
+          <?php if ($policy->canView('anadir_aviso') && $policy->canAct('registrar_aviso') && CommercialTaskTools::allowsTask(CommercialTaskTools::SIGN, $ticket)): ?>
             <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-[#EBF1FB] text-slate-700 border border-slate-200 text-xs font-semibold transition-all cursor-pointer" data-commercial-task-form="sign" data-ticket-pk="<?php echo esc_attr((string) $pk); ?>"><span class="material-symbols-outlined text-[16px]">add_photo_alternate</span><span>Aviso nuevo</span></button>
           <?php endif; ?>
-          <?php if ($policy->canAct('ingresar_inmueble')): ?>
+          <?php if ($policy->canAct('ingresar_inmueble') && CommercialTaskTools::allowsTask(CommercialTaskTools::PROPERTY, $ticket)): ?>
             <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-[#EBF1FB] text-slate-700 border border-slate-200 text-xs font-semibold transition-all cursor-pointer" data-commercial-task-form="property" data-ticket-pk="<?php echo esc_attr((string) $pk); ?>"><span class="material-symbols-outlined text-[16px]">add_home_work</span><span>Ingresar inmueble</span></button>
-            <?php if ($propertyCode !== '' || (int) ($ticket['id_inmueble_data'] ?? 0) > 0): ?>
-              <button type="button" class="csg-secondary" data-commercial-task-form="media" data-ticket-pk="<?php echo esc_attr((string) $pk); ?>"><span class="material-symbols-outlined text-[16px]">photo_library</span><span>Multimedia del inmueble</span></button>
-            <?php endif; ?>
           <?php endif; ?>
-          <?php if ($policy->canAct('cotizacion_crear')): ?>
+          <?php if ($policy->canAct('ingresar_inmueble') && CommercialTaskTools::allowsTask(CommercialTaskTools::MEDIA, $ticket) && ($propertyCode !== '' || (int) ($ticket['id_inmueble_data'] ?? 0) > 0)): ?>
+            <button type="button" class="csg-secondary" data-commercial-task-form="media" data-ticket-pk="<?php echo esc_attr((string) $pk); ?>"><span class="material-symbols-outlined text-[16px]">photo_library</span><span>Multimedia del inmueble</span></button>
+          <?php endif; ?>
+          <?php if ($policy->canAct('cotizacion_crear') && CommercialTaskTools::allowsTask(CommercialTaskTools::QUOTE, $ticket)): ?>
             <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-[#EBF1FB] text-slate-700 border border-slate-200 text-xs font-semibold transition-all cursor-pointer" data-commercial-task-form="quote" data-ticket-pk="<?php echo esc_attr((string) $pk); ?>"><span class="material-symbols-outlined text-[16px]">request_quote</span><span>Cotizar inmuebles</span></button>
           <?php endif; ?>
           <?php if ($policy->canAct('responder')): ?>

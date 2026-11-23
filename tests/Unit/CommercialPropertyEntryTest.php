@@ -7,6 +7,7 @@ namespace Tests\Unit;
 use PHPUnit\Framework\TestCase;
 use SCM\Commercial\CommercialAccessPolicy;
 use SCM\Commercial\CommercialPropertyEntryService;
+use SCM\Commercial\CommercialTaskTools;
 use SCM\Core\Database;
 use SCM\Core\Settings;
 use SCM\Views\CommercialPropertyEntryView;
@@ -166,6 +167,39 @@ final class CommercialPropertyEntryTest extends TestCase
     self::assertStringContainsString('name="horario-mudanza-inicio-1"', $form);
     self::assertStringContainsString('name="tipo_maquinaria_per[]"', $form);
     self::assertStringContainsString('Propietario de prueba', $form);
+  }
+
+  public function testTaskActionsDependOnTheTaskTopic(): void
+  {
+    $task = $this->db->getRow('SELECT * FROM wp_jet_cct_tickets WHERE _ID=100');
+    $buttons = fn(array $ticket): string => CommercialTicketModalView::render(['ticket'=>$ticket,'timeline'=>[]], $this->policy, []);
+    $captacion = $buttons($task);
+    self::assertStringContainsString('data-commercial-task-form="media"', $captacion);
+    self::assertStringNotContainsString('data-commercial-task-form="quote"', $captacion, 'Captación no cotiza.');
+
+    $rent = $buttons(['tema_ayuda'=>'Arriendo'] + $task);
+    foreach (['sign','property','media'] as $tool) self::assertStringNotContainsString('data-commercial-task-form="' . $tool . '"', $rent, 'Arriendo sin ' . $tool);
+    self::assertStringContainsString('data-commercial-open-workflow="reply"', $rent, 'Los botones generales salen en todos los temas.');
+
+    $update = $buttons(['tema_ayuda'=>'Actualización'] + $task);
+    self::assertStringContainsString('data-commercial-task-form="media"', $update);
+    self::assertStringNotContainsString('data-commercial-task-form="property"', $update);
+    self::assertStringNotContainsString('data-commercial-task-form="sign"', $update);
+
+    $touchUp = $buttons(['tema_ayuda'=>'retoque'] + $task);
+    self::assertStringContainsString('data-commercial-task-form="sign"', $touchUp);
+    self::assertStringNotContainsString('data-commercial-task-form="property"', $touchUp);
+  }
+
+  public function testTaskToolsTopicRules(): void
+  {
+    self::assertTrue(CommercialTaskTools::allows(CommercialTaskTools::QUOTE, 'Arriendo y venta'));
+    self::assertTrue(CommercialTaskTools::allows(CommercialTaskTools::PROPERTY, ' RECAPTACIÓN '));
+    self::assertTrue(CommercialTaskTools::allows(CommercialTaskTools::SIGN, 'Ruta'));
+    self::assertFalse(CommercialTaskTools::allows(CommercialTaskTools::SIGN, 'Avaluo'));
+    self::assertFalse(CommercialTaskTools::allows(CommercialTaskTools::QUOTE, 'Retencion de contrato'));
+    self::assertFalse(CommercialTaskTools::allows(CommercialTaskTools::MEDIA, ''), 'Sin tema no sale ninguna herramienta de tema.');
+    self::assertSame('Ingresar inmueble no aplica a las tareas de Venta.', CommercialTaskTools::deniedMessage(CommercialTaskTools::PROPERTY, ['tema_ayuda'=>'Venta']));
   }
 
   public function testTaskActionsRespectPermissionsAndCannotAccessOtherTasks(): void

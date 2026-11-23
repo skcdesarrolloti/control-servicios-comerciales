@@ -205,6 +205,19 @@ final class CommercialQuotesTest extends TestCase
     $this->service()->searchProperties([]);
   }
 
+  public function testOnlyRentOrSaleTasksCanBeQuoted(): void
+  {
+    $this->db->update('wp_jet_cct_tickets', ['tema_ayuda' => 'Captación'], ['_ID' => 700]);
+    try {
+      $this->service()->formData(700);
+      self::fail('Una tarea de captación no se cotiza.');
+    } catch (\RuntimeException $exception) {
+      self::assertStringContainsString('Cotizar inmuebles no aplica', $exception->getMessage());
+    }
+    $this->expectException(\RuntimeException::class);
+    $this->create();
+  }
+
   // ── Crear ───────────────────────────────────────────
 
   public function testCreateSavesQuoteOneHistoryPerPropertyAndNotifiesTheClient(): void

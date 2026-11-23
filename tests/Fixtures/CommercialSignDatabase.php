@@ -48,7 +48,7 @@ final class CommercialSignDatabase
     if ($db->getVar('SELECT _ID FROM wp_jet_cct_inmuebles LIMIT 1')) return $db;
     $db->insert('wp_jet_cct_inmuebles', ['_ID'=>1,'codigo'=>'500','direccion'=>'Calle de prueba 10','barrio'=>'El Poblado','ciudad'=>'Medellín','ruta'=>'1','punto_referencia'=>'Frente al parque','tipo_inmueble'=>'Casa','tipo_negocio'=>'Arriendo','destinacion'=>'Vivienda','estado'=>'Publicado']);
     $db->insert('wp_jet_cct_inmuebles', ['_ID'=>2,'codigo'=>'600','barrio'=>'Otro barrio','tipo_inmueble'=>'Apartamento']);
-    $db->insert('wp_jet_cct_tickets', ['_ID'=>100,'id_ticket'=>'100','id_inmueble'=>'500','id_empleado'=>'101','asunto'=>'Instalar aviso','estado'=>'Abierto','estado_comercial'=>'Solicitando aviso']);
+    $db->insert('wp_jet_cct_tickets', ['_ID'=>100,'id_ticket'=>'100','id_inmueble'=>'500','id_empleado'=>'101','asunto'=>'Instalar aviso','tema_ayuda'=>'Captacion','estado'=>'Abierto','estado_comercial'=>'Solicitando aviso']);
     $db->insert('wp_jet_cct_tickets', ['_ID'=>200,'id_ticket'=>'200','id_inmueble'=>'600','id_empleado'=>'202','asunto'=>'Otra tarea']);
     $db->update('wp_jet_cct_funcionarios', ['id_sucursal'=>'3'], ['_ID'=>1]);
     $db->update('wp_jet_cct_barrios', ['ruta_asignada'=>'1'], ['_ID'=>1]);

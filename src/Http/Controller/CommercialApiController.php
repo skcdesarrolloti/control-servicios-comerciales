@@ -811,6 +811,7 @@ final class CommercialApiController
     $taskId = (int) ($input['ticket_pk'] ?? 0);
     $this->authorizeTicketScope($taskId);
     try {
+      $this->authorizeTaskTool(\SCM\Commercial\CommercialTaskTools::SIGN, $taskId);
       $service = new \SCM\Commercial\CommercialSignService($this->db, $this->policy, $this->config);
       JsonResponse::success(['html'=>'<div class="commercial-entry-shell">' . \SCM\Views\CommercialSignView::render($service, $this->policy, $service->taskContext($taskId)) . '</div>']);
     } catch (\SCM\Commercial\CommercialSignAccessDenied $exception) {
@@ -1001,6 +1002,7 @@ final class CommercialApiController
   {
     $this->verify($input);
     try {
+      $this->authorizeTaskTool(\SCM\Commercial\CommercialTaskTools::PROPERTY, (int) ($input['ticket_pk'] ?? 0));
       $service = new \SCM\Commercial\CommercialPropertyEntryService($this->db, $this->policy, $this->config);
       JsonResponse::success(['html'=>\SCM\Views\CommercialPropertyEntryView::render($service, (int) ($input['ticket_pk'] ?? 0))]);
     } catch (\SCM\Commercial\CommercialSignAccessDenied $exception) {
@@ -1014,6 +1016,7 @@ final class CommercialApiController
   {
     $this->verify($input);
     try {
+      $this->authorizeTaskTool(\SCM\Commercial\CommercialTaskTools::PROPERTY, (int) ($input['ticket_pk'] ?? 0));
       $service = new \SCM\Commercial\CommercialPropertyEntryService($this->db, $this->policy, $this->config);
       $document = $_FILES['uso_suelo'] ?? null;
       $store = is_array($document) && (int) ($document['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE
@@ -1120,6 +1123,7 @@ final class CommercialApiController
     try {
       $service = new \SCM\Commercial\CommercialPropertyMediaService($this->db, $this->policy, $this->config);
       $task = (int) ($input['ticket_pk'] ?? 0); $code = (int) ($input['id_inmueble'] ?? 0);
+      $this->authorizeTaskTool(\SCM\Commercial\CommercialTaskTools::MEDIA, $task);
       $result = match ($operation) {
         'form' => ['html'=>\SCM\Views\CommercialPropertyMediaView::render($service, $task, $code)],
         'draft' => $service->draftContext($task, $code),
@@ -1159,6 +1163,18 @@ final class CommercialApiController
 
     $filters['id_empleado'] = $this->tickets->currentEmployeeTicketFilter($this->commercialCargos);
     return $filters;
+  }
+
+  /** Aviso nuevo, Ingresar inmueble y Multimedia solo se abren desde tareas de su tema (CommercialTaskTools). */
+  private function authorizeTaskTool(string $tool, int $taskId): void
+  {
+    if ($taskId <= 0) {
+      return;
+    }
+    $task = $this->db->getRow('SELECT `tema_ayuda` FROM `' . $this->db->table('jet_cct_tickets') . '` WHERE `_ID` = ? LIMIT 1', [$taskId]);
+    if (is_array($task) && !\SCM\Commercial\CommercialTaskTools::allowsTask($tool, $task)) {
+      throw new \SCM\Commercial\CommercialSignAccessDenied(\SCM\Commercial\CommercialTaskTools::deniedMessage($tool, $task));
+    }
   }
 
   private function authorizeTicketScope(int $ticketPk): void

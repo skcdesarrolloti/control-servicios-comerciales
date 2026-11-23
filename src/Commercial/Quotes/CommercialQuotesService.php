@@ -7,6 +7,7 @@ namespace SCM\Commercial\Quotes;
 use SCM\Commercial\CommercialAccessPolicy;
 use SCM\Commercial\CommercialSettingsService;
 use SCM\Commercial\CommercialStatusCatalog;
+use SCM\Commercial\CommercialTaskTools;
 use SCM\Commercial\PropertyUpdateState;
 use SCM\Core\Auth;
 use SCM\Core\Settings;
@@ -93,6 +94,9 @@ final class CommercialQuotesService
     $task = $this->repository->task($ticketPk);
     if ($task === null) {
       throw new \InvalidArgumentException('La tarea no existe.');
+    }
+    if (!CommercialTaskTools::allowsTask(CommercialTaskTools::QUOTE, $task)) {
+      throw new \RuntimeException(CommercialTaskTools::deniedMessage(CommercialTaskTools::QUOTE, $task));
     }
     $topic = mb_strtolower(trim((string) ($task['tema_ayuda'] ?? '')), 'UTF-8');
     $previous = [];
@@ -191,6 +195,9 @@ final class CommercialQuotesService
     $task = $this->repository->task($ticketPk);
     if ($task === null) {
       throw new \InvalidArgumentException('La tarea no existe.');
+    }
+    if (!CommercialTaskTools::allowsTask(CommercialTaskTools::QUOTE, $task)) {
+      throw new \RuntimeException(CommercialTaskTools::deniedMessage(CommercialTaskTools::QUOTE, $task));
     }
     $text = static fn(string $key, int $max = 200): string => is_scalar($input[$key] ?? null) ? mb_substr(trim(strip_tags((string) $input[$key])), 0, $max, 'UTF-8') : '';
     $type = $text('tipo');
