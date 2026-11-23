@@ -946,6 +946,48 @@
     }
   }
 
+  // Enlace público de un inmueble (el mismo de la ficha de la tarea y las cotizaciones).
+  function propertyUrl(code) {
+    return "https://sucasainmobiliaria.com.co/inmuebles/inmueble-" + encodeURIComponent(code);
+  }
+
+  // Botones «Otro inmueble» y «Enlace web» de Responder: piden el dato en un popup del panel y devuelven el enlace listo.
+  function askLink(kind) {
+    var property = kind === "property";
+    var check = function (value) {
+      value = String(value || "").trim();
+      if (property) return /^[A-Za-z0-9_-]+$/.test(value) ? "" : "Escribe solo el código del inmueble (números o letras, sin espacios).";
+      return /^https?:\/\/\S+\.\S+$/i.test(value) ? "" : "La dirección debe empezar con https:// y no llevar espacios.";
+    };
+    var done = function (value) {
+      value = String(value || "").trim();
+      return check(value) === "" ? (property ? propertyUrl(value) : value) : "";
+    };
+    if (!(window.Swal && typeof window.Swal.fire === "function")) {
+      return Promise.resolve(done(window.prompt(property ? "Código del inmueble:" : "Dirección web (https://…):", property ? "" : "https://")));
+    }
+    return window.Swal.fire({
+      title: property ? "Enlace de otro inmueble" : "Enlace web",
+      text: property
+        ? "Escribe el código del inmueble y se agrega a la respuesta el enlace de su ficha en la página web."
+        : "Pega la dirección completa de la página que quieres compartir con el cliente.",
+      input: "text",
+      inputValue: property ? "" : "https://",
+      inputPlaceholder: property ? "Ej: 12345" : "https://…",
+      showCancelButton: true,
+      confirmButtonText: "Insertar enlace",
+      cancelButtonText: "Cancelar",
+      confirmButtonColor: "#061D49",
+      inputValidator: check
+    }).then(function (result) { return result.isConfirmed ? done(result.value) : ""; });
+  }
+
+  function insertLinkInReply(button, url) {
+    var form = button.closest("form");
+    var textarea = form ? form.querySelector('textarea[name="respuesta"]') : null;
+    if (url && textarea) insertTextAtCursor(textarea, url);
+  }
+
   // Clics de la ventana de guías; devuelve true si el clic era suyo.
   function handleGuidesClick(event) {
     var modal = guidesModal();
@@ -1843,43 +1885,19 @@
       if (insertPropertyBtn) {
         event.preventDefault();
         var propCode = insertPropertyBtn.getAttribute("data-commercial-insert-property") || "";
-        if (propCode) {
-          var formProp = insertPropertyBtn.closest("form");
-          var textareaProp = formProp ? formProp.querySelector('textarea[name="respuesta"]') : null;
-          var urlProp = "https://sucasainmobiliaria.com.co/inmueble/" + encodeURIComponent(propCode);
-          insertTextAtCursor(textareaProp, urlProp);
-        }
+        if (propCode) insertLinkInReply(insertPropertyBtn, propertyUrl(propCode));
         return;
       }
       var insertCustomPropBtn = event.target.closest("[data-commercial-insert-custom-property]");
       if (insertCustomPropBtn) {
         event.preventDefault();
-        var code = window.prompt("Ingresa el código del inmueble (ej: 12345):", "");
-        if (code) {
-          code = code.trim().replace(/[^a-zA-Z0-9_-]/g, "");
-          if (code) {
-            var formCustom = insertCustomPropBtn.closest("form");
-            var textareaCustom = formCustom ? formCustom.querySelector('textarea[name="respuesta"]') : null;
-            var urlCustom = "https://sucasainmobiliaria.com.co/inmueble/" + encodeURIComponent(code);
-            insertTextAtCursor(textareaCustom, urlCustom);
-          }
-        }
+        askLink("property").then(function (url) { insertLinkInReply(insertCustomPropBtn, url); });
         return;
       }
       var insertLinkBtn = event.target.closest("[data-commercial-insert-link]");
       if (insertLinkBtn) {
         event.preventDefault();
-        var linkUrl = window.prompt("Ingresa la dirección web (URL):", "https://");
-        if (linkUrl) {
-          linkUrl = linkUrl.trim();
-          if (linkUrl && /^https?:\/\//i.test(linkUrl)) {
-            var formLink = insertLinkBtn.closest("form");
-            var textareaLink = formLink ? formLink.querySelector('textarea[name="respuesta"]') : null;
-            insertTextAtCursor(textareaLink, linkUrl);
-          } else if (linkUrl) {
-            notify("error", "La URL debe comenzar con http:// o https://");
-          }
-        }
+        askLink("web").then(function (url) { insertLinkInReply(insertLinkBtn, url); });
         return;
       }
       var addDocument = event.target.closest("[data-add-ticket-document]");

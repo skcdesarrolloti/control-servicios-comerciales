@@ -291,4 +291,21 @@ final class CommercialTaskWorkflowTest extends TestCase
     preg_match('/data-commercial-workflow-form="reassign".*?<\/form>/s', $html, $reassign);
     self::assertStringContainsString('name="observacion" rows="2" required', $reassign[0]);
   }
+
+  public function testContactWhatsappUsesTheNoticeNumberAndTheFooterHasNoDuplicateClose(): void
+  {
+    $policy = CommercialCallsDatabase::policy($this->db);
+    $render = fn (array $extra): string => CommercialTicketModalView::render(['ticket' => $extra + $this->task(), 'timeline' => [], 'reply_guides' => []], $policy, []);
+
+    // Con indicativo: no se antepone otro 57; el de WhatsApp manda sobre el celular.
+    self::assertStringContainsString('href="https://wa.me/573001112233"', $render(['celular_solicitante' => '+57 300 111 2233']));
+    self::assertStringContainsString('href="https://wa.me/13055550100"', $render(['celular_solicitante' => '3001112233', 'celular_wsp' => '3055550100', 'indicativo' => '1']));
+    self::assertStringNotContainsString('data-commercial-whatsapp', $render(['celular_solicitante' => '123']), 'Sin un número válido no hay botón.');
+
+    $html = $render(['id_inmueble' => '345']);
+    self::assertStringNotContainsString('Finalizar y Entregar Inmueble', $html, 'Cerrar la tarea va solo en Gestión Operativa.');
+    self::assertStringNotContainsString('Core CRM', $html);
+    self::assertStringContainsString('href="https://sucasainmobiliaria.com.co/inmuebles/inmueble-345"', $html);
+    self::assertStringContainsString('data-commercial-insert-property="345"', $html);
+  }
 }

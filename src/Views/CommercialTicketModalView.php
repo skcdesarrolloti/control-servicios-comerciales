@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SCM\Views;
 
+use SCM\Commercial\Calls\CommercialCallsNotifier;
 use SCM\Commercial\CommercialAccessPolicy;
 use SCM\Commercial\CommercialReplyGuides;
 use SCM\Commercial\CommercialStatusCatalog;
@@ -35,7 +36,8 @@ final class CommercialTicketModalView
     $assigneeId = trim((string) ($ticket['id_empleado'] ?? ''));
     $email = trim((string) ($ticket['correo_solicitante'] ?? $ticket['correo'] ?? ''));
     $phone = trim((string) ($ticket['celular_solicitante'] ?? $ticket['celular'] ?? ''));
-    $cleanPhone = preg_replace('/[^0-9]/', '', $phone);
+    // El mismo número al que salen los avisos por WhatsApp: el de WhatsApp si lo dio, con su indicativo.
+    $whatsappPhone = CommercialCallsNotifier::phone(trim((string) ($ticket['celular_wsp'] ?? '')) ?: $phone, (string) ($ticket['indicativo'] ?? ''));
     $theme = trim((string) ($ticket['tema'] ?? $ticket['tema_ayuda'] ?? ''));
     $priority = trim((string) ($ticket['prioridad'] ?? ''));
     $channel = trim((string) ($ticket['medio'] ?? ''));
@@ -330,15 +332,18 @@ final class CommercialTicketModalView
               <?php endif; ?>
               <?php if ($phone !== ''): ?>
                 <!-- Phone with WhatsApp action -->
-                <div class="flex items-center justify-between text-xs text-slate-600 bg-white px-2 py-1 rounded border border-slate-200">
-                  <div class="flex items-center gap-1.5">
+                <div class="flex items-center justify-between gap-2 text-xs text-slate-600 bg-white pl-2 pr-1 py-1 rounded border border-slate-200">
+                  <div class="flex items-center gap-1.5 min-w-0">
                     <span class="material-symbols-outlined text-[15px] text-slate-400 flex-shrink-0">phone</span>
-                    <span><?php echo esc_html($phone); ?></span>
+                    <span class="truncate"><?php echo esc_html($phone); ?></span>
+                    <button type="button" class="text-slate-400 hover:text-[#1E3C76] cursor-pointer flex-shrink-0" title="Copiar celular" data-commercial-copy="<?php echo esc_attr($phone); ?>">
+                      <span class="material-symbols-outlined text-[14px]">content_copy</span>
+                    </button>
                   </div>
-                  <?php if ($cleanPhone !== ''): ?>
-                    <a class="text-emerald-600 hover:text-emerald-700 font-medium flex items-center gap-1 text-[11px]" href="https://wa.me/57<?php echo esc_attr($cleanPhone); ?>" target="_blank" rel="noopener noreferrer">
+                  <?php if ($whatsappPhone !== ''): ?>
+                    <a class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#25D366] hover:bg-[#1DA851] text-white text-[11px] font-semibold shadow-sm transition-colors flex-shrink-0" href="https://wa.me/<?php echo esc_attr(ltrim($whatsappPhone, '+')); ?>" target="_blank" rel="noopener noreferrer" title="Abrir el chat de WhatsApp con <?php echo esc_attr($requester); ?> (<?php echo esc_attr($whatsappPhone); ?>)" data-commercial-whatsapp>
+                      <span class="material-symbols-outlined text-[14px]">chat</span>
                       <span>WhatsApp</span>
-                      <span class="material-symbols-outlined text-[14px]">arrow_forward</span>
                     </a>
                   <?php endif; ?>
                 </div>
@@ -534,20 +539,12 @@ final class CommercialTicketModalView
   <!-- BEGIN: ModalFooter -->
   <footer class="bg-white border-t border-slate-100 px-6 sm:px-8 py-3.5 flex flex-wrap items-center justify-between gap-3 flex-shrink-0">
     <div class="flex items-center gap-2 text-xs text-slate-500">
-      <span class="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
-      <span>Sincronizado con SuCasa Inmobiliaria Core CRM v4.2</span>
+      <span class="material-symbols-outlined text-[15px] text-slate-400">info</span>
+      <span>Tarea #<?php echo esc_html($logicalId); ?> · Responder, postergar, cerrar y las demás acciones están en Gestión Operativa.</span>
     </div>
-    <div class="flex items-center gap-3">
-      <button class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 transition-colors cursor-pointer" type="button" data-commercial-close-case>
-        Cerrar Ventana
-      </button>
-      <?php if ($policy->canAct('cerrar')): ?>
-        <button class="px-5 py-2 rounded-xl text-xs font-bold text-[#061D49] bg-[#F8CF4A] hover:bg-[#E5BD3B] transition-all shadow-sm active:scale-95 flex items-center gap-2 cursor-pointer" type="button" data-commercial-open-workflow="close">
-          <span class="material-symbols-outlined text-[16px]">task_alt</span>
-          <span>Finalizar y Entregar Inmueble</span>
-        </button>
-      <?php endif; ?>
-    </div>
+    <button class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 transition-colors cursor-pointer" type="button" data-commercial-close-case>
+      Cerrar ventana
+    </button>
   </footer>
   <!-- END: ModalFooter -->
 
@@ -692,16 +689,16 @@ final class CommercialTicketModalView
           <!-- Botones de inserción rápida de links -->
           <div class="flex items-center gap-1.5 flex-wrap">
             <?php if ($propertyCode !== ''): ?>
-              <button type="button" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#EBF1FB] hover:bg-[#d8e5f8] text-[#1E3C76] border border-[#1E3C76]/25 text-[11px] font-semibold transition-all shadow-xs cursor-pointer active:scale-95" data-commercial-insert-property="<?php echo esc_attr($propertyCode); ?>" title="Insertar enlace del inmueble de este caso en la respuesta">
+              <button type="button" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#EBF1FB] hover:bg-[#d8e5f8] text-[#1E3C76] border border-[#1E3C76]/25 text-[11px] font-semibold transition-all shadow-xs cursor-pointer active:scale-95" data-commercial-insert-property="<?php echo esc_attr($propertyCode); ?>" title="Agrega a la respuesta el enlace de este inmueble en la página web">
                 <span class="material-symbols-outlined text-[14px]">apartment</span>
                 <span>Inmueble #<?php echo esc_html($propertyCode); ?></span>
               </button>
             <?php endif; ?>
-            <button type="button" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-[11px] font-medium transition-all cursor-pointer active:scale-95" data-commercial-insert-custom-property title="Insertar enlace a otro código de inmueble">
+            <button type="button" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-[11px] font-medium transition-all cursor-pointer active:scale-95" data-commercial-insert-custom-property title="Pide el código de otro inmueble y agrega a la respuesta el enlace de su ficha en la página web">
               <span class="material-symbols-outlined text-[14px] text-slate-500">add_home_work</span>
               <span>Otro inmueble</span>
             </button>
-            <button type="button" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-[11px] font-medium transition-all cursor-pointer active:scale-95" data-commercial-insert-link title="Insertar cualquier enlace web (URL)">
+            <button type="button" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-[11px] font-medium transition-all cursor-pointer active:scale-95" data-commercial-insert-link title="Pide una dirección web y la agrega a la respuesta">
               <span class="material-symbols-outlined text-[14px] text-slate-500">link</span>
               <span>Enlace web</span>
             </button>
