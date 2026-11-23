@@ -254,15 +254,18 @@ final class CommercialTaskWorkflowTest extends TestCase
       self::assertStringNotContainsString('<option value="' . $status . '"', $reply[0], 'Responder no posterga ni cierra: ' . $status);
     }
     self::assertStringContainsString('data-help="' . CommercialStatusCatalog::descriptions()['Contactado'] . '"', $reply[0]);
-    self::assertStringContainsString('data-commercial-status-help-text>Se mantiene el estado actual. ' . CommercialStatusCatalog::descriptions()['Mostrando'], $reply[0]);
-    self::assertStringContainsString('Ver la guía de todos los estados', $reply[0]);
-    self::assertStringContainsString('data-commercial-open-guides="reply"', $reply[0], 'Responder abre la ventana de guías.');
+    // Solo el significado del estado elegido y un botón a la ventana de guías (sin la lista de todos los estados).
+    self::assertStringContainsString('data-commercial-status-help-name>Mostrando</strong>: <span data-commercial-status-help-text>' . CommercialStatusCatalog::descriptions()['Mostrando'] . '</span>', $reply[0]);
+    self::assertStringNotContainsString('Ver la guía de todos los estados', $html);
+    self::assertStringContainsString('Guía de estados</button>', $reply[0]);
+    self::assertSame(3, substr_count($reply[0] . (preg_match('/data-commercial-workflow-form="close".*?<\/form>/s', $html, $closeForm) ? $closeForm[0] : ''), 'data-commercial-open-guides'), 'Responder: guía de estados y respuestas guía; Cerrar: guía de estados.');
+    self::assertStringContainsString('Ver respuestas guía</button>', $reply[0], 'Responder abre la ventana de guías.');
     self::assertStringContainsString('1 respuesta guía, 1 para este estado', $reply[0]);
     self::assertStringNotContainsString('data-commercial-guide ', $reply[0], 'Las respuestas guía ya no van dentro del formulario.');
 
     // Ventana de guías: botón propio, el estado de la tarea elegido con su significado y las respuestas editables.
     self::assertStringContainsString('data-commercial-open-guides>', $html);
-    preg_match('/<div class="commercial-analysis-modal" data-commercial-guides-modal.*?<\/ul>/s', $html, $modal);
+    preg_match('/<div class="[^"]*" data-commercial-guides-modal.*?<\/ul>/s', $html, $modal);
     self::assertStringContainsString('data-current-status="mostrando"', $modal[0]);
     self::assertStringContainsString('<option value="mostrando" data-label="Mostrando" data-help="' . CommercialStatusCatalog::descriptions()['Mostrando'] . '" selected>Mostrando (estado actual)</option>', $modal[0]);
     self::assertStringContainsString('<option value="finalizado" data-label="Finalizado"', $modal[0], 'Se consultan todos los estados, también los de cierre.');

@@ -695,6 +695,7 @@
     document.body.classList.toggle("commercial-modal-open", open || !!document.querySelector(".commercial-modal.open"));
     if (!open) {
       currentCasePk = "";
+      setGuidesModal(false);
       if (detailRequest) detailRequest.abort();
       if (lastFocused && typeof lastFocused.focus === "function") lastFocused.focus();
     }
@@ -805,8 +806,17 @@
 
   // Ventana de guías de la tarea (CommercialTicketModalView::guidesModal): al elegir un estado muestra qué significa y
   // sus respuestas guía; "Usar" pone el texto en Responder y, con permiso, se crean, editan y eliminan ahí mismo.
+  // La ventana llega dentro de la tarea; se pasa al <body> para quedar centrada encima (el fondo difuminado de la tarea
+  // la encerraría) y para que un clic en ella no cierre la tarea. La de una tarea anterior se descarta.
+  var guidesPortal = null;
   function guidesModal() {
-    return caseContent ? caseContent.querySelector("[data-commercial-guides-modal]") : null;
+    var fresh = caseContent ? caseContent.querySelector("[data-commercial-guides-modal]") : null;
+    if (fresh) {
+      if (guidesPortal && guidesPortal !== fresh) guidesPortal.remove();
+      guidesPortal = fresh;
+      document.body.appendChild(fresh);
+    }
+    return guidesPortal && guidesPortal.isConnected ? guidesPortal : null;
   }
 
   function guideKey(value) {
@@ -821,7 +831,7 @@
     var label = option ? option.getAttribute("data-label") || "" : "";
     var title = modal.querySelector("[data-commercial-guides-meaning-title]");
     var meaning = modal.querySelector("[data-commercial-guides-meaning-text]");
-    if (title) title.textContent = state ? "«" + label + "»" : "cada estado";
+    if (title) title.textContent = label;
     if (meaning) meaning.textContent = option ? option.getAttribute("data-help") || "" : "";
     var search = modal.querySelector("[data-commercial-guide-search]");
     var query = guideKey(search ? search.value : "");
@@ -843,6 +853,8 @@
     if (!modal) return;
     modal.hidden = !open;
     modal.classList.toggle("open", open);
+    modal.classList.toggle("hidden", !open);
+    modal.classList.toggle("flex", open);
     if (!open) {
       var editor = modal.querySelector("[data-commercial-guide-editor]");
       if (editor) editor.hidden = true;
@@ -940,11 +952,11 @@
     var opener = event.target.closest("[data-commercial-open-guides]");
     if (opener) {
       event.preventDefault();
+      // Desde un formulario abre en el estado elegido en su lista; "Mantener" o el botón Guías, en el de la tarea.
       var state = modal ? modal.getAttribute("data-current-status") || "" : "";
-      if (opener.getAttribute("data-commercial-open-guides") === "reply") {
-        var replySelect = opener.closest("form") ? opener.closest("form").querySelector("[data-commercial-status-select]") : null;
-        if (replySelect && replySelect.value !== "__keep__") state = guideKey(replySelect.value);
-      }
+      var openerForm = opener.closest("form");
+      var statusSelect = openerForm ? openerForm.querySelector("[data-commercial-status-select]") : null;
+      if (statusSelect && statusSelect.value !== "__keep__") state = guideKey(statusSelect.value);
       setGuidesModal(true, state);
       return true;
     }
@@ -954,6 +966,15 @@
       return true;
     }
     var card = event.target.closest("[data-commercial-guide]");
+    var more = event.target.closest("[data-commercial-guide-more]");
+    if (more && card) {
+      var fullText = card.querySelector("[data-commercial-guide-text]");
+      var expanded = more.getAttribute("aria-expanded") === "true";
+      if (fullText) fullText.classList.toggle("line-clamp-3", expanded);
+      more.setAttribute("aria-expanded", expanded ? "false" : "true");
+      more.textContent = expanded ? "Ver más" : "Ver menos";
+      return true;
+    }
     if (event.target.closest("[data-commercial-use-guide]") && card) {
       event.preventDefault();
       var replyForm = caseContent.querySelector('[data-commercial-workflow-form="reply"]');
@@ -990,6 +1011,21 @@
     }
     return true;
   }
+
+  // La ventana de guías vive en el <body>: sus eventos se escuchan en el documento, no en la tarea.
+  document.addEventListener("click", function (event) { handleGuidesClick(event); });
+  document.addEventListener("change", function (event) {
+    if (event.target.closest && event.target.closest("[data-commercial-guides-state]")) filterGuides(guidesModal());
+  });
+  document.addEventListener("input", function (event) {
+    if (event.target.closest && event.target.closest("[data-commercial-guide-search]")) filterGuides(guidesModal());
+  });
+  document.addEventListener("submit", function (event) {
+    var editor = event.target.closest && event.target.closest("[data-commercial-guide-editor]");
+    if (!editor) return;
+    event.preventDefault();
+    saveGuide(editor);
+  });
 
   function submitWorkflow(form) {
     var key = form.getAttribute("data-commercial-workflow-form") || "";
@@ -1803,7 +1839,6 @@
         closeWorkflows();
         return;
       }
-      if (handleGuidesClick(event)) return;
       var insertPropertyBtn = event.target.closest("[data-commercial-insert-property]");
       if (insertPropertyBtn) {
         event.preventDefault();
@@ -1866,27 +1901,17 @@
     });
     // Guía del estado elegido bajo cada lista de estado comercial.
     caseModal.addEventListener("change", function (event) {
-      if (event.target.closest("[data-commercial-guides-state]")) {
-        filterGuides(guidesModal());
-        return;
-      }
       var select = event.target.closest("[data-commercial-status-select]");
       if (!select) return;
       var box = select.parentElement;
       var help = box ? box.querySelector("[data-commercial-status-help-text]") : null;
       var option = select.options[select.selectedIndex];
+      var helpName = box ? box.querySelector("[data-commercial-status-help-name]") : null;
       if (help && option) help.textContent = option.getAttribute("data-help") || "";
-    });
-    caseModal.addEventListener("input", function (event) {
-      if (event.target.closest("[data-commercial-guide-search]")) filterGuides(guidesModal());
+      if (helpName && option) helpName.textContent = option.getAttribute("data-label") || option.textContent.trim();
     });
     caseModal.addEventListener("submit", function (event) {
-      var guideEditor = event.target.closest("[data-commercial-guide-editor]");
-      if (guideEditor) {
-        event.preventDefault();
-        saveGuide(guideEditor);
-        return;
-      }
+
       var form = event.target.closest("[data-commercial-workflow-form]");
       if (!form) return;
       event.preventDefault();

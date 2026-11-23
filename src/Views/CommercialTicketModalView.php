@@ -666,18 +666,18 @@ final class CommercialTicketModalView
           </label>
           <span class="text-[11px] font-normal text-slate-500">Actual: <strong class="text-[#061D49]"><?php echo esc_html($currentStatus); ?></strong></span>
         </div>
-        <?php $descriptions = CommercialStatusCatalog::descriptions(); $keepHelp = 'Se mantiene el estado actual. ' . ($descriptions[$currentStatus] ?? ''); ?>
+        <?php $descriptions = CommercialStatusCatalog::descriptions(); ?>
         <select name="estado" data-commercial-status-select class="w-full text-xs sm:text-sm rounded-xl border border-slate-200 focus:border-[#1E3C76] focus:ring focus:ring-[#1E3C76]/20 p-2.5 outline-none bg-white font-medium text-slate-800 transition">
-          <option value="__keep__" selected data-help="<?php echo esc_attr(trim($keepHelp)); ?>">Mantener estado actual (<?php echo esc_html($currentStatus); ?>)</option>
+          <option value="__keep__" selected data-label="<?php echo esc_attr($currentStatus); ?>" data-help="<?php echo esc_attr($descriptions[$currentStatus] ?? ''); ?>">Mantener estado actual (<?php echo esc_html($currentStatus); ?>)</option>
           <optgroup label="Gestión activa">
             <?php foreach (CommercialStatusCatalog::OPEN as $st): ?>
               <?php if ($st !== $currentStatus): ?>
-                <option value="<?php echo esc_attr($st); ?>" data-help="<?php echo esc_attr($descriptions[$st] ?? ''); ?>"><?php echo esc_html($st); ?></option>
+                <option value="<?php echo esc_attr($st); ?>" data-label="<?php echo esc_attr($st); ?>" data-help="<?php echo esc_attr($descriptions[$st] ?? ''); ?>"><?php echo esc_html($st); ?></option>
               <?php endif; ?>
             <?php endforeach; ?>
           </optgroup>
         </select>
-        <?php echo self::statusGuide(trim($keepHelp), CommercialStatusCatalog::OPEN); ?>
+        <?php echo self::statusGuide($currentStatus, $descriptions[$currentStatus] ?? ''); ?>
         <p class="text-[11px] text-slate-500">Para postergar o cerrar la tarea usa su botón: piden la fecha o el resultado y le avisan al cliente.</p>
       </div>
 
@@ -804,10 +804,10 @@ final class CommercialTicketModalView
         <?php $descriptions = CommercialStatusCatalog::descriptions(); ?>
         <select name="estado" required data-commercial-status-select class="w-full text-xs sm:text-sm rounded-xl border border-slate-200 focus:border-[#1E3C76] p-2.5 outline-none bg-white font-medium text-slate-700">
           <?php foreach ($statuses as $st): ?>
-            <option value="<?php echo esc_attr($st); ?>" data-help="<?php echo esc_attr($descriptions[$st] ?? ''); ?>"<?php selected($selected, $st); ?>><?php echo esc_html($st); ?></option>
+            <option value="<?php echo esc_attr($st); ?>" data-label="<?php echo esc_attr($st); ?>" data-help="<?php echo esc_attr($descriptions[$st] ?? ''); ?>"<?php selected($selected, $st); ?>><?php echo esc_html($st); ?></option>
           <?php endforeach; ?>
         </select>
-        <?php echo self::statusGuide($descriptions[$selected] ?? '', $statuses); ?>
+        <?php echo self::statusGuide($selected, $descriptions[$selected] ?? ''); ?>
       </div>
       <div class="space-y-1">
         <label class="block text-xs font-semibold text-slate-700">Motivo / Observaciones <em class="text-rose-600">*</em></label>
@@ -837,18 +837,15 @@ final class CommercialTicketModalView
   }
 
   /**
-   * Guía del estado elegido bajo la lista (la actualiza el JS al cambiar) y la de todos los estados de esa lista.
-   * @param array<int,string> $statuses
+   * Significado del estado elegido bajo la lista (lo actualiza el JS al cambiar) y botón que abre la ventana de guías
+   * en ese estado.
    */
-  private static function statusGuide(string $current, array $statuses): string
+  private static function statusGuide(string $status, string $meaning): string
   {
-    $descriptions = CommercialStatusCatalog::descriptions();
-    $items = '';
-    foreach ($statuses as $status) {
-      $items .= '<li><strong class="text-slate-700">' . esc_html($status) . ':</strong> ' . esc_html($descriptions[$status] ?? '') . '</li>';
-    }
-    return '<p class="text-[11px] text-[#1E3C76] flex items-start gap-1" data-commercial-status-help aria-live="polite"><span class="material-symbols-outlined text-[14px]" aria-hidden="true">info</span><span data-commercial-status-help-text>' . esc_html($current) . '</span></p>'
-      . '<details class="text-[11px] text-slate-500"><summary class="cursor-pointer font-semibold text-slate-600">Ver la guía de todos los estados</summary><ul class="mt-1.5 space-y-1 pl-1">' . $items . '</ul></details>';
+    return '<div class="flex items-start justify-between gap-3 rounded-xl border border-[#1E3C76]/15 bg-[#EBF1FB]/70 px-3 py-2.5" data-commercial-status-help aria-live="polite">'
+      . '<p class="flex items-start gap-1.5 text-xs text-slate-700 min-w-0"><span class="material-symbols-outlined text-[16px] text-[#1E3C76] shrink-0" aria-hidden="true">info</span>'
+      . '<span><strong class="text-[#061D49]" data-commercial-status-help-name>' . esc_html($status) . '</strong>: <span data-commercial-status-help-text>' . esc_html($meaning) . '</span></span></p>'
+      . '<button type="button" class="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white hover:bg-[#061D49] hover:text-white text-[#1E3C76] border border-[#1E3C76]/25 text-[11px] font-semibold transition-colors cursor-pointer" data-commercial-open-guides><span class="material-symbols-outlined text-[14px]" aria-hidden="true">menu_book</span>Guía de estados</button></div>';
   }
 
   /**
@@ -859,16 +856,17 @@ final class CommercialTicketModalView
   {
     $matches = count(array_filter($guides, static fn(array $guide): bool => !empty($guide['match'])));
     $count = $guides === [] ? 'Aún no hay respuestas guía' : (count($guides) === 1 ? '1 respuesta guía' : count($guides) . ' respuestas guía') . ($matches > 0 ? ', ' . $matches . ' para este estado' : '');
-    return '<div class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50/70 p-3">'
-      . '<div class="min-w-0"><p class="text-xs font-bold text-slate-700 flex items-center gap-1.5"><span class="material-symbols-outlined text-[16px] text-[#1E3C76]" aria-hidden="true">menu_book</span>¿Qué responder?</p>'
-      . '<p class="text-[11px] text-slate-500">' . esc_html($count) . '. Elige una y queda en el mensaje para que la ajustes antes de enviar.</p></div>'
-      . '<button type="button" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#061D49] hover:bg-[#1E3C76] text-white text-xs font-semibold cursor-pointer" data-commercial-open-guides="reply"><span class="material-symbols-outlined text-[15px]" aria-hidden="true">menu_book</span>Ver respuestas guía</button></div>';
+    return '<div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3.5 py-3">'
+      . '<div class="flex items-center gap-3 min-w-0"><span class="w-9 h-9 rounded-xl bg-[#F8CF4A]/30 text-[#061D49] flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-[19px]" aria-hidden="true">tips_and_updates</span></span>'
+      . '<div class="min-w-0"><p class="text-xs font-bold text-[#061D49]">¿Qué responder?</p><p class="text-[11px] text-slate-500">' . esc_html($count) . '</p></div></div>'
+      . '<button type="button" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#061D49] hover:bg-[#1E3C76] text-white text-xs font-semibold transition-colors cursor-pointer" data-commercial-open-guides><span class="material-symbols-outlined text-[16px]" aria-hidden="true">menu_book</span>Ver respuestas guía</button></div>';
   }
 
   /**
-   * Ventana de guías de la tarea (botón Guías y Responder): al elegir un estado muestra qué significa y sus respuestas
-   * guía. Con responder, "Usar" pone el texto en la respuesta; con respuestas_guia_editar se crean, editan y eliminan
-   * (solo la categoría Comercial, CommercialReplyGuides).
+   * Ventana de guías de la tarea (botón Guías, Responder y la guía de cada lista de estado): al elegir un estado muestra
+   * qué significa y sus respuestas guía. Con responder, "Usar" pone el texto en la respuesta; con respuestas_guia_editar
+   * se crean, editan y eliminan (solo la categoría Comercial, CommercialReplyGuides). El JS la pasa al <body> al abrirla
+   * para que quede encima de la tarea y centrada.
    * @param array<int,array<string,mixed>> $guides
    */
   private static function guidesModal(array $guides, string $status, bool $canUse, bool $canEdit): string
@@ -901,42 +899,56 @@ final class CommercialTicketModalView
       }
       $options .= '</optgroup>';
     }
-    $field = 'w-full text-xs sm:text-sm rounded-xl border border-slate-200 focus:border-[#1E3C76] focus:ring focus:ring-[#1E3C76]/20 p-2.5 outline-none bg-white text-slate-800';
+    $field = 'w-full text-sm rounded-xl border border-slate-200 focus:border-[#1E3C76] focus:ring-2 focus:ring-[#1E3C76]/15 px-3 py-2.5 outline-none bg-white text-slate-800 transition';
     ob_start();
 ?>
   <!-- Ventana de guías: estados y respuestas guía -->
-  <div class="commercial-analysis-modal" data-commercial-guides-modal data-current-status="<?php echo esc_attr($current); ?>" role="dialog" aria-modal="true" aria-labelledby="commercial-guides-title" hidden>
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[88vh] overflow-hidden flex flex-col border border-slate-100" role="document">
-      <div class="px-5 py-4 bg-slate-50 flex items-center justify-between gap-3 border-b border-slate-200">
-        <div>
-          <span class="text-[11px] uppercase tracking-wider font-semibold text-slate-500">Guías de la tarea</span>
-          <h2 class="text-base sm:text-lg font-bold text-[#061D49]" id="commercial-guides-title">Estados y respuestas guía</h2>
+  <div class="fixed inset-0 z-[70] hidden items-center justify-center p-3 sm:p-6 bg-[#061D49]/55 backdrop-blur-sm" data-commercial-guides-modal data-current-status="<?php echo esc_attr($current); ?>" role="dialog" aria-modal="true" aria-labelledby="commercial-guides-title" hidden>
+    <div class="bg-white w-full max-w-2xl max-h-[90vh] rounded-3xl shadow-2xl border border-slate-100 flex flex-col overflow-hidden" role="document">
+      <header class="px-6 pt-5 pb-4 flex items-start justify-between gap-4 border-b border-slate-100">
+        <div class="flex items-start gap-3">
+          <span class="w-11 h-11 rounded-2xl bg-[#EBF1FB] text-[#1E3C76] flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-[22px]" aria-hidden="true">menu_book</span></span>
+          <div>
+            <span class="block text-[11px] uppercase tracking-wider font-semibold text-slate-400">Guías de la tarea</span>
+            <h2 class="text-lg font-bold text-[#061D49] leading-tight" id="commercial-guides-title">Estados y respuestas guía</h2>
+            <p class="text-xs text-slate-500 mt-0.5">Elige un estado para ver qué significa y qué responderle al cliente.</p>
+          </div>
         </div>
-        <button type="button" class="w-8 h-8 rounded-full hover:bg-slate-200 text-slate-500 flex items-center justify-center cursor-pointer" data-commercial-close-guides aria-label="Cerrar guías">
+        <button type="button" class="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center shrink-0 transition-colors cursor-pointer" data-commercial-close-guides aria-label="Cerrar guías">
           <span class="material-symbols-outlined text-[20px]">close</span>
         </button>
-      </div>
-      <div class="overflow-y-auto p-5 space-y-4 flex-1">
-        <label class="block space-y-1">
-          <span class="block text-xs font-bold text-slate-700">Estado comercial</span>
-          <select data-commercial-guides-state class="<?php echo esc_attr($field); ?> font-medium">
+      </header>
+
+      <section class="px-6 py-4 bg-slate-50/80 border-b border-slate-100 space-y-3">
+        <label class="block">
+          <span class="sr-only">Estado comercial</span>
+          <select data-commercial-guides-state class="<?php echo esc_attr($field); ?> font-semibold">
             <option value="" data-label="Todos los estados" data-help="Todas las respuestas guía comerciales, de todos los estados.">Todos los estados</option>
             <?php echo $options; ?>
           </select>
         </label>
-        <div class="rounded-xl border border-[#1E3C76]/20 bg-[#EBF1FB]/60 p-3" data-commercial-guides-meaning aria-live="polite">
-          <p class="text-[11px] font-bold uppercase tracking-wider text-[#1E3C76] flex items-center gap-1"><span class="material-symbols-outlined text-[15px]" aria-hidden="true">info</span>Qué significa <span data-commercial-guides-meaning-title></span></p>
-          <p class="text-xs sm:text-sm text-slate-700 mt-1" data-commercial-guides-meaning-text></p>
+        <div class="flex items-start gap-3 rounded-2xl bg-white border border-slate-200 p-3.5" data-commercial-guides-meaning aria-live="polite">
+          <span class="w-8 h-8 rounded-full bg-[#F8CF4A]/35 text-[#061D49] flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">lightbulb</span></span>
+          <div class="min-w-0">
+            <p class="text-sm font-bold text-[#061D49]" data-commercial-guides-meaning-title></p>
+            <p class="text-[13px] text-slate-600 leading-relaxed" data-commercial-guides-meaning-text></p>
+          </div>
         </div>
+      </section>
+
+      <div class="flex-1 overflow-y-auto px-6 py-4 space-y-3">
         <div class="flex flex-wrap items-center gap-2">
-          <input type="search" data-commercial-guide-search placeholder="Buscar por situación o texto" aria-label="Buscar respuestas guía" class="flex-1 min-w-[12rem] text-xs rounded-xl border border-slate-200 focus:border-[#1E3C76] p-2.5 outline-none bg-white">
+          <label class="relative flex-1 min-w-[12rem]">
+            <span class="material-symbols-outlined text-[18px] text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true">search</span>
+            <input type="search" data-commercial-guide-search placeholder="Buscar por situación o texto" aria-label="Buscar respuestas guía" class="w-full text-sm rounded-xl border border-slate-200 focus:border-[#1E3C76] focus:ring-2 focus:ring-[#1E3C76]/15 pl-9 pr-3 py-2.5 outline-none bg-white transition">
+          </label>
           <?php if ($canEdit): ?>
-            <button type="button" class="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-[#061D49] hover:bg-[#1E3C76] text-white text-xs font-semibold cursor-pointer" data-commercial-guide-new><span class="material-symbols-outlined text-[15px]" aria-hidden="true">add</span>Nueva respuesta</button>
+            <button type="button" class="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-white hover:bg-[#EBF1FB] text-[#1E3C76] border border-[#1E3C76]/30 text-xs font-semibold transition-colors cursor-pointer" data-commercial-guide-new><span class="material-symbols-outlined text-[17px]" aria-hidden="true">add</span>Nueva respuesta</button>
           <?php endif; ?>
         </div>
         <?php if ($canEdit): ?>
-          <form class="rounded-xl border border-[#1E3C76]/30 bg-white p-4 space-y-3 shadow-sm" data-commercial-guide-editor hidden>
-            <p class="text-xs font-bold text-[#061D49]" data-commercial-guide-editor-title>Nueva respuesta guía</p>
+          <form class="rounded-2xl border border-[#1E3C76]/25 bg-[#F7FAFF] p-4 space-y-3" data-commercial-guide-editor hidden>
+            <p class="text-sm font-bold text-[#061D49] flex items-center gap-1.5"><span class="material-symbols-outlined text-[18px] text-[#1E3C76]" aria-hidden="true">edit_note</span><span data-commercial-guide-editor-title>Nueva respuesta guía</span></p>
             <input type="hidden" name="id" value="">
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <label class="block space-y-1">
@@ -963,15 +975,23 @@ final class CommercialTicketModalView
             </label>
             <div class="flex flex-wrap items-center justify-end gap-2">
               <span class="text-xs text-rose-600 mr-auto font-medium" data-commercial-guide-editor-message aria-live="polite"></span>
-              <button type="button" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold cursor-pointer" data-commercial-guide-cancel>Cancelar</button>
-              <button type="submit" class="px-5 py-2 bg-[#061D49] hover:bg-[#1E3C76] text-white rounded-xl text-xs font-semibold cursor-pointer">Guardar respuesta</button>
+              <button type="button" class="px-4 py-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold transition-colors cursor-pointer" data-commercial-guide-cancel>Cancelar</button>
+              <button type="submit" class="px-5 py-2 bg-[#061D49] hover:bg-[#1E3C76] text-white rounded-xl text-xs font-semibold transition-colors cursor-pointer">Guardar respuesta</button>
             </div>
           </form>
         <?php endif; ?>
-        <p class="text-[11px] font-semibold text-slate-500" data-commercial-guides-count></p>
-        <ul class="space-y-2" data-commercial-guides-list><?php echo self::guideCards($guides, $canUse, $canEdit); ?></ul>
-        <p class="text-xs text-slate-500 text-center py-6 rounded-xl border border-dashed border-slate-200" data-commercial-guides-empty hidden>No hay respuestas guía para este estado<?php echo $canEdit ? ': crea una con «Nueva respuesta».' : '.'; ?></p>
+        <p class="text-[11px] uppercase tracking-wider font-semibold text-slate-400 pt-1" data-commercial-guides-count></p>
+        <ul class="space-y-2.5" data-commercial-guides-list><?php echo self::guideCards($guides, $canUse, $canEdit); ?></ul>
+        <div class="text-center py-8 rounded-2xl border border-dashed border-slate-200 bg-slate-50/60" data-commercial-guides-empty hidden>
+          <span class="material-symbols-outlined text-[28px] text-slate-300" aria-hidden="true">forum</span>
+          <p class="text-xs text-slate-500 mt-1">No hay respuestas guía para este estado<?php echo $canEdit ? '. Crea una con «Nueva respuesta».' : '.'; ?></p>
+        </div>
       </div>
+
+      <footer class="px-6 py-3 border-t border-slate-100 flex items-center justify-between gap-3 bg-white">
+        <p class="text-[11px] text-slate-400"><?php echo $canUse ? '«Usar» lleva el texto a Responder para que lo ajustes antes de enviar.' : 'Consulta qué significa cada estado y qué responder.'; ?></p>
+        <button type="button" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors cursor-pointer" data-commercial-close-guides>Cerrar</button>
+      </footer>
     </div>
   </div>
 <?php
@@ -984,21 +1004,25 @@ final class CommercialTicketModalView
    */
   public static function guideCards(array $guides, bool $canUse, bool $canEdit): string
   {
-    $button = 'inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold cursor-pointer border ';
+    $icon = 'w-8 h-8 rounded-lg flex items-center justify-center transition-colors cursor-pointer ';
     $cards = '';
     foreach ($guides as $guide) {
       $state = trim((string) ($guide['estado'] ?? ''));
       $situation = (string) ($guide['situacion'] ?? '');
+      $text = (string) ($guide['respuesta'] ?? '');
       $match = !empty($guide['match']);
-      $cards .= '<li class="rounded-xl border ' . ($match ? 'border-[#1E3C76]/40 bg-[#EBF1FB]/60' : 'border-slate-200 bg-white') . ' p-3 space-y-2" data-commercial-guide data-id="' . (int) ($guide['id'] ?? 0) . '" data-estado="' . esc_attr(CommercialReplyGuides::key($state)) . '" data-estado-label="' . esc_attr($state) . '" data-situacion="' . esc_attr($situation) . '">'
-        . '<div class="flex flex-wrap items-center justify-between gap-2"><strong class="text-xs sm:text-sm text-[#061D49]">' . esc_html($situation) . '</strong>'
-        . '<span class="text-[10px] font-semibold px-2 py-0.5 rounded-full ' . ($match ? 'bg-[#1E3C76] text-white' : 'bg-slate-100 text-slate-600') . '">' . esc_html($state !== '' ? $state : 'Todos los estados') . '</span></div>'
-        . '<p class="text-xs sm:text-[13px] text-slate-700 whitespace-pre-line leading-relaxed" data-commercial-guide-text>' . esc_html((string) ($guide['respuesta'] ?? '')) . '</p>'
-        . '<div class="flex flex-wrap gap-1.5">'
-        . ($canUse ? '<button type="button" class="' . $button . 'bg-white hover:bg-[#EBF1FB] text-[#1E3C76] border-[#1E3C76]/25" data-commercial-use-guide><span class="material-symbols-outlined text-[14px]" aria-hidden="true">edit_note</span>Usar esta respuesta</button>' : '')
-        . ($canEdit ? '<button type="button" class="' . $button . 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200" data-commercial-guide-edit><span class="material-symbols-outlined text-[14px]" aria-hidden="true">edit</span>Editar</button>'
-          . '<button type="button" class="' . $button . 'bg-white hover:bg-rose-50 text-rose-700 border-rose-200" data-commercial-guide-delete><span class="material-symbols-outlined text-[14px]" aria-hidden="true">delete</span>Eliminar</button>' : '')
-        . '</div></li>';
+      $long = mb_strlen($text, 'UTF-8') > 200 || substr_count($text, "\n") > 2;
+      $cards .= '<li class="rounded-2xl border border-slate-200 bg-white p-4 hover:border-[#1E3C76]/35 hover:shadow-sm transition' . ($match ? ' border-l-4 border-l-[#1E3C76]' : '') . '" data-commercial-guide data-id="' . (int) ($guide['id'] ?? 0) . '" data-estado="' . esc_attr(CommercialReplyGuides::key($state)) . '" data-estado-label="' . esc_attr($state) . '" data-situacion="' . esc_attr($situation) . '">'
+        . '<div class="flex items-start justify-between gap-3"><strong class="text-sm font-semibold text-[#061D49]">' . esc_html($situation) . '</strong>'
+        . '<span class="shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full ' . ($match ? 'bg-[#EBF1FB] text-[#1E3C76]' : 'bg-slate-100 text-slate-500') . '">' . esc_html($state !== '' ? $state : 'Todos los estados') . '</span></div>'
+        . '<p class="mt-1.5 text-[13px] text-slate-600 leading-relaxed whitespace-pre-line' . ($long ? ' line-clamp-3' : '') . '" data-commercial-guide-text>' . esc_html($text) . '</p>'
+        . '<div class="mt-3 flex items-center justify-between gap-2">'
+        . ($long ? '<button type="button" class="text-[11px] font-semibold text-[#1E3C76] hover:underline cursor-pointer" data-commercial-guide-more aria-expanded="false">Ver más</button>' : '<span></span>')
+        . '<div class="flex items-center gap-1">'
+        . ($canEdit ? '<button type="button" class="' . $icon . 'text-slate-500 hover:bg-slate-100 hover:text-[#061D49]" data-commercial-guide-edit title="Editar" aria-label="Editar ' . esc_attr($situation) . '"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">edit</span></button>'
+          . '<button type="button" class="' . $icon . 'text-slate-400 hover:bg-rose-50 hover:text-rose-600" data-commercial-guide-delete title="Eliminar" aria-label="Eliminar ' . esc_attr($situation) . '"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">delete</span></button>' : '')
+        . ($canUse ? '<button type="button" class="ml-1 inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#061D49] hover:bg-[#1E3C76] text-white text-xs font-semibold transition-colors cursor-pointer" data-commercial-use-guide><span class="material-symbols-outlined text-[15px]" aria-hidden="true">reply</span>Usar</button>' : '')
+        . '</div></div></li>';
     }
     return $cards;
   }
