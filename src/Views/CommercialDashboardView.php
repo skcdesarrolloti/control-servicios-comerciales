@@ -4258,8 +4258,9 @@ final class CommercialDashboardView
    * Render HTML for the complete property technical sheet inside the modal.
    *
    * @param array<string,mixed> $property
+   * @param bool $highlights Muestra destacados y portales (solicitar, cancelar, liberar), que piden la vista Inmuebles.
    */
-  public static function renderPropertyDetailModalContent(array $property): string
+  public static function renderPropertyDetailModalContent(array $property, bool $highlights = true): string
   {
     $codigo = trim((string) ($property['codigo'] ?? $property['_ID'] ?? ''));
     $tipo = trim((string) ($property['tipo_inmueble'] ?? 'Inmueble'));
@@ -4618,7 +4619,8 @@ final class CommercialDashboardView
         </div>
       <?php endif; ?>
 
-      <!-- Gestor de Destacados & Portales (Absorbido de gestor-destacados) -->
+      <!-- Gestor de Destacados & Portales (Absorbido de gestor-destacados): solo con la vista Inmuebles, que piden sus acciones -->
+      <?php if ($highlights): ?>
       <?php
         $activePortals = is_array($property['active_portals'] ?? null) ? $property['active_portals'] : [];
         $userQuotas = is_array($property['user_quotas'] ?? null) ? $property['user_quotas'] : [];
@@ -4797,6 +4799,7 @@ final class CommercialDashboardView
           </div>
         <?php endif; ?>
       </div>
+      <?php endif; ?>
 
       <!-- Amenidades y Características -->
       <?php if ($hasAnyFeatures): ?>

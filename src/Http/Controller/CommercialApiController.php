@@ -1446,7 +1446,12 @@ final class CommercialApiController
     if (!is_array($property) || $property === []) {
       JsonResponse::error('Inmueble no encontrado.', 404);
     }
-    $html = CommercialDashboardView::renderPropertyDetailModalContent($property);
+    // Destacados y portales solo para quien tiene la vista Inmuebles: sus acciones la piden en el servidor.
+    $highlights = $this->policy->canView('inmuebles');
+    $html = CommercialDashboardView::renderPropertyDetailModalContent($property, $highlights);
+    if (!$highlights) {
+      unset($property['active_portals'], $property['user_quotas'], $property['pending_requests'], $property['highlight_history']);
+    }
     JsonResponse::success([
       'property' => $property,
       'html' => $html,

@@ -331,6 +331,19 @@ final class CommercialTaskWorkflowTest extends TestCase
     // Servidor: sin la vista Inmuebles, solo desde una tarea visible de ese inmueble o si el inmueble está a su cargo.
     $source = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Http/Controller/CommercialApiController.php');
     self::assertMatchesRegularExpression('/function canOpenPropertyFromContext.*?id_funcionario.*?authorizeTicketScope\(\$ticketPk\)/s', $source);
+    self::assertStringContainsString("renderPropertyDetailModalContent(\$property, \$highlights)", $source);
+    self::assertMatchesRegularExpression("/\\\$highlights = \\\$this->policy->canView\('inmuebles'\);/", $source);
+
+    // Sin la vista Inmuebles la ficha no ofrece destacados (solicitar, cancelar ni liberar cupo).
+    $sheet = ['codigo' => '345', 'tipo_inmueble' => 'Apartamento', 'estado' => 'Publico', 'active_portals' => ['fincaraiz']];
+    $full = \SCM\Views\CommercialDashboardView::renderPropertyDetailModalContent($sheet);
+    self::assertStringContainsString('Gestión de Destacados', $full);
+    self::assertStringContainsString('data-commercial-highlight-form', $full);
+    $limited = \SCM\Views\CommercialDashboardView::renderPropertyDetailModalContent($sheet, false);
+    foreach (['Gestión de Destacados', 'data-commercial-highlight-form', 'data-commercial-release-highlight'] as $piece) {
+      self::assertStringNotContainsString($piece, $limited);
+    }
+    self::assertStringContainsString('Ver en la página web', $limited);
     $views = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Views/CommercialDashboardView.php');
     self::assertSame(1, substr_count($views, 'inmuebles/inmueble-'), 'El portal solo se abre desde la ficha.');
   }
