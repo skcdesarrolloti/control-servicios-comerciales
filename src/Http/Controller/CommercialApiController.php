@@ -342,6 +342,59 @@ final class CommercialApiController
     $this->replyGuidesResponse($guides, $input, 'Respuesta guía eliminada.', 0);
   }
 
+  /**
+   * Edita una respuesta, seguimiento o nota de la cronología de la tarea (CommercialTimelineEditor): su autor o un
+   * administrador, hasta MAX_EDITS veces y sin reenviarla al cliente.
+   * @param array<string,mixed> $input
+   */
+  public function timelineEdit(array $input): never
+  {
+    $this->verify($input);
+    [$editor, $ticketPk] = $this->timelineEditor($input);
+    try {
+      $result = $editor->edit($ticketPk, (string) ($input['tipo'] ?? ''), (int) ($input['id'] ?? 0), (string) ($input['texto'] ?? ''), (string) \SCM\Core\Auth::employeeId(), $this->policy->canManage());
+    } catch (\InvalidArgumentException $exception) {
+      JsonResponse::error($exception->getMessage(), 422);
+    } catch (\RuntimeException $exception) {
+      JsonResponse::error($exception->getMessage(), 409);
+    }
+    JsonResponse::success(['message' => $result['message'], 'refresh' => true]);
+  }
+
+  /**
+   * Elimina una entrada de la cronología (la ventana pide confirmarlo) y deja una nota interna de constancia.
+   * @param array<string,mixed> $input
+   */
+  public function timelineDelete(array $input): never
+  {
+    $this->verify($input);
+    [$editor, $ticketPk] = $this->timelineEditor($input);
+    $type = (string) ($input['tipo'] ?? '');
+    $id = (int) ($input['id'] ?? 0);
+    try {
+      $message = $editor->delete($ticketPk, $type, $id, (string) \SCM\Core\Auth::employeeId(), $this->policy->canManage(), \SCM\Core\Auth::user());
+    } catch (\InvalidArgumentException $exception) {
+      JsonResponse::error($exception->getMessage(), 422);
+    } catch (\RuntimeException $exception) {
+      JsonResponse::error($exception->getMessage(), 409);
+    }
+    error_log('[tareas:historial] Eliminada ' . $type . ' #' . $id . ' de la tarea #' . $ticketPk . ' por el funcionario ' . \SCM\Core\Auth::employeeId());
+    JsonResponse::success(['message' => $message, 'refresh' => true]);
+  }
+
+  /**
+   * @param array<string,mixed> $input
+   * @return array{0:\SCM\Commercial\CommercialTimelineEditor,1:int}
+   */
+  private function timelineEditor(array $input): array
+  {
+    $this->authorize('ver_ticket', 'No tienes permiso para ver esta tarea.');
+    $this->authorize('historial_editar', 'No tienes permiso para editar el historial de las tareas.');
+    $ticketPk = (int) ($input['ticket_pk'] ?? 0);
+    $this->authorizeTicketScope($ticketPk);
+    return [new \SCM\Commercial\CommercialTimelineEditor($this->db), $ticketPk];
+  }
+
   private function replyGuidesForEditor(): \SCM\Commercial\CommercialReplyGuides
   {
     $this->authorize('ver_ticket', 'No tienes permiso para ver las guías.');

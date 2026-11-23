@@ -39,6 +39,11 @@ final class CommercialTaskWorkflowTest extends TestCase
       $this->db->pdo()->exec('ALTER TABLE wp_jet_cct_tickets ADD COLUMN `' . $column . '` TEXT');
     }
     $this->db->pdo()->exec('CREATE TABLE wp_jet_cct_respuesta_de_ticket (_ID INTEGER PRIMARY KEY AUTOINCREMENT, categoria TEXT, estado TEXT, situacion TEXT, respuesta TEXT, cct_status TEXT, cct_author_id TEXT, cct_created TEXT, cct_modified TEXT)');
+    // Cronología: seguimientos y notas, y los campos de edición (bin/add-timeline-edit-fields.php) en las tres tablas.
+    $this->db->pdo()->exec('CREATE TABLE wp_jet_cct_seguimiento_ticket (_ID INTEGER PRIMARY KEY AUTOINCREMENT, id_ticket TEXT, fecha INTEGER, nombre TEXT, observacion TEXT, id_empleado TEXT, id_coordinador TEXT, evidencia TEXT, cct_status TEXT, cct_author_id TEXT, cct_created TEXT, cct_modified TEXT, veces_editada TEXT, fecha_edicion INTEGER)');
+    $this->db->pdo()->exec('CREATE TABLE wp_jet_cct_notas_ticket (_ID INTEGER PRIMARY KEY AUTOINCREMENT, id_ticket TEXT, fecha INTEGER, nombre TEXT, observacion TEXT, id_empleado TEXT, cct_status TEXT, cct_author_id TEXT, cct_created TEXT, cct_modified TEXT, veces_editada TEXT, fecha_edicion INTEGER)');
+    $this->db->pdo()->exec('ALTER TABLE wp_jet_cct_historial_del_ticket ADD COLUMN veces_editada TEXT');
+    $this->db->pdo()->exec('ALTER TABLE wp_jet_cct_historial_del_ticket ADD COLUMN fecha_edicion INTEGER');
     $this->db->insert('wp_jet_cct_tickets', ['_ID' => 900, 'id_ticket' => '900', 'asunto' => 'Busca apartamento', 'tema_ayuda' => 'Arriendo', 'estado' => 'En proceso', 'estado_comercial' => 'Mostrando', 'estado_administrativo' => 'En gestión', 'id_empleado' => '101', 'nombre_empleado' => 'Consultora Uno', 'correo_empleado' => '101@example.test', 'celular_empleado' => '3000000101', 'solicitante' => 'Laura Prueba', 'correo_solicitante' => 'laura@example.test', 'celular_solicitante' => '3001234567', 'indicativo' => '57']);
     $_SESSION = ['scm_logged_in' => true, 'scm_user_id' => 101, 'scm_employee_id' => '101', 'scm_user_cargo' => '13', 'scm_user' => 'Consultora Uno'];
     $this->mirrorSchema();
@@ -347,4 +352,94 @@ final class CommercialTaskWorkflowTest extends TestCase
     $views = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Views/CommercialDashboardView.php');
     self::assertSame(1, substr_count($views, 'inmuebles/inmueble-'), 'El portal solo se abre desde la ficha.');
   }
-}
+
+  public function testTimelineEntriesAreEditedTwiceAndDeletedWithATrace(): void
+  {
+    $editor = new \SCM\Commercial\CommercialTimelineEditor($this->db);
+    $add = function (string $table, array $row): int {
+      $this->db->insert($table, $row + ['id_ticket' => '900', 'fecha' => 1793000000, 'cct_status' => 'publish']);
+      return (int) $this->db->lastInsertId();
+    };
+    $mine = $add('wp_jet_cct_historial_del_ticket', ['respuesta' => 'Texto con eror', 'id_empleado' => '101', 'nombre' => 'Consultora Uno']);
+    $other = $add('wp_jet_cct_historial_del_ticket', ['respuesta' => 'De otra persona', 'id_empleado' => '202', 'nombre' => 'Consultor Dos']);
+    $client = $add('wp_jet_cct_historial_del_ticket', ['respuesta' => 'Gracias', 'id_empleado' => 'cliente', 'nombre' => 'Laura Prueba']);
+    $follow = $add('wp_jet_cct_seguimiento_ticket', ['observacion' => 'Llamé al cliente', 'id_coordinador' => '101', 'nombre' => 'Consultora Uno']);
+    $foreign = $add('wp_jet_cct_historial_del_ticket', ['respuesta' => 'De otra tarea', 'id_empleado' => '101', 'id_ticket' => '901']);
+    self::assertTrue($editor->editable('respuesta') && $editor->editable('seguimiento') && $editor->editable('nota'));
+
+    // Su autor la edita dos veces; la tercera ya no. El cliente no recibe nada (no hay notificador).
+    self::assertSame(1, $editor->edit(900, 'respuesta', $mine, "Texto con error\r\n<b>corregido</b>", '101', false)['edits']);
+    $row = $this->db->getRow('SELECT * FROM wp_jet_cct_historial_del_ticket WHERE _ID = ?', [$mine]);
+    self::assertSame("Texto con error\ncorregido", $row['respuesta']);
+    self::assertGreaterThan(0, (int) $row['fecha_edicion']);
+    self::assertStringContainsString('Ya no se puede editar de nuevo.', $editor->edit(900, 'respuesta', $mine, 'Segunda corrección', '101', false)['message']);
+    try {
+      $editor->edit(900, 'respuesta', $mine, 'Tercera', '101', false);
+      self::fail('Solo dos ediciones.');
+    } catch (\RuntimeException $exception) {
+      self::assertStringContainsString('ya se editó 2 veces', $exception->getMessage());
+    }
+
+    // Solo el autor (id_empleado exacto, también id_coordinador en seguimientos) o un administrador.
+    $refused = static function (callable $action): bool {
+      try {
+        $action();
+      } catch (\InvalidArgumentException | \RuntimeException) {
+        return true;
+      }
+      return false;
+    };
+    self::assertTrue($refused(fn() => $editor->edit(900, 'respuesta', $other, 'Cambio', '101', false)), 'No es suya.');
+    self::assertSame(1, $editor->edit(900, 'respuesta', $other, 'Cambio del administrador', '303', true)['edits']);
+    self::assertTrue($refused(fn() => $editor->edit(900, 'respuesta', $client, 'Cambio', '303', true)), 'El mensaje del cliente no se toca.');
+    self::assertTrue($refused(fn() => $editor->delete(900, 'respuesta', $foreign, '101', false, 'Consultora Uno')), 'Otra tarea.');
+    self::assertTrue($refused(fn() => $editor->edit(900, 'respuesta', $mine, '   ', '101', false)), 'Texto vacío.');
+
+    // Eliminar deja una nota interna de constancia, que no se edita ni se elimina.
+    $editor->delete(900, 'seguimiento', $follow, '101', false, 'Consultora Uno');
+    self::assertNull($this->db->getRow('SELECT * FROM wp_jet_cct_seguimiento_ticket WHERE _ID = ?', [$follow]));
+    $trace = $this->db->getRow('SELECT * FROM wp_jet_cct_notas_ticket ORDER BY _ID DESC LIMIT 1');
+    self::assertStringStartsWith(\SCM\Commercial\CommercialTimelineEditor::TRACE_PREFIX . ' Consultora Uno eliminó el seguimiento del ', (string) $trace['observacion']);
+    self::assertStringContainsString('Decía: «Llamé al cliente»', (string) $trace['observacion']);
+    self::assertSame(['900', '101', '101'], [$trace['id_ticket'], $trace['id_empleado'], $trace['cct_author_id']]);
+    self::assertTrue($refused(fn() => $editor->delete(900, 'nota', (int) $trace['_ID'], '303', true, 'Coordinación')));
+
+    // Botones: los ve el autor o un administrador, con el permiso; editar mientras queden ediciones.
+    $item = ['_ID' => $mine, 'type' => 'respuesta', 'actor_id' => '101', 'message' => 'x', 'veces_editada' => '1', 'edit_ready' => '1'];
+    self::assertSame(['edit' => true, 'delete' => true, 'edits' => 1], \SCM\Commercial\CommercialTimelineEditor::permissions($item, '101', false, true));
+    self::assertSame(['edit' => false, 'delete' => false, 'edits' => 1], \SCM\Commercial\CommercialTimelineEditor::permissions($item, '202', false, true));
+    self::assertFalse(\SCM\Commercial\CommercialTimelineEditor::permissions($item, '101', false, false)['delete'], 'Sin el permiso.');
+    self::assertFalse(\SCM\Commercial\CommercialTimelineEditor::permissions(['veces_editada' => '2'] + $item, '101', false, true)['edit']);
+    self::assertFalse(\SCM\Commercial\CommercialTimelineEditor::permissions(['edit_ready' => '0'] + $item, '101', false, true)['edit'], 'Sin los campos todavía.');
+    self::assertTrue(\SCM\Commercial\CommercialTimelineEditor::permissions(['actor_id' => '202'] + $item, '303', true, true)['edit']);
+
+    // La tarjeta: botones, editor con el texto y la marca «Editada».
+    $policy = CommercialCallsDatabase::policy($this->db);
+    $timeline = [
+      ['_ID' => $mine, 'type' => 'respuesta', 'actor_id' => '303', 'nombre' => 'Coordinación', 'message' => 'Mi "texto" & más', 'veces_editada' => '1', 'fecha_edicion' => 1793000500, 'edit_ready' => '1', '_timestamp' => 1793000000],
+      ['_ID' => $client, 'type' => 'respuesta', 'actor_id' => 'cliente', 'nombre' => 'Laura', 'message' => 'Gracias, vi https://sucasainmobiliaria.com.co/inmuebles/inmueble-345. y https://www.sucasainmobiliaria.com.co/inmueble/77?x=1', 'veces_editada' => '0', 'edit_ready' => '1', '_timestamp' => 1792000000],
+    ];
+    $_SESSION['scm_employee_id'] = '303';
+    $html = CommercialTicketModalView::render(['ticket' => $this->task(), 'timeline' => $timeline, 'reply_guides' => []], $policy, []);
+    self::assertStringContainsString('data-purpose="timeline-feed" data-ticket-pk="900"', $html);
+    self::assertSame(1, substr_count($html, 'data-commercial-timeline-edit '), 'Solo la propia; la del cliente no.');
+    self::assertSame(1, substr_count($html, 'data-commercial-timeline-delete '));
+    self::assertStringContainsString('data-commercial-timeline-edited>', $html);
+    self::assertStringContainsString('Mi &quot;texto&quot; &amp; más</textarea>', $html);
+    self::assertStringContainsString('Es la última edición. No se le reenvía al cliente.', $html);
+    // Los enlaces de inmuebles del mensaje abren la ficha interna con la tarea de contexto.
+    self::assertStringContainsString('<button type="button" data-commercial-property-detail="345" data-ticket-pk="900"', $html);
+    self::assertStringContainsString('<span>Ficha Inmueble #345</span></button>.', $html);
+    self::assertStringContainsString('data-commercial-property-detail="77"', $html);
+
+    // Permiso y endpoints.
+    self::assertArrayHasKey('historial_editar', \SCM\Commercial\CommercialAccessPolicy::ACTIONS);
+    self::assertStringContainsString("'respuestas_guia_editar', 'historial_editar'],", (string) file_get_contents(dirname(__DIR__, 2) . '/src/Views/CommercialDashboardView.php'), 'En el grupo Tareas de Permisos.');
+    $router = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Http/Api/CommercialActionRouter.php');
+    self::assertStringContainsString("'commercial_timeline_edit' => 'timelineEdit'", $router);
+    self::assertStringContainsString("'commercial_timeline_delete' => 'timelineDelete'", $router);
+    $source = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Http/Controller/CommercialApiController.php');
+    self::assertMatchesRegularExpression("/function timelineEditor\(.*?authorize\('historial_editar'.*?authorizeTicketScope/s", $source);
+    $repository = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Commercial/CommercialTicketsRepository.php');
+    self::assertSame(3, substr_count($repository, 'Edits},'), 'La cronología trae las ediciones de las tres tablas.');
+  }}

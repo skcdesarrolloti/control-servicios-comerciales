@@ -41,6 +41,7 @@ final class CommercialAccessPolicy
     'cambiar_estado' => 'Cambiar estado comercial',
     'reasignar' => 'Reasignar responsable',
     'respuestas_guia_editar' => 'Respuestas guía: crear, editar y eliminar las respuestas comerciales desde la tarea',
+    'historial_editar' => 'Historial de la tarea: editar (hasta 2 veces) y eliminar sus propias respuestas, seguimientos y notas',
     'enviar_notificacion' => 'Enviar notificaciones comerciales',
     'eliminar_notificacion' => 'Eliminar notificaciones comerciales (solo administradores)',
     'editar_actor' => 'Editar datos de actores y registros relacionados',

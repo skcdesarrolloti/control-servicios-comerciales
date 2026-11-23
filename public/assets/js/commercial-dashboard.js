@@ -1121,6 +1121,149 @@
     saveGuide(editor);
   });
 
+  // Cronología de la tarea: editar (hasta 2 veces) y eliminar entradas propias (CommercialTimelineEditor).
+  function timelinePayload(entry, extra) {
+    var feed = entry.closest('[data-purpose="timeline-feed"]');
+    var payload = { ticket_pk: (feed && feed.getAttribute("data-ticket-pk")) || currentCasePk, tipo: entry.getAttribute("data-type") || "", id: entry.getAttribute("data-id") || "" };
+    Object.keys(extra || {}).forEach(function (key) { payload[key] = extra[key]; });
+    return payload;
+  }
+
+  function toggleTimelineEditor(entry, open) {
+    var editor = entry.querySelector("[data-commercial-timeline-editor]");
+    var text = entry.querySelector("[data-commercial-timeline-text]");
+    if (!editor) return;
+    editor.hidden = !open;
+    if (text) text.hidden = open;
+    var message = editor.querySelector("[data-commercial-timeline-message]");
+    if (message) message.textContent = "";
+    if (!open) {
+      editor.reset();
+      return;
+    }
+    var area = editor.querySelector("textarea");
+    if (area) {
+      area.focus();
+      area.setSelectionRange(area.value.length, area.value.length);
+    }
+  }
+
+  function saveTimelineEntry(editor) {
+    var entry = editor.closest("[data-commercial-timeline-entry]");
+    var area = editor.querySelector("textarea");
+    var message = editor.querySelector("[data-commercial-timeline-message]");
+    var submit = editor.querySelector('button[type="submit"]');
+    if (!entry || !area) return;
+    if (!area.value.trim()) {
+      if (message) message.textContent = "Escribe el texto de la entrada.";
+      area.focus();
+      return;
+    }
+    if (submit) submit.disabled = true;
+    request("commercial_timeline_edit", timelinePayload(entry, { texto: area.value }))
+      .then(function (response) {
+        notify("success", response.message || "Entrada editada.");
+        return loadCase(currentCasePk, true);
+      })
+      .catch(function (error) {
+        if (message) message.textContent = error.message;
+      })
+      .finally(function () {
+        if (submit && document.contains(submit)) submit.disabled = false;
+      });
+  }
+
+  // Confirmación con el diseño del panel (encima de la tarea; Escape o el fondo la cancelan sin cerrar la tarea).
+  function confirmInPanel(options) {
+    var previous = document.querySelector("[data-commercial-confirm-dialog]");
+    if (previous) previous.remove();
+    var opener = document.activeElement;
+    var dialog = document.createElement("div");
+    dialog.className = "fixed inset-0 z-[80] flex items-center justify-center p-3 sm:p-6 bg-[#061D49]/55 backdrop-blur-sm";
+    dialog.setAttribute("data-commercial-confirm-dialog", "");
+    dialog.setAttribute("role", "alertdialog");
+    dialog.setAttribute("aria-modal", "true");
+    dialog.setAttribute("aria-labelledby", "commercial-confirm-title");
+    dialog.innerHTML =
+      '<div class="bg-white w-full max-w-md rounded-3xl shadow-modal border border-slate-100 overflow-hidden" role="document">' +
+        '<div class="px-6 pt-6 pb-5 flex items-start gap-3">' +
+          '<span class="w-10 h-10 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-[20px]">' + escapeHtml(options.icon || "delete") + '</span></span>' +
+          '<div class="min-w-0">' +
+            '<h3 class="text-base font-bold text-[#061D49] leading-tight" id="commercial-confirm-title">' + escapeHtml(options.title || "¿Confirmas?") + '</h3>' +
+            '<p class="text-xs text-slate-600 mt-1.5 leading-relaxed">' + escapeHtml(options.text || "") + '</p>' +
+            (options.quote ? '<blockquote class="mt-3 px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 line-clamp-3">' + escapeHtml(options.quote) + '</blockquote>' : "") +
+          '</div>' +
+        '</div>' +
+        '<footer class="px-6 py-3.5 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2">' +
+          '<button type="button" class="px-4 py-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-semibold transition-colors cursor-pointer" data-commercial-confirm-cancel>Cancelar</button>' +
+          '<button type="button" class="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold shadow-sm flex items-center gap-1.5 transition-colors cursor-pointer" data-commercial-confirm-ok><span class="material-symbols-outlined text-[15px]">' + escapeHtml(options.icon || "delete") + '</span><span>' + escapeHtml(options.confirm || "Confirmar") + '</span></button>' +
+        '</footer>' +
+      '</div>';
+    document.body.appendChild(dialog);
+    var ok = dialog.querySelector("[data-commercial-confirm-ok]");
+    ok.focus();
+    return new Promise(function (resolve) {
+      var finish = function (value) {
+        dialog.remove();
+        if (opener && typeof opener.focus === "function" && document.contains(opener)) opener.focus();
+        resolve(value);
+      };
+      dialog.addEventListener("click", function (event) {
+        if (event.target.closest("[data-commercial-confirm-ok]")) finish(true);
+        else if (event.target === dialog || event.target.closest("[data-commercial-confirm-cancel]")) finish(false);
+      });
+      dialog.addEventListener("keydown", function (event) {
+        if (event.key !== "Escape") return;
+        event.preventDefault();
+        event.stopPropagation();
+        finish(false);
+      });
+    });
+  }
+
+  function deleteTimelineEntry(entry) {
+    var text = entry.querySelector("[data-commercial-timeline-text]");
+    var labels = { respuesta: "la respuesta al cliente", seguimiento: "el seguimiento", nota: "la nota interna" };
+    var label = labels[entry.getAttribute("data-type") || ""] || "la entrada";
+    confirmInPanel({
+      title: "¿Eliminar " + label + "?",
+      text: "Se quita del historial de la tarea y queda una nota interna de constancia con quién la eliminó y qué decía." + (entry.getAttribute("data-type") === "nota" ? "" : " El cliente ya recibió este mensaje: no se le avisa."),
+      quote: text ? text.textContent.trim() : "",
+      confirm: "Sí, eliminar"
+    }).then(function (confirmed) {
+      if (!confirmed) return;
+      request("commercial_timeline_delete", timelinePayload(entry))
+        .then(function (response) {
+          notify("success", response.message || "Entrada eliminada.");
+          return loadCase(currentCasePk, true);
+        })
+        .catch(function (error) { notify("error", error.message); });
+    });
+  }
+
+  // Clics de la cronología; devuelve true si el clic era suyo.
+  function handleTimelineClick(event) {
+    var entry = event.target.closest("[data-commercial-timeline-entry]");
+    if (!entry) return false;
+    if (event.target.closest("[data-commercial-timeline-edit]")) {
+      event.preventDefault();
+      var editor = entry.querySelector("[data-commercial-timeline-editor]");
+      toggleTimelineEditor(entry, !!(editor && editor.hidden));
+      return true;
+    }
+    if (event.target.closest("[data-commercial-timeline-cancel]")) {
+      event.preventDefault();
+      toggleTimelineEditor(entry, false);
+      return true;
+    }
+    if (event.target.closest("[data-commercial-timeline-delete]")) {
+      event.preventDefault();
+      deleteTimelineEntry(entry);
+      return true;
+    }
+    return false;
+  }
+
   function submitWorkflow(form) {
     var key = form.getAttribute("data-commercial-workflow-form") || "";
     var action = actionMap[key];
@@ -1874,6 +2017,7 @@
         showCaseModal(false);
         return;
       }
+      if (handleTimelineClick(event)) return;
       var workflowButton = event.target.closest("[data-commercial-open-workflow]");
       var taskFormButton = event.target.closest("[data-commercial-task-form]");
       if (taskFormButton) { loadTaskForm(taskFormButton); return; }
@@ -1981,7 +2125,12 @@
       if (helpName && option) helpName.textContent = option.getAttribute("data-label") || option.textContent.trim();
     });
     caseModal.addEventListener("submit", function (event) {
-
+      var timelineEditor = event.target.closest("[data-commercial-timeline-editor]");
+      if (timelineEditor) {
+        event.preventDefault();
+        saveTimelineEntry(timelineEditor);
+        return;
+      }
       var form = event.target.closest("[data-commercial-workflow-form]");
       if (!form) return;
       event.preventDefault();

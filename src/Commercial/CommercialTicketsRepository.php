@@ -231,6 +231,16 @@ final class CommercialTicketsRepository
     $followUpTable = $this->db->table('jet_cct_seguimiento_ticket');
     $notesTable = $this->db->table('jet_cct_notas_ticket');
     $employeesTable = $this->db->table('jet_cct_funcionarios');
+    // Ediciones de cada entrada (CommercialTimelineEditor); sin los campos aún no se puede editar.
+    $edits = function (string $table, string $alias): string {
+      $ready = $this->schema->columnExists($table, 'veces_editada') && $this->schema->columnExists($table, 'fecha_edicion');
+      return $ready
+        ? "COALESCE(NULLIF(TRIM({$alias}.`veces_editada`), ''), '0') AS `veces_editada`, COALESCE({$alias}.`fecha_edicion`, 0) AS `fecha_edicion`, '1' AS `edit_ready`"
+        : "'0' AS `veces_editada`, 0 AS `fecha_edicion`, '0' AS `edit_ready`";
+    };
+    $historyEdits = $edits($historyTable, 'h');
+    $followUpEdits = $edits($followUpTable, 's');
+    $notesEdits = $edits($notesTable, 'n');
     $timeline = $this->db->getResults(
       "SELECT activity.*
          FROM (
@@ -239,7 +249,7 @@ final class CommercialTicketsRepository
                   COALESCE(NULLIF(TRIM(h.`id_empleado`), ''), NULLIF(TRIM(h.`cct_author_id`), '')) AS `actor_id`,
                   COALESCE(NULLIF(TRIM(h.`correo`), ''), NULLIF(TRIM(f.`correo`), '')) AS `actor_email`,
                   h.`respuesta` AS `message`, 'respuesta' AS `type`,
-                  h.`imagen` AS `image`, h.`archivos` AS `documents`,
+                  h.`imagen` AS `image`, h.`archivos` AS `documents`, {$historyEdits},
                   COALESCE(NULLIF(h.`fecha`, 0), UNIX_TIMESTAMP(h.`cct_created`), 0) AS `_timestamp`
              FROM `{$historyTable}` h
              LEFT JOIN `{$employeesTable}` f
@@ -251,7 +261,7 @@ final class CommercialTicketsRepository
                   COALESCE(NULLIF(TRIM(s.`id_empleado`), ''), NULLIF(TRIM(s.`id_coordinador`), ''), NULLIF(TRIM(s.`cct_author_id`), '')) AS `actor_id`,
                   NULLIF(TRIM(f.`correo`), '') AS `actor_email`,
                   s.`observacion` AS `message`, 'seguimiento' AS `type`,
-                  s.`evidencia` AS `image`, '' AS `documents`,
+                  s.`evidencia` AS `image`, '' AS `documents`, {$followUpEdits},
                   COALESCE(NULLIF(s.`fecha`, 0), UNIX_TIMESTAMP(s.`cct_created`), 0) AS `_timestamp`
              FROM `{$followUpTable}` s
              LEFT JOIN `{$employeesTable}` f
@@ -263,7 +273,7 @@ final class CommercialTicketsRepository
                   COALESCE(NULLIF(TRIM(n.`id_empleado`), ''), NULLIF(TRIM(n.`cct_author_id`), '')) AS `actor_id`,
                   NULLIF(TRIM(f.`correo`), '') AS `actor_email`,
                   n.`observacion` AS `message`, 'nota' AS `type`,
-                  '' AS `image`, '' AS `documents`,
+                  '' AS `image`, '' AS `documents`, {$notesEdits},
                   COALESCE(NULLIF(n.`fecha`, 0), UNIX_TIMESTAMP(n.`cct_created`), 0) AS `_timestamp`
              FROM `{$notesTable}` n
              LEFT JOIN `{$employeesTable}` f

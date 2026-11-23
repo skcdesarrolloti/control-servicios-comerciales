@@ -9,6 +9,7 @@ use SCM\Commercial\CommercialAccessPolicy;
 use SCM\Commercial\CommercialReplyGuides;
 use SCM\Commercial\CommercialStatusCatalog;
 use SCM\Commercial\CommercialTaskTools;
+use SCM\Commercial\CommercialTimelineEditor;
 
 final class CommercialTicketModalView
 {
@@ -457,7 +458,13 @@ final class CommercialTicketModalView
         </div>
 
         <!-- Messages Timeline / Feed -->
-        <div class="space-y-4 overflow-y-auto max-h-[520px] pr-1" data-purpose="timeline-feed">
+        <?php
+          // Editar y eliminar entradas: su autor (id_empleado exacto) o un administrador, con el permiso historial_editar.
+          $me = trim((string) \SCM\Core\Auth::employeeId());
+          $isAdmin = $policy->canManage();
+          $canEditTimeline = $policy->canAct('historial_editar');
+        ?>
+        <div class="space-y-4 overflow-y-auto max-h-[520px] pr-1" data-purpose="timeline-feed" data-ticket-pk="<?php echo esc_attr((string) $pk); ?>">
           <?php if ($timeline === []): ?>
             <div class="py-16 text-center text-slate-400">
               <span class="material-symbols-outlined text-[36px] opacity-40 block mb-1">chat</span>
@@ -477,6 +484,10 @@ final class CommercialTicketModalView
               }
               $time = self::formatDate($item['_timestamp'] ?? $item['fecha'] ?? 0);
               $msg = trim(wp_strip_all_tags((string) ($item['message'] ?? ''), true));
+              $entryId = (int) ($item['_ID'] ?? 0);
+              $can = CommercialTimelineEditor::permissions($item, $me, $isAdmin, $canEditTimeline);
+              $editsLeft = CommercialTimelineEditor::MAX_EDITS - $can['edits'];
+              $editedTs = (int) ($item['fecha_edicion'] ?? 0);
 
               $icon = '↩';
               $badgeBg = 'bg-amber-100 text-amber-900';
@@ -490,7 +501,7 @@ final class CommercialTicketModalView
                 $badgeBg = 'bg-blue-100 text-[#1E3C76]';
               }
             ?>
-              <article class="p-4 rounded-xl border transition-all hover:shadow-sm <?php echo $cardBg; ?>">
+              <article class="p-4 rounded-xl border transition-all hover:shadow-sm <?php echo $cardBg; ?>" data-commercial-timeline-entry data-type="<?php echo esc_attr($type); ?>" data-id="<?php echo esc_attr((string) $entryId); ?>">
                 <div class="flex items-start justify-between gap-3 mb-2">
                   <div class="flex items-center gap-2">
                     <span class="w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold <?php echo $badgeBg; ?>">
@@ -499,15 +510,43 @@ final class CommercialTicketModalView
                     <div>
                       <span class="text-xs font-bold text-slate-900"><?php echo esc_html($fromClient ? 'Mensaje del cliente' : ($labels[$type] ?? 'Actividad')); ?></span>
                       <span class="text-xs text-slate-500">· <?php echo esc_html($author); ?></span>
+                      <?php if ($can['edits'] > 0): ?>
+                        <span class="ml-1 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-500 text-[10px] font-semibold" title="<?php echo esc_attr('Editada ' . $can['edits'] . ($can['edits'] === 1 ? ' vez' : ' veces') . ($editedTs > 0 ? ', la última el ' . self::formatDate($editedTs) : '')); ?>" data-commercial-timeline-edited>
+                          <span class="material-symbols-outlined text-[12px]">edit</span>Editada
+                        </span>
+                      <?php endif; ?>
                     </div>
                   </div>
-                  <div class="text-right">
+                  <div class="flex items-center gap-1.5 shrink-0">
                     <span class="text-xs font-semibold text-slate-700"><?php echo esc_html($time); ?></span>
+                    <?php if ($can['edit']): ?>
+                      <button type="button" class="w-7 h-7 rounded-lg text-slate-400 hover:text-[#1E3C76] hover:bg-[#EBF1FB] flex items-center justify-center cursor-pointer transition-colors" data-commercial-timeline-edit title="<?php echo esc_attr('Editar (' . ($editsLeft === 1 ? 'queda 1 edición' : 'quedan ' . $editsLeft . ' ediciones') . ')'); ?>" aria-label="Editar entrada">
+                        <span class="material-symbols-outlined text-[16px]">edit</span>
+                      </button>
+                    <?php endif; ?>
+                    <?php if ($can['delete']): ?>
+                      <button type="button" class="w-7 h-7 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center cursor-pointer transition-colors" data-commercial-timeline-delete title="Eliminar (queda una nota interna de constancia)" aria-label="Eliminar entrada">
+                        <span class="material-symbols-outlined text-[16px]">delete</span>
+                      </button>
+                    <?php endif; ?>
                   </div>
                 </div>
-                <div class="text-xs sm:text-[13px] text-slate-700 leading-relaxed font-normal pl-8">
-                  <?php echo self::renderFormattedMessage($msg); ?>
+                <div class="text-xs sm:text-[13px] text-slate-700 leading-relaxed font-normal pl-8" data-commercial-timeline-text>
+                  <?php echo self::renderFormattedMessage($msg, $pk); ?>
                 </div>
+                <?php if ($can['edit']): ?>
+                  <form class="pl-8 mt-1 space-y-2" data-commercial-timeline-editor hidden>
+                    <textarea name="texto" rows="5" required maxlength="<?php echo esc_attr((string) CommercialTimelineEditor::MAX_TEXT); ?>" class="w-full text-xs sm:text-[13px] rounded-xl border border-slate-200 focus:border-[#1E3C76] focus:ring focus:ring-[#1E3C76]/20 p-3 outline-none transition bg-white"><?php echo esc_html($msg); ?></textarea>
+                    <div class="flex items-center justify-end gap-2 flex-wrap">
+                      <span class="text-[11px] text-slate-500 mr-auto"><?php echo esc_html(($editsLeft === 1 ? 'Es la última edición' : 'Puedes editarla ' . $editsLeft . ' veces') . ($type !== 'nota' ? '. No se le reenvía al cliente.' : '.')); ?></span>
+                      <span class="text-xs font-medium text-rose-600 w-full text-right" data-commercial-timeline-message aria-live="polite"></span>
+                      <button type="button" class="px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors cursor-pointer" data-commercial-timeline-cancel>Cancelar</button>
+                      <button type="submit" class="px-4 py-1.5 rounded-xl bg-[#061D49] hover:bg-[#1E3C76] text-white text-xs font-semibold shadow-sm flex items-center gap-1.5 transition-colors cursor-pointer">
+                        <span class="material-symbols-outlined text-[15px]">save</span><span>Guardar cambios</span>
+                      </button>
+                    </div>
+                  </form>
+                <?php endif; ?>
                 <?php echo self::timelineAttachments($item); ?>
                 <div class="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400 pl-8">
                   <span><?php echo esc_html(self::actorMeta($actorId, $actorEmail)); ?></span>
@@ -1312,11 +1351,12 @@ final class CommercialTicketModalView
     return $parsed !== false ? date('d/m/Y · h:i a', $parsed) : 'Sin fecha';
   }
 
-  private static function renderFormattedMessage(string $message): string
+  /** Enlaces del mensaje: los de un inmueble abren su ficha interna (con la tarea de contexto); los demás, la página. */
+  private static function renderFormattedMessage(string $message, int $ticketPk = 0): string
   {
     $escaped = esc_html($message);
     $pattern = '#https?://[^\s<>"\'\(\)]+#i';
-    $formatted = preg_replace_callback($pattern, static function (array $matches): string {
+    $formatted = preg_replace_callback($pattern, static function (array $matches) use ($ticketPk): string {
       $url = $matches[0];
       $trailing = '';
       if (preg_match('/[.,;:!]+$/', $url, $punctMatches)) {
@@ -1324,13 +1364,14 @@ final class CommercialTicketModalView
         $url = substr($url, 0, -strlen($trailing));
       }
 
-      if (preg_match('#^https?://(?:www\.)?sucasainmobiliaria\.com\.co/inmueble/([a-zA-Z0-9_-]+)(?:[/?#].*)?$#i', $url, $codeMatches)) {
-        $code = esc_html($codeMatches[1]);
-        $safeUrl = esc_url($url);
+      // Ficha del inmueble: /inmuebles/inmueble-<código> (o el formato anterior /inmueble/<código>).
+      if (preg_match('~^https?://(?:www\.)?sucasainmobiliaria\.com\.co/(?:inmuebles/inmueble-|inmueble/)([a-zA-Z0-9_-]+)/?(?:[?#].*)?$~i', $url, $codeMatches)) {
+        $code = esc_attr($codeMatches[1]);
         return sprintf(
-          '<a href="%s" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-2.5 py-1 my-1 rounded-lg bg-[#EBF1FB] hover:bg-[#d5e3f7] text-[#1E3C76] font-semibold text-xs border border-[#1E3C76]/25 transition-all shadow-xs cursor-pointer"><span class="material-symbols-outlined text-[15px] text-[#1E3C76]">apartment</span><span>Ficha Inmueble #%s</span><span class="material-symbols-outlined text-[13px] opacity-60">open_in_new</span></a>%s',
-          $safeUrl,
+          '<button type="button" data-commercial-property-detail="%s" data-ticket-pk="%s" class="inline-flex items-center gap-1.5 px-2.5 py-1 my-1 rounded-lg bg-[#EBF1FB] hover:bg-[#d5e3f7] text-[#1E3C76] font-semibold text-xs border border-[#1E3C76]/25 transition-all shadow-xs cursor-pointer"><span class="material-symbols-outlined text-[15px] text-[#1E3C76]">apartment</span><span>Ficha Inmueble #%s</span></button>%s',
           $code,
+          esc_attr((string) $ticketPk),
+          esc_html($codeMatches[1]),
           $trailing
         );
       }

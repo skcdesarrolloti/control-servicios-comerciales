@@ -188,6 +188,8 @@ final class CommercialActionRouter
       'commercial_ticket_close' => 'close',
       'commercial_reply_guide_save' => 'replyGuideSave',
       'commercial_reply_guide_delete' => 'replyGuideDelete',
+      'commercial_timeline_edit' => 'timelineEdit',
+      'commercial_timeline_delete' => 'timelineDelete',
       'commercial_permissions_save' => 'savePermissions',
       'commercial_calendar_due' => 'calendarDue',
       'commercial_calendar_cita_notify' => 'calendarCitaNotify',
