@@ -683,7 +683,7 @@ final class CommercialDashboardView
     </div>
 
     <!-- Modal Detalle Completo de Inmueble -->
-    <div class="fixed inset-0 z-50 items-center justify-center p-3 sm:p-5 lg:p-7 bg-[#061D49]/60 backdrop-blur-md commercial-modal overflow-y-auto" id="commercial-property-detail-modal" role="dialog" aria-modal="true" aria-labelledby="commercial-property-detail-title" aria-hidden="true">
+    <div class="fixed inset-0 z-[60] items-center justify-center p-3 sm:p-5 lg:p-7 bg-[#061D49]/60 backdrop-blur-md commercial-modal overflow-y-auto" id="commercial-property-detail-modal" role="dialog" aria-modal="true" aria-labelledby="commercial-property-detail-title" aria-hidden="true">
       <div class="bg-surface-container-lowest w-full max-w-5xl max-h-[94vh] rounded-3xl shadow-modal border border-slate-200/80 flex flex-col overflow-hidden relative text-on-surface" role="document" data-commercial-property-detail-container>
         <div class="flex items-center justify-center py-28 text-slate-500 gap-3">
           <span class="w-3 h-3 rounded-full bg-[#1E3C76] animate-ping"></span>
@@ -3966,9 +3966,6 @@ final class CommercialDashboardView
                       <span class="material-symbols-outlined text-[15px]">visibility</span>
                       <span>Ver ficha</span>
                     </button>
-                    <a href="https://sucasainmobiliaria.com.co/inmuebles/inmueble-<?php echo esc_attr($reqCode); ?>" target="_blank" rel="noopener noreferrer" class="p-1.5 rounded-xl bg-surface-container-low hover:bg-surface-container text-secondary text-xs transition-all cursor-pointer border border-outline-variant/30" title="Ver en sitio web">
-                      <span class="material-symbols-outlined text-[16px]">open_in_new</span>
-                    </a>
                   </div>
 
                   <?php if ($reqEstado === 'pendiente'): ?>
@@ -4085,8 +4082,7 @@ final class CommercialDashboardView
         $businessBadgeClass = 'bg-[#1E3C76]/85 text-white';
       }
 
-      $portalUrl = "https://sucasainmobiliaria.com.co/inmuebles/inmueble-{$codigo}";
-      $title = $tipoInmueble . ($barrio !== '' ? " en {$barrio}" : '');
+      $title =$tipoInmueble . ($barrio !== '' ? " en {$barrio}" : '');
       $initials = self::initials($funcionarioNombre);
 ?>
       <article class="group bg-surface-container-lowest rounded-2xl border border-surface-container overflow-hidden shadow-xs hover:shadow-lg hover:border-outline-variant/60 transition-all duration-300 flex flex-col" data-commercial-property-card="<?php echo esc_attr($codigo); ?>">
@@ -4245,9 +4241,6 @@ final class CommercialDashboardView
           </div>
 
           <div class="flex items-center gap-1.5 shrink-0">
-            <a href="<?php echo esc_url($portalUrl); ?>" target="_blank" rel="noopener noreferrer" class="p-1.5 rounded-lg bg-surface-container-low hover:bg-surface-container text-on-surface hover:text-primary transition-colors cursor-pointer" title="Ver en portal sucasainmobiliaria.com.co">
-              <span class="material-symbols-outlined text-[17px]">open_in_new</span>
-            </a>
             <button type="button" class="px-3 py-1.5 rounded-lg bg-primary text-white hover:bg-primary/90 text-xs font-semibold transition-all shadow-xs cursor-pointer flex items-center gap-1 active:scale-95" data-commercial-property-detail="<?php echo esc_attr($codigo); ?>">
               <span class="material-symbols-outlined text-[14px]">visibility</span>
               <span>Ficha</span>
@@ -4354,7 +4347,7 @@ final class CommercialDashboardView
       <div class="flex items-center gap-2 shrink-0">
         <a href="<?php echo esc_url($portalUrl); ?>" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface text-xs font-semibold transition-all cursor-pointer">
           <span class="material-symbols-outlined text-[16px]">open_in_new</span>
-          <span class="hidden sm:inline">Ver en portal</span>
+          <span class="hidden sm:inline">Ver en la página web</span>
         </a>
         <button type="button" class="w-8 h-8 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface flex items-center justify-center cursor-pointer transition-colors" data-commercial-close-property-detail aria-label="Cerrar modal">
           <span class="material-symbols-outlined text-[18px]">close</span>

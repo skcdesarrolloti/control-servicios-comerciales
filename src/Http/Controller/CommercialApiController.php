@@ -1432,16 +1432,17 @@ final class CommercialApiController
   public function propertyDetail(array $input): never
   {
     $this->verify($input);
-    // La tabla de control de la calculadora de mercado también abre la ficha del inmueble.
-    if (!$this->policy->canView('inmuebles') && !($this->policy->canSubview('herramientas', 'calculadora_mercado') && $this->policy->canAct('mercado_vista_completa'))) {
-      JsonResponse::error('No tienes permiso para consultar inmuebles.', 403);
-    }
     $identifier = trim((string) ($input['codigo'] ?? $input['property_id'] ?? ''));
     if ($identifier === '') {
       JsonResponse::error('Identificador de inmueble inválido.', 400);
     }
+    // La tabla de control de la calculadora de mercado también abre la ficha del inmueble.
+    $general = $this->policy->canView('inmuebles') || ($this->policy->canSubview('herramientas', 'calculadora_mercado') && $this->policy->canAct('mercado_vista_completa'));
     $repo = new CommercialPropertiesRepository($this->db);
     $property = $repo->propertyDetail($identifier);
+    if (!$general && !(is_array($property) && $this->canOpenPropertyFromContext($property, (int) ($input['ticket_pk'] ?? 0)))) {
+      JsonResponse::error('No tienes permiso para consultar inmuebles.', 403);
+    }
     if (!is_array($property) || $property === []) {
       JsonResponse::error('Inmueble no encontrado.', 404);
     }
@@ -1450,6 +1451,34 @@ final class CommercialApiController
       'property' => $property,
       'html' => $html,
     ]);
+  }
+
+  /**
+   * Sin la vista Inmuebles, la ficha se abre desde una tarea que la persona ve y que es de ese inmueble,
+   * o si el inmueble está a su cargo (avisos y actualizaciones del calendario), por su id_empleado exacto.
+   * @param array<string,mixed> $property
+   */
+  private function canOpenPropertyFromContext(array $property, int $ticketPk): bool
+  {
+    $code = trim((string) ($property['codigo'] ?? ''));
+    $me = trim((string) \SCM\Core\Auth::employeeId());
+    if ($me !== '' && trim((string) ($property['id_funcionario'] ?? '')) === $me) {
+      return true;
+    }
+    if ($ticketPk <= 0 || !$this->policy->canAct('ver_ticket')) {
+      return false;
+    }
+    $this->authorizeTicketScope($ticketPk);
+    try {
+      $ticket = $this->tickets->detail($ticketPk)['ticket'];
+    } catch (\InvalidArgumentException | \RuntimeException) {
+      return false;
+    }
+    $data = is_array($ticket['_scm_inmueble_data'] ?? null) ? $ticket['_scm_inmueble_data'] : [];
+    if ($data !== [] && trim((string) ($data['_ID'] ?? '')) !== '' && trim((string) ($data['_ID'] ?? '')) === trim((string) ($property['_ID'] ?? ''))) {
+      return true;
+    }
+    return $code !== '' && in_array($code, array_map(static fn($value): string => trim((string) $value), [$ticket['id_inmueble'] ?? '', $ticket['inmueble'] ?? '', $data['codigo'] ?? '']), true);
   }
 
   /** @param array<string,mixed> $input */

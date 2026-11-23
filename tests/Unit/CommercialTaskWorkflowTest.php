@@ -305,7 +305,33 @@ final class CommercialTaskWorkflowTest extends TestCase
     $html = $render(['id_inmueble' => '345']);
     self::assertStringNotContainsString('Finalizar y Entregar Inmueble', $html, 'Cerrar la tarea va solo en Gestión Operativa.');
     self::assertStringNotContainsString('Core CRM', $html);
-    self::assertStringContainsString('href="https://sucasainmobiliaria.com.co/inmuebles/inmueble-345"', $html);
     self::assertStringContainsString('data-commercial-insert-property="345"', $html);
+  }
+
+  public function testPropertySheetOpensInsideThePanelAndTheSlaIsReal(): void
+  {
+    $policy = CommercialCallsDatabase::policy($this->db);
+    $ticket = (new \SCM\Commercial\CommercialSlaService($this->db))->decorateTicket(['id_inmueble' => '345', 'fecha' => time()] + $this->task());
+    self::assertNotSame('', (string) ($ticket['scm_sla_status'] ?? ''));
+    $repository = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Commercial/CommercialTicketsRepository.php');
+    self::assertStringContainsString('$ticket = $this->sla->decorateTicket($enrichedTickets[0] ?? $ticket);', $repository, 'El detalle de la tarea trae el SLA calculado.');
+    $html = CommercialTicketModalView::render(['ticket' => $ticket, 'timeline' => [], 'reply_guides' => []], $policy, []);
+
+    // La ficha del inmueble es la interna (con la tarea como contexto); el enlace al portal va dentro de la ficha.
+    self::assertSame(2, substr_count($html, 'data-commercial-property-detail="345" data-ticket-pk="900"'));
+    self::assertStringNotContainsString('href="https://sucasainmobiliaria.com.co/inmuebles/inmueble-', $html);
+    self::assertStringNotContainsString('Lead Calificado', $html);
+    self::assertStringNotContainsString('92%', $html);
+    self::assertStringContainsString('data-commercial-sla="' . $ticket['scm_sla_status'] . '"', $html);
+    $late = CommercialTicketModalView::render(['ticket' => ['scm_sla_status' => 'atrasado', 'scm_sla_is_overdue' => '1', 'scm_attention_days' => 7, 'scm_sla_due_days' => 5, 'scm_sla_percent' => 140] + $ticket, 'timeline' => [], 'reply_guides' => []], $policy, []);
+    self::assertStringContainsString('>Atrasada</span>', $late);
+    self::assertStringContainsString('7 días hábiles sin atender; el plazo es de 5.', $late);
+    self::assertStringContainsString('style="width:100%"', $late);
+
+    // Servidor: sin la vista Inmuebles, solo desde una tarea visible de ese inmueble o si el inmueble está a su cargo.
+    $source = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Http/Controller/CommercialApiController.php');
+    self::assertMatchesRegularExpression('/function canOpenPropertyFromContext.*?id_funcionario.*?authorizeTicketScope\(\$ticketPk\)/s', $source);
+    $views = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Views/CommercialDashboardView.php');
+    self::assertSame(1, substr_count($views, 'inmuebles/inmueble-'), 'El portal solo se abre desde la ficha.');
   }
 }

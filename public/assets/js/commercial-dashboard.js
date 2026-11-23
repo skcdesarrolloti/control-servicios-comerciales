@@ -951,7 +951,8 @@
     return "https://sucasainmobiliaria.com.co/inmuebles/inmueble-" + encodeURIComponent(code);
   }
 
-  // Botones «Otro inmueble» y «Enlace web» de Responder: piden el dato en un popup del panel y devuelven el enlace listo.
+  // Botones «Otro inmueble» y «Enlace web» de Responder: piden el dato en un popup propio del panel
+  // (mismo diseño que la ventana de guías, encima de la tarea) y devuelven el enlace listo, o "" si se cancela.
   function askLink(kind) {
     var property = kind === "property";
     var check = function (value) {
@@ -959,29 +960,80 @@
       if (property) return /^[A-Za-z0-9_-]+$/.test(value) ? "" : "Escribe solo el código del inmueble (números o letras, sin espacios).";
       return /^https?:\/\/\S+\.\S+$/i.test(value) ? "" : "La dirección debe empezar con https:// y no llevar espacios.";
     };
-    var done = function (value) {
-      value = String(value || "").trim();
-      return check(value) === "" ? (property ? propertyUrl(value) : value) : "";
-    };
-    if (!(window.Swal && typeof window.Swal.fire === "function")) {
-      return Promise.resolve(done(window.prompt(property ? "Código del inmueble:" : "Dirección web (https://…):", property ? "" : "https://")));
-    }
-    return window.Swal.fire({
-      title: property ? "Enlace de otro inmueble" : "Enlace web",
-      text: property
-        ? "Escribe el código del inmueble y se agrega a la respuesta el enlace de su ficha en la página web."
-        : "Pega la dirección completa de la página que quieres compartir con el cliente.",
-      input: "text",
-      inputValue: property ? "" : "https://",
-      inputPlaceholder: property ? "Ej: 12345" : "https://…",
-      showCancelButton: true,
-      confirmButtonText: "Insertar enlace",
-      cancelButtonText: "Cancelar",
-      confirmButtonColor: "#061D49",
-      inputValidator: check
-    }).then(function (result) { return result.isConfirmed ? done(result.value) : ""; });
+    var previous = document.querySelector("[data-commercial-link-dialog]");
+    if (previous) previous.remove();
+    var opener = document.activeElement;
+    var dialog = document.createElement("div");
+    dialog.className = "fixed inset-0 z-[80] flex items-center justify-center p-3 sm:p-6 bg-[#061D49]/55 backdrop-blur-sm";
+    dialog.setAttribute("data-commercial-link-dialog", kind);
+    dialog.setAttribute("role", "dialog");
+    dialog.setAttribute("aria-modal", "true");
+    dialog.setAttribute("aria-labelledby", "commercial-link-dialog-title");
+    dialog.innerHTML =
+      '<form class="bg-white w-full max-w-md rounded-3xl shadow-modal border border-slate-100 overflow-hidden" role="document" novalidate>' +
+        '<header class="px-6 pt-5 pb-4 border-b border-slate-100 flex items-start gap-3">' +
+          '<span class="w-10 h-10 rounded-2xl bg-[#EBF1FB] text-[#1E3C76] flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-[20px]">' + (property ? "add_home_work" : "link") + '</span></span>' +
+          '<div class="min-w-0 flex-1">' +
+            '<p class="text-[11px] font-bold uppercase tracking-wider text-[#1E3C76]">Enlace para la respuesta</p>' +
+            '<h3 class="text-base font-bold text-[#061D49] leading-tight" id="commercial-link-dialog-title">' + (property ? "Otro inmueble" : "Enlace web") + '</h3>' +
+            '<p class="text-xs text-slate-500 mt-0.5">' + (property ? "Se agrega el enlace de su ficha en la página web." : "Se agrega tal cual, para que el cliente la abra.") + '</p>' +
+          '</div>' +
+          '<button type="button" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center cursor-pointer transition-colors" data-commercial-link-cancel aria-label="Cerrar"><span class="material-symbols-outlined text-[18px]">close</span></button>' +
+        '</header>' +
+        '<div class="px-6 py-5 space-y-2">' +
+          '<label class="block text-xs font-semibold text-slate-700" for="commercial-link-dialog-input">' + (property ? "Código del inmueble" : "Dirección web") + '</label>' +
+          '<input id="commercial-link-dialog-input" type="text" autocomplete="off" inputmode="' + (property ? "text" : "url") + '" placeholder="' + (property ? "Ej: 12345" : "https://…") + '" value="' + (property ? "" : "https://") + '" class="w-full text-sm rounded-xl border border-slate-200 focus:border-[#1E3C76] focus:ring focus:ring-[#1E3C76]/20 p-2.5 outline-none transition">' +
+          '<p class="text-[11px] text-slate-500 truncate" data-commercial-link-preview>' + (property ? "Escribe el código para ver el enlace." : "Pega la dirección completa de la página.") + '</p>' +
+          '<p class="text-xs font-medium text-rose-600" data-commercial-link-error aria-live="polite"></p>' +
+        '</div>' +
+        '<footer class="px-6 py-3.5 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2">' +
+          '<button type="button" class="px-4 py-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-semibold transition-colors cursor-pointer" data-commercial-link-cancel>Cancelar</button>' +
+          '<button type="submit" class="px-5 py-2 rounded-xl bg-[#061D49] hover:bg-[#1E3C76] text-white text-xs font-semibold shadow-sm flex items-center gap-1.5 transition-colors cursor-pointer"><span class="material-symbols-outlined text-[15px]">add_link</span><span>Insertar enlace</span></button>' +
+        '</footer>' +
+      '</form>';
+    document.body.appendChild(dialog);
+    var form = dialog.querySelector("form");
+    var input = dialog.querySelector("input");
+    var error = dialog.querySelector("[data-commercial-link-error]");
+    var preview = dialog.querySelector("[data-commercial-link-preview]");
+    input.focus();
+    if (!property) input.setSelectionRange(input.value.length, input.value.length);
+    return new Promise(function (resolve) {
+      var finish = function (url) {
+        dialog.remove();
+        if (opener && typeof opener.focus === "function" && document.contains(opener)) opener.focus();
+        resolve(url);
+      };
+      dialog.addEventListener("click", function (event) {
+        if (event.target === dialog || event.target.closest("[data-commercial-link-cancel]")) finish("");
+      });
+      // Escape cierra solo este popup, no la tarea.
+      dialog.addEventListener("keydown", function (event) {
+        if (event.key !== "Escape") return;
+        event.preventDefault();
+        event.stopPropagation();
+        finish("");
+      });
+      input.addEventListener("input", function () {
+        error.textContent = "";
+        if (property) {
+          var code = input.value.trim();
+          preview.textContent = code && !check(code) ? "Se agrega: " + propertyUrl(code) : "Escribe el código para ver el enlace.";
+        }
+      });
+      form.addEventListener("submit", function (event) {
+        event.preventDefault();
+        var value = input.value.trim();
+        var problem = check(value);
+        if (problem) {
+          error.textContent = problem;
+          input.focus();
+          return;
+        }
+        finish(property ? propertyUrl(value) : value);
+      });
+    });
   }
-
   function insertLinkInReply(button, url) {
     var form = button.closest("form");
     var textarea = form ? form.querySelector('textarea[name="respuesta"]') : null;
@@ -1149,7 +1201,7 @@
   function signDetailMarkup(row) {
     row = row || {};
     var maps = row.maps_url ? '<a class="commercial-control-btn commercial-control-btn--primary" target="_blank" rel="noopener" href="' + escapeHtml(row.maps_url) + '">Ver en Google Maps</a>' : "";
-    var property = row.property_url ? '<a class="commercial-control-btn" target="_blank" rel="noopener" href="' + escapeHtml(row.property_url) + '">Ver inmueble</a>' : "";
+    var property = row.codigo ? '<button type="button" class="commercial-control-btn" data-commercial-property-detail="' + escapeHtml(row.codigo) + '">Ficha del inmueble</button>' : "";
     var stateClass = /venc|atras/i.test(row.estado || "") ? "danger" : (/alert/i.test(row.estado || "") ? "warning" : "success");
     function rowItem(label, value) {
       return "<div><span>" + escapeHtml(label) + "</span><strong>" + escapeHtml(value || "-") + "</strong></div>";
@@ -1327,14 +1379,14 @@
     });
   }
 
-  function openPropertyDetail(propCode) {
+  function openPropertyDetail(propCode, ticketPk) {
     if (!propCode) return;
     var propModal = document.getElementById("commercial-property-detail-modal");
     var propContainer = propModal && propModal.querySelector("[data-commercial-property-detail-container]");
     if (propModal && propContainer) {
       propContainer.innerHTML = '<div class="flex items-center justify-center py-28 text-slate-500 gap-3"><span class="w-3 h-3 rounded-full bg-[#1E3C76] animate-ping"></span><p class="font-body-md text-sm font-medium">Cargando información del inmueble…</p></div>';
       setStandaloneModal(propModal, true);
-      request("commercial_property_detail", { codigo: propCode })
+      request("commercial_property_detail", { codigo: propCode, ticket_pk: ticketPk || "" })
         .then(function (res) {
           if (res && res.html) {
             propContainer.innerHTML = res.html;
@@ -1442,7 +1494,7 @@
     if (propertyDetailBtn) {
       event.preventDefault();
       var propCode = propertyDetailBtn.getAttribute("data-commercial-property-detail") || "";
-      openPropertyDetail(propCode);
+      openPropertyDetail(propCode, propertyDetailBtn.getAttribute("data-ticket-pk") || "");
       return;
     }
     var closePropDetail = event.target.closest("[data-commercial-close-property-detail]");
@@ -2050,6 +2102,8 @@
     var guides = guidesModal();
     if (guides && guides.classList.contains("open")) setGuidesModal(false);
     else if (modal && modal.classList.contains("open")) setAnalysisModal(false);
+    // La ficha del inmueble se abre encima de la tarea y de los avisos: Escape la cierra primero.
+    else if (document.getElementById("commercial-property-detail-modal") && document.getElementById("commercial-property-detail-modal").classList.contains("open")) setStandaloneModal(document.getElementById("commercial-property-detail-modal"), false);
     else if (document.getElementById("commercial-property-modal") && document.getElementById("commercial-property-modal").classList.contains("open")) setStandaloneModal(document.getElementById("commercial-property-modal"), false);
     else if (document.getElementById("commercial-sign-detail-modal") && document.getElementById("commercial-sign-detail-modal").classList.contains("open")) setStandaloneModal(document.getElementById("commercial-sign-detail-modal"), false);
     else if (document.getElementById("commercial-property-detail-modal") && document.getElementById("commercial-property-detail-modal").classList.contains("open")) setStandaloneModal(document.getElementById("commercial-property-detail-modal"), false);

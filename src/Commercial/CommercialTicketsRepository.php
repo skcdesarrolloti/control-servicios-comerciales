@@ -223,7 +223,7 @@ final class CommercialTicketsRepository
       throw new \RuntimeException('La tarea comercial no existe.');
     }
     $enrichedTickets = $this->enrichPropertyData([$ticket]);
-    $ticket = $enrichedTickets[0] ?? $ticket;
+    $ticket = $this->sla->decorateTicket($enrichedTickets[0] ?? $ticket);
 
     $keys = $this->ticketLookupKeys($ticket, $ticketPk);
     $placeholders = implode(',', array_fill(0, count($keys), '?'));

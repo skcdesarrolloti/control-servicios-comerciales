@@ -122,10 +122,10 @@ final class CommercialTicketModalView
       <!-- Quick Action Buttons -->
       <div class="flex flex-wrap items-center gap-2 self-start md:self-auto">
         <?php if ($propertyCode !== ''): ?>
-          <a href="https://sucasainmobiliaria.com.co/inmuebles/inmueble-<?php echo esc_attr($propertyCode); ?>" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-[#EBF1FB] text-[#061D49] border border-slate-200 hover:border-[#1E3C76] text-xs font-medium transition-all shadow-sm cursor-pointer">
+          <button type="button" data-commercial-property-detail="<?php echo esc_attr($propertyCode); ?>" data-ticket-pk="<?php echo esc_attr((string) $pk); ?>" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-[#EBF1FB] text-[#061D49] border border-slate-200 hover:border-[#1E3C76] text-xs font-medium transition-all shadow-sm cursor-pointer">
             <span class="material-symbols-outlined text-[16px] text-[#1E3C76]">apartment</span>
             <span>Ficha del inmueble</span>
-          </a>
+          </button>
         <?php endif; ?>
       </div>
     </div>
@@ -296,12 +296,8 @@ final class CommercialTicketModalView
 
       <!-- Customer and Property Details Card -->
       <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-card flex flex-col gap-4" data-purpose="customer-property-summary">
-        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div class="border-b border-slate-100 pb-3">
           <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Detalles &amp; Contacto</span>
-          <span class="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
-            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-            Lead Calificado
-          </span>
         </div>
 
         <!-- Solicitante Profile Block -->
@@ -376,10 +372,10 @@ final class CommercialTicketModalView
             <?php endif; ?>
             <?php if ($propertyCode !== ''): ?>
               <div class="pt-1 flex items-center justify-between">
-                <a href="https://sucasainmobiliaria.com.co/inmuebles/inmueble-<?php echo esc_attr($propertyCode); ?>" target="_blank" rel="noopener noreferrer" class="text-xs font-semibold text-[#1E3C76] hover:text-[#061D49] hover:underline flex items-center gap-1 cursor-pointer">
+                <button type="button" data-commercial-property-detail="<?php echo esc_attr($propertyCode); ?>" data-ticket-pk="<?php echo esc_attr((string) $pk); ?>" class="text-xs font-semibold text-[#1E3C76] hover:text-[#061D49] hover:underline flex items-center gap-1 cursor-pointer">
                   <span>Abrir ficha técnica detallada</span>
-                  <span class="material-symbols-outlined text-[14px]">open_in_new</span>
-                </a>
+                  <span class="material-symbols-outlined text-[14px]">arrow_forward</span>
+                </button>
               </div>
             <?php endif; ?>
           </div>
@@ -401,16 +397,7 @@ final class CommercialTicketModalView
           <?php endif; ?>
         </div>
 
-        <!-- Tiempos SLA -->
-        <div class="pt-2 border-t border-slate-100">
-          <div class="flex justify-between text-xs mb-1">
-            <span class="text-slate-500 font-medium">Cumplimiento de Acuerdo (SLA)</span>
-            <span class="font-bold text-slate-800">92%</span>
-          </div>
-          <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-            <div class="bg-[#F8CF4A] h-2 rounded-full w-[92%]"></div>
-          </div>
-        </div>
+        <?php echo self::slaBar($ticket); ?>
       </div>
 
       <!-- Saved Analyses -->
@@ -620,6 +607,43 @@ final class CommercialTicketModalView
       }
     }
     return $counts;
+  }
+
+  /**
+   * Plazo de atención real de la tarea (CommercialSlaService::decorateTicket, SLA del tema en Configuración).
+   * @param array<string,mixed> $ticket
+   */
+  private static function slaBar(array $ticket): string
+  {
+    $status = (string) ($ticket['scm_sla_status'] ?? '');
+    if ($status === '') {
+      return '';
+    }
+    $days = (int) ($ticket['scm_attention_days'] ?? 0);
+    $due = max(1, (int) ($ticket['scm_sla_due_days'] ?? 1));
+    $warning = (int) ($ticket['scm_sla_warning_from'] ?? 0);
+    $overdue = (string) ($ticket['scm_sla_is_overdue'] ?? '0') === '1';
+    if ($status === 'cerrado' || $status === 'postergado') {
+      $label = $status === 'cerrado' ? 'Cerrada' : 'Postergada';
+      $detail = $status === 'cerrado' ? 'La tarea ya no cuenta plazo.' : 'El plazo no corre mientras esté postergada.';
+      $tone = ['text-slate-600', 'bg-slate-300'];
+      $width = $status === 'cerrado' ? 100 : 0;
+    } else {
+      $label = $overdue ? 'Atrasada' : ($warning > 0 && $days >= $warning ? 'Por vencer' : 'Al día');
+      $detail = $overdue
+        ? sprintf('%d %s hábiles sin atender; el plazo es de %d.', $days, $days === 1 ? 'día' : 'días', $due)
+        : sprintf('Día %d de %d hábiles para atenderla.', $days, $due);
+      $tone = $overdue ? ['text-rose-700', 'bg-rose-500'] : ($label === 'Por vencer' ? ['text-amber-700', 'bg-[#F8CF4A]'] : ['text-emerald-700', 'bg-emerald-500']);
+      $width = min(100, max(4, (int) ($ticket['scm_sla_percent'] ?? 0)));
+    }
+    return '<div class="pt-2 border-t border-slate-100" data-commercial-sla="' . esc_attr($status) . '">'
+      . '<div class="flex justify-between gap-2 text-xs mb-1">'
+      . '<span class="text-slate-500 font-medium">Tiempo de atención (SLA)</span>'
+      . '<span class="font-bold ' . $tone[0] . '">' . esc_html($label) . '</span>'
+      . '</div>'
+      . '<div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden"><div class="h-2 rounded-full ' . $tone[1] . '" style="width:' . $width . '%"></div></div>'
+      . '<p class="text-[11px] text-slate-500 mt-1">' . esc_html($detail) . '</p>'
+      . '</div>';
   }
 
   private static function actorMeta(string $actorId, string $actorEmail): string

@@ -1283,7 +1283,9 @@
         var links = [];
         if (caseData.ticket_pk) links.push('<button type="button" class="' + linkClass + '" data-commercial-open-case="' + escHtml(caseData.ticket_pk) + '">Ver tarea</button>');
         if (caseData.link_url) links.push('<a class="' + linkClass + '" href="' + escHtml(caseData.link_url) + '" target="_blank" rel="noopener">' + escHtml(caseData.link_label || "Abrir") + '</a>');
-        if (caseData.property_url) links.push('<a class="' + linkClass + '" href="' + escHtml(caseData.property_url) + '" target="_blank" rel="noopener">Ver inmueble</a>');
+        // Comercial: la ficha del inmueble se abre en el panel (commercial-dashboard.js), que trae el botón al portal.
+        if (caseData.property_code) links.push('<button type="button" class="' + linkClass + '" data-commercial-property-detail="' + escHtml(caseData.property_code) + '">Ver inmueble</button>');
+        else if (caseData.property_url) links.push('<a class="' + linkClass + '" href="' + escHtml(caseData.property_url) + '" target="_blank" rel="noopener">Ver inmueble</a>');
         return links.join('<span class="text-slate-300" aria-hidden="true">·</span>');
       }
 
