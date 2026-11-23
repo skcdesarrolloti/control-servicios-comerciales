@@ -418,10 +418,10 @@ final class CommercialTicketModalView
           <?php echo self::messageForm($pk, 'note', 'Agregar nota interna privada', 'Esta nota sólo será visible para el equipo interno y auditoría.', 'observacion', 'Escribe los detalles internos confidenciales de la tarea…', 'Guardar nota interna'); ?>
         <?php endif; ?>
         <?php if ($policy->canAct('seguimiento')): ?>
-          <?php echo self::messageForm($pk, 'follow_up', 'Registrar gestión de seguimiento', 'Deja constancia de llamadas, acuerdos o gestiones comerciales realizadas.', 'observacion', 'Describe detalladamente la gestión comercial efectuada…', 'Guardar seguimiento', true, false, true); ?>
+          <?php echo self::messageForm($pk, 'follow_up', 'Registrar gestión de seguimiento', 'Deja constancia de llamadas, acuerdos o gestiones comerciales realizadas. El cliente lo recibe por correo.', 'observacion', 'Describe detalladamente la gestión comercial efectuada…', 'Guardar seguimiento', false, true); ?>
         <?php endif; ?>
         <?php if ($policy->canAct('postergar')): ?>
-          <?php echo self::messageForm($pk, 'postpone', 'Postergar tarea', 'La tarea se moverá al estado comercial Postergado hasta la fecha programada.', 'observacion', 'Indica el motivo o justificación de la postergación…', 'Postergar tarea', true, true, true); ?>
+          <?php echo self::messageForm($pk, 'postpone', 'Postergar tarea', 'La tarea pasa al estado comercial Postergado. El cliente recibe el motivo por correo.', 'observacion', 'Indica el motivo o justificación de la postergación…', 'Postergar tarea', true, true); ?>
         <?php endif; ?>
         <?php if ($policy->canAct('activar') && $isPostponedOrClosed): ?>
           <?php echo self::statusMessageForm($pk, 'activate', 'Activar tarea', 'Selecciona el estado con el que retoma la gestión activa.', 'motivo', CommercialStatusCatalog::OPEN, 'Nuevo', 'Activar tarea ahora', false, true); ?>
@@ -640,7 +640,7 @@ final class CommercialTicketModalView
             <span class="material-symbols-outlined text-[18px] text-[#1E3C76]">reply</span>
             <span>Responder al solicitante</span>
           </h3>
-          <p class="text-xs text-slate-500 mt-0.5">Escribe la respuesta oficial para <?php echo esc_html($requester); ?>. Puedes actualizar el estado comercial y adjuntar enlaces o archivos.</p>
+          <p class="text-xs text-slate-500 mt-0.5">Escribe la respuesta oficial para <?php echo esc_html($requester); ?>. Le llega por correo y WhatsApp. Puedes actualizar el estado comercial y adjuntar enlaces o archivos.</p>
         </div>
         <button type="button" class="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center cursor-pointer transition-colors" data-commercial-close-workflow aria-label="Cerrar formulario">
           <span class="material-symbols-outlined text-[16px]">close</span>
@@ -716,11 +716,6 @@ final class CommercialTicketModalView
 
       <?php echo self::attachmentFields(); ?>
 
-      <label class="flex items-center gap-2 cursor-pointer text-xs text-slate-600 select-none pt-1">
-        <input type="checkbox" name="notificar_solicitante" value="1" checked class="rounded border-slate-300 text-[#1E3C76] focus:ring-[#1E3C76]">
-        <span>Notificar por correo electrónico al solicitante</span>
-      </label>
-
       <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
         <span class="text-xs text-rose-600 mr-auto font-medium" data-commercial-form-message aria-live="polite"></span>
         <button type="button" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-colors cursor-pointer" data-commercial-close-workflow>Cancelar</button>
@@ -742,7 +737,6 @@ final class CommercialTicketModalView
     string $field,
     string $placeholder,
     string $submit,
-    bool $notify = false,
     bool $danger = false,
     bool $attachments = false
   ): string {
@@ -766,12 +760,7 @@ final class CommercialTicketModalView
       <?php if ($attachments): ?>
         <?php echo self::attachmentFields(); ?>
       <?php endif; ?>
-      <?php if ($notify): ?>
-        <label class="flex items-center gap-2 cursor-pointer text-xs text-slate-600 select-none">
-          <input type="checkbox" name="notificar_solicitante" value="1"<?php echo $action === 'reply' ? ' checked' : ''; ?> class="rounded border-slate-300 text-[#1E3C76] focus:ring-[#1E3C76]">
-          <span>Notificar por correo electrónico al solicitante</span>
-        </label>
-      <?php endif; ?>
+
       <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
         <span class="text-xs text-rose-600 mr-auto font-medium" data-commercial-form-message aria-live="polite"></span>
         <button type="button" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-colors cursor-pointer" data-commercial-close-workflow>Cancelar</button>
@@ -1039,7 +1028,7 @@ final class CommercialTicketModalView
             <span class="material-symbols-outlined text-[18px] text-[#1E3C76]">manage_accounts</span>
             <span>Reasignar responsable</span>
           </h3>
-          <p class="text-xs text-slate-500 mt-0.5">Selecciona un integrante habilitado del equipo comercial para transferir la gestión de esta tarea.</p>
+          <p class="text-xs text-slate-500 mt-0.5">Selecciona un integrante habilitado del equipo comercial para transferir la gestión de esta tarea. Se le avisa por WhatsApp y correo.</p>
         </div>
         <button type="button" class="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center cursor-pointer transition-colors" data-commercial-close-workflow aria-label="Cerrar formulario">
           <span class="material-symbols-outlined text-[16px]">close</span>
@@ -1060,22 +1049,6 @@ final class CommercialTicketModalView
       <div class="space-y-1">
         <label class="block text-xs font-semibold text-slate-700">Motivo de la reasignación <span class="text-slate-400 font-normal">(Opcional)</span></label>
         <textarea name="observacion" rows="2" placeholder="Ej: Reasignación por turno, redistribución de carga comercial o rotación de zona…" class="w-full text-xs sm:text-sm rounded-xl border border-slate-200 focus:border-[#1E3C76] p-2.5 outline-none font-medium text-slate-700"></textarea>
-      </div>
-      <div class="space-y-1.5 pt-1 border-t border-slate-100">
-        <label class="flex items-center gap-2 cursor-pointer text-xs text-slate-700 select-none">
-          <input type="checkbox" name="notificar_whatsapp" value="1" checked class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500">
-          <span class="flex items-center gap-1.5">
-            <span class="material-symbols-outlined text-[16px] text-emerald-600">chat</span>
-            <span>Notificar al nuevo responsable por <strong>WhatsApp</strong></span>
-          </span>
-        </label>
-        <label class="flex items-center gap-2 cursor-pointer text-xs text-slate-700 select-none">
-          <input type="checkbox" name="notificar_correo" value="1" checked class="rounded border-slate-300 text-[#1E3C76] focus:ring-[#1E3C76]">
-          <span class="flex items-center gap-1.5">
-            <span class="material-symbols-outlined text-[16px] text-[#1E3C76]">mail</span>
-            <span>Notificar al nuevo responsable por correo electrónico</span>
-          </span>
-        </label>
       </div>
       <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
         <span class="text-xs text-rose-600 mr-auto font-medium" data-commercial-form-message aria-live="polite"></span>

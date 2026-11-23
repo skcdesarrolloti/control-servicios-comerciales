@@ -376,8 +376,6 @@ final class CommercialApiController
     $this->authorizeTicketScope($ticketPk);
     $newEmployeeId = trim((string) ($input['id_empleado'] ?? ''));
     $observacion = trim((string) ($input['observacion'] ?? ''));
-    $notifyWhatsapp = !isset($input['notificar_whatsapp']) || !empty($input['notificar_whatsapp']);
-    $notifyEmail = !isset($input['notificar_correo']) || !empty($input['notificar_correo']);
 
     try {
       $reassignData = $this->tickets->reassign($ticketPk, $newEmployeeId, $this->commercialCargos, $observacion);
@@ -396,15 +394,15 @@ final class CommercialApiController
     }
 
     $newEmpNombre = (string) ($target['nombre'] ?? '');
-    $newEmpCelular = $notifyWhatsapp ? (string) ($target['celular'] ?? '') : '';
-    // Aviso del panel comercial: enlace individual del nuevo responsable que abre la tarea (no la página de tickets).
+    $newEmpCelular = (string) ($target['celular'] ?? '');
+    // Aviso del panel comercial, siempre por correo y WhatsApp: enlace individual del nuevo responsable que abre la tarea.
     try {
       (new \SCM\Commercial\Calls\CommercialCallsNotifier($this->db, $this->settings))->taskReassigned($ticketPk, array_merge($ticket, [
         'id_empleado' => (string) ($target['id'] ?? $newEmployeeId),
         'nombre_empleado' => $newEmpNombre,
         'correo_empleado' => (string) ($target['correo'] ?? ''),
         'celular_empleado' => (string) ($target['celular'] ?? ''),
-      ]), $previousName, wp_strip_all_tags($observacion), $userName, $notifyEmail, $notifyWhatsapp);
+      ]), $previousName, wp_strip_all_tags($observacion), $userName, true, true);
     } catch (\Throwable $exception) {
       error_log('[tareas:traslado] ' . $exception->getMessage());
     }
@@ -497,8 +495,6 @@ final class CommercialApiController
     if ($message === '') {
       JsonResponse::error('La respuesta no puede estar vacía.', 422);
     }
-    // El aviso al cliente lo envía la conversación pública, con su enlace para responder.
-    $notifyClient = $this->notifyClient($input);
     $result = $this->workflow->saveTicketResponse(
       $ticketPk,
       $message,
@@ -509,15 +505,14 @@ final class CommercialApiController
       $this->uploadedDocuments()
     );
     $this->ensureWorkflowSucceeded($result);
-    if ($notifyClient) {
-      try {
-        $conversation = new \SCM\Commercial\Calls\PublicTaskConversation($this->db, new \SCM\Commercial\Calls\CommercialCallsNotifier($this->db, $this->settings));
-        $conversation->officerReply($ticketPk, wp_strip_all_tags($message, true), \SCM\Core\Auth::user(), \SCM\Core\Auth::employeeId());
-        $result['message'] = 'Respuesta guardada. Se avisó al cliente.';
-      } catch (\Throwable $exception) {
-        error_log('[llamadas:respuesta] ' . $exception->getMessage());
-        $result['message'] = 'Respuesta guardada, pero no se pudo avisar al cliente.';
-      }
+    // El cliente siempre recibe la respuesta (correo y WhatsApp) por la conversación pública, con su enlace para responder.
+    try {
+      $conversation = new \SCM\Commercial\Calls\PublicTaskConversation($this->db, new \SCM\Commercial\Calls\CommercialCallsNotifier($this->db, $this->settings));
+      $conversation->officerReply($ticketPk, wp_strip_all_tags($message, true), \SCM\Core\Auth::user(), \SCM\Core\Auth::employeeId());
+      $result['message'] = 'Respuesta guardada. Se avisó al cliente.';
+    } catch (\Throwable $exception) {
+      error_log('[llamadas:respuesta] ' . $exception->getMessage());
+      $result['message'] = 'Respuesta guardada, pero no se pudo avisar al cliente.';
     }
 
     $newStatus = trim((string) ($input['estado'] ?? ''));
@@ -529,7 +524,7 @@ final class CommercialApiController
       }
     }
 
-    JsonResponse::success(['message' => (string) ($result['message'] ?? 'Respuesta guardada.'), 'refresh' => true]);
+    JsonResponse::success(['message' => $result['message'], 'refresh' => true]);
   }
 
   /** @param array<string,mixed> $input */
@@ -572,7 +567,7 @@ final class CommercialApiController
       $this->uploadedDocuments()
     );
     $this->ensureWorkflowSucceeded($result);
-    $notice = $this->notifyClient($input) ? $this->clientUpdate($ticketPk, 'seguimiento', $message) : '';
+    $notice = $this->clientUpdate($ticketPk, 'seguimiento', $message);
     JsonResponse::success(['message' => 'Seguimiento guardado.' . $notice, 'refresh' => true]);
   }
 
@@ -596,7 +591,7 @@ final class CommercialApiController
     );
     $this->ensureWorkflowSucceeded($result);
     $this->tickets->changeStatus($ticketPk, 'Postergado');
-    $notice = $this->notifyClient($input) ? $this->clientUpdate($ticketPk, 'postergada', $message) : '';
+    $notice = $this->clientUpdate($ticketPk, 'postergada', $message);
     JsonResponse::success(['message' => 'Tarea postergada.' . $notice, 'refresh' => true]);
   }
 
@@ -1187,12 +1182,6 @@ final class CommercialApiController
     if (!$this->tickets->ticketMatchesEmployeeFilter($ticketPk, $employeeFilter)) {
       JsonResponse::error('Esta tarea no está asignada a tu usuario.', 403);
     }
-  }
-
-  /** @param array<string,mixed> $input @return array<int,string> */
-  private function notifyClient(array $input): bool
-  {
-    return !empty($input['notificar_solicitante']);
   }
 
   /**

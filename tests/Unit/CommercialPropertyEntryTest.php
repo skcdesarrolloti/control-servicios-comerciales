@@ -191,6 +191,15 @@ final class CommercialPropertyEntryTest extends TestCase
     self::assertStringNotContainsString('data-commercial-task-form="property"', $touchUp);
   }
 
+  public function testWorkflowFormsHaveNoNotificationCheckboxes(): void
+  {
+    $task = $this->db->getRow('SELECT * FROM wp_jet_cct_tickets WHERE _ID=100');
+    $html = CommercialTicketModalView::render(['ticket'=>$task,'timeline'=>[]], $this->policy, []);
+    self::assertStringNotContainsString('name="notificar_', $html, 'Los avisos al cliente y al nuevo responsable van siempre, sin casilla.');
+    self::assertStringContainsString('data-commercial-workflow-form="follow_up"', $html);
+    self::assertStringContainsString('El cliente lo recibe por correo.', $html);
+  }
+
   public function testTaskToolsTopicRules(): void
   {
     self::assertTrue(CommercialTaskTools::allows(CommercialTaskTools::QUOTE, 'Arriendo y venta'));

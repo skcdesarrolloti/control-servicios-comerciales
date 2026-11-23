@@ -172,8 +172,8 @@ final class CommercialCallsNotifier
   }
 
   /**
-   * Seguimiento o postergación que el funcionario decidió contarle al cliente (casilla "Notificar al solicitante"): le llega
-   * por correo con el enlace a la vista pública de su tarea, nunca a la página de tickets anterior.
+   * Seguimiento o postergación de la tarea: al cliente siempre le llega (sin casilla en el popup, salvo que haya bloqueado
+   * el correo) por correo con el enlace a la vista pública de su tarea, nunca a la página de tickets anterior.
    * @param array<string,mixed> $task
    */
   public function clientUpdate(int $id, array $task, string $kind, string $message, string $author, string $employee = ''): void
