@@ -262,6 +262,10 @@ final class CommercialActionRouter
       'commercial_highlight_release' => 'releaseHighlight',
       'commercial_highlight_toggle_premium' => 'togglePremium',
       'commercial_property_change_status' => 'propertyChangeStatus',
+      'commercial_property_history' => 'propertyHistory',
+      'commercial_property_history_pdf' => 'propertyHistoryPdf',
+      'commercial_property_transfer_options' => 'propertyTransferOptions',
+      'commercial_property_transfer' => 'propertyTransfer',
     ][$action] ?? null;
   }
 }

@@ -66,6 +66,113 @@
     window.alert(message);
   }
 
+  // Historial del inmueble desde su tarjeta: el informe consolidado del panel inmobiliario (commercial_property_history).
+  function openPropertyHistory(code) {
+    var modal = document.getElementById("commercial-property-history-modal");
+    var content = modal && modal.querySelector("[data-commercial-property-history-content]");
+    var pdfBtn = modal && modal.querySelector("[data-commercial-property-history-pdf]");
+    if (!code || !modal || !content) return;
+    content.innerHTML = '<div class="flex items-center justify-center py-28 text-secondary gap-3"><span class="w-3 h-3 rounded-full bg-primary animate-ping"></span><p class="text-sm font-medium">Cargando el historial del inmueble #' + escapeHtml(code) + "…</p></div>";
+    if (pdfBtn) { pdfBtn.disabled = true; pdfBtn.setAttribute("data-code", code); }
+    setStandaloneModal(modal, true);
+    request("commercial_property_history", { codigo: code })
+      .then(function (res) {
+        content.innerHTML = (res && res.html) || "";
+        if (window.scmPropertyHistoryBind) window.scmPropertyHistoryBind(content);
+        if (pdfBtn) pdfBtn.disabled = false;
+      })
+      .catch(function (err) {
+        notify("error", (err && err.message) || "No se pudo cargar el historial del inmueble.");
+        setStandaloneModal(modal, false);
+      });
+  }
+
+  function downloadPropertyHistoryPdf(button) {
+    var code = button.getAttribute("data-code") || "";
+    if (!code) return;
+    var body = new FormData();
+    body.set("action", "commercial_property_history_pdf");
+    body.set("nonce", nonce);
+    body.set("codigo", code);
+    if (window.SCMLoader) window.SCMLoader.show({ title: "Generando el PDF", detail: "Preparamos el historial del inmueble #" + code + ". Puede tardar unos segundos.", icon: "pdf" });
+    fetch(apiUrl, { method: "POST", credentials: "same-origin", body: body })
+      .then(function (response) {
+        if (!response.ok || (response.headers.get("Content-Type") || "").indexOf("application/pdf") !== 0) {
+          return response.json().catch(function () { return null; }).then(function (json) {
+            throw new Error((json && json.data && json.data.message) || "No se pudo generar el PDF.");
+          });
+        }
+        var match = /filename="([^"]+)"/.exec(response.headers.get("Content-Disposition") || "");
+        return response.blob().then(function (blob) {
+          var url = URL.createObjectURL(blob);
+          var link = document.createElement("a");
+          link.href = url;
+          link.download = match ? match[1] : "historial-inmueble-" + code + ".pdf";
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          window.setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+          if (window.SCMLoader) window.SCMLoader.hide();
+        });
+      })
+      .catch(function (err) {
+        if (window.SCMLoader) window.SCMLoader.fail((err && err.message) || "No se pudo generar el PDF.");
+        else notify("error", (err && err.message) || "No se pudo generar el PDF.");
+      });
+  }
+
+  // Transferir el inmueble a otro funcionario (commercial_property_transfer), como el formulario "Transferir inmueble".
+  function openPropertyTransferPopup(button) {
+    var code = button.getAttribute("data-commercial-property-transfer") || "";
+    var currentId = button.getAttribute("data-current-id") || "";
+    var currentName = button.getAttribute("data-current-name") || "Sin asignar";
+    if (!code || !window.Swal) return;
+    window.Swal.fire({ title: "Cargando funcionarios…", didOpen: function () { window.Swal.showLoading(); }, allowOutsideClick: false, showConfirmButton: false });
+    request("commercial_property_transfer_options", { codigo: code })
+      .then(function (res) {
+        var options = ((res && res.funcionarios) || []).filter(function (item) { return item.id !== currentId; }).map(function (item) {
+          return '<option value="' + escapeHtml(item.id) + '">' + escapeHtml(item.name) + "</option>";
+        }).join("");
+        return window.Swal.fire({
+          title: "Transferir inmueble #" + code,
+          html:
+            '<div style="text-align:left;display:grid;gap:12px;font-size:14px">' +
+              '<p style="margin:0;color:#475569">Asignado ahora a <strong>' + escapeHtml(currentName) + "</strong>. " +
+              "Quien lo reciba queda como responsable en el inmueble, en la web y en su historial.</p>" +
+              '<label style="display:grid;gap:4px;font-weight:600">¿Transferir a?' +
+                '<select id="scm-property-transfer-select" class="swal2-select" style="margin:0;width:100%;font-size:14px"><option value="">Selecciona una opción</option>' + options + "</select></label>" +
+            "</div>",
+          showCancelButton: true,
+          confirmButtonText: "Transferir inmueble",
+          cancelButtonText: "Cancelar",
+          focusConfirm: false,
+          showLoaderOnConfirm: true,
+          allowOutsideClick: function () { return !window.Swal.isLoading(); },
+          preConfirm: function () {
+            var target = (document.getElementById("scm-property-transfer-select") || {}).value || "";
+            if (!target) {
+              window.Swal.showValidationMessage("Selecciona a la persona que recibe el inmueble.");
+              return false;
+            }
+            return request("commercial_property_transfer", { codigo: code, id_empleado: target })
+              .catch(function (err) {
+                window.Swal.showValidationMessage((err && err.message) || "No se pudo transferir el inmueble.");
+                return false;
+              });
+          },
+        });
+      })
+      .then(function (result) {
+        if (!result || !result.isConfirmed || !result.value) return;
+        notify("success", result.value.message || "Inmueble transferido.");
+        window.setTimeout(function () { window.location.reload(); }, 900);
+      })
+      .catch(function (err) {
+        window.Swal.close();
+        notify("error", (err && err.message) || "No se pudieron cargar los funcionarios.");
+      });
+  }
+
   // Cambiar estado del inmueble desde su tarjeta: actualiza el CCT y el post type (commercial_property_change_status).
   function propertyStatusLabel(state) {
     return state === "Publico" ? "Público" : state;
@@ -1720,6 +1827,29 @@
       }
       return;
     }
+    var historyBtn = event.target.closest("[data-commercial-property-history]");
+    if (historyBtn) {
+      event.preventDefault();
+      openPropertyHistory(historyBtn.getAttribute("data-commercial-property-history") || "");
+      return;
+    }
+    if (event.target.closest("[data-commercial-close-property-history]") || (event.target.matches && event.target.matches("#commercial-property-history-modal"))) {
+      event.preventDefault();
+      setStandaloneModal(document.getElementById("commercial-property-history-modal"), false);
+      return;
+    }
+    var historyPdfBtn = event.target.closest("[data-commercial-property-history-pdf]");
+    if (historyPdfBtn) {
+      event.preventDefault();
+      downloadPropertyHistoryPdf(historyPdfBtn);
+      return;
+    }
+    var transferBtn = event.target.closest("[data-commercial-property-transfer]");
+    if (transferBtn) {
+      event.preventDefault();
+      openPropertyTransferPopup(transferBtn);
+      return;
+    }
     var statusBtn = event.target.closest("[data-commercial-property-status]");
     if (statusBtn) {
       event.preventDefault();
@@ -2314,6 +2444,7 @@
     var guides = guidesModal();
     if (guides && guides.classList.contains("open")) setGuidesModal(false);
     else if (modal && modal.classList.contains("open")) setAnalysisModal(false);
+    else if (document.getElementById("commercial-property-history-modal") && document.getElementById("commercial-property-history-modal").classList.contains("open")) setStandaloneModal(document.getElementById("commercial-property-history-modal"), false);
     // La ficha del inmueble se abre encima de la tarea y de los avisos: Escape la cierra primero.
     else if (document.getElementById("commercial-property-detail-modal") && document.getElementById("commercial-property-detail-modal").classList.contains("open")) setStandaloneModal(document.getElementById("commercial-property-detail-modal"), false);
     else if (document.getElementById("commercial-property-modal") && document.getElementById("commercial-property-modal").classList.contains("open")) setStandaloneModal(document.getElementById("commercial-property-modal"), false);

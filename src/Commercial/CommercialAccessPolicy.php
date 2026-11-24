@@ -60,6 +60,8 @@ final class CommercialAccessPolicy
     'registrar_aviso' => 'Registrar avisos nuevos y retoques',
     'ingresar_inmueble' => 'Ingresar inmuebles desde una tarea',
     'inmueble_cambiar_estado' => 'Inmuebles: cambiar el estado del inmueble (público, en cierre, arrendado…) en el CCT y en la web',
+    'inmueble_ver_historial' => 'Inmuebles: ver el historial consolidado del inmueble (casos, contratos, cobros, revisiones) y su PDF',
+    'inmueble_transferir' => 'Inmuebles: transferir el inmueble a otro funcionario',
     'mercado_vista_completa' => 'Calculadora de mercado: estadística completa y tabla de inmuebles',
     'aseo_vista_interna' => 'Calculadora de aseo: costos, márgenes, utilidades y PDF internos',
     'promocion_ver_ip' => 'Promoción: ver IP y navegador en logs y actividad de portales',
@@ -80,7 +82,7 @@ final class CommercialAccessPolicy
   ];
 
   /** Acciones que un cargo sin configurar no recibe por defecto: hay que marcarlas. */
-  public const OPT_IN_ACTIONS = ['editar_actor', 'mercado_vista_completa', 'aseo_vista_interna', 'promocion_ver_ip', 'plan_estrategico_editar', 'pop_gestionar', 'pop_anular', 'pop_ver_costos', 'redes_ver_inversion', 'redes_sincronizar', 'piezas_gestionar', 'piezas_archivar', 'fichas_gestionar', 'campanas_enviar', 'campanas_eliminar', 'plantillas_editar', 'reportes_pagar', 'reportes_editar_valor', 'respuestas_guia_editar', 'inmueble_cambiar_estado'];
+  public const OPT_IN_ACTIONS = ['editar_actor', 'mercado_vista_completa', 'aseo_vista_interna', 'promocion_ver_ip', 'plan_estrategico_editar', 'pop_gestionar', 'pop_anular', 'pop_ver_costos', 'redes_ver_inversion', 'redes_sincronizar', 'piezas_gestionar', 'piezas_archivar', 'fichas_gestionar', 'campanas_enviar', 'campanas_eliminar', 'plantillas_editar', 'reportes_pagar', 'reportes_editar_valor', 'respuestas_guia_editar', 'inmueble_cambiar_estado', 'inmueble_ver_historial', 'inmueble_transferir'];
 
   /**
    * Vistas que un cargo sin configurar no recibe por defecto: hay que marcarlas en Permisos. Los cargos con acceso total

@@ -459,6 +459,7 @@ final class CommercialDashboardView
   <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/commercial-quotes.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/commercial-quotes.css')); ?>">
   <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/commercial-studies.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/commercial-studies.css')); ?>">
   <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/scm-loader.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/scm-loader.css')); ?>">
+  <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/property-history-report.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/property-history-report.css')); ?>">
   <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/commercial-signs.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/commercial-signs.css')); ?>">
   <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/commercial-tools.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/commercial-tools.css')); ?>">
   <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/commercial-property-entry.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/commercial-property-entry.css')); ?>">
@@ -695,6 +696,28 @@ final class CommercialDashboardView
       </div>
     </div>
 
+    <!-- Historial del inmueble (Inmuebles › tarjeta): el informe consolidado del panel inmobiliario. -->
+    <div class="fixed inset-0 z-[60] items-center justify-center p-3 sm:p-5 lg:p-7 bg-[#061D49]/60 backdrop-blur-md commercial-modal overflow-y-auto" id="commercial-property-history-modal" role="dialog" aria-modal="true" aria-labelledby="commercial-property-history-title" aria-hidden="true">
+      <div class="bg-surface-container-lowest w-full max-w-6xl max-h-[94vh] rounded-3xl shadow-modal border border-surface-container flex flex-col overflow-hidden relative text-on-surface" role="document">
+        <div class="px-5 py-4 bg-surface-container-low border-b border-surface-container flex items-center justify-between gap-3">
+          <div>
+            <span class="font-label-sm text-secondary uppercase font-semibold">Inmuebles</span>
+            <h2 class="font-headline-sm text-headline-sm text-on-surface" id="commercial-property-history-title">Historial del inmueble</h2>
+          </div>
+          <div class="flex items-center gap-2">
+            <button type="button" class="px-3 py-1.5 rounded-lg bg-primary text-white hover:bg-primary/90 text-xs font-semibold transition-all shadow-xs cursor-pointer flex items-center gap-1 disabled:opacity-50" data-commercial-property-history-pdf disabled>
+              <span class="material-symbols-outlined text-[14px]">picture_as_pdf</span>
+              <span>Descargar PDF</span>
+            </button>
+            <button type="button" class="w-8 h-8 rounded-full hover:bg-surface-container-high text-secondary flex items-center justify-center cursor-pointer" data-commercial-close-property-history aria-label="Cerrar">
+              <span class="material-symbols-outlined text-[20px]">close</span>
+            </button>
+          </div>
+        </div>
+        <div class="overflow-y-auto p-3 sm:p-5 bg-surface" data-commercial-property-history-content></div>
+      </div>
+    </div>
+
     <!-- Guía y Permisos -->
     <?php echo CommercialGuideView::render(); ?>
     <?php if ($policy instanceof CommercialAccessPolicy && $policy->canManage()): ?>
@@ -711,6 +734,7 @@ final class CommercialDashboardView
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-reports.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-reports.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-calls.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-calls.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/scm-loader.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/scm-loader.js')); ?>"></script>
+  <script src="<?php echo esc_url($baseUrl . '/assets/js/property-history-report.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/property-history-report.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-quotes.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-quotes.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-studies.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-studies.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-calendar-form.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-calendar-form.js')); ?>"></script>
@@ -4010,10 +4034,14 @@ final class CommercialDashboardView
       return '';
     }
 
-    // Cambiar estado: con el permiso; quien no ve todo el inventario, solo en sus inmuebles (el servidor lo valida igual).
+    // Acciones de la tarjeta (estado, historial, transferir): cada una con su permiso; quien no ve todo el inventario,
+    // solo en sus inmuebles (el servidor lo valida igual).
     $canChangeStatus = !$policy instanceof CommercialAccessPolicy || $policy->canAct('inmueble_cambiar_estado');
+    $canSeeHistory = !$policy instanceof CommercialAccessPolicy || $policy->canAct('inmueble_ver_historial');
+    $canTransfer = !$policy instanceof CommercialAccessPolicy || $policy->canAct('inmueble_transferir');
     $statusScopeAll = !$policy instanceof CommercialAccessPolicy || $policy->canSeeAll('inmuebles');
     $myEmployeeId = trim(Auth::employeeId());
+    $secondaryButton = 'w-8 h-8 rounded-lg bg-surface-container-low text-on-surface hover:bg-surface-container border border-outline-variant/40 transition-all cursor-pointer flex items-center justify-center active:scale-95';
     $statusOptions = (string) json_encode(CommercialPropertiesRepository::EDITABLE_STATUSES, JSON_UNESCAPED_UNICODE);
 
     ob_start();
@@ -4258,11 +4286,21 @@ final class CommercialDashboardView
             </span>
           </div>
 
+          <?php $isMine = $statusScopeAll || ($myEmployeeId !== '' && trim((string) ($row['id_funcionario'] ?? '')) === $myEmployeeId); ?>
           <div class="flex items-center gap-1.5 shrink-0">
-            <?php if ($canChangeStatus && ($statusScopeAll || ($myEmployeeId !== '' && trim((string) ($row['id_funcionario'] ?? '')) === $myEmployeeId))): ?>
-              <button type="button" class="px-3 py-1.5 rounded-lg bg-surface-container-low text-on-surface hover:bg-surface-container border border-outline-variant/40 text-xs font-semibold transition-all cursor-pointer flex items-center gap-1 active:scale-95" data-commercial-property-status="<?php echo esc_attr($codigo); ?>" data-current="<?php echo esc_attr($estado); ?>" data-states="<?php echo esc_attr($statusOptions); ?>" title="Cambiar el estado del inmueble">
-                <span class="material-symbols-outlined text-[14px]">swap_horiz</span>
-                <span>Estado</span>
+            <?php if ($canSeeHistory && $isMine): ?>
+              <button type="button" class="<?php echo esc_attr($secondaryButton); ?>" data-commercial-property-history="<?php echo esc_attr($codigo); ?>" title="Ver historial del inmueble" aria-label="Ver historial del inmueble #<?php echo esc_attr($codigo); ?>">
+                <span class="material-symbols-outlined text-[16px]">history</span>
+              </button>
+            <?php endif; ?>
+            <?php if ($canTransfer && $isMine): ?>
+              <button type="button" class="<?php echo esc_attr($secondaryButton); ?>" data-commercial-property-transfer="<?php echo esc_attr($codigo); ?>" data-current-name="<?php echo esc_attr($funcionarioNombre); ?>" data-current-id="<?php echo esc_attr(trim((string) ($row['id_funcionario'] ?? ''))); ?>" title="Transferir inmueble" aria-label="Transferir el inmueble #<?php echo esc_attr($codigo); ?>">
+                <span class="material-symbols-outlined text-[16px]">person_add</span>
+              </button>
+            <?php endif; ?>
+            <?php if ($canChangeStatus && $isMine): ?>
+              <button type="button" class="<?php echo esc_attr($secondaryButton); ?>" data-commercial-property-status="<?php echo esc_attr($codigo); ?>" data-current="<?php echo esc_attr($estado); ?>" data-states="<?php echo esc_attr($statusOptions); ?>" title="Cambiar el estado del inmueble" aria-label="Cambiar el estado del inmueble #<?php echo esc_attr($codigo); ?>">
+                <span class="material-symbols-outlined text-[16px]">swap_horiz</span>
               </button>
             <?php endif; ?>
             <button type="button" class="px-3 py-1.5 rounded-lg bg-primary text-white hover:bg-primary/90 text-xs font-semibold transition-all shadow-xs cursor-pointer flex items-center gap-1 active:scale-95" data-commercial-property-detail="<?php echo esc_attr($codigo); ?>">
@@ -4991,7 +5029,7 @@ final class CommercialDashboardView
     'Cotizaciones' => ['cotizacion_crear'],
     'Estudios de aseguradora' => ['estudio_crear', 'estudio_responder', 'estudio_desistir'],
     'Precaptación' => ['precaptacion_crear', 'precaptacion_editar', 'precaptacion_ticket', 'precaptacion_catalogos'],
-    'Inmuebles y avisos' => ['ingresar_inmueble', 'inmueble_cambiar_estado', 'registrar_aviso', 'editar_actor'],
+    'Inmuebles y avisos' => ['ingresar_inmueble', 'inmueble_cambiar_estado', 'inmueble_ver_historial', 'inmueble_transferir', 'registrar_aviso', 'editar_actor'],
     'Herramientas' => ['mercado_vista_completa', 'aseo_vista_interna', 'plan_estrategico_editar'],
     'Promoción' => ['promocion_ver_ip', 'pop_gestionar', 'pop_anular', 'pop_ver_costos', 'redes_ver_inversion', 'redes_sincronizar', 'piezas_gestionar', 'piezas_archivar', 'fichas_gestionar'],
   ];

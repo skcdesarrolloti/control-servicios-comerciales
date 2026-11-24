@@ -1719,6 +1719,99 @@ final class CommercialApiController
     JsonResponse::ok($res);
   }
 
+  /**
+   * Las acciones sobre un inmueble desde su tarjeta: vista Inmuebles, el permiso de la acción y, quien no ve todo el
+   * inventario, solo sus inmuebles (id_funcionario = su id_empleado).
+   */
+  private function authorizePropertyAction(string $action, string $code, string $message): void
+  {
+    if (!$this->policy->canView('inmuebles') || !$this->policy->canAct($action)) {
+      JsonResponse::error($message, 403);
+    }
+    if ($this->policy->canSeeAll('inmuebles')) {
+      return;
+    }
+    $employeeId = trim(Auth::employeeId());
+    $property = (new \SCM\Commercial\CommercialPropertyHistory($this->db))->property($code);
+    if ($employeeId === '' || $property === null || trim((string) ($property['id_funcionario'] ?? '')) !== $employeeId) {
+      JsonResponse::error('Solo puedes hacerlo con tus inmuebles.', 403);
+    }
+  }
+
+  /** @param array<string,mixed> $input */
+  public function propertyHistory(array $input): never
+  {
+    $this->verify($input);
+    $code = \SCM\Commercial\CommercialPropertyHistory::cleanCode((string) ($input['codigo'] ?? ''));
+    $this->authorizePropertyAction('inmueble_ver_historial', $code, 'No tienes permiso para ver el historial de los inmuebles.');
+    $history = new \SCM\Commercial\CommercialPropertyHistory($this->db);
+    try {
+      $payload = $history->payload($code);
+    } catch (\InvalidArgumentException $exception) {
+      JsonResponse::error($exception->getMessage(), 404);
+    }
+    JsonResponse::ok(['html' => $history->render($payload), 'codigo' => (string) $payload['property']['codigo']]);
+  }
+
+  /** @param array<string,mixed> $input */
+  public function propertyHistoryPdf(array $input): never
+  {
+    $this->verify($input);
+    $code = \SCM\Commercial\CommercialPropertyHistory::cleanCode((string) ($input['codigo'] ?? ''));
+    $this->authorizePropertyAction('inmueble_ver_historial', $code, 'No tienes permiso para generar este PDF.');
+    $history = new \SCM\Commercial\CommercialPropertyHistory($this->db);
+    try {
+      $payload = $history->payload($code);
+      $bytes = $history->pdf($payload);
+    } catch (\InvalidArgumentException $exception) {
+      JsonResponse::error($exception->getMessage(), 404);
+    } catch (\RuntimeException $exception) {
+      error_log('[commercial-property-history-pdf] ' . $exception->getMessage());
+      JsonResponse::error($exception->getMessage(), 503);
+    }
+    while (ob_get_level() > 0) ob_end_clean();
+    header('Content-Type: application/pdf');
+    header('Content-Disposition: attachment; filename="' . \SCM\Commercial\CommercialPropertyHistory::filename($payload) . '"');
+    header('Cache-Control: private, no-store');
+    header('X-Content-Type-Options: nosniff');
+    header('Content-Length: ' . strlen($bytes));
+    echo $bytes;
+    exit;
+  }
+
+  private function propertyTransferService(): \SCM\Commercial\CommercialPropertyTransfer
+  {
+    return new \SCM\Commercial\CommercialPropertyTransfer($this->db, is_array($this->config['panelapi'] ?? null) ? $this->config['panelapi'] : []);
+  }
+
+  /** @param array<string,mixed> $input */
+  public function propertyTransferOptions(array $input): never
+  {
+    $this->verify($input);
+    $code = trim((string) ($input['codigo'] ?? ''));
+    $this->authorizePropertyAction('inmueble_transferir', $code, 'No tienes permiso para transferir inmuebles.');
+    JsonResponse::ok(['funcionarios' => $this->propertyTransferService()->employees()]);
+  }
+
+  /** @param array<string,mixed> $input */
+  public function propertyTransfer(array $input): never
+  {
+    $this->verify($input);
+    $code = trim((string) ($input['codigo'] ?? ''));
+    $this->authorizePropertyAction('inmueble_transferir', $code, 'No tienes permiso para transferir inmuebles.');
+    $employeeId = trim(Auth::employeeId());
+    try {
+      $res = $this->propertyTransferService()->transfer($code, trim((string) ($input['id_empleado'] ?? '')), $employeeId, $this->policy->canSeeAll('inmuebles') ? null : $employeeId);
+    } catch (\Throwable $error) {
+      error_log('[commercial-property-transfer] No se pudo transferir el inmueble ' . $code . ': ' . $error->getMessage());
+      JsonResponse::error('No se pudo transferir el inmueble.', 500);
+    }
+    if (!$res['ok']) {
+      JsonResponse::error($res['message'], 422);
+    }
+    JsonResponse::ok($res);
+  }
+
   /** @param array<string,mixed> $input @return array<string,mixed> */
   private function propertyFilters(array $input, bool $isNonAdmin): array
   {
