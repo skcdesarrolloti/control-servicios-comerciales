@@ -247,7 +247,7 @@
         '<div class="scm-task-agenda-week" data-agenda-week aria-live="polite"></div>' +
         '<div class="scm-task-agenda-detail-wrap" data-agenda-detail hidden></div>' +
         '<div class="scm-task-agenda-foot"><span><i></i>Citas de esta tarea</span>' +
-        '<a href="#" data-agenda-link>Abrir calendario comercial</a></div></div>',
+        '<a href="#" target="_blank" rel="noopener" data-agenda-link>Abrir calendario comercial</a></div></div>',
       width: 1080,
       showConfirmButton: false,
       showCloseButton: true,
