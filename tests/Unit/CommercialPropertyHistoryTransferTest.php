@@ -35,7 +35,7 @@ final class CommercialPropertyHistoryTransferTest extends TestCase
       'wp_jet_cct_historial_del_inmueble' => '_ID INTEGER PRIMARY KEY AUTOINCREMENT, cct_status TEXT, fecha TEXT, id_inmueble TEXT, id_ticket TEXT, id_empleado TEXT, funcionario TEXT, tipo_reporte TEXT, observacion TEXT, cct_author_id TEXT, cct_created TEXT, cct_modified TEXT',
       'wp_jet_cct_tickets' => '_ID INTEGER PRIMARY KEY, id_inmueble TEXT, asunto TEXT, estado TEXT, fecha TEXT, cct_created TEXT',
       'wp_jet_cct_contratos_arrendamiento' => '_ID INTEGER PRIMARY KEY, contrato TEXT, id_inmueble TEXT, arrendatario TEXT, estado TEXT, canon TEXT, fecha_inicio TEXT, cct_created TEXT',
-      'wp_jet_cct_funcionarios' => '_ID INTEGER PRIMARY KEY, id_empleado TEXT, nombre TEXT, rol TEXT, correo TEXT, celular TEXT, activo TEXT',
+      'wp_jet_cct_funcionarios' => '_ID INTEGER PRIMARY KEY, id_empleado TEXT, nombre TEXT, rol TEXT, id_cargo TEXT, correo TEXT, celular TEXT, activo TEXT',
       'wp_jet_rel_941' => '_ID INTEGER PRIMARY KEY AUTOINCREMENT, created TEXT, rel_id INTEGER, parent_rel INTEGER, parent_object_id TEXT, child_object_id TEXT',
     ];
     foreach ($tables as $table => $definition) {
@@ -51,8 +51,9 @@ final class CommercialPropertyHistoryTransferTest extends TestCase
     $this->db->insert('wp_jet_cct_tickets', ['_ID' => 55, 'id_inmueble' => '96957', 'asunto' => 'Visita de interesado', 'estado' => 'Abierto', 'fecha' => (string) strtotime('2026-11-02 09:00:00')]);
     $this->db->insert('wp_jet_cct_contratos_arrendamiento', ['_ID' => 7, 'contrato' => '1201', 'id_inmueble' => '96957', 'arrendatario' => 'Laura Gómez', 'estado' => 'Entregado', 'canon' => '1.800.000', 'fecha_inicio' => '2026-01-01']);
     $this->db->insert('wp_jet_cct_historial_del_inmueble', ['fecha' => '1700000000', 'id_inmueble' => '84016', 'tipo_reporte' => 'Otro inmueble', 'observacion' => 'No debe salir']);
-    foreach ([['900', 'Ana Pérez', 'Si'], ['901', 'Royner Guardo', 'Si'], ['902', 'Retirado', 'No']] as $i => [$id, $name, $active]) {
-      $this->db->insert('wp_jet_cct_funcionarios', ['_ID' => $i + 1, 'id_empleado' => $id, 'nombre' => $name, 'correo' => 'f' . $id . '@example.test', 'celular' => '300000' . $id, 'activo' => $active]);
+    // 9 y 11 son cargos comerciales; 5 (contabilidad) no.
+    foreach ([['900', 'Ana Pérez', 'Si', '9'], ['901', 'Royner Guardo', 'Si', '11'], ['902', 'Retirado', 'No', '9'], ['903', 'Contadora', 'Si', '5']] as $i => [$id, $name, $active, $cargo]) {
+      $this->db->insert('wp_jet_cct_funcionarios', ['_ID' => $i + 1, 'id_empleado' => $id, 'nombre' => $name, 'id_cargo' => $cargo, 'correo' => 'f' . $id . '@example.test', 'celular' => '300000' . $id, 'activo' => $active]);
     }
     $this->db->insert('wp_postmeta', ['post_id' => 96957, 'meta_key' => 'id_empleado', 'meta_value' => '900']);
     $this->db->insert('wp_jet_rel_941', ['created' => '2026-01-01', 'rel_id' => 941, 'parent_rel' => 0, 'parent_object_id' => '900', 'child_object_id' => '96957']);
@@ -91,7 +92,7 @@ final class CommercialPropertyHistoryTransferTest extends TestCase
 
   public function testTransferUpdatesThePostTypeTheCctTheRelationAndTheHistory(): void
   {
-    $result = (new CommercialPropertyTransfer($this->db))->transfer('96957', '901', '999');
+    $result = (new CommercialPropertyTransfer($this->db, ['9', '11']))->transfer('96957', '901', '999');
 
     self::assertTrue($result['ok']);
     self::assertSame('Royner Guardo', $result['funcionario']);
@@ -107,9 +108,11 @@ final class CommercialPropertyHistoryTransferTest extends TestCase
 
   public function testTransferRejectsTheSamePersonUnknownPeopleAndOtherPeoplesProperties(): void
   {
-    $transfer = new CommercialPropertyTransfer($this->db);
+    $transfer = new CommercialPropertyTransfer($this->db, ['9', '11']);
     self::assertFalse($transfer->transfer('96957', '900', '999')['ok']);
     self::assertFalse($transfer->transfer('96957', '777', '999')['ok']);
+    self::assertFalse($transfer->transfer('96957', '903', '999')['ok'], 'Solo personal comercial.');
+    self::assertFalse($transfer->transfer('96957', '902', '999')['ok'], 'Solo funcionarios activos.');
     self::assertFalse($transfer->transfer('96957', '', '999')['ok']);
     self::assertFalse($transfer->transfer('00000', '901', '999')['ok']);
     self::assertFalse($transfer->transfer('96957', '901', '901', '901')['ok'], 'Sin ver todo el inventario, solo sus inmuebles.');
@@ -118,9 +121,10 @@ final class CommercialPropertyHistoryTransferTest extends TestCase
   }
 
 
-  public function testTheTransferListOnlyHasActiveEmployees(): void
+  public function testTheTransferListOnlyHasActiveCommercialStaff(): void
   {
-    self::assertSame([['id' => '900', 'name' => 'Ana Pérez'], ['id' => '901', 'name' => 'Royner Guardo']], (new CommercialPropertyTransfer($this->db))->employees());
+    self::assertSame([['id' => '900', 'name' => 'Ana Pérez'], ['id' => '901', 'name' => 'Royner Guardo']], (new CommercialPropertyTransfer($this->db, ['9', '11']))->employees());
+    self::assertSame([], (new CommercialPropertyTransfer($this->db, []))->employees(), 'Sin cargos comerciales no hay a quién transferir.');
   }
 
   public function testActionsArePermissionsWithTheirEndpoints(): void

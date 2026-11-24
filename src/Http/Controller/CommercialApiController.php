@@ -1781,7 +1781,7 @@ final class CommercialApiController
 
   private function propertyTransferService(): \SCM\Commercial\CommercialPropertyTransfer
   {
-    return new \SCM\Commercial\CommercialPropertyTransfer($this->db);
+    return new \SCM\Commercial\CommercialPropertyTransfer($this->db, $this->commercialCargos);
   }
 
   /** @param array<string,mixed> $input */

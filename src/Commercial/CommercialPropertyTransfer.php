@@ -14,6 +14,8 @@ use SCM\Support\SchemaInspector;
  *  - CCT de inmuebles: id_funcionario y funcionario;
  *  - relación JetEngine 941 (funcionario → inmueble) en modo "append", como el formulario;
  *  - historial del inmueble "Traslado".
+ * Solo se transfiere al personal comercial: funcionarios activos de los cargos comerciales (Configuración ›
+ * commercial_employee_cargos), los mismos de reasignar tareas.
  * La actualización de panel_inmueble (base panelapi) del hook ya no se usa y no se hace.
  */
 final class CommercialPropertyTransfer
@@ -22,20 +24,28 @@ final class CommercialPropertyTransfer
 
   private Database $db;
   private SchemaInspector $schema;
-  public function __construct(Database $db, ?SchemaInspector $schema = null)
+  /** @var array<int,string> */
+  private array $cargoIds;
+
+  /** @param array<int,string> $cargoIds Cargos comerciales: sin cargos no hay a quién transferir. */
+  public function __construct(Database $db, array $cargoIds, ?SchemaInspector $schema = null)
   {
     $this->db = $db;
+    $this->cargoIds = array_values(array_unique(array_filter(array_map(static fn($id): string => trim((string) $id), $cargoIds), static fn(string $id): bool => $id !== '')));
     $this->schema = $schema ?? new SchemaInspector($db);
   }
 
   /**
-   * Funcionarios activos a quienes se puede transferir, como la lista del formulario (id_empleado | nombre).
+   * Personal comercial activo a quien se puede transferir (id_empleado | nombre).
    *
    * @return array<int,array{id:string,name:string}>
    */
   public function employees(): array
   {
-    $rows = $this->db->getResults("SELECT TRIM(id_empleado) AS id, TRIM(nombre) AS name FROM `" . $this->db->table('jet_cct_funcionarios') . "` WHERE TRIM(COALESCE(id_empleado, '')) <> '' AND TRIM(COALESCE(nombre, '')) <> '' AND COALESCE(activo, 'Si') = 'Si' ORDER BY nombre ASC");
+    if ($this->cargoIds === []) {
+      return [];
+    }
+    $rows = $this->db->getResults("SELECT TRIM(id_empleado) AS id, TRIM(nombre) AS name FROM `" . $this->db->table('jet_cct_funcionarios') . "` WHERE TRIM(COALESCE(id_empleado, '')) <> '' AND TRIM(COALESCE(nombre, '')) <> '' AND `activo` = 'Si' AND TRIM(COALESCE(`id_cargo`, '')) IN (" . implode(',', array_fill(0, count($this->cargoIds), '?')) . ') ORDER BY nombre ASC', $this->cargoIds);
     $seen = [];
     $list = [];
     foreach ($rows as $row) {
@@ -71,9 +81,12 @@ final class CommercialPropertyTransfer
     if ($current === $targetEmployeeId) {
       return ['ok' => false, 'message' => 'El inmueble ya está asignado a esa persona.'];
     }
-    $employee = $this->db->getRow('SELECT id_empleado, nombre, correo, celular FROM `' . $this->db->table('jet_cct_funcionarios') . '` WHERE TRIM(id_empleado) = ? LIMIT 1', [$targetEmployeeId]);
+    $employee = $this->db->getRow('SELECT id_empleado, nombre, correo, celular, activo, id_cargo FROM `' . $this->db->table('jet_cct_funcionarios') . '` WHERE TRIM(id_empleado) = ? LIMIT 1', [$targetEmployeeId]);
     if (!is_array($employee)) {
       return ['ok' => false, 'message' => 'No se encontró el funcionario elegido.'];
+    }
+    if (trim((string) ($employee['activo'] ?? '')) !== 'Si' || !in_array(trim((string) ($employee['id_cargo'] ?? '')), $this->cargoIds, true)) {
+      return ['ok' => false, 'message' => 'Solo puedes transferir el inmueble a personal comercial activo.'];
     }
     $name = trim((string) ($employee['nombre'] ?? ''));
     $propertyCode = trim((string) ($property['codigo'] ?? '')) !== '' ? trim((string) $property['codigo']) : (string) $property['_ID'];
