@@ -56,6 +56,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   session_write_close();
   $service = new SCM\Commercial\Studies\CommercialStudiesService(new SCM\Commercial\Studies\CommercialStudiesRepository($db), $settings, $policy, $notifier);
   $studies = static fn(): SCM\Http\Controller\CommercialStudiesApiController => new SCM\Http\Controller\CommercialStudiesApiController($db, $settings, $csrf, $config, $service);
+  if (($_POST['action'] ?? '') === 'fixture_delivery_docs') {
+    // Lo que el panel inmobiliario abre con «Ver documentos»: anexos_entrega del caso de entrega.
+    SCM\Http\Response\JsonResponse::success(['url' => (string) $db->getVar("SELECT anexos_entrega FROM wp_jet_cct_tickets WHERE id_estudio_aseguradora = '1' AND anexos_entrega <> '' LIMIT 1")]);
+  }
   if (($_POST['action'] ?? '') === 'fixture_notices') {
     SCM\Http\Response\JsonResponse::success(['lines' => is_file($log) ? array_values(array_filter(explode("\n", (string) file_get_contents($log)))) : []]);
   }

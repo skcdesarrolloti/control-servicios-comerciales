@@ -159,6 +159,28 @@ const shots = process.argv[3] || '';
     if (shots) await client.screenshot({ path: path.join(shots, 'estudio-cliente-movil.png'), fullPage: true });
     await client.close();
 
+    // Caso de entrega del panel inmobiliario: «Ver documentos» abre anexos_entrega en un popup y los documentos se ven dentro.
+    const delivery = await page.evaluate(async url => { const body = new FormData(); body.append('action', 'fixture_delivery_docs'); return (await (await fetch(url, { method: 'POST', body })).json()).data.url; }, endpoint);
+    assert.match(delivery, /\/public\/estudio\.php\?d=1\.[a-f0-9]{64}$/, 'El caso de entrega lleva el enlace de los documentos');
+    const docs = await context.newPage();
+    // Mismo dominio que el panel inmobiliario en producción (la página solo se deja abrir desde el mismo origen).
+    await docs.route('http://127.0.0.1:8776/caso-inmobiliario.html', route => route.fulfill({ contentType: 'text/html', body: '<iframe style="width:1100px;height:900px;border:0" src="' + delivery + '&ver=servicios"></iframe>' }));
+    await docs.goto('http://127.0.0.1:8776/caso-inmobiliario.html');
+    const docsFrame = docs.frameLocator('iframe');
+    await docsFrame.locator('.ps-viewer').waitFor();
+    assert.equal(await docsFrame.locator('.ps-docs li.is-current [data-ps-doc]').getAttribute('data-ps-doc'), 'servicios', '«Ver asegurable»/ver= elige el documento');
+    const viewerFrame = () => docs.frames().find(frame => frame.name() === 'ps-visor');
+    const firstUrl = viewerFrame().url();
+    const asegurableHref = await docsFrame.locator('[data-ps-doc="asegurable"]').getAttribute('href');
+    await docsFrame.locator('[data-ps-doc="asegurable"]').click();
+    await docsFrame.locator('.ps-docs li.is-current [data-ps-doc="asegurable"]').waitFor();
+    for (let i = 0; i < 50 && viewerFrame().url() !== asegurableHref; i++) await docs.waitForTimeout(100);
+    assert.notEqual(firstUrl, asegurableHref);
+    assert.equal(viewerFrame().url(), asegurableHref, 'El documento se abre en el visor de la misma página');
+    assert.equal(docs.url(), 'http://127.0.0.1:8776/caso-inmobiliario.html', 'No sale del caso');
+    if (shots) await docs.screenshot({ path: path.join(shots, 'estudio-documentos-caso.png') });
+    await docs.close();
+
     // Listado: Desistir negocio en un popup.
     await page.goto(endpoint + '?as=101');
     await page.locator('[data-cst-page] .cqt-table').waitFor();

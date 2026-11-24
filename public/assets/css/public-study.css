@@ -72,3 +72,11 @@ a:focus-visible { outline:3px solid var(--ps-orange); outline-offset:2px; }
 .ps-docs a:hover,.ps-docs a:focus-visible { border-color:#1e3c76; background:#eef1f8; }
 .ps-docs span { font-size:14px; overflow-wrap:anywhere; }
 .ps-docs small { font-size:12px; color:#5b6780; }
+.ps-viewer { display:grid; grid-template-columns:minmax(220px,300px) 1fr; gap:14px; align-items:start; }
+.ps-viewer .ps-docs li { position:relative; }
+.ps-viewer .ps-docs li > a:first-child { padding-right:40px; }
+.ps-viewer .ps-docs li.is-current > a:first-child { border-color:#1e3c76; background:#eef1f8; }
+.ps-viewer .ps-docs a.ps-docs-out { position:absolute; top:10px; right:10px; width:26px; height:26px; padding:0; display:grid; place-items:center; border:0; border-radius:8px; background:transparent; color:#1e3c76; text-decoration:none; font-size:15px; }
+.ps-viewer .ps-docs a.ps-docs-out:hover,.ps-viewer .ps-docs a.ps-docs-out:focus-visible { background:#dfe3ee; }
+.ps-viewer-frame { width:100%; height:75vh; min-height:420px; border:1px solid #dfe3ee; border-radius:12px; background:#f6f7fb; }
+@media (max-width:760px) { .ps-viewer { grid-template-columns:1fr; } .ps-viewer-frame { height:60vh; } }

@@ -37,7 +37,7 @@ final class PublicStudyView
    * Documentos de la aprobación (estudio.php?d=): lo abre el equipo de entregas desde el caso de entrega.
    * @param array<string,mixed>|null $data CommercialStudiesService::documentsData()
    */
-  public static function documents(?array $data, string $css, string $logo, string $error): string
+  public static function documents(?array $data, string $css, string $logo, string $error, string $show = '', string $script = ''): string
   {
     $title = $data !== null ? 'Documentos del estudio #' . (int) $data['id'] : 'Documentos no disponibles';
     $html = self::head($title, $css, $logo);
@@ -51,8 +51,37 @@ final class PublicStudyView
       'Caso de entrega' => $data['caso_entrega'] > 0 ? '#' . $data['caso_entrega'] : '',
     ], static fn($value): bool => trim((string) $value) !== '');
     $html .= '<section class="ps-card"><p class="ps-eyebrow">Estudio de aseguradora #' . (int) $data['id'] . '</p><h1>Documentos de la aprobación</h1>' . self::facts($facts) . '</section>'
-      . '<section class="ps-card ps-internal">' . self::documentLinks($data['documentos']) . '</section>';
+      . '<section class="ps-card ps-internal">' . self::documentViewer($data['documentos'], $show, $script) . '</section>';
     return $html . self::foot();
+  }
+
+  /**
+   * Lista y visor en la misma página: cada documento se abre en el visor (iframe con nombre, sin JS) para no salir del caso.
+   * `$show` elige el que se ve al abrir (por ejemplo `asegurable` desde «Ver asegurable» del panel inmobiliario).
+   * @param list<array{tipo:string,titulo:string,nombre:string,url:string,fecha:int,por:string}> $documents
+   */
+  private static function documentViewer(array $documents, string $show, string $script): string
+  {
+    if ($documents === []) {
+      return self::documentLinks($documents);
+    }
+    // Agrupados por tipo, en el orden de la aprobación (asegurable, recibos, arrendatario).
+    $order = array_flip(array_keys(CommercialStudiesService::DOCUMENTS));
+    usort($documents, static fn(array $a, array $b): int => ($order[$a['tipo']] ?? 99) <=> ($order[$b['tipo']] ?? 99));
+    $current = $documents[0];
+    foreach ($documents as $document) {
+      if ($document['tipo'] === $show) {
+        $current = $document;
+        break;
+      }
+    }
+    $html = '<h2>Documentos</h2><div class="ps-viewer"><ul class="ps-docs">';
+    foreach ($documents as $document) {
+      $html .= '<li' . ($document === $current ? ' class="is-current"' : '') . '><a href="' . self::e($document['url']) . '" target="ps-visor" data-ps-doc="' . self::e($document['tipo']) . '"><strong>' . self::e($document['titulo']) . '</strong><span>' . self::e($document['nombre']) . '</span>'
+        . ($document['fecha'] > 0 ? '<small>' . self::e(date('d/m/Y', $document['fecha']) . ($document['por'] !== '' ? ' · ' . $document['por'] : '')) . '</small>' : '') . '</a>'
+        . '<a class="ps-docs-out" href="' . self::e($document['url']) . '" target="_blank" rel="noopener noreferrer" title="Abrir en otra pestaña" aria-label="Abrir ' . self::e($document['nombre']) . ' en otra pestaña">↗</a></li>';
+    }
+    return $html . '</ul><iframe class="ps-viewer-frame" name="ps-visor" title="Documento" src="' . self::e($current['url']) . '"></iframe></div>' . ($script !== '' ? '<script src="' . self::e($script) . '" defer></script>' : '');
   }
 
   /** @param list<array{tipo:string,titulo:string,nombre:string,url:string,fecha:int,por:string}> $documents */

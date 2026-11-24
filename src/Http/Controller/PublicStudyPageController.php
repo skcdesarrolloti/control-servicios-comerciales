@@ -65,7 +65,8 @@ final class PublicStudyPageController
       // Documentos de la aprobación para el equipo de entregas (anexos_entrega del caso de entrega).
       $id = PublicStudyAccess::verifyDocuments(is_string($query['d']) ? $query['d'] : '');
       $documents = $id > 0 ? $this->service(new CommercialAccessPolicy($this->settings, $this->db, []))->documentsData($id) : null;
-      $this->send($documents === null ? 403 : 200, PublicStudyView::documents($documents, $this->css(), $this->logo(), self::INVALID));
+      $show = is_string($query['ver'] ?? null) ? $query['ver'] : '';
+      $this->send($documents === null ? 403 : 200, PublicStudyView::documents($documents, $this->css(), $this->logo(), self::INVALID, $show, $this->asset('js/public-study-docs.js')));
       return;
     }
     $id = PublicStudyAccess::verify(is_string($query['e'] ?? null) ? $query['e'] : '');
@@ -129,8 +130,13 @@ final class PublicStudyPageController
     header('Referrer-Policy: no-referrer');
     header('X-Content-Type-Options: nosniff');
     header('X-Robots-Tag: noindex, nofollow');
-    header("Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' https:; base-uri 'none'; form-action 'none'; frame-ancestors 'self'");
+    header("Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' https:; frame-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'");
     echo $html;
+  }
+
+  private function asset(string $path): string
+  {
+    return rtrim((string) SCM_BASE_URL, '/') . '/assets/' . $path . '?v=' . substr((string) @hash_file('sha256', SCM_PUBLIC_PATH . '/assets/' . $path), 0, 12);
   }
 
   private function css(): string

@@ -346,6 +346,11 @@ final class CommercialStudiesTest extends TestCase
     self::assertStringContainsString('Recibos de servicios públicos', $html);
     self::assertStringContainsString('cedula.png', $html);
     self::assertStringNotContainsString('Portería', $html);
+    self::assertStringContainsString('name="ps-visor"', $html, 'Los documentos se ven dentro de la misma página');
+    self::assertMatchesRegularExpression('#<iframe[^>]+src="[^"]*file\.php\?n=[^"]+"#', $html);
+    $servicios = PublicStudyView::documents($data, 'public-study.css', '', '', 'servicios');
+    self::assertMatchesRegularExpression('#<li class="is-current"><a [^>]*data-ps-doc="servicios"#', $servicios, 'Se abre en el documento pedido');
+    self::assertMatchesRegularExpression('#<li class="is-current"><a [^>]*data-ps-doc="asegurable"#', PublicStudyView::documents($data, 'public-study.css', '', '', 'asegurable'));
     self::assertSame(0, PublicStudyAccess::verifyDocuments($id . '.' . str_repeat('a', 64)));
     self::assertSame(0, PublicStudyAccess::verifyDocuments(PublicStudyAccess::reference($id)), 'El enlace del cliente no abre los documentos.');
   }
