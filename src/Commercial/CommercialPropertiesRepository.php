@@ -1162,6 +1162,105 @@ final class CommercialPropertiesRepository
   }
 
   /**
+   * Estados que se pueden elegir al cambiar el estado de un inmueble desde el listado: los valores canónicos que usan
+   * el CCT y el post type (el sitio web publica solo "Publico").
+   */
+  public const EDITABLE_STATUSES = [
+    'Publico',
+    'En borrador',
+    'En cierre',
+    'En proceso de cierre',
+    'Ocupado',
+    'Arrendado',
+    'Vendido',
+    'Desistido',
+    'Vetado',
+    'No publicar',
+  ];
+
+  /**
+   * Cambia el estado del inmueble en el CCT (jet_cct_inmuebles.estado) y en el post type (meta "estado" del post cuyo
+   * ID es el código), y deja el cambio en el historial del inmueble. Con $ownerEmployeeId solo cambia los inmuebles de
+   * esa persona.
+   *
+   * @return array{ok:bool,message:string,estado?:string,anterior?:string}
+   */
+  public function changeStatus(string $code, string $state, string $observation, string $employeeId, string $employeeName, ?string $ownerEmployeeId = null): array
+  {
+    $code = trim($code);
+    $state = trim($state);
+    $observation = trim($observation);
+    if ($code === '') {
+      return ['ok' => false, 'message' => 'Inmueble no válido.'];
+    }
+    if (!in_array($state, self::EDITABLE_STATUSES, true)) {
+      return ['ok' => false, 'message' => 'Elige un estado válido.'];
+    }
+
+    $inmTable = $this->db->table('jet_cct_inmuebles');
+    $prop = $this->db->getRow("SELECT `_ID`, `codigo`, `estado`, `id_funcionario` FROM `{$inmTable}` WHERE `codigo` = ? OR `_ID` = ? LIMIT 1", [$code, ctype_digit($code) ? (int) $code : 0]);
+    if (!is_array($prop) || $prop === []) {
+      return ['ok' => false, 'message' => 'Inmueble no encontrado.'];
+    }
+    if ($ownerEmployeeId !== null && (trim($ownerEmployeeId) === '' || trim((string) ($prop['id_funcionario'] ?? '')) !== trim($ownerEmployeeId))) {
+      return ['ok' => false, 'message' => 'Solo puedes cambiar el estado de tus inmuebles.'];
+    }
+
+    $previous = trim((string) ($prop['estado'] ?? ''));
+    if ($previous === $state) {
+      return ['ok' => false, 'message' => 'El inmueble ya está en estado "' . $state . '".'];
+    }
+
+    $propId = (int) $prop['_ID'];
+    $propCode = trim((string) ($prop['codigo'] ?? '')) !== '' ? trim((string) $prop['codigo']) : (string) $propId;
+    $now = time();
+    $nowSql = date('Y-m-d H:i:s', $now);
+
+    $pdo = $this->db->pdo();
+    $ownTransaction = !$pdo->inTransaction();
+    if ($ownTransaction) {
+      $pdo->beginTransaction();
+    }
+    try {
+      $this->db->update($inmTable, ['estado' => $state, 'cct_modified' => $nowSql], ['_ID' => $propId]);
+
+      // El post type del inmueble: su ID es el código y el sitio web lee el meta "estado".
+      if (ctype_digit($propCode)) {
+        $postmeta = $this->db->table('postmeta');
+        $postId = (int) $propCode;
+        $metaId = (int) $this->db->getVar("SELECT `meta_id` FROM `{$postmeta}` WHERE `post_id` = ? AND `meta_key` = 'estado' LIMIT 1", [$postId]);
+        if ($metaId > 0) {
+          $this->db->update($postmeta, ['meta_value' => $state], ['meta_id' => $metaId]);
+        } else {
+          $this->db->insert($postmeta, ['post_id' => $postId, 'meta_key' => 'estado', 'meta_value' => $state]);
+        }
+      }
+
+      $this->db->insert($this->db->table('jet_cct_historial_del_inmueble'), [
+        'fecha' => $now,
+        'id_inmueble' => $propCode,
+        'id_empleado' => $employeeId,
+        'funcionario' => $employeeName,
+        'tipo_reporte' => 'Cambio de estado',
+        'observacion' => 'Cambio de estado del inmueble: "' . ($previous !== '' ? $previous : 'Sin estado') . '" → "' . $state . '".' . ($observation !== '' ? ' Observación: ' . $observation : ''),
+        'cct_author_id' => $employeeId,
+        'cct_created' => $nowSql,
+        'cct_modified' => $nowSql,
+      ]);
+      if ($ownTransaction) {
+        $pdo->commit();
+      }
+    } catch (\Throwable $error) {
+      if ($ownTransaction) {
+        $pdo->rollBack();
+      }
+      throw $error;
+    }
+
+    return ['ok' => true, 'message' => 'El inmueble #' . $propCode . ' quedó en estado "' . $state . '".', 'estado' => $state, 'anterior' => $previous];
+  }
+
+  /**
    * Toggle Promoción Premium for property and sync with WordPress post meta.
    *
    * @return array{ok:bool,message:string}

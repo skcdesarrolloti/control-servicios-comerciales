@@ -4010,6 +4010,12 @@ final class CommercialDashboardView
       return '';
     }
 
+    // Cambiar estado: con el permiso; quien no ve todo el inventario, solo en sus inmuebles (el servidor lo valida igual).
+    $canChangeStatus = !$policy instanceof CommercialAccessPolicy || $policy->canAct('inmueble_cambiar_estado');
+    $statusScopeAll = !$policy instanceof CommercialAccessPolicy || $policy->canSeeAll('inmuebles');
+    $myEmployeeId = trim(Auth::employeeId());
+    $statusOptions = (string) json_encode(CommercialPropertiesRepository::EDITABLE_STATUSES, JSON_UNESCAPED_UNICODE);
+
     ob_start();
     foreach ($rows as $row) {
       $id = (int) ($row['_ID'] ?? 0);
@@ -4253,6 +4259,12 @@ final class CommercialDashboardView
           </div>
 
           <div class="flex items-center gap-1.5 shrink-0">
+            <?php if ($canChangeStatus && ($statusScopeAll || ($myEmployeeId !== '' && trim((string) ($row['id_funcionario'] ?? '')) === $myEmployeeId))): ?>
+              <button type="button" class="px-3 py-1.5 rounded-lg bg-surface-container-low text-on-surface hover:bg-surface-container border border-outline-variant/40 text-xs font-semibold transition-all cursor-pointer flex items-center gap-1 active:scale-95" data-commercial-property-status="<?php echo esc_attr($codigo); ?>" data-current="<?php echo esc_attr($estado); ?>" data-states="<?php echo esc_attr($statusOptions); ?>" title="Cambiar el estado del inmueble">
+                <span class="material-symbols-outlined text-[14px]">swap_horiz</span>
+                <span>Estado</span>
+              </button>
+            <?php endif; ?>
             <button type="button" class="px-3 py-1.5 rounded-lg bg-primary text-white hover:bg-primary/90 text-xs font-semibold transition-all shadow-xs cursor-pointer flex items-center gap-1 active:scale-95" data-commercial-property-detail="<?php echo esc_attr($codigo); ?>">
               <span class="material-symbols-outlined text-[14px]">visibility</span>
               <span>Ficha</span>
@@ -4979,7 +4991,7 @@ final class CommercialDashboardView
     'Cotizaciones' => ['cotizacion_crear'],
     'Estudios de aseguradora' => ['estudio_crear', 'estudio_responder', 'estudio_desistir'],
     'Precaptación' => ['precaptacion_crear', 'precaptacion_editar', 'precaptacion_ticket', 'precaptacion_catalogos'],
-    'Inmuebles y avisos' => ['ingresar_inmueble', 'registrar_aviso', 'editar_actor'],
+    'Inmuebles y avisos' => ['ingresar_inmueble', 'inmueble_cambiar_estado', 'registrar_aviso', 'editar_actor'],
     'Herramientas' => ['mercado_vista_completa', 'aseo_vista_interna', 'plan_estrategico_editar'],
     'Promoción' => ['promocion_ver_ip', 'pop_gestionar', 'pop_anular', 'pop_ver_costos', 'redes_ver_inversion', 'redes_sincronizar', 'piezas_gestionar', 'piezas_archivar', 'fichas_gestionar'],
   ];

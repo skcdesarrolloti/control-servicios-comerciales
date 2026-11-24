@@ -66,6 +66,58 @@
     window.alert(message);
   }
 
+  // Cambiar estado del inmueble desde su tarjeta: actualiza el CCT y el post type (commercial_property_change_status).
+  function propertyStatusLabel(state) {
+    return state === "Publico" ? "Público" : state;
+  }
+
+  function openPropertyStatusPopup(button) {
+    var code = button.getAttribute("data-commercial-property-status") || "";
+    var current = button.getAttribute("data-current") || "";
+    var states = [];
+    try { states = JSON.parse(button.getAttribute("data-states") || "[]"); } catch (e) { states = []; }
+    if (!code || !states.length || !window.Swal) return;
+    var options = states.map(function (state) {
+      return '<option value="' + escapeHtml(state) + '"' + (state === current ? " disabled" : "") + ">" +
+        escapeHtml(propertyStatusLabel(state)) + (state === current ? " (actual)" : "") + "</option>";
+    }).join("");
+    window.Swal.fire({
+      title: "Cambiar estado del inmueble #" + code,
+      html:
+        '<div style="text-align:left;display:grid;gap:12px;font-size:14px">' +
+          '<p style="margin:0;color:#475569">Estado actual: <strong>' + escapeHtml(propertyStatusLabel(current) || "Sin estado") + "</strong>. " +
+          "El cambio se guarda en el inmueble y en la web (solo los públicos se ven en el sitio).</p>" +
+          '<label style="display:grid;gap:4px;font-weight:600">Nuevo estado' +
+            '<select id="scm-property-status-select" class="swal2-select" style="margin:0;width:100%;font-size:14px"><option value="">Selecciona…</option>' + options + "</select></label>" +
+          '<label style="display:grid;gap:4px;font-weight:600">Observación <span style="font-weight:400;color:#64748b">(opcional, queda en el historial)</span>' +
+            '<textarea id="scm-property-status-note" class="swal2-textarea" rows="3" maxlength="1000" style="margin:0;width:100%;font-size:14px"></textarea></label>' +
+        "</div>",
+      showCancelButton: true,
+      confirmButtonText: "Guardar estado",
+      cancelButtonText: "Cancelar",
+      focusConfirm: false,
+      showLoaderOnConfirm: true,
+      allowOutsideClick: function () { return !window.Swal.isLoading(); },
+      preConfirm: function () {
+        var state = (document.getElementById("scm-property-status-select") || {}).value || "";
+        var note = (document.getElementById("scm-property-status-note") || {}).value || "";
+        if (!state) {
+          window.Swal.showValidationMessage("Elige el nuevo estado.");
+          return false;
+        }
+        return request("commercial_property_change_status", { codigo: code, estado: state, observacion: note })
+          .catch(function (err) {
+            window.Swal.showValidationMessage((err && err.message) || "No se pudo cambiar el estado.");
+            return false;
+          });
+      },
+    }).then(function (result) {
+      if (!result.isConfirmed || !result.value) return;
+      notify("success", (result.value && result.value.message) || "Estado actualizado.");
+      window.setTimeout(function () { window.location.reload(); }, 900);
+    });
+  }
+
   function escapeHtml(value) {
     return String(value || "")
       .replace(/&/g, "&amp;")
@@ -1666,6 +1718,12 @@
         videoFrame.replaceChildren(vIframe);
         vIframe.focus();
       }
+      return;
+    }
+    var statusBtn = event.target.closest("[data-commercial-property-status]");
+    if (statusBtn) {
+      event.preventDefault();
+      openPropertyStatusPopup(statusBtn);
       return;
     }
     var releaseBtn = event.target.closest("[data-commercial-release-highlight]");

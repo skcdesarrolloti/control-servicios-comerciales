@@ -261,6 +261,7 @@ final class CommercialActionRouter
       'commercial_highlight_complete' => 'completeHighlight',
       'commercial_highlight_release' => 'releaseHighlight',
       'commercial_highlight_toggle_premium' => 'togglePremium',
+      'commercial_property_change_status' => 'propertyChangeStatus',
     ][$action] ?? null;
   }
 }

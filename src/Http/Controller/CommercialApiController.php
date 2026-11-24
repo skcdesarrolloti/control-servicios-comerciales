@@ -1688,6 +1688,37 @@ final class CommercialApiController
     JsonResponse::ok($res);
   }
 
+  /**
+   * Cambia el estado del inmueble (CCT y post type). Quien no ve todo el inventario solo cambia sus inmuebles.
+   *
+   * @param array<string,mixed> $input
+   */
+  public function propertyChangeStatus(array $input): never
+  {
+    $this->verify($input);
+    if (!$this->policy->canView('inmuebles') || !$this->policy->canAct('inmueble_cambiar_estado')) {
+      JsonResponse::error('No tienes permiso para cambiar el estado de los inmuebles.', 403);
+    }
+    $code = trim((string) ($input['codigo'] ?? ''));
+    $state = trim((string) ($input['estado'] ?? ''));
+    $observation = mb_substr(trim((string) ($input['observacion'] ?? '')), 0, 1000);
+
+    $employeeId = trim(Auth::employeeId());
+    $employeeName = trim(Auth::user()) !== '' ? trim(Auth::user()) : 'Funcionario';
+    $owner = $this->policy->canSeeAll('inmuebles') ? null : $employeeId;
+
+    try {
+      $res = (new CommercialPropertiesRepository($this->db))->changeStatus($code, $state, $observation, $employeeId, $employeeName, $owner);
+    } catch (\Throwable $error) {
+      error_log('[commercial-properties] No se pudo cambiar el estado del inmueble ' . $code . ': ' . $error->getMessage());
+      JsonResponse::error('No se pudo cambiar el estado del inmueble.', 500);
+    }
+    if (!$res['ok']) {
+      JsonResponse::error($res['message'], 422);
+    }
+    JsonResponse::ok($res);
+  }
+
   /** @param array<string,mixed> $input @return array<string,mixed> */
   private function propertyFilters(array $input, bool $isNonAdmin): array
   {
