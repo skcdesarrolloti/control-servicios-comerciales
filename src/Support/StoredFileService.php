@@ -100,6 +100,43 @@ final class StoredFileService
     return $stored;
   }
 
+  /**
+   * Archivos de un campo, todos válidos o ninguno: si uno no sirve se borran los ya guardados y se avisa cuál falló.
+   * Solo formatos que sirve public/file.php.
+   * @param array<string,string> $formats mime => extensión
+   * @return list<array{nombre:string,url:string}>
+   */
+  public function storeFiles(string $fieldName, array $formats, int $maximumFiles, string $label): array
+  {
+    // Un campo de archivo sin elegir llega como una entrada vacía (UPLOAD_ERR_NO_FILE): no es un archivo.
+    $files = array_values(array_filter($this->normalizeUploadedFiles($fieldName), static fn(array $file): bool => (int) $file['error'] !== UPLOAD_ERR_NO_FILE));
+    if (count($files) > $maximumFiles) {
+      throw new \InvalidArgumentException($label . ': sube máximo ' . $maximumFiles . ' archivo' . ($maximumFiles === 1 ? '' : 's') . '.');
+    }
+    $stored = [];
+    try {
+      foreach ($files as $file) {
+        $original = mb_substr(trim(basename(str_replace('\\', '/', (string) ($file['name'] ?? '')))), 0, 120, 'UTF-8');
+        if (!$this->isAcceptableUpload($file)) {
+          throw new \InvalidArgumentException($label . ': no se recibió "' . $original . '". Revisa que no pese más de ' . (int) floor($this->maxBytes / 1048576) . ' MB.');
+        }
+        $mime = $this->detectMime((string) $file['tmp_name']);
+        if (!isset($formats[$mime]) || !$this->ensureDirectory()) {
+          throw new \InvalidArgumentException($label . ': "' . $original . '" debe ser ' . implode(', ', array_map('strtoupper', array_unique(array_values($formats)))) . '.');
+        }
+        $name = $this->moveUpload((string) $file['tmp_name'], $formats[$mime]);
+        if ($name === '') {
+          throw new \RuntimeException('No se pudo guardar "' . $original . '".');
+        }
+        $stored[] = ['nombre' => $original !== '' ? $original : $name, 'url' => $this->urlFor($name)];
+      }
+      return $stored;
+    } catch (\Throwable $exception) {
+      $this->removeImages(array_column($stored, 'url'));
+      throw $exception;
+    }
+  }
+
   public function urlFor(string $name): string
   {
     $name = basename($name);

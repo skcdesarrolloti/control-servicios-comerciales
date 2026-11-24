@@ -52,6 +52,17 @@ final class CommercialStudiesService
   /** Pestañas del listado: los aprobados se separan por lo que pasó con el negocio. */
   public const LIST_STATES = [self::WAITING, self::POSTPONED, self::APPROVED, 'Entregado', 'Negocio desistido', self::REJECTED, self::DESISTED];
   public const CHANGE_PROPERTY = 'Cambio de inmueble';
+  /**
+   * Documentos que el consultor/a sube al aprobar (reemplazan el enlace de Drive del formulario): clave => [título,
+   * formatos (mime => extensión, los que sirve public/file.php), máximo de archivos, ayuda]. Todos son obligatorios.
+   */
+  public const DOCUMENTS = [
+    'asegurable' => ['Asegurable', ['application/pdf' => 'pdf'], 1, 'El PDF de la aprobación de la aseguradora.'],
+    'servicios' => ['Recibos de servicios públicos', ['application/pdf' => 'pdf', 'image/jpeg' => 'jpg', 'image/png' => 'png'], 6, 'Un archivo por cada servicio, en PDF o foto.'],
+    'arrendatario' => ['Documento del arrendatario', ['application/pdf' => 'pdf', 'image/jpeg' => 'jpg', 'image/png' => 'png'], 4, 'Documento de identidad por ambas caras, en PDF o foto.'],
+  ];
+  /** Columna JSON del estudio con los documentos (bin/add-study-documents-field.php). */
+  public const DOCUMENTS_COLUMN = 'documentos';
   public const CONTRACT_PENDING = 'Por entregar';
 
   /** Estado comercial y estado general de la tarea según el estudio (estado_administrativo no se toca). */
@@ -299,11 +310,14 @@ final class CommercialStudiesService
 
   /**
    * Corrige los datos del estudio (aseguradora, solicitud, valor y datos del cliente; lo faltante si está aplazado). Si ya
-   * tiene caso de entrega y contrato, también les corrige aseguradora y número de solicitud.
+   * tiene caso de entrega y contrato, también les corrige aseguradora y número de solicitud. En un estudio aprobado
+   * también se agregan o quitan documentos ($documents: archivos ya guardados por el controlador; quitar_documentos[]:
+   * posiciones de los que se quitan).
    * @param array<string,mixed> $input
-   * @return array{id:int,message:string}
+   * @param array<string,list<array{nombre:string,url:string}>> $documents
+   * @return array{id:int,message:string,removed:list<string>}
    */
-  public function update(int $id, int $ticketPk, array $input): array
+  public function update(int $id, int $ticketPk, array $input, array $documents = []): array
   {
     $this->require($this->canCreate(), 'No tienes permiso para editar estudios de aseguradora.');
     $this->taskOrFail($ticketPk);
@@ -326,11 +340,44 @@ final class CommercialStudiesService
         $changes[] = $labels[$key];
       }
     }
-    if ($changes === []) {
-      return ['id' => $id, 'message' => 'No hubo cambios en el estudio #' . $id . '.'];
-    }
     $actor = $this->actor();
     $now = time();
+    $removed = [];
+    $rawRemove = $input['quitar_documentos'] ?? [];
+    $remove = array_values(array_unique(array_map('intval', array_filter(is_array($rawRemove) ? $rawRemove : [], static fn($value): bool => is_scalar($value) && ctype_digit((string) $value)))));
+    if (self::hasNewDocuments($documents) || $remove !== []) {
+      if (trim((string) ($study['estado'] ?? '')) !== self::APPROVED) {
+        throw new \InvalidArgumentException('Los documentos se suben cuando el estudio está aprobado.');
+      }
+      $this->requireDocumentsColumn();
+      $kept = [];
+      foreach (self::documents($study) as $index => $document) {
+        if (in_array($index, $remove, true)) {
+          $removed[] = $document['url'];
+        } else {
+          $kept[] = $document;
+        }
+      }
+      $list = array_merge($kept, $this->newDocuments($documents, $actor, $now));
+      foreach (self::DOCUMENTS as $type => [$title, , $max]) {
+        if (count(array_filter($list, static fn(array $document): bool => $document['tipo'] === $type)) > $max) {
+          throw new \InvalidArgumentException($title . ': máximo ' . $max . ' archivo' . ($max === 1 ? '' : 's') . '. Quita el anterior para reemplazarlo.');
+        }
+      }
+      $data[self::DOCUMENTS_COLUMN] = self::encodeDocuments($list);
+      $added = count($list) - count($kept);
+      $parts = [];
+      if ($added > 0) {
+        $parts[] = $added . ($added === 1 ? ' documento nuevo' : ' documentos nuevos');
+      }
+      if ($removed !== []) {
+        $parts[] = count($removed) . (count($removed) === 1 ? ' documento quitado' : ' documentos quitados');
+      }
+      $changes[] = implode(' y ', $parts);
+    }
+    if ($changes === []) {
+      return ['id' => $id, 'message' => 'No hubo cambios en el estudio #' . $id . '.', 'removed' => []];
+    }
     $common = $this->common($actor, $now);
     $pdo = $this->repository->database()->pdo();
     $pdo->beginTransaction();
@@ -338,7 +385,13 @@ final class CommercialStudiesService
       $this->repository->updateStudy($id, $data + ['cct_modified' => $common['cct_modified']]);
       $sync = ['aseguradora' => $data['aseguradora'], 'numero_solicitud' => $data['num_solicitud'], 'cct_modified' => $common['cct_modified']];
       $this->repository->updateContract((int) ($study['id_contrato_mandato_arrendamiento'] ?? 0), $sync);
-      $this->repository->updateTicket((int) ($study['id_ticket_entrega'] ?? 0), ['numero_solicitud' => $data['num_solicitud'], 'cct_modified' => $common['cct_modified']]);
+      $deliveryUpdate = ['numero_solicitud' => $data['num_solicitud'], 'cct_modified' => $common['cct_modified']];
+      $delivery = (int) ($study['id_ticket_entrega'] ?? 0) > 0 ? $this->repository->task((int) $study['id_ticket_entrega']) : null;
+      if (array_key_exists(self::DOCUMENTS_COLUMN, $data) && $delivery !== null && trim((string) ($delivery['anexos_entrega'] ?? '')) === '') {
+        // Un caso de entrega sin anexos pasa a mostrar los documentos del estudio; uno con su enlace de Drive lo conserva.
+        $deliveryUpdate['anexos_entrega'] = PublicStudyAccess::documentsUrl($id);
+      }
+      $this->repository->updateTicket((int) ($study['id_ticket_entrega'] ?? 0), $deliveryUpdate);
       $this->repository->insertTaskHistory($common + [
         'id_ticket' => $ticketPk, 'fecha' => $now, 'nombre' => $actor['nombre'], 'id_empleado' => $actor['id'], 'id_estudio_aseguradora' => (string) $id,
         'respuesta' => 'Se actualizó el estudio de aseguradora #' . $id . ' (' . implode(', ', $changes) . ').',
@@ -350,16 +403,18 @@ final class CommercialStudiesService
       }
       throw $exception;
     }
-    return ['id' => $id, 'message' => 'Estudio #' . $id . ' actualizado: ' . implode(', ', $changes) . '.'];
+    return ['id' => $id, 'message' => 'Estudio #' . $id . ' actualizado: ' . implode(', ', $changes) . '.', 'removed' => $removed];
   }
 
   /**
    * Respuesta de la aseguradora. Aprobado crea el caso de entrega y el contrato "No asignado" y deja el inmueble "En
-   * proceso de cierre" (como el formulario de WordPress); todas avisan al cliente y al equipo.
+   * proceso de cierre" (como el formulario de WordPress) y exige los documentos de DOCUMENTS ($documents: archivos ya
+   * guardados por el controlador); todas avisan al cliente y al equipo.
    * @param array<string,mixed> $input
+   * @param array<string,list<array{nombre:string,url:string}>> $documents
    * @return array{id:int,estado:string,message:string,enviado:array{correo:bool,whatsapp:bool},caso_entrega:int,contrato:int}
    */
-  public function respond(int $id, int $ticketPk, array $input): array
+  public function respond(int $id, int $ticketPk, array $input, array $documents = []): array
   {
     $this->require($this->canRespond(), 'No tienes permiso para responder estudios de aseguradora.');
     $task = $this->taskOrFail($ticketPk);
@@ -399,6 +454,18 @@ final class CommercialStudiesService
       $detail = 'Recibimos la información y la aseguradora continúa el estudio.';
     } else {
       $approval = $this->approvalData($input);
+      $this->requireDocumentsColumn();
+      $uploaded = $this->newDocuments($documents, $actor, $now);
+      $missing = [];
+      foreach (self::DOCUMENTS as $type => [$title]) {
+        if (!in_array($type, array_column($uploaded, 'tipo'), true)) {
+          $missing[] = $title;
+        }
+      }
+      if ($missing !== []) {
+        throw new \InvalidArgumentException('Sube los documentos de la aprobación: ' . implode(', ', $missing) . '.');
+      }
+      $update[self::DOCUMENTS_COLUMN] = self::encodeDocuments($uploaded);
       $detail = 'Coordinaremos con usted la entrega del inmueble' . ($approval['fecha_posible_entrega'] > 0 ? ' (fecha posible: ' . date('d/m/Y', $approval['fecha_posible_entrega']) . ')' : '') . '.';
     }
 
@@ -452,9 +519,9 @@ final class CommercialStudiesService
   }
 
   /**
-   * Inmueble, llaves, fecha, servicios y enlace de Drive de la aprobación, validados.
+   * Inmueble, llaves, fecha y servicios de la aprobación, validados (los documentos los valida respond()).
    * @param array<string,mixed> $input
-   * @return array{property:array<string,mixed>,owner:array<string,mixed>,responsable:array<string,mixed>,ubicacion_llaves:string,persona_llaves:string,contacto_llaves:string,fecha_posible_entrega:int,servicios:list<string>,link_drive:string}
+   * @return array{property:array<string,mixed>,owner:array<string,mixed>,responsable:array<string,mixed>,ubicacion_llaves:string,persona_llaves:string,contacto_llaves:string,fecha_posible_entrega:int,servicios:list<string>}
    */
   private function approvalData(array $input): array
   {
@@ -490,13 +557,9 @@ final class CommercialStudiesService
     if ($date === false) {
       throw new \InvalidArgumentException('Elige la fecha posible de entrega.');
     }
-    $link = self::text($input, 'link_drive', 500);
-    if (filter_var($link, FILTER_VALIDATE_URL) === false || preg_match('#^https?://#i', $link) !== 1) {
-      throw new \InvalidArgumentException('Pega el enlace de Drive con los recibos de servicios públicos y el asegurable en PDF.');
-    }
     $raw = $input['servicios_publicos'] ?? [];
     $services = array_values(array_intersect($this->repository->utilities(), array_map(static fn($value): string => is_scalar($value) ? trim((string) $value) : '', is_array($raw) ? $raw : [])));
-    return $out + ['property' => $property, 'owner' => $owner, 'responsable' => $responsible, 'fecha_posible_entrega' => $date, 'servicios' => $services, 'link_drive' => $link];
+    return $out + ['property' => $property, 'owner' => $owner, 'responsable' => $responsible, 'fecha_posible_entrega' => $date, 'servicios' => $services];
   }
 
   /**
@@ -535,7 +598,7 @@ final class CommercialStudiesService
       'inmueble' => 'No asignado', 'contrato' => 'No asignado', 'asunto' => 'REVISION ANTES DE LA OCUPACION',
       'descripcion' => '<p>Reciba un cordial saludo. Hemos generado este caso a fin de revisar el inmueble antes de la ocupación; ' . htmlspecialchars($responsibleName, ENT_QUOTES, 'UTF-8') . ' estará en contacto con usted para coordinar la cita.</p>',
       'numero_solicitud' => $number, 'consultor_entrega' => $actor['nombre'], 'consultor_entrega_correo' => $actor['correo'], 'consultor_entrega_celular' => $actor['celular'],
-      'fecha_posible_entrega' => $approval['fecha_posible_entrega'], 'anexos_entrega' => $approval['link_drive'],
+      'fecha_posible_entrega' => $approval['fecha_posible_entrega'], 'anexos_entrega' => PublicStudyAccess::documentsUrl($id),
       'estado' => 'Nuevo', 'estado_administrativo' => 'Nuevo', 'estado_rev_entrega' => 'No', 'estado_inventario' => 'No', 'estado_acta_entrega' => 'No',
       'tuvo_seguimiento' => 'No', 'tuvo_reporte' => 'No', 'creador_por' => 'Funcionario',
     ]);
@@ -699,6 +762,108 @@ final class CommercialStudiesService
     return !in_array($state, [self::DESISTED, 'Negocio desistido'], true);
   }
 
+  // ── Documentos ──────────────────────────────────────
+
+  /** Si ya existe la columna de documentos en el estudio (bin/add-study-documents-field.php). */
+  public function documentsReady(): bool
+  {
+    return $this->repository->hasStudyColumn(self::DOCUMENTS_COLUMN);
+  }
+
+  private function requireDocumentsColumn(): void
+  {
+    if (!$this->documentsReady()) {
+      throw new \RuntimeException('Falta crear el campo de documentos del estudio: en el servidor, php bin/add-study-documents-field.php --aplicar.');
+    }
+  }
+
+  /** @param array<string,list<array{nombre:string,url:string}>> $documents */
+  private static function hasNewDocuments(array $documents): bool
+  {
+    foreach ($documents as $files) {
+      if ($files !== []) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Archivos recién guardados, con su tipo, fecha y quien los subió. Solo enlaces firmados de public/file.php.
+   * @param array<string,list<array{nombre:string,url:string}>> $documents
+   * @param array<string,string> $actor
+   * @return list<array{tipo:string,nombre:string,url:string,fecha:int,por:string}>
+   */
+  private function newDocuments(array $documents, array $actor, int $now): array
+  {
+    $out = [];
+    foreach (self::DOCUMENTS as $type => $spec) {
+      foreach ($documents[$type] ?? [] as $file) {
+        $url = trim($file['url']);
+        if (!self::isStoredFile($url)) {
+          continue;
+        }
+        $out[] = ['tipo' => $type, 'nombre' => mb_substr(trim($file['nombre']), 0, 120, 'UTF-8') ?: $spec[0], 'url' => $url, 'fecha' => $now, 'por' => $actor['nombre']];
+      }
+    }
+    return $out;
+  }
+
+  private static function isStoredFile(string $url): bool
+  {
+    return preg_match('#/file\.php\?n=[a-f0-9]{24}_[0-9]+\.(pdf|jpg|png)&s=[a-f0-9]{64}$#D', $url) === 1;
+  }
+
+  /**
+   * Documentos guardados en el estudio, en el orden en que se subieron (la posición sirve para quitarlos al editar).
+   * @param array<string,mixed> $study
+   * @return list<array{tipo:string,titulo:string,nombre:string,url:string,fecha:int,por:string}>
+   */
+  public static function documents(array $study): array
+  {
+    $raw = json_decode((string) ($study[self::DOCUMENTS_COLUMN] ?? ''), true);
+    $out = [];
+    foreach (is_array($raw) ? $raw : [] as $item) {
+      $type = is_array($item) ? (string) ($item['tipo'] ?? '') : '';
+      $url = is_array($item) ? trim((string) ($item['url'] ?? '')) : '';
+      if (!isset(self::DOCUMENTS[$type]) || !self::isStoredFile($url)) {
+        continue;
+      }
+      $out[] = ['tipo' => $type, 'titulo' => self::DOCUMENTS[$type][0], 'nombre' => trim((string) ($item['nombre'] ?? '')) ?: self::DOCUMENTS[$type][0], 'url' => $url, 'fecha' => (int) ($item['fecha'] ?? 0), 'por' => trim((string) ($item['por'] ?? ''))];
+    }
+    return $out;
+  }
+
+  /** @param list<array{tipo:string,nombre:string,url:string,fecha:int,por:string}|array<string,mixed>> $list */
+  private static function encodeDocuments(array $list): string
+  {
+    $clean = array_map(static fn(array $document): array => ['tipo' => (string) $document['tipo'], 'nombre' => (string) $document['nombre'], 'url' => (string) $document['url'], 'fecha' => (int) $document['fecha'], 'por' => (string) $document['por']], $list);
+    return (string) json_encode($clean, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+  }
+
+  /**
+   * Página de documentos del enlace del caso de entrega (estudio.php?d=): para el equipo de entregas.
+   * @return array<string,mixed>|null
+   */
+  public function documentsData(int $id): ?array
+  {
+    $study = $this->repository->find($id);
+    if ($study === null) {
+      return null;
+    }
+    $code = trim((string) ($study['id_inmueble'] ?? ''));
+    $property = $code !== '' ? ($this->repository->propertyByCode($code) ?? []) : [];
+    return [
+      'id' => $id,
+      'cliente' => trim((string) ($study['cliente'] ?? '')),
+      'aseguradora' => trim((string) ($study['aseguradora'] ?? '')),
+      'num_solicitud' => trim((string) ($study['num_solicitud'] ?? '')),
+      'inmueble' => $code !== '' ? '#' . $code . (($address = trim((string) ($property['direccion_fisica'] ?? '')) ?: trim((string) ($property['direccion'] ?? ''))) !== '' ? ' · ' . $address : '') : '',
+      'caso_entrega' => (int) ($study['id_ticket_entrega'] ?? 0),
+      'documentos' => self::documents($study),
+    ];
+  }
+
   // ── Listado ─────────────────────────────────────────
 
   /** @param array<string,mixed> $input */
@@ -733,8 +898,9 @@ final class CommercialStudiesService
       $filters['empleado'] = '';
     }
     $result = $this->repository->search($filters, $scope, $page, self::LIST_PER_PAGE);
+    $properties = $this->repository->propertiesByCodes(array_map(static fn(array $row): string => trim((string) ($row['id_inmueble'] ?? '')), $result['rows']));
     return [
-      'rows' => array_map(fn(array $row): array => $this->listRow($row), $result['rows']),
+      'rows' => array_map(fn(array $row): array => $this->listRow($row, $properties), $result['rows']),
       'total' => $result['total'],
       'estados' => $result['estados'],
       'page' => $page,
@@ -853,6 +1019,7 @@ final class CommercialStudiesService
         'mandato' => (int) ($study['id_contrato_mandato'] ?? 0),
         'estado_contrato' => trim((string) ($study['estado_contrato'] ?? '')),
         'enlace_cliente' => PublicStudyAccess::url($id),
+        'documentos' => self::documents($study),
       ];
     }
     return $data;
@@ -876,9 +1043,15 @@ final class CommercialStudiesService
     return $state;
   }
 
-  /** @param array<string,mixed> $row @return array<string,mixed> */
-  private function listRow(array $row): array
+  /**
+   * @param array<string,mixed> $row
+   * @param array<string,array<string,mixed>> $properties Inmuebles por código (columna Inmueble del listado).
+   * @return array<string,mixed>
+   */
+  private function listRow(array $row, array $properties = []): array
   {
+    $code = trim((string) ($row['id_inmueble'] ?? ''));
+    $property = $properties[$code] ?? null;
     $created = (int) ($row['fecha'] ?? 0) ?: (strtotime((string) ($row['cct_created'] ?? '')) ?: 0);
     $value = self::amount((string) ($row['valor'] ?? ''));
     return [
@@ -894,7 +1067,11 @@ final class CommercialStudiesService
       'celular' => trim((string) ($row['celular_cliente'] ?? '')),
       'faltante' => trim((string) ($row['faltante'] ?? '')),
       'tarea' => (int) ($row['id_ticket'] ?? 0),
-      'inmueble' => trim((string) ($row['id_inmueble'] ?? '')),
+      'inmueble' => $code,
+      'inmueble_titulo' => $property !== null ? trim((string) ($property['tipo_inmueble'] ?? '')) . ' · ' . (trim((string) ($property['direccion_fisica'] ?? '')) ?: trim((string) ($property['direccion'] ?? '')) ?: 'Sin dirección') : '',
+      'inmueble_detalle' => $property !== null ? implode(' · ', array_filter([trim((string) ($property['barrio'] ?? '')), trim((string) ($property['estado'] ?? ''))])) : '',
+      'documentos' => self::documents($row),
+      'enlace' => (int) ($row['_ID'] ?? 0) > 0 ? PublicStudyAccess::url((int) $row['_ID']) : '',
       'caso_entrega' => (int) ($row['id_ticket_entrega'] ?? 0),
       'asesor' => trim((string) ($row['creador'] ?? '')),
       'propio' => trim((string) ($row['id_empleado'] ?? '')) !== '' && trim((string) $row['id_empleado']) === trim(Auth::employeeId()),

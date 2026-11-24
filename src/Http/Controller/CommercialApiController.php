@@ -1502,7 +1502,7 @@ final class CommercialApiController
     $general = $this->policy->canView('inmuebles') || ($this->policy->canSubview('herramientas', 'calculadora_mercado') && $this->policy->canAct('mercado_vista_completa'));
     $repo = new CommercialPropertiesRepository($this->db);
     $property = $repo->propertyDetail($identifier);
-    if (!$general && !(is_array($property) && $this->canOpenPropertyFromContext($property, (int) ($input['ticket_pk'] ?? 0)))) {
+    if (!$general && !(is_array($property) && ($this->canOpenPropertyFromStudy($property, (int) ($input['study_id'] ?? 0), (int) ($input['ticket_pk'] ?? 0)) || $this->canOpenPropertyFromContext($property, (int) ($input['ticket_pk'] ?? 0))))) {
       JsonResponse::error('No tienes permiso para consultar inmuebles.', 403);
     }
     if (!is_array($property) || $property === []) {
@@ -1518,6 +1518,32 @@ final class CommercialApiController
       'property' => $property,
       'html' => $html,
     ]);
+  }
+
+  /**
+   * Desde Estudios / Mis estudios o la ventana de estudios de la tarea: la ficha del inmueble del estudio, si la persona
+   * puede abrir ese estudio (el suyo, el de una tarea que ve o cualquiera si ve todo el equipo en Estudios).
+   * @param array<string,mixed> $property
+   */
+  private function canOpenPropertyFromStudy(array $property, int $studyId, int $ticketPk): bool
+  {
+    if ($studyId <= 0) {
+      return false;
+    }
+    if ($ticketPk > 0) {
+      if (!$this->policy->canAct('ver_ticket')) {
+        return false;
+      }
+      $this->authorizeTicketScope($ticketPk);
+    }
+    $service = new \SCM\Commercial\Studies\CommercialStudiesService(new \SCM\Commercial\Studies\CommercialStudiesRepository($this->db), $this->settings, $this->policy);
+    try {
+      $study = $service->studyFor($studyId, $ticketPk);
+    } catch (\InvalidArgumentException | \RuntimeException) {
+      return false;
+    }
+    $code = trim((string) ($study['id_inmueble'] ?? ''));
+    return $code !== '' && $code === trim((string) ($property['codigo'] ?? ''));
   }
 
   /**

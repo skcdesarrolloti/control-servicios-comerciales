@@ -68,14 +68,29 @@ final class CommercialStudiesTest extends TestCase
     return $this->service()->create($task, $override + ['aseguradora' => 'El libertador', 'num_solicitud' => '12548532', 'valor' => '$ 1.500.000', 'cliente' => 'Laura Cliente', 'email' => 'laura@example.test', 'celular' => '3001234567']);
   }
 
-  /** @param array<string,mixed> $override */
-  private function approve(int $id, array $override = []): array
+  /** Un archivo como los que guarda StoredFileService (enlace firmado de public/file.php). */
+  private static function file(string $name, string $ext = 'pdf'): array
+  {
+    return ['nombre' => $name, 'url' => 'https://panel.test/public/file.php?n=' . substr(hash('sha256', $name), 0, 24) . '_1700000000.' . $ext . '&s=' . hash('sha256', 'firma' . $name)];
+  }
+
+  /** @return array<string,list<array{nombre:string,url:string}>> Los tres documentos de la aprobación. */
+  private static function documents(): array
+  {
+    return ['asegurable' => [self::file('asegurable.pdf')], 'servicios' => [self::file('agua.pdf'), self::file('energia.jpg', 'jpg')], 'arrendatario' => [self::file('cedula.png', 'png')]];
+  }
+
+  /**
+   * @param array<string,mixed> $override
+   * @param array<string,list<array{nombre:string,url:string}>>|null $documents
+   */
+  private function approve(int $id, array $override = [], ?array $documents = null): array
   {
     (new Settings($this->db))->set(CommercialStudiesService::SETTING, ['responsable_entrega' => '404'], 1);
     return $this->service()->respond($id, 700, $override + [
       'estado' => 'Aprobado', 'id_inmueble' => '9001', 'ubicacion_llaves' => 'Portería', 'persona_llaves' => 'Recepción', 'contacto_llaves' => '321 699 9529',
-      'fecha_posible_entrega' => '2026-12-15', 'link_drive' => 'https://drive.google.com/drive/folders/abc', 'servicios_publicos' => ['Agua', 'Gas', 'Inventado'],
-    ]);
+      'fecha_posible_entrega' => '2026-12-15', 'servicios_publicos' => ['Agua', 'Gas', 'Inventado'],
+    ], $documents ?? self::documents());
   }
 
   /** @return array<string,mixed> */
@@ -245,7 +260,11 @@ final class CommercialStudiesTest extends TestCase
     self::assertSame('Ana Propietaria', $delivery['solicitante']);
     self::assertSame('Consultora Uno', $delivery['consultor_entrega']);
     self::assertSame((string) $result['contrato'], $delivery['id_contrato']);
-    self::assertSame('https://drive.google.com/drive/folders/abc', $delivery['anexos_entrega']);
+    self::assertSame(PublicStudyAccess::documentsUrl($id), $delivery['anexos_entrega'], 'El caso de entrega abre los documentos del estudio.');
+    self::assertSame($id, PublicStudyAccess::verifyDocuments(substr($delivery['anexos_entrega'], strpos($delivery['anexos_entrega'], '?d=') + 3)));
+    $documents = CommercialStudiesService::documents($study);
+    self::assertSame(['asegurable', 'servicios', 'servicios', 'arrendatario'], array_column($documents, 'tipo'));
+    self::assertSame('Consultora Uno', $documents[0]['por']);
     self::assertStringContainsString('Libia Entregas', $delivery['descripcion']);
 
     $contract = $this->row('jet_cct_contratos_arrendamiento', $result['contrato']);
@@ -283,7 +302,7 @@ final class CommercialStudiesTest extends TestCase
     self::assertSame(0, (int) $this->db->getVar("SELECT COUNT(*) FROM wp_jet_cct_tickets WHERE tema_ayuda = 'Entrega de inmuebles'"), 'Nada se crea si falla.');
     (new Settings($this->db))->set(CommercialStudiesService::SETTING, ['responsable_entrega' => ''], 1);
     try {
-      $this->service()->respond($id, 700, ['estado' => 'Aprobado', 'id_inmueble' => '9001', 'ubicacion_llaves' => 'a', 'persona_llaves' => 'b', 'contacto_llaves' => '3001234567', 'fecha_posible_entrega' => '2026-12-15', 'link_drive' => 'https://drive.google.com/x']);
+      $this->service()->respond($id, 700, ['estado' => 'Aprobado', 'id_inmueble' => '9001', 'ubicacion_llaves' => 'a', 'persona_llaves' => 'b', 'contacto_llaves' => '3001234567', 'fecha_posible_entrega' => '2026-12-15'], self::documents());
       self::fail('Sin responsable de entregas no se aprueba.');
     } catch (\RuntimeException $exception) {
       self::assertStringContainsString('Configuración', $exception->getMessage());
@@ -293,7 +312,69 @@ final class CommercialStudiesTest extends TestCase
     self::assertSame('404', (string) ($this->service()->deliveryResponsible()['id_empleado'] ?? ''));
   }
 
+  public function testApprovalRequiresTheThreeDocumentsAndTheColumn(): void
+  {
+    $id = $this->create()['id'];
+    try {
+      $this->approve($id, [], ['asegurable' => [self::file('a.pdf')], 'servicios' => [], 'arrendatario' => []]);
+      self::fail('Sin los documentos no se aprueba.');
+    } catch (\InvalidArgumentException $exception) {
+      self::assertStringContainsString('Recibos de servicios públicos, Documento del arrendatario', $exception->getMessage());
+    }
+    // Un enlace que no es un archivo del panel no se guarda como documento.
+    try {
+      $this->approve($id, [], ['asegurable' => [['nombre' => 'x', 'url' => 'https://otro.sitio/x.pdf']], 'servicios' => [self::file('b.pdf')], 'arrendatario' => [self::file('c.pdf')]]);
+      self::fail('Solo archivos firmados del panel.');
+    } catch (\InvalidArgumentException $exception) {
+      self::assertStringContainsString('Asegurable', $exception->getMessage());
+    }
+    self::assertSame('Esperando respuesta', $this->row('jet_cct_estudios_aseguradoras', $id)['estado']);
+    $this->db->pdo()->exec('ALTER TABLE wp_jet_cct_estudios_aseguradoras DROP COLUMN documentos');
+    $this->expectException(\RuntimeException::class);
+    $this->expectExceptionMessage('bin/add-study-documents-field.php');
+    $this->approve($id);
+  }
+
+  public function testDocumentsPageForTheDeliveryCase(): void
+  {
+    $id = $this->create()['id'];
+    $this->approve($id);
+    $data = $this->service()->documentsData($id);
+    self::assertSame('#9001 · Calle 9001 apto 1', $data['inmueble']);
+    $html = PublicStudyView::documents($data, 'public-study.css', '', '');
+    self::assertStringContainsString('Documentos de la aprobación', $html);
+    self::assertStringContainsString('Recibos de servicios públicos', $html);
+    self::assertStringContainsString('cedula.png', $html);
+    self::assertStringNotContainsString('Portería', $html);
+    self::assertSame(0, PublicStudyAccess::verifyDocuments($id . '.' . str_repeat('a', 64)));
+    self::assertSame(0, PublicStudyAccess::verifyDocuments(PublicStudyAccess::reference($id)), 'El enlace del cliente no abre los documentos.');
+  }
+
   // ── Editar ──────────────────────────────────────────
+
+  public function testUpdateAddsAndRemovesDocumentsOfAnApprovedStudy(): void
+  {
+    $id = $this->create()['id'];
+    $base = ['aseguradora' => 'El libertador', 'num_solicitud' => '12548532', 'valor' => '1500000', 'cliente' => 'Laura Cliente', 'email' => 'laura@example.test', 'celular' => '3001234567'];
+    try {
+      $this->service()->update($id, 700, $base, ['servicios' => [self::file('gas.pdf')]]);
+      self::fail('Solo un estudio aprobado tiene documentos.');
+    } catch (\InvalidArgumentException $exception) {
+      self::assertStringContainsString('aprobado', $exception->getMessage());
+    }
+    $this->approve($id);
+    try {
+      $this->service()->update($id, 700, $base, ['asegurable' => [self::file('otro.pdf')]]);
+      self::fail('El asegurable es uno solo.');
+    } catch (\InvalidArgumentException $exception) {
+      self::assertStringContainsString('Quita el anterior', $exception->getMessage());
+    }
+    $result = $this->service()->update($id, 700, $base + ['quitar_documentos' => ['0', '2']], ['asegurable' => [self::file('nuevo.pdf')], 'servicios' => [self::file('gas.pdf')]]);
+    self::assertStringContainsString('2 documentos nuevos y 2 documentos quitados', $result['message']);
+    self::assertSame([self::file('asegurable.pdf')['url'], self::file('energia.jpg', 'jpg')['url']], $result['removed'], 'El controlador borra los archivos quitados.');
+    $names = array_column(CommercialStudiesService::documents($this->row('jet_cct_estudios_aseguradoras', $id)), 'nombre');
+    self::assertSame(['agua.pdf', 'cedula.png', 'nuevo.pdf', 'gas.pdf'], $names);
+  }
 
   public function testUpdateCorrectsDataAndSyncsDeliveryCaseAndContract(): void
   {
@@ -383,6 +464,34 @@ final class CommercialStudiesTest extends TestCase
     self::assertSame(0, $mine['total'], 'Mis estudios es solo lo de la persona, también para administradores.');
     self::assertTrue($mine['mine']);
     self::assertSame(0, $this->service()->listing(['es_estado' => 'Aprobado'])['total']);
+
+    // Columna Inmueble con su ficha y botón del enlace del cliente.
+    $this->login('101', '9');
+    $this->approve($own);
+    $listing = $this->service()->listing([]);
+    self::assertSame(['9001', 'Apartamento · Calle 9001 apto 1'], [$listing['rows'][0]['inmueble'], $listing['rows'][0]['inmueble_titulo']]);
+    self::assertSame($own, PublicStudyAccess::verify(substr($listing['rows'][0]['enlace'], strpos($listing['rows'][0]['enlace'], '?e=') + 3)));
+    $html = CommercialStudiesView::results($listing, CommercialStudiesDatabase::policy($this->db), true);
+    self::assertStringContainsString('<th>Inmueble</th>', $html);
+    self::assertStringContainsString('data-commercial-property-detail="9001" data-study-id="' . $own . '"', $html);
+    self::assertStringContainsString('data-cst-copy="' . htmlspecialchars($listing['rows'][0]['enlace'], ENT_QUOTES), $html);
+  }
+
+  public function testPropertySheetOpensFromAStudyThePersonCanSee(): void
+  {
+    $own = $this->create()['id'];
+    $this->approve($own);
+    $controller = new \SCM\Http\Controller\CommercialApiController($this->db, new Settings($this->db), new \SCM\Core\Csrf(str_repeat('x', 40)), ['dashboard_admin_cargos' => ['13'], 'commercial_employee_cargos' => ['9', '13']]);
+    $check = new \ReflectionMethod($controller, 'canOpenPropertyFromStudy');
+    self::assertTrue($check->invoke($controller, ['codigo' => '9001'], $own, 0), 'Su estudio abre la ficha de su inmueble.');
+    self::assertFalse($check->invoke($controller, ['codigo' => '9002'], $own, 0), 'Solo el inmueble del estudio.');
+    self::assertFalse($check->invoke($controller, ['codigo' => '9001'], 0, 0));
+    $this->login('202', '9');
+    $controller = new \SCM\Http\Controller\CommercialApiController($this->db, new Settings($this->db), new \SCM\Core\Csrf(str_repeat('x', 40)), ['dashboard_admin_cargos' => ['13'], 'commercial_employee_cargos' => ['9', '13']]);
+    self::assertFalse($check->invoke($controller, ['codigo' => '9001'], $own, 0), 'El estudio de otro no abre la ficha.');
+    $this->login('303', '13');
+    $controller = new \SCM\Http\Controller\CommercialApiController($this->db, new Settings($this->db), new \SCM\Core\Csrf(str_repeat('x', 40)), ['dashboard_admin_cargos' => ['13'], 'commercial_employee_cargos' => ['9', '13']]);
+    self::assertTrue($check->invoke($controller, ['codigo' => '9001'], $own, 0), 'Quien ve todo el equipo en Estudios.');
   }
 
   // ── Vistas ──────────────────────────────────────────
@@ -403,7 +512,8 @@ final class CommercialStudiesTest extends TestCase
     $staff = PublicStudyView::render($this->service()->viewData($id, true), 'public-study.css', '');
     self::assertStringContainsString('Portería', $staff);
     self::assertStringContainsString('#' . $approved['caso_entrega'], $staff);
-    self::assertStringContainsString('drive.google.com', $staff);
+    self::assertStringContainsString('asegurable.pdf', $staff, 'El equipo ve los documentos.');
+    self::assertStringNotContainsString('asegurable.pdf', $html, 'El cliente no ve los documentos.');
     self::assertStringContainsString('no es válido', PublicStudyView::render(null, 'x.css', '', 'Este enlace no es válido o venció.'));
     self::assertSame(0, PublicStudyAccess::verify($id . '.9999999999.' . str_repeat('a', 64)));
   }
@@ -418,8 +528,13 @@ final class CommercialStudiesTest extends TestCase
     self::assertStringContainsString('data-cst-toggle="edit-' . $id . '"', $html);
     self::assertStringNotContainsString('data-cst-toggle="desist-' . $id . '"', $html, 'Solo se desiste un estudio aprobado.');
     self::assertStringContainsString('data-cst-form="create"', $html);
+    self::assertStringContainsString('name="docs_asegurable[]"', $html, 'La aprobación pide los archivos, no el enlace de Drive.');
+    self::assertStringNotContainsString('link_drive', $html);
     $this->approve($id);
     $html = CommercialStudiesView::taskPanel($this->service()->formData(700));
+    self::assertStringContainsString('data-cst-file=', $html, 'La tarjeta lista los documentos.');
+    self::assertStringContainsString('name="quitar_documentos[]"', $html);
+    self::assertStringContainsString('data-commercial-property-detail="9001" data-study-id="' . $id . '" data-ticket-pk="700"', $html);
     self::assertStringNotContainsString('data-cst-toggle="respond-' . $id . '"', $html);
     self::assertStringContainsString('data-cst-toggle="desist-' . $id . '"', $html);
 

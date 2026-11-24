@@ -13,6 +13,18 @@ const shots = process.argv[3] || '';
     const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
     // El visor y los enlaces abren public/estudio.php: aquí lo atiende el fixture sobre la misma base.
     await context.route('http://127.0.0.1:8776/public/estudio.php?**', route => route.continue({ url: endpoint + '?' + new URL(route.request().url()).searchParams.toString() }));
+    await context.route('http://127.0.0.1:8776/public/file.php?**', route => route.continue({ url: endpoint + '?' + new URL(route.request().url()).searchParams.toString() }));
+    await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: 'http://127.0.0.1:8776' });
+    // La ficha del inmueble necesita todo el esquema de Inmuebles: aquí se responde fija y se revisa que pida el estudio.
+    const propertyRequests = [];
+    await context.route(endpoint, route => {
+      const body = route.request().postData() || '';
+      if (route.request().method() === 'POST' && body.includes('commercial_property_detail')) {
+        propertyRequests.push(body);
+        return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ success: true, data: { html: '<div data-fake-ficha>Ficha del inmueble</div>' } }) });
+      }
+      return route.continue();
+    });
     const page = await context.newPage();
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
@@ -74,19 +86,63 @@ const shots = process.argv[3] || '';
     await respond.locator('[name="persona_llaves"]').fill('Recepción');
     await respond.locator('[name="contacto_llaves"]').fill('3216999529');
     await respond.locator('[name="fecha_posible_entrega"]').fill('2026-12-15');
-    await respond.locator('[name="link_drive"]').fill('https://drive.google.com/drive/folders/abc');
+    // Sin los documentos no se envía: el navegador lo avisa antes de subir nada.
+    await respond.locator('[type="submit"]').click();
+    await page.waitForFunction(() => (document.querySelector('[data-cst-form="respond"] [data-cst-error]') || {}).innerText === 'Sube asegurable.');
+    const pdf = name => ({ name, mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n') });
+    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+    await respond.locator('[name="docs_asegurable[]"]').setInputFiles([pdf('asegurable.pdf')]);
+    await respond.locator('[name="docs_servicios[]"]').setInputFiles([pdf('agua.pdf'), { name: 'energia.png', mimeType: 'image/png', buffer: png }]);
+    await respond.locator('[name="docs_arrendatario[]"]').setInputFiles([{ name: 'cedula.txt', mimeType: 'text/plain', buffer: Buffer.from('no') }]);
+    await respond.locator('[type="submit"]').click();
+    await page.waitForFunction(() => ((document.querySelector('[data-cst-form="respond"] [data-cst-error]') || {}).innerText || '').includes('debe ser PDF, JPG, PNG'));
+    assert.equal(await page.locator('[data-cst-card="1"] .cst-state').innerText(), 'Esperando respuesta', 'Un archivo inválido no aprueba nada');
+    await respond.locator('[name="docs_arrendatario[]"]').setInputFiles([{ name: 'cedula.png', mimeType: 'image/png', buffer: png }]);
     if (shots) await page.screenshot({ path: path.join(shots, 'estudio-aprobar.png'), fullPage: false });
     await respond.locator('[type="submit"]').click();
     await page.waitForFunction(() => (document.querySelector('.cst-flash') || {}).innerText && document.querySelector('.cst-flash').innerText.includes('caso de entrega'));
     assert.equal(await page.locator('[data-cst-card="1"] .cst-state').innerText(), 'Aprobado');
     assert.equal(await page.locator('[data-cst-card="1"] .cst-actions [data-cst-toggle="respond-1"]').count(), 0, 'Un estudio respondido no se vuelve a aprobar');
     assert.equal(await page.locator('[data-cst-card="1"] .cst-actions [data-cst-toggle="desist-1"]').count(), 1);
+    assert.deepEqual(await page.locator('[data-cst-card="1"] .cst-docbtn small').allInnerTexts(), ['asegurable.pdf', 'agua.pdf', 'energia.png', 'cedula.png']);
+
+    // Un documento se abre dentro del panel.
+    await page.locator('[data-cst-card="1"] .cst-docbtn').first().click();
+    assert.ok((await page.locator('#cst-viewer iframe').getAttribute('src')).includes('/file.php?n='));
+    const served = await page.evaluate(async () => { const response = await fetch(document.querySelector('#cst-viewer iframe').src.replace('/public/file.php', '/tests/Fixtures/commercial-studies.php')); return [response.status, (await response.text()).slice(0, 5)]; });
+    assert.deepEqual(served, [200, '%PDF-'], 'El asegurable quedó guardado');
+    if (shots) await page.screenshot({ path: path.join(shots, 'estudio-documento.png') });
+    await page.keyboard.press('Escape');
+
+    // El inmueble del estudio abre su ficha interna, con el estudio y la tarea para el permiso.
+    await page.locator('[data-cst-card="1"] [data-commercial-property-detail="9001"]').click();
+    await page.locator('#commercial-property-detail-modal [data-fake-ficha]').waitFor();
+    assert.ok(/name="study_id"\r\n\r\n1\r\n/.test(propertyRequests[0]) && /name="ticket_pk"\r\n\r\n700\r\n/.test(propertyRequests[0]), 'La ficha se pide con el estudio y la tarea');
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(() => document.getElementById('commercial-property-detail-modal').getAttribute('aria-hidden') === 'true');
+
+    // Editar: quitar un recibo y agregar otro.
+    await page.locator('[data-cst-card="1"] .cst-actions [data-cst-toggle="edit-1"]').click();
+    const edit = page.locator('[data-cst-card="1"] [data-cst-form="edit"]');
+    await edit.locator('[name="quitar_documentos[]"][value="2"]').check();
+    await edit.locator('[name="docs_servicios[]"]').setInputFiles([pdf('gas.pdf')]);
+    if (shots) await page.screenshot({ path: path.join(shots, 'estudio-editar-documentos.png') });
+    await edit.locator('[type="submit"]').click();
+    const edited = await page.waitForFunction(() => {
+      const flash = document.querySelector('.cst-flash');
+      if (flash && flash.innerText.includes('documento')) return flash.innerText;
+      const error = document.querySelector('[data-cst-card="1"] [data-cst-form="edit"] [data-cst-error]');
+      return error && !error.hidden ? 'Error: ' + error.innerText : false;
+    });
+    assert.ok((await edited.jsonValue()).includes('1 documento nuevo y 1 documento quitado'), 'Editar documentos: ' + await edited.jsonValue());
+    assert.deepEqual(await page.locator('[data-cst-card="1"] .cst-docbtn small').allInnerTexts(), ['asegurable.pdf', 'agua.pdf', 'cedula.png', 'gas.pdf']);
 
     // Visor: la vista interna del estudio dentro del panel.
     await page.locator('[data-cst-card="1"] [data-cst-view="1"]').click();
     const frame = page.frameLocator('#cst-viewer iframe');
     await frame.locator('.ps-internal').waitFor();
     assert.ok((await frame.locator('.ps-internal').innerText()).includes('Portería'));
+    assert.ok((await frame.locator('.ps-docs').innerText()).includes('gas.pdf'), 'La vista interna lista los documentos');
     const clientLink = await page.locator('#cst-viewer [data-cqt-copy]').getAttribute('data-cqt-copy');
     if (shots) await page.screenshot({ path: path.join(shots, 'estudio-visor.png') });
     await page.keyboard.press('Escape');
@@ -107,6 +163,15 @@ const shots = process.argv[3] || '';
     await page.goto(endpoint + '?as=101');
     await page.locator('[data-cst-page] .cqt-table').waitFor();
     assert.equal(await page.locator('[data-cst-state="Aprobado"] strong').innerText(), '1');
+    const propertyCell = page.locator('[data-cst-list] td[data-label="Inmueble"]').first();
+    assert.ok((await propertyCell.innerText()).includes('Apartamento · Calle 9001 apto 1'), 'Columna Inmueble');
+    await propertyCell.locator('[data-commercial-property-detail="9001"]').click();
+    await page.locator('#commercial-property-detail-modal [data-fake-ficha]').waitFor();
+    assert.ok(/name="study_id"\r\n\r\n1\r\n/.test(propertyRequests[1]), 'Desde el listado también va el estudio');
+    await page.keyboard.press('Escape');
+    await page.locator('[data-cst-list] [data-cst-copy]').first().click();
+    assert.match(await page.evaluate(() => navigator.clipboard.readText()), /\/public\/estudio\.php\?e=1\.\d{10}\.[a-f0-9]{64}$/, 'El botón Enlace copia el enlace firmado del cliente');
+    if (shots) await page.screenshot({ path: path.join(shots, 'estudios-listado-inmueble.png') });
     await page.locator('[data-cst-desist="1"]').click();
     const dialog = page.locator('#cst-dialog');
     await dialog.locator('[name="motivo"]').waitFor();

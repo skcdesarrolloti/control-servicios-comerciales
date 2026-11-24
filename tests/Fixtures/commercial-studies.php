@@ -13,9 +13,21 @@ define('SCM_BASE_URL', 'http://127.0.0.1:8776/public');
 define('SCM_VERSION', 'test');
 define('SCM_PUBLIC_PATH', dirname(__DIR__, 2) . '/public');
 define('SCM_APP_SECRET', str_repeat('x', 40));
+define('SCM_UPLOAD_PATH', sys_get_temp_dir() . '/scm-studies-uploads');
+define('SCM_UPLOAD_MAX_BYTES', 10485760);
+
+// Los documentos subidos se sirven como public/file.php, sobre la carpeta de prueba.
+if (isset($_GET['n'], $_GET['s'])) {
+  $files = SCM\Support\StoredFileService::fromRuntime();
+  $path = $files->isValidSignature((string) $_GET['n'], (string) $_GET['s']) ? $files->pathFor((string) $_GET['n']) : null;
+  if ($path === null) { http_response_code(404); exit('Archivo no disponible.'); }
+  header('Content-Type: ' . (new finfo(FILEINFO_MIME_TYPE))->file($path));
+  readfile($path);
+  exit;
+}
 
 session_start();
-$view = isset($_GET['e']) || isset($_GET['id']);
+$view = isset($_GET['e']) || isset($_GET['id']) || isset($_GET['d']);
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'GET' && !$view) {
   $employee = in_array($_GET['as'] ?? '', ['101', '202'], true) ? (string) $_GET['as'] : '303';
   $_SESSION = ['scm_logged_in' => true, 'scm_user_id' => (int) $employee, 'scm_employee_id' => $employee, 'scm_user_cargo' => $employee === '303' ? '13' : '9', 'scm_user' => 'Prueba', 'db' => $_SESSION['db'] ?? bin2hex(random_bytes(6))];

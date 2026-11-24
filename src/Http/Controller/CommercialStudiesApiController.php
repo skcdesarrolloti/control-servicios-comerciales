@@ -13,6 +13,7 @@ use SCM\Core\Csrf;
 use SCM\Core\Database;
 use SCM\Core\Settings;
 use SCM\Http\Response\JsonResponse;
+use SCM\Support\StoredFileService;
 use SCM\Views\CommercialStudiesView;
 
 /**
@@ -29,10 +30,12 @@ final class CommercialStudiesApiController
   private Csrf $csrf;
   /** @var array<int|string,mixed> */
   private array $defaultCargos;
+  private ?StoredFileService $files;
 
   /** @param array<string,mixed> $config */
-  public function __construct(Database $db, Settings $settings, Csrf $csrf, array $config, ?CommercialStudiesService $service = null)
+  public function __construct(Database $db, Settings $settings, Csrf $csrf, array $config, ?CommercialStudiesService $service = null, ?StoredFileService $files = null)
   {
+    $this->files = $files;
     $this->csrf = $csrf;
     $this->settings = $settings;
     $adminCargos = is_array($config['dashboard_admin_cargos'] ?? null) ? $config['dashboard_admin_cargos'] : ['11', '12', '13', '14'];
@@ -109,7 +112,10 @@ final class CommercialStudiesApiController
   {
     $this->guarded($input, function () use ($input): array {
       $pk = $this->taskPk($input);
-      $result = $this->service->update((int) ($input['id'] ?? 0), $pk, $input);
+      $result = $this->withDocuments(fn(array $documents): array => $this->service->update((int) ($input['id'] ?? 0), $pk, $input, $documents));
+      if ($result['removed'] !== []) {
+        $this->files()->removeImages($result['removed']);
+      }
       return ['message' => $result['message']] + $this->panel($pk, $result['message']);
     });
   }
@@ -119,9 +125,39 @@ final class CommercialStudiesApiController
   {
     $this->guarded($input, function () use ($input): array {
       $pk = $this->taskPk($input);
-      $result = $this->service->respond((int) ($input['id'] ?? 0), $pk, $input);
+      $result = ($input['estado'] ?? '') === CommercialStudiesService::APPROVED
+        ? $this->withDocuments(fn(array $documents): array => $this->service->respond((int) ($input['id'] ?? 0), $pk, $input, $documents))
+        : $this->service->respond((int) ($input['id'] ?? 0), $pk, $input);
       return ['message' => $result['message']] + $this->panel($pk, $result['message']);
     });
+  }
+
+  private function files(): StoredFileService
+  {
+    return $this->files ??= StoredFileService::fromRuntime();
+  }
+
+  /**
+   * Guarda los archivos de cada tipo de CommercialStudiesService::DOCUMENTS (campos docs_<tipo>[]) y se los pasa a $work;
+   * si algo falla, borra los que alcanzó a guardar.
+   * @template T
+   * @param callable(array<string,list<array{nombre:string,url:string}>>):T $work
+   * @return T
+   */
+  private function withDocuments(callable $work): mixed
+  {
+    $documents = [];
+    try {
+      foreach (CommercialStudiesService::DOCUMENTS as $type => [$title, $formats, $max]) {
+        $documents[$type] = $this->files()->storeFiles('docs_' . $type, $formats, $max, $title);
+      }
+      return $work($documents);
+    } catch (\Throwable $exception) {
+      foreach ($documents as $files) {
+        $this->files()->removeImages(array_column($files, 'url'));
+      }
+      throw $exception;
+    }
   }
 
   /** @param array<string,mixed> $input */

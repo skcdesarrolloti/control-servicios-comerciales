@@ -19,6 +19,7 @@ use SCM\Views\PublicStudyView;
 /**
  * public/estudio.php, la vista del estudio de aseguradora que reemplaza /estudio-aseguradora/ de WordPress:
  * - ?e=<enlace firmado>: el cliente, sin sesión (PublicStudyAccess), con límite por IP. Sin datos internos.
+ * - ?d=<enlace firmado de documentos>: los documentos de la aprobación, para el caso de entrega (anexos_entrega).
  * - ?id=<estudio>: el funcionario con la sesión del panel; ve también llaves, caso de entrega, contrato y Drive si puede
  *   abrir el estudio (el suyo, el de una tarea que puede abrir o cualquiera si ve todo el equipo en Estudios).
  * El panel la muestra en un popup, por eso permite que la enmarque el mismo sitio.
@@ -58,6 +59,13 @@ final class PublicStudyPageController
     }
     if (isset($query['id'])) {
       $this->staff((int) $query['id']);
+      return;
+    }
+    if (isset($query['d'])) {
+      // Documentos de la aprobación para el equipo de entregas (anexos_entrega del caso de entrega).
+      $id = PublicStudyAccess::verifyDocuments(is_string($query['d']) ? $query['d'] : '');
+      $documents = $id > 0 ? $this->service(new CommercialAccessPolicy($this->settings, $this->db, []))->documentsData($id) : null;
+      $this->send($documents === null ? 403 : 200, PublicStudyView::documents($documents, $this->css(), $this->logo(), self::INVALID));
       return;
     }
     $id = PublicStudyAccess::verify(is_string($query['e'] ?? null) ? $query['e'] : '');
@@ -110,6 +118,11 @@ final class PublicStudyPageController
   /** @param array<string,mixed>|null $study */
   private function page(int $status, ?array $study, string $error): void
   {
+    $this->send($status, PublicStudyView::render($study, $this->css(), $this->logo(), $error));
+  }
+
+  private function send(int $status, string $html): void
+  {
     http_response_code($status);
     header('Content-Type: text/html; charset=UTF-8');
     header('Cache-Control: no-store, private');
@@ -117,7 +130,16 @@ final class PublicStudyPageController
     header('X-Content-Type-Options: nosniff');
     header('X-Robots-Tag: noindex, nofollow');
     header("Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' https:; base-uri 'none'; form-action 'none'; frame-ancestors 'self'");
-    $asset = static fn(string $path): string => rtrim((string) SCM_BASE_URL, '/') . '/assets/' . $path . '?v=' . substr((string) @hash_file('sha256', SCM_PUBLIC_PATH . '/assets/' . $path), 0, 12);
-    echo PublicStudyView::render($study, $asset('css/public-study.css'), function_exists('system_image') ? system_image('portal_logo_url') : '', $error);
+    echo $html;
+  }
+
+  private function css(): string
+  {
+    return rtrim((string) SCM_BASE_URL, '/') . '/assets/css/public-study.css?v=' . substr((string) @hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/public-study.css'), 0, 12);
+  }
+
+  private function logo(): string
+  {
+    return function_exists('system_image') ? system_image('portal_logo_url') : '';
   }
 }

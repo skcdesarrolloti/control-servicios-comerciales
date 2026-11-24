@@ -20,14 +20,60 @@ final class PublicStudyView
     return htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
   }
 
+  private static function head(string $title, string $css, string $logo): string
+  {
+    return '<!doctype html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">'
+      . '<title>' . self::e($title) . ' · SKC SuCasa Inmobiliaria</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
+      . '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&amp;display=swap"><link rel="stylesheet" href="' . self::e($css) . '"></head><body>'
+      . '<header class="ps-top"><div class="ps-wrap ps-top-in">' . ($logo !== '' ? '<img src="' . self::e(self::https($logo)) . '" alt="" class="ps-logo">' : '') . '<span class="ps-brand">SKC SuCasa Inmobiliaria</span></div></header><main class="ps-wrap ps-main">';
+  }
+
+  private static function foot(): string
+  {
+    return '</main><footer class="ps-foot"><div class="ps-wrap"><p class="ps-motto">Construimos confianza, protegemos su patrimonio.</p><p>SKC SuCasa Inmobiliaria</p></div></footer></body></html>';
+  }
+
+  /**
+   * Documentos de la aprobación (estudio.php?d=): lo abre el equipo de entregas desde el caso de entrega.
+   * @param array<string,mixed>|null $data CommercialStudiesService::documentsData()
+   */
+  public static function documents(?array $data, string $css, string $logo, string $error): string
+  {
+    $title = $data !== null ? 'Documentos del estudio #' . (int) $data['id'] : 'Documentos no disponibles';
+    $html = self::head($title, $css, $logo);
+    if ($data === null) {
+      return $html . '<section class="ps-card ps-empty"><h1>' . self::e($title) . '</h1><p role="alert">' . self::e($error) . '</p></section></main></body></html>';
+    }
+    $facts = array_filter([
+      'Cliente' => $data['cliente'],
+      'Aseguradora' => $data['aseguradora'] . ($data['num_solicitud'] !== '' ? ' · solicitud ' . $data['num_solicitud'] : ''),
+      'Inmueble' => $data['inmueble'],
+      'Caso de entrega' => $data['caso_entrega'] > 0 ? '#' . $data['caso_entrega'] : '',
+    ], static fn($value): bool => trim((string) $value) !== '');
+    $html .= '<section class="ps-card"><p class="ps-eyebrow">Estudio de aseguradora #' . (int) $data['id'] . '</p><h1>Documentos de la aprobación</h1>' . self::facts($facts) . '</section>'
+      . '<section class="ps-card ps-internal">' . self::documentLinks($data['documentos']) . '</section>';
+    return $html . self::foot();
+  }
+
+  /** @param list<array{tipo:string,titulo:string,nombre:string,url:string,fecha:int,por:string}> $documents */
+  private static function documentLinks(array $documents): string
+  {
+    if ($documents === []) {
+      return '<h2>Documentos</h2><p>Este estudio todavía no tiene documentos cargados.</p>';
+    }
+    $html = '<h2>Documentos</h2><ul class="ps-docs">';
+    foreach ($documents as $document) {
+      $html .= '<li><a href="' . self::e($document['url']) . '" target="_blank" rel="noopener noreferrer"><strong>' . self::e($document['titulo']) . '</strong><span>' . self::e($document['nombre']) . '</span>'
+        . ($document['fecha'] > 0 ? '<small>' . self::e(date('d/m/Y', $document['fecha']) . ($document['por'] !== '' ? ' · ' . $document['por'] : '')) . '</small>' : '') . '</a></li>';
+    }
+    return $html . '</ul>';
+  }
+
   /** @param array<string,mixed>|null $study CommercialStudiesService::viewData() */
   public static function render(?array $study, string $css, string $logo, string $error = ''): string
   {
     $title = $study !== null ? 'Estudio de aseguradora #' . (int) $study['id'] : 'Estudio no disponible';
-    $html = '<!doctype html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">'
-      . '<title>' . self::e($title) . ' · SKC SuCasa Inmobiliaria</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
-      . '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&amp;display=swap"><link rel="stylesheet" href="' . self::e($css) . '"></head><body>'
-      . '<header class="ps-top"><div class="ps-wrap ps-top-in">' . ($logo !== '' ? '<img src="' . self::e(self::https($logo)) . '" alt="" class="ps-logo">' : '') . '<span class="ps-brand">SKC SuCasa Inmobiliaria</span></div></header><main class="ps-wrap ps-main">';
+    $html = self::head($title, $css, $logo);
     if ($study === null) {
       return $html . '<section class="ps-card ps-empty"><h1>' . self::e($title) . '</h1><p role="alert">' . self::e($error) . '</p></section></main></body></html>';
     }
@@ -82,10 +128,11 @@ final class PublicStudyView
         'Contrato de mandato' => $internal['mandato'] > 0 ? '#' . $internal['mandato'] : '',
       ], static fn($value): bool => trim((string) $value) !== '');
       $html .= '<section class="ps-card ps-internal"><h2>Datos internos <small>solo los ve el equipo</small></h2>' . self::facts($rows)
-        . ($internal['anexos'] !== '' && preg_match('#^https?://#i', $internal['anexos']) === 1 ? '<p><a class="ps-button ps-button--light" href="' . self::e($internal['anexos']) . '" target="_blank" rel="noopener noreferrer">Abrir anexos de la entrega (Drive)</a></p>' : '')
+        . ($internal['documentos'] !== [] ? self::documentLinks($internal['documentos']) : '')
+        . ($internal['anexos'] !== '' && preg_match('#^https?://#i', $internal['anexos']) === 1 && !str_contains($internal['anexos'], '/estudio.php?d=') ? '<p><a class="ps-button ps-button--light" href="' . self::e($internal['anexos']) . '" target="_blank" rel="noopener noreferrer">Abrir anexos de la entrega (Drive)</a></p>' : '')
         . '<p class="ps-hint">Enlace para el cliente: <span class="ps-pre">' . self::e($internal['enlace_cliente']) . '</span></p></section>';
     }
-    return $html . '</main><footer class="ps-foot"><div class="ps-wrap"><p class="ps-motto">Construimos confianza, protegemos su patrimonio.</p><p>SKC SuCasa Inmobiliaria</p></div></footer></body></html>';
+    return $html . self::foot();
   }
 
   /** Avance: enviado a la aseguradora → respuesta → entrega del inmueble. @param array<string,mixed> $study */

@@ -47,7 +47,8 @@ php bin/cct-add-fields.php contratos_arrendamiento propietario_tab correo_2="Cor
 
 Para un grupo de campos que va a varias pestañas o a varios CCT, se escribe un script corto que llame a
 `CctFieldInstaller::run($slug, [pestaña => [columna => [título, tipo]]], $aplicar)`. Ejemplo:
-`bin/add-quote-link-fields.php` (enlaces de la cotización y de su PDF en `cotizacion_inmuebles`).
+`bin/add-quote-link-fields.php` (enlaces de la cotización y de su PDF en `cotizacion_inmuebles`) y
+`bin/add-study-documents-field.php` (documentos de la aprobación en `estudios_aseguradoras`).
 
 ## Antes de aplicar en producción
 

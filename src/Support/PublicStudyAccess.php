@@ -34,6 +34,32 @@ final class PublicStudyAccess
     return self::base() . '/estudio.php?id=' . $id;
   }
 
+  /**
+   * Documentos del estudio (asegurable, servicios públicos y documento del arrendatario) para el equipo de entregas: va en
+   * `anexos_entrega` del caso de entrega, donde el panel inmobiliario lo abre con "Ver documentos". No vence, como el
+   * enlace de Drive que reemplaza, y tiene su propia firma: no abre la vista del estudio.
+   */
+  public static function documentsUrl(int $id): string
+  {
+    if ($id < 1) {
+      throw new \InvalidArgumentException('Estudio inválido.');
+    }
+    return self::base() . '/estudio.php?d=' . $id . '.' . self::documentsSignature($id);
+  }
+
+  public static function verifyDocuments(string $reference): int
+  {
+    if (preg_match('/^([1-9][0-9]{0,17})\.([a-f0-9]{64})$/D', $reference, $parts) !== 1) {
+      return 0;
+    }
+    return hash_equals(self::documentsSignature((int) $parts[1]), $parts[2]) ? (int) $parts[1] : 0;
+  }
+
+  private static function documentsSignature(int $id): string
+  {
+    return hash_hmac('sha256', 'public_study_documents_v1|' . $id, (string) SCM_APP_SECRET);
+  }
+
   /** Número del estudio si el enlace es auténtico y está vigente; 0 si no. */
   public static function verify(string $reference): int
   {

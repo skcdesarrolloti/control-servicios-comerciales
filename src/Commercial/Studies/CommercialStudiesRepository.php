@@ -188,6 +188,32 @@ final class CommercialStudiesRepository
   }
 
   /**
+   * Tipo, dirección, barrio y estado de varios inmuebles por código, para la columna Inmueble del listado.
+   * @param list<string> $codes
+   * @return array<string,array<string,mixed>>
+   */
+  public function propertiesByCodes(array $codes): array
+  {
+    $codes = array_values(array_unique(array_filter(array_map('trim', $codes), static fn(string $code): bool => $code !== '')));
+    if ($codes === []) {
+      return [];
+    }
+    $select = array_values(array_intersect(['_ID', 'codigo', 'estado', 'tipo_inmueble', 'barrio', 'direccion', 'direccion_fisica'], $this->columns->columns('jet_cct_inmuebles')));
+    $out = [];
+    $rows = $this->db->getResults('SELECT `' . implode('`, `', $select) . '` FROM `' . $this->db->table('jet_cct_inmuebles') . '` WHERE CAST(`codigo` AS CHAR) IN (' . implode(',', array_fill(0, count($codes), '?')) . ') ORDER BY `_ID` ASC', $codes);
+    foreach ($rows as $row) {
+      $out[trim((string) $row['codigo'])] = $row;
+    }
+    return $out;
+  }
+
+  /** Si la tabla del estudio tiene la columna (p. ej. `documentos`, que se crea con bin/add-study-documents-field.php). */
+  public function hasStudyColumn(string $column): bool
+  {
+    return in_array($column, $this->columns->columns(self::TABLE), true);
+  }
+
+  /**
    * Inmuebles que se pueden entregar (públicos o en borrador), por código, dirección, barrio o conjunto.
    * @return list<array<string,mixed>>
    */

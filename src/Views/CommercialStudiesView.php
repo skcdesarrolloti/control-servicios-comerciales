@@ -137,7 +137,6 @@ final class CommercialStudiesView
       'Valor' => $study['valor'],
       'Registrado' => $study['fecha'] . ($study['asesor'] !== '' ? ' por ' . $study['asesor'] : ''),
       'Cliente' => $study['cliente'],
-      'Inmueble' => $study['inmueble'] !== '' ? '#' . $study['inmueble'] : '',
       'Caso de entrega' => $study['caso_entrega'] > 0 ? '#' . $study['caso_entrega'] : '',
     ], static fn($value): bool => (string) $value !== '');
     $html = '<article class="cqt-panel cst-card" data-cst-card="' . $id . '">'
@@ -145,11 +144,18 @@ final class CommercialStudiesView
     foreach ($facts as $label => $value) {
       $html .= '<div><dt>' . $label . '</dt><dd>' . self::e($value) . '</dd></div>';
     }
+    if ($study['inmueble'] !== '') {
+      $html .= '<div><dt>Inmueble</dt><dd>' . self::propertyButton($study, $pk) . '</dd></div>';
+    }
     $html .= '</dl>';
+    if ($study['documentos'] !== []) {
+      $html .= self::documentList($study['documentos']);
+    }
     if ($study['estado'] === CommercialStudiesService::POSTPONED && $study['faltante'] !== '') {
       $html .= '<p class="cst-note"><strong>Falta:</strong> ' . nl2br(self::e($study['faltante'])) . '</p>';
     }
-    $html .= '<div class="cst-actions"><button type="button" class="cqt-secondary cqt-small" data-cst-view="' . $id . '" data-ticket-pk="' . $pk . '">' . self::icon('visibility') . 'Ver estudio</button>';
+    $html .= '<div class="cst-actions"><button type="button" class="cqt-secondary cqt-small" data-cst-view="' . $id . '" data-ticket-pk="' . $pk . '">' . self::icon('visibility') . 'Ver estudio</button>'
+      . self::copyButton($study['enlace'], 'Copiar enlace del cliente');
     if ($can['responder'] && $study['respondible']) {
       $html .= '<button type="button" class="cqt-primary cqt-small" data-cst-toggle="respond-' . $id . '" aria-expanded="false">' . self::icon('fact_check') . 'Registrar respuesta</button>';
     }
@@ -168,6 +174,7 @@ final class CommercialStudiesView
         . '<input type="hidden" name="ticket_pk" value="' . $pk . '"><input type="hidden" name="id" value="' . $id . '">'
         . self::baseFields($data, $study)
         . ($study['estado'] === CommercialStudiesService::POSTPONED ? '<label class="cqt-field"><span>Información o documentación faltante <em aria-hidden="true">*</em></span><textarea name="faltante" rows="3" maxlength="2000" required>' . self::e($study['faltante']) . '</textarea></label>' : '')
+        . ($study['estado'] === CommercialStudiesService::APPROVED ? self::documentEditor($study['documentos']) : '')
         . '<p class="cqt-hint">Si el estudio ya tiene caso de entrega y contrato, también se les corrige la aseguradora y la solicitud.</p>'
         . '<p class="cqt-error" data-cst-error role="alert" hidden></p>'
         . '<div class="cst-form-actions"><button type="submit" class="cqt-primary cqt-small">' . self::icon('save') . 'Guardar cambios</button><button type="button" class="cqt-secondary cqt-small" data-cst-toggle="edit-' . $id . '">Cancelar</button></div></form>';
@@ -207,10 +214,65 @@ final class CommercialStudiesView
       . self::input('contacto_llaves', 'Teléfono', '', false, 'tel', ' maxlength="30"')
       . self::input('fecha_posible_entrega', 'Fecha posible de entrega', '', false, 'date')
       . '</div><fieldset class="cst-services"><legend>Servicios públicos del inmueble</legend>' . $services . '</fieldset>'
-      . '<label class="cqt-field"><span>Enlace de Drive <em aria-hidden="true">*</em></span><input type="url" name="link_drive" maxlength="500" placeholder="https://drive.google.com/…" autocomplete="off"><small class="cqt-hint">Con los recibos de servicios públicos por separado y el asegurable en PDF.</small></label>'
+      . self::documentInputs(true)
       . '</div>'
       . '<p class="cqt-error" data-cst-error role="alert" hidden></p>'
       . '<div class="cst-form-actions"><button type="submit" class="cqt-primary cqt-small">' . self::icon('send') . 'Guardar respuesta y avisar al cliente</button><button type="button" class="cqt-secondary cqt-small" data-cst-toggle="respond-' . $id . '">Cancelar</button></div></form>';
+  }
+
+  /** Código del inmueble que abre su ficha interna (la misma de la tarea; dentro está "Ver en la web"). @param array<string,mixed> $study */
+  private static function propertyButton(array $study, int $pk = 0): string
+  {
+    return '<button type="button" class="cqt-link cst-property-link" data-commercial-property-detail="' . self::e($study['inmueble']) . '" data-study-id="' . (int) $study['id'] . '"' . ($pk > 0 ? ' data-ticket-pk="' . $pk . '"' : '') . ' title="Ver la ficha del inmueble">'
+      . self::icon('home') . '#' . self::e($study['inmueble']) . '</button>';
+  }
+
+  private static function copyButton(string $url, string $label): string
+  {
+    return $url === '' ? '' : '<button type="button" class="cqt-secondary cqt-small" data-cst-copy="' . self::e($url) . '" title="Enlace para que el cliente siga su estudio">' . self::icon('link') . $label . '</button>';
+  }
+
+  /** Campos de archivo de cada documento (CommercialStudiesService::DOCUMENTS). */
+  private static function documentInputs(bool $required): string
+  {
+    $html = '<fieldset class="cst-docs"><legend>' . ($required ? 'Documentos de la aprobación' : 'Agregar documentos') . '</legend>';
+    foreach (CommercialStudiesService::DOCUMENTS as $type => [$title, $formats, $max, $help]) {
+      $accept = implode(',', array_merge(array_map(static fn(string $ext): string => '.' . $ext, array_values(array_unique($formats))), array_keys($formats)));
+      $kinds = implode(', ', array_map('strtoupper', array_values(array_unique($formats))));
+      $html .= '<label class="cqt-field cst-doc"><span>' . self::e($title) . ($required ? ' <em aria-hidden="true">*</em>' : '') . '</span>'
+        . '<input type="file" name="docs_' . $type . '[]" accept="' . self::e($accept) . '"' . ($max > 1 ? ' multiple' : '') . ' data-cst-doc="' . $type . '" data-cst-doc-max="' . $max . '" data-cst-doc-title="' . self::e($title) . '">'
+        . '<small class="cqt-hint">' . self::e($help) . ' ' . $kinds . ($max > 1 ? ', hasta ' . $max . ' archivos' : '') . '.</small></label>';
+    }
+    return $html . '<p class="cqt-hint">Quedan en el estudio y en el caso de entrega ("Ver documentos" del panel inmobiliario).</p></fieldset>';
+  }
+
+  /**
+   * Documentos de un estudio aprobado en el formulario de edición: quitar los que sobran y agregar otros.
+   * @param list<array{tipo:string,titulo:string,nombre:string,url:string,fecha:int,por:string}> $documents
+   */
+  private static function documentEditor(array $documents): string
+  {
+    $html = '';
+    if ($documents !== []) {
+      $html .= '<fieldset class="cst-docs"><legend>Documentos actuales</legend>';
+      foreach ($documents as $index => $document) {
+        $html .= '<label class="cqt-check"><input type="checkbox" name="quitar_documentos[]" value="' . $index . '"><span>Quitar <strong>' . self::e($document['titulo']) . '</strong>: ' . self::e($document['nombre']) . '</span></label>';
+      }
+      $html .= '</fieldset>';
+    }
+    return $html . self::documentInputs(false);
+  }
+
+  /** @param list<array{tipo:string,titulo:string,nombre:string,url:string,fecha:int,por:string}> $documents */
+  public static function documentList(array $documents): string
+  {
+    $html = '<div class="cst-doclist"><h3>Documentos</h3><ul>';
+    foreach ($documents as $document) {
+      $pdf = preg_match('/\.pdf&/', $document['url']) === 1;
+      $html .= '<li><button type="button" class="cst-docbtn" data-cst-file="' . self::e($document['url']) . '" data-cst-file-title="' . self::e($document['titulo'] . ' · ' . $document['nombre']) . '">'
+        . self::icon($pdf ? 'picture_as_pdf' : 'image') . '<span><strong>' . self::e($document['titulo']) . '</strong><small>' . self::e($document['nombre']) . '</small></span></button></li>';
+    }
+    return $html . '</ul></div>';
   }
 
   /**
@@ -281,7 +343,7 @@ final class CommercialStudiesView
       return $html . '<p class="cqt-empty">No hay estudios con estos filtros.</p>';
     }
     $canOpenTask = $policy->canAct('ver_ticket');
-    $html .= '<div class="cqt-table-wrap"><table class="cqt-table"><thead><tr><th>Estudio</th><th>Cliente</th><th>Aseguradora</th><th>Tarea</th><th>Consultor/a</th><th><span class="sr-only">Acciones</span></th></tr></thead><tbody>';
+    $html .= '<div class="cqt-table-wrap"><table class="cqt-table"><thead><tr><th>Estudio</th><th>Cliente</th><th>Aseguradora</th><th>Inmueble</th><th>Tarea</th><th>Consultor/a</th><th><span class="sr-only">Acciones</span></th></tr></thead><tbody>';
     foreach ($listing['rows'] as $row) {
       $id = (int) $row['id'];
       $task = $row['tarea'] > 0 ? ($canOpenTask ? '<button type="button" class="cqt-link" data-commercial-open-case="' . $row['tarea'] . '">#' . $row['tarea'] . '</button>' : '#' . $row['tarea']) : '<span class="cqt-muted">Sin tarea</span>';
@@ -289,9 +351,13 @@ final class CommercialStudiesView
         . '<td data-label="Estudio"><strong>#' . $id . '</strong><small>' . self::e($row['fecha']) . '</small>' . self::state($row['estado']) . '</td>'
         . '<td data-label="Cliente"><strong>' . self::e($row['cliente'] ?: 'Sin nombre') . '</strong><small>' . self::e($row['celular']) . '</small><small>' . self::e($row['correo']) . '</small></td>'
         . '<td data-label="Aseguradora"><strong>' . self::e($row['aseguradora']) . '</strong><small>Solicitud ' . self::e($row['num_solicitud']) . '</small><small>' . self::e($row['valor']) . '</small></td>'
-        . '<td data-label="Tarea">' . $task . ($row['inmueble'] !== '' ? '<small>Inmueble #' . self::e($row['inmueble']) . '</small>' : '') . '</td>'
+        . '<td data-label="Inmueble">' . ($row['inmueble'] !== ''
+          ? self::propertyButton($row) . ($row['inmueble_titulo'] !== '' ? '<small>' . self::e($row['inmueble_titulo']) . '</small>' : '') . ($row['inmueble_detalle'] !== '' ? '<small>' . self::e($row['inmueble_detalle']) . '</small>' : '')
+          : '<span class="cqt-muted">Sin inmueble</span>') . '</td>'
+        . '<td data-label="Tarea">' . $task . '</td>'
         . '<td data-label="Consultor/a">' . self::e($row['asesor'] ?: 'Sin consultor/a') . '</td>'
         . '<td data-label="Acciones"><div class="cqt-row-actions cst-row-actions"><button type="button" class="cqt-secondary cqt-small" data-cst-view="' . $id . '">' . self::icon('visibility') . 'Ver</button>'
+        . self::copyButton($row['enlace'], 'Enlace')
         . ($canDesist && $row['desistible'] ? '<button type="button" class="cqt-secondary cqt-small cst-danger" data-cst-desist="' . $id . '">' . self::icon('block') . 'Desistir negocio</button>' : '')
         . '</div></td></tr>';
     }

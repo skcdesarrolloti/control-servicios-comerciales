@@ -67,13 +67,19 @@
     var action = ACTIONS[kind];
     if (!action) return;
     if (kind === "desist" && !form.elements.confirmar.checked) { showError(form, "Confirma que quieres desistir el negocio."); return; }
+    var docError = checkDocuments(form);
+    if (docError) { showError(form, docError); return; }
+    var uploading = Array.prototype.some.call(form.querySelectorAll("[data-cst-doc]"), function (input) { return !input.closest("[hidden]") && input.files && input.files.length; });
     var data = new FormData(form);
+    // Los archivos de un bloque oculto (otra respuesta) no se envían.
+    form.querySelectorAll("[data-cst-doc]").forEach(function (input) { if (input.closest("[hidden]")) data.delete(input.name); });
     if (data.has("valor")) data.set("valor", String(data.get("valor") || "").replace(/\D/g, ""));
     var button = form.querySelector("button[type=submit]");
     if (button) { button.disabled = true; button.setAttribute("aria-busy", "true"); }
     showError(form, "");
     var task = form.closest("[data-cst-task]");
     var dialog = form.closest("#cst-dialog");
+    if (uploading && window.SCMLoader) window.SCMLoader.show({ title: "Subiendo los documentos", detail: "Guardamos el asegurable, los servicios públicos y el documento del arrendatario. Puede tardar unos segundos.", icon: "pdf" });
     request(action, data).then(function (result) {
       notify("success", result.message || "Listo.");
       if (task && result.html) {
@@ -88,8 +94,35 @@
     }).catch(function (error) {
       showError(form, error.message);
     }).finally(function () {
+      if (uploading && window.SCMLoader) window.SCMLoader.hide();
       if (button && document.contains(button)) { button.disabled = false; button.removeAttribute("aria-busy"); }
     });
+  }
+  // Antes de subir: al aprobar, el inmueble y los tres documentos son obligatorios; en todos, el máximo de archivos de cada uno.
+  function checkDocuments(form) {
+    var select = form.querySelector("[data-cst-response]");
+    var approving = select && select.value === "Aprobado";
+    var code = form.querySelector("[data-cst-property-code]");
+    if (approving && code && !code.value) { form.querySelector("[data-cst-property-search]").focus(); return "Elige el inmueble que se va a entregar."; }
+    var inputs = form.querySelectorAll("[data-cst-doc]");
+    for (var i = 0; i < inputs.length; i++) {
+      var input = inputs[i];
+      if (input.closest("[hidden]")) continue;
+      var count = input.files ? input.files.length : 0;
+      var title = input.getAttribute("data-cst-doc-title") || "Documento";
+      var max = parseInt(input.getAttribute("data-cst-doc-max") || "1", 10);
+      if (approving && count === 0) { input.focus(); return "Sube " + title.toLowerCase() + "."; }
+      if (count > max) { input.focus(); return title + ": sube máximo " + max + (max === 1 ? " archivo." : " archivos."); }
+    }
+    return "";
+  }
+  function copy(text) {
+    var done = function () { notify("success", "Enlace copiado. Compártelo con el cliente."); };
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(done).catch(function () { window.prompt("Copia el enlace:", text); });
+    } else {
+      window.prompt("Copia el enlace:", text);
+    }
   }
   function searchProperties(field) {
     var box = field.closest("[data-cst-property]");
@@ -147,6 +180,39 @@
       var close = viewer.querySelector("[data-cst-viewer-close]");
       if (close) close.focus();
     }).catch(function (error) { notify("error", error.message); }).finally(function () { button.disabled = false; });
+  }
+  // Un documento del estudio dentro del panel, sin abrir otra pestaña.
+  function openFile(button) {
+    returnFocus = button;
+    closeViewer();
+    var viewer = document.createElement("div");
+    viewer.id = "cst-viewer";
+    viewer.className = "cqt-viewer";
+    viewer.setAttribute("role", "dialog");
+    viewer.setAttribute("aria-modal", "true");
+    viewer.setAttribute("aria-labelledby", "cst-viewer-title");
+    var box = document.createElement("div");
+    box.className = "cqt-viewer-box";
+    box.setAttribute("role", "document");
+    var head = document.createElement("header");
+    head.className = "cqt-viewer-head";
+    var title = document.createElement("h2");
+    title.id = "cst-viewer-title";
+    title.textContent = button.getAttribute("data-cst-file-title") || "Documento";
+    var actions = document.createElement("div");
+    actions.className = "cqt-viewer-actions";
+    actions.innerHTML = '<button type="button" class="cqt-icon" data-cst-viewer-close aria-label="Cerrar"><span class="material-symbols-outlined" aria-hidden="true">close</span></button>';
+    head.appendChild(title);
+    head.appendChild(actions);
+    var frame = document.createElement("iframe");
+    frame.className = "cqt-frame";
+    frame.title = title.textContent;
+    frame.src = button.getAttribute("data-cst-file");
+    box.appendChild(head);
+    box.appendChild(frame);
+    viewer.appendChild(box);
+    document.body.appendChild(viewer);
+    actions.querySelector("button").focus();
   }
   function closeDialog() {
     var dialog = document.getElementById("cst-dialog");
@@ -209,6 +275,10 @@
     var view = target.closest("[data-cst-view]");
     if (view) { event.preventDefault(); openViewer(view); return; }
     if (target.closest("[data-cst-viewer-close]") || target.id === "cst-viewer") { closeViewer(); return; }
+    var file = target.closest("[data-cst-file]");
+    if (file) { event.preventDefault(); openFile(file); return; }
+    var copyButton = target.closest("[data-cst-copy]");
+    if (copyButton) { event.preventDefault(); copy(copyButton.getAttribute("data-cst-copy")); return; }
     if (target.closest("[data-cst-dialog-close]") || target.id === "cst-dialog") { closeDialog(); return; }
     var desist = target.closest("[data-cst-desist]");
     if (desist) { openDesist(desist); return; }
