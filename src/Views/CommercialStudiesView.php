@@ -315,7 +315,7 @@ final class CommercialStudiesView
     return '<section class="cqt cqt-page cst" data-cst-page>'
       . '<header class="cqt-head"><div><p class="cqt-eyebrow">Actividades comerciales · Registros</p><h1>' . ($listing['mine'] ? 'Mis estudios' : 'Estudios de aseguradora') . '</h1><p>'
       . ($mine ? 'Los estudios de aseguradora que has registrado.' : 'Los estudios de aseguradora de todo el equipo.')
-      . ' Se crean, se responden y se editan desde el popup de cada tarea con el botón Estudio de aseguradora.</p></div></header>'
+      . ' Se crean y se editan desde el popup de cada tarea con el botón Estudio de aseguradora; los que esperan respuesta se responden también desde aquí con Responder.</p></div></header>'
       . '<form class="cqt-filters cqt-list-filters" data-cst-list-filters aria-label="Filtros de estudios">'
       . ($listing['mine'] ? '<input type="hidden" name="portafolio" value="1">' : '')
       . '<input type="hidden" name="es_estado" value="' . self::e($f['estado']) . '">'
@@ -356,7 +356,10 @@ final class CommercialStudiesView
           : '<span class="cqt-muted">Sin inmueble</span>') . '</td>'
         . '<td data-label="Tarea">' . $task . '</td>'
         . '<td data-label="Consultor/a">' . self::e($row['asesor'] ?: 'Sin consultor/a') . '</td>'
-        . '<td data-label="Acciones"><div class="cqt-row-actions cst-row-actions"><button type="button" class="cqt-secondary cqt-small" data-cst-view="' . $id . '">' . self::icon('visibility') . 'Ver</button>'
+        . '<td data-label="Acciones"><div class="cqt-row-actions cst-row-actions">'
+        // Responder abre el popup de la tarea ya en el estudio y con su formulario de respuesta (el mismo de la tarea).
+        . ($canOpenTask && $row['tarea'] > 0 && $row['respondible'] ? '<button type="button" class="cqt-primary cqt-small" data-commercial-open-case="' . $row['tarea'] . '" data-cst-respond="' . $id . '">' . self::icon('fact_check') . 'Responder</button>' : '')
+        . '<button type="button" class="cqt-secondary cqt-small" data-cst-view="' . $id . '">' . self::icon('visibility') . 'Ver</button>'
         . self::copyButton($row['enlace'], 'Enlace')
         . ($canDesist && $row['desistible'] ? '<button type="button" class="cqt-secondary cqt-small cst-danger" data-cst-desist="' . $id . '">' . self::icon('block') . 'Desistir negocio</button>' : '')
         . '</div></td></tr>';

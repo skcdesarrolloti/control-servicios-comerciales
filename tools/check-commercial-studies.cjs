@@ -63,10 +63,15 @@ const shots = process.argv[3] || '';
     const card = page.locator('[data-cst-card="1"]');
     assert.equal(await card.locator('.cst-state').innerText(), 'Esperando respuesta');
 
-    // Respuesta: Aprobado pide inmueble, llaves, fecha y Drive.
-    await card.locator('.cst-actions [data-cst-toggle="respond-1"]').click();
+    // Responder desde Registros › Estudios: abre el popup de la tarea ya en el estudio y con la respuesta abierta.
+    await page.goto(endpoint + '?as=101');
+    await page.locator('[data-cst-page] .cqt-table').waitFor();
+    if (shots) await page.screenshot({ path: path.join(shots, 'estudios-listado-responder.png') });
+    await page.locator('[data-cst-list] [data-cst-respond="1"]').click();
     const respond = card.locator('[data-cst-form="respond"]');
-    assert.equal(await respond.isVisible(), true);
+    await respond.waitFor();
+    assert.equal(await page.locator('#commercial-case-modal [data-cst-task]').count(), 1, 'Responder abre la tarea en su ventana de estudios');
+    assert.equal(await respond.isVisible(), true, 'Con el formulario de respuesta abierto');
     assert.equal(await respond.locator('[data-cst-when="Aprobado"]').isVisible(), false, 'Los datos de aprobación salen solo al aprobar');
     await respond.locator('[name="estado"]').selectOption('Aplazado');
     assert.equal(await respond.locator('[data-cst-when="Aplazado"]').isVisible(), true);
@@ -185,6 +190,7 @@ const shots = process.argv[3] || '';
     await page.goto(endpoint + '?as=101');
     await page.locator('[data-cst-page] .cqt-table').waitFor();
     assert.equal(await page.locator('[data-cst-state="Aprobado"] strong').innerText(), '1');
+    assert.equal(await page.locator('[data-cst-list] [data-cst-respond]').count(), 0, 'Un estudio aprobado ya no se responde');
     const propertyCell = page.locator('[data-cst-list] td[data-label="Inmueble"]').first();
     assert.ok((await propertyCell.innerText()).includes('Apartamento · Calle 9001 apto 1'), 'Columna Inmueble');
     await propertyCell.locator('[data-commercial-property-detail="9001"]').click();

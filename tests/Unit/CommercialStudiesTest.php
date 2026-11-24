@@ -469,6 +469,8 @@ final class CommercialStudiesTest extends TestCase
     self::assertSame(0, $mine['total'], 'Mis estudios es solo lo de la persona, también para administradores.');
     self::assertTrue($mine['mine']);
     self::assertSame(0, $this->service()->listing(['es_estado' => 'Aprobado'])['total']);
+    $waiting = CommercialStudiesView::results($team, CommercialStudiesDatabase::policy($this->db), true);
+    self::assertStringContainsString('data-commercial-open-case="700" data-cst-respond="' . $own . '"', $waiting, 'Responder abre la tarea en el estudio');
 
     // Columna Inmueble con su ficha y botón del enlace del cliente.
     $this->login('101', '9');
@@ -478,6 +480,7 @@ final class CommercialStudiesTest extends TestCase
     self::assertSame($own, PublicStudyAccess::verify(substr($listing['rows'][0]['enlace'], strpos($listing['rows'][0]['enlace'], '?e=') + 3)));
     $html = CommercialStudiesView::results($listing, CommercialStudiesDatabase::policy($this->db), true);
     self::assertStringContainsString('<th>Inmueble</th>', $html);
+    self::assertStringNotContainsString('data-cst-respond="' . $own . '"', $html, 'Un estudio aprobado ya no se responde');
     self::assertStringContainsString('data-commercial-property-detail="9001" data-study-id="' . $own . '"', $html);
     self::assertStringContainsString('data-cst-copy="' . htmlspecialchars($listing['rows'][0]['enlace'], ENT_QUOTES), $html);
   }
