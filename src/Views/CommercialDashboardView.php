@@ -458,6 +458,7 @@ final class CommercialDashboardView
   <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/commercial-calls.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/commercial-calls.css')); ?>">
   <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/commercial-quotes.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/commercial-quotes.css')); ?>">
   <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/commercial-studies.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/commercial-studies.css')); ?>">
+  <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/commercial-mandates.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/commercial-mandates.css')); ?>">
   <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/scm-loader.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/scm-loader.css')); ?>">
   <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/property-history-report.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/property-history-report.css')); ?>">
   <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/commercial-signs.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/commercial-signs.css')); ?>">
@@ -739,6 +740,7 @@ final class CommercialDashboardView
   <script src="<?php echo esc_url($baseUrl . '/assets/js/property-history-report.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/property-history-report.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-quotes.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-quotes.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-studies.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-studies.js')); ?>"></script>
+  <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-mandate-form.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-mandate-form.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-mandates.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-mandates.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-calendar-form.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-calendar-form.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-calendar-schedule.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-calendar-schedule.js')); ?>"></script>
@@ -5037,7 +5039,7 @@ final class CommercialDashboardView
     'Llamadas' => ['llamadas_crear', 'llamadas_editar', 'llamadas_tarea'],
     'Cotizaciones' => ['cotizacion_crear'],
     'Estudios de aseguradora' => ['estudio_crear', 'estudio_responder', 'estudio_desistir'],
-    'Contratos de mandato' => ['mandato_enviar_revision', 'mandato_responder_observaciones'],
+    'Contratos de mandato' => ['mandato_crear', 'mandato_enviar_revision', 'mandato_responder_observaciones', 'mandato_enviar_firma'],
     'Precaptación' => ['precaptacion_crear', 'precaptacion_editar', 'precaptacion_ticket', 'precaptacion_catalogos'],
     'Inmuebles y avisos' => ['ingresar_inmueble', 'inmueble_cambiar_estado', 'inmueble_ver_historial', 'inmueble_transferir', 'registrar_aviso', 'editar_actor'],
     'Herramientas' => ['mercado_vista_completa', 'aseo_vista_interna', 'plan_estrategico_editar'],

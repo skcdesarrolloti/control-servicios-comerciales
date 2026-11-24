@@ -1,0 +1,37 @@
+/* Contratos de mandato en el panel: ventana de la tarea (cma-*) y formulario (cmf-*), sobre cotizaciones y estudios. */
+.cma-flash { margin:0 0 12px; padding:12px 14px; border-radius:12px; background:#e8f6ee; color:#0b5d35; font-size:14px; font-weight:600; }
+.cma-cards { display:grid; gap:12px; }
+.cma-card { padding:16px; border:1px solid #dfe3ee; border-radius:16px; background:#fff; }
+.cma-card header { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+.cma-card header strong { font-size:16px; color:#061d49; margin-right:4px; }
+.cma-card p { margin:8px 0 0; font-size:14px; }
+.cma-warn { display:flex; align-items:center; gap:6px; color:#7a4a00; font-weight:600; }
+.cma-dialog-box { width:min(1080px,96vw); max-height:94vh; overflow-y:auto; padding:20px; background:#fff; border-radius:20px; }
+
+.cmf { display:flex; flex-direction:column; gap:16px; }
+.cmf h2 { margin:0 0 4px; font-size:18px; }
+.cmf h3 { margin:16px 0 8px; font-size:15px; color:#061d49; }
+.cmf-steps { list-style:none; margin:0; padding:0; display:flex; flex-wrap:wrap; gap:6px; position:sticky; top:0; z-index:2; background:#fff; padding:6px 0; }
+.cmf-steps button { min-height:40px; padding:0 14px; border-radius:999px; border:1px solid #dfe3ee; background:#f4f6fb; color:#1e3c76; font-weight:600; font-size:13px; cursor:pointer; }
+.cmf-steps button[aria-current="step"] { background:#1e3c76; border-color:#1e3c76; color:#fff; }
+.cmf-steps button:focus-visible { outline:3px solid #f8cf4a; outline-offset:2px; }
+.cmf-step { display:flex; flex-direction:column; gap:12px; }
+.cmf-owner { margin:0; padding:14px; border:1px solid #dfe3ee; border-radius:16px; background:#fbfcff; display:flex; flex-direction:column; gap:12px; }
+.cmf-owner legend { padding:0 6px; font-weight:700; color:#061d49; }
+.cmf-search { position:relative; }
+.cmf-search .cst-results { margin-top:6px; }
+.cmf-block { display:flex; flex-direction:column; gap:12px; padding:14px; border:1px solid #dfe3ee; border-radius:14px; background:#f8f9fc; }
+.cmf-block .cmf-block { background:#fff; }
+.cmf-inline { display:contents; }
+.cmf-inline[hidden] { display:none; }
+.cmf-wide { grid-column:1 / -1; }
+.cmf-agreement { padding:10px; border-radius:12px; background:#fff; border:1px dashed #dfe3ee; }
+.cmf [data-cmf-calc] { background:#f1f4fa; color:#24334c; font-weight:600; }
+.cmf-nav { display:flex; flex-wrap:wrap; justify-content:space-between; gap:8px; position:sticky; bottom:0; padding:10px 0; background:#fff; border-top:1px solid #dfe3ee; }
+.cmf-nav [hidden] { display:none; }
+.cmf .cqt-field { min-width:0; }
+.cmf .cqt-field input, .cmf .cqt-field select, .cmf .cqt-field textarea { box-sizing:border-box; width:100%; max-width:100%; min-height:44px; padding:8px 12px; border:1px solid #c6cddc; border-radius:12px; font:inherit; font-size:14px; background:#fff; }
+.cmf .cqt-field textarea { min-height:64px; resize:vertical; }
+.cmf .cqt-field input:focus, .cmf .cqt-field select:focus, .cmf .cqt-field textarea:focus { outline:3px solid #f8cf4a; outline-offset:1px; border-color:#1e3c76; }
+.cmf h2:focus { outline:none; }
+.cmf .cqt-check { display:inline-flex; align-items:center; gap:6px; margin-right:16px; font-size:14px; }

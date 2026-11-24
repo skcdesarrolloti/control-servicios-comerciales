@@ -31,6 +31,11 @@ return [
   'db_prefix' => $env('DB_PREFIX', 'wp_'),
   'db_charset' => $env('DB_CHARSET', 'utf8mb4'),
 
+  // Firma del contrato de mandato por eSignatures. El token es secreto: solo en el .env. ESIGNATURES_TEST=true manda
+  // contratos de prueba (sin costo, marcados como demo).
+  'esignatures_token' => $env('ESIGNATURES_TOKEN', ''),
+  'esignatures_test' => $envBool('ESIGNATURES_TEST', false),
+
 
   'sla_risk_days' => (int) $env('SLA_RISK_DAYS', '8'),
   'sla_overdue_days' => (int) $env('SLA_OVERDUE_DAYS', '15'),

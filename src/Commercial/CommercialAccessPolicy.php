@@ -54,6 +54,8 @@ final class CommercialAccessPolicy
     'estudio_crear' => 'Estudios de aseguradora: crear y editar desde una tarea',
     'estudio_responder' => 'Estudios de aseguradora: registrar la respuesta (aprobar crea el caso de entrega y el contrato por entregar)',
     'estudio_desistir' => 'Estudios de aseguradora: desistir el negocio de un estudio aprobado',
+    'mandato_crear' => 'Mandatos: crear y editar el contrato de mandato (desde la tarea o la pestaña Mandatos)',
+    'mandato_enviar_firma' => 'Mandatos: enviar el contrato a firma digital (eSignatures)',
     'mandato_enviar_revision' => 'Mandatos: enviar el contrato al propietario para que lo revise antes de la firma',
     'mandato_responder_observaciones' => 'Mandatos: responder y marcar resueltas las observaciones del propietario',
     'precaptacion_crear' => 'Registrar precaptaciones',

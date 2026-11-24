@@ -82,10 +82,99 @@
     }).catch(function (error) { notify("error", error.message); }).finally(function () { holder.removeAttribute("aria-busy"); });
   }
 
+  // ── Formulario, ventana de la tarea y firma ────────
+  function caseContent() { return document.querySelector("[data-commercial-case-content]"); }
+  function showInCase(html) {
+    var holder = caseContent();
+    if (!holder) return;
+    holder.innerHTML = html || "";
+    var form = holder.querySelector("[data-cmf]");
+    if (form && window.initCommercialMandateForm) window.initCommercialMandateForm(form);
+    var heading = holder.querySelector("h1");
+    if (heading) heading.focus({ preventScroll: true });
+    holder.scrollTop = 0;
+  }
+  function showInDialog(html) {
+    var old = document.getElementById("cma-viewer");
+    if (old) old.remove();
+    var viewer = document.createElement("div");
+    viewer.id = "cma-viewer";
+    viewer.className = "cqt-viewer cma-dialog";
+    viewer.setAttribute("role", "dialog");
+    viewer.setAttribute("aria-modal", "true");
+    viewer.setAttribute("aria-label", "Contrato de mandato");
+    viewer.innerHTML = '<div class="cqt-viewer-box cma-dialog-box" role="document">' + (html || "") + "</div>";
+    document.body.appendChild(viewer);
+    var form = viewer.querySelector("[data-cmf]");
+    if (form && window.initCommercialMandateForm) window.initCommercialMandateForm(form);
+    var heading = viewer.querySelector("h1");
+    if (heading) heading.focus();
+  }
+  function openForm(button) {
+    var ticket = button.getAttribute("data-ticket-pk") || "";
+    returnFocus = button;
+    button.disabled = true;
+    request("commercial_mandate_form", { id: button.getAttribute("data-id") || "", ticket_pk: ticket }).then(function (result) {
+      if (ticket) showInCase(result.html); else showInDialog(result.html);
+    }).catch(function (error) { notify("error", error.message); }).finally(function () { button.disabled = false; });
+  }
+  function openTask(ticket, flash) {
+    request("commercial_mandate_task", { ticket_pk: ticket }).then(function (result) { showInCase(result.html); if (flash) notify("success", flash); })
+      .catch(function (error) { notify("error", error.message); });
+  }
+  function save(form) {
+    if (typeof form.validAll === "function" && !form.validAll()) return;
+    var submit = form.querySelector("[data-cmf-submit]");
+    var data = new FormData(form);
+    var ticket = data.get("ticket_pk") || "";
+    submit.disabled = true;
+    request("commercial_mandate_save", data).then(function (result) {
+      notify("success", result.message || "Mandato guardado.");
+      if (ticket && result.html) { showInCase(result.html); return; }
+      var dialog = document.getElementById("cma-viewer");
+      if (dialog) dialog.remove();
+      if (document.querySelector("[data-cma-list]")) refreshList(listPage);
+    }).catch(function (error) {
+      var box = form.querySelector("[data-cmf-error]");
+      if (box) { box.textContent = error.message; box.hidden = false; box.scrollIntoView({ block: "nearest" }); } else notify("error", error.message);
+    }).finally(function () { submit.disabled = false; });
+  }
+  function sign(button) {
+    var id = button.getAttribute("data-cma-sign");
+    var ticket = button.getAttribute("data-ticket-pk") || "";
+    var approved = button.getAttribute("data-approved") === "1";
+    var resend = button.getAttribute("data-resend") === "1";
+    var text = (resend ? "Se actualizará el contrato que ya está en eSignatures con los datos actuales del mandato #" : "Se enviará el mandato #") + id + " a firma digital: a cada propietario le llega la solicitud por correo y celular."
+      + (approved ? "" : "\n\n⚠️ El propietario todavía no ha aprobado la versión actual en su revisión.");
+    var go = function () {
+      button.disabled = true;
+      request("commercial_mandate_sign", { id: id, ticket_pk: ticket, confirmar: "1" }).then(function (result) {
+        notify("success", result.message || "Enviado a firma.");
+        if (ticket && result.html) showInCase(result.html); else if (document.querySelector("[data-cma-list]")) refreshList(listPage);
+      }).catch(function (error) { notify("error", error.message); }).finally(function () { button.disabled = false; });
+    };
+    if (window.Swal) {
+      window.Swal.fire({ title: resend ? "¿Reenviar a firma?" : "¿Enviar a firma?", text: text, icon: approved ? "question" : "warning", showCancelButton: true, confirmButtonText: approved ? "Sí, enviar" : "Enviar de todas formas", cancelButtonText: "Cancelar" })
+        .then(function (answer) { if (answer.isConfirmed) go(); });
+    } else if (window.confirm(text)) {
+      go();
+    }
+  }
+  document.addEventListener("submit", function (event) {
+    var form = event.target;
+    if (form instanceof HTMLFormElement && form.matches("[data-cmf]")) { event.preventDefault(); save(form); }
+  });
+
   // ── Delegación ─────────────────────────────────────
   document.addEventListener("click", function (event) {
     var target = event.target;
     if (!(target instanceof Element)) return;
+    var formButton = target.closest("[data-cma-form]");
+    if (formButton) { event.preventDefault(); openForm(formButton); return; }
+    var taskButton = target.closest("[data-cma-task-open]");
+    if (taskButton) { event.preventDefault(); openTask(taskButton.getAttribute("data-ticket-pk")); return; }
+    var signButton = target.closest("[data-cma-sign]");
+    if (signButton) { event.preventDefault(); sign(signButton); return; }
     var view = target.closest("[data-cma-view]");
     if (view) { event.preventDefault(); openViewer(view.getAttribute("data-cma-view"), view); return; }
     if (target.closest("[data-cma-viewer-close]") || target.id === "cma-viewer") { closeViewer(); return; }

@@ -175,6 +175,25 @@ final class StoredFileService
     return ['type' => $type, 'url' => $this->urlFor($stored), 'name' => basename((string) $file['name'])];
   }
 
+  /**
+   * Guarda un PDF que no llegó como subida (por ejemplo, el contrato firmado que se descarga de eSignatures) y devuelve
+   * su enlace firmado (file.php).
+   */
+  public function storePdfBytes(string $bytes): string
+  {
+    if (strncmp($bytes, '%PDF', 4) !== 0) {
+      throw new \InvalidArgumentException('El archivo no es un PDF.');
+    }
+    if (!$this->ensureDirectory()) {
+      throw new \RuntimeException('No se pudo crear el directorio de archivos.');
+    }
+    $name = $this->newName('pdf');
+    if (file_put_contents($this->directory . '/' . $name, $bytes, LOCK_EX) === false) {
+      throw new \RuntimeException('No se pudo guardar el PDF.');
+    }
+    return $this->urlFor($name);
+  }
+
   public function isValidSignature(string $name, string $signature): bool
   {
     $name = basename($name);

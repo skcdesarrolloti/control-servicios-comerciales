@@ -257,11 +257,11 @@ final class CommercialMandatesTest extends TestCase
     self::assertContains('mandatos', CommercialAccessPolicy::VIEW_GROUPS['Actividades comerciales']);
     self::assertArrayHasKey('mandatos', CommercialAccessPolicy::SCOPED_VIEWS);
     $groups = (new \ReflectionClassConstant(CommercialDashboardView::class, 'PERMISSION_ACTION_GROUPS'))->getValue();
-    self::assertSame([CommercialMandatesService::ACTION_SEND, CommercialMandatesService::ACTION_ANSWER], $groups['Contratos de mandato']);
-    foreach ([CommercialMandatesService::ACTION_SEND, CommercialMandatesService::ACTION_ANSWER] as $action) {
+    self::assertSame(['mandato_crear', CommercialMandatesService::ACTION_SEND, CommercialMandatesService::ACTION_ANSWER, 'mandato_enviar_firma'], $groups['Contratos de mandato']);
+    foreach (['mandato_crear', CommercialMandatesService::ACTION_SEND, CommercialMandatesService::ACTION_ANSWER, 'mandato_enviar_firma'] as $action) {
       self::assertArrayHasKey($action, CommercialAccessPolicy::ACTIONS);
     }
-    self::assertSame(['commercial_mandates_list' => 'list', 'commercial_mandate_view' => 'view'], CommercialActionRouter::MANDATE_ACTIONS);
+    self::assertSame(['commercial_mandates_list' => 'list', 'commercial_mandate_view' => 'view', 'commercial_mandate_task' => 'task', 'commercial_mandate_form' => 'form', 'commercial_mandate_save' => 'save', 'commercial_mandate_sign' => 'sign', 'commercial_mandate_search' => 'search', 'commercial_mandate_property' => 'property'], CommercialActionRouter::MANDATE_ACTIONS);
     $events = array_merge(...array_values(array_map(static fn(array $group): array => array_keys($group['items']), CommercialInternalNotifications::CATALOG)));
     foreach ([CommercialMandatesNotifier::EVENT_SENT, CommercialMandatesNotifier::EVENT_NOTE, CommercialMandatesNotifier::EVENT_APPROVED] as $event) {
       self::assertContains($event, $events);
@@ -278,7 +278,9 @@ final class CommercialMandatesTest extends TestCase
     self::assertStringContainsString('1 observación(es) pendiente(s)', $html);
     self::assertStringContainsString('href="/formularios/firmados/mandato-51.pdf"', $html);
     self::assertStringContainsString('src="https://panel.test/public/mandato.php?id=50&amp;embed=1"', CommercialMandatesView::viewer(50));
-    self::assertSame('https://sucasainmobiliaria.com.co/formularios/enviar-mandato/formulario.php?id_mandato=50&id_inmueble=28355&id_propietario=10&id_funcionario=900', CommercialMandatesService::formUrl('enviar-mandato', $this->mandate()));
+    self::assertStringContainsString('data-cma-form data-id="50"', $html, 'Editar desde la pestaña.');
+    self::assertStringContainsString('data-cma-sign="50"', $html, 'Enviar a firma desde la pestaña.');
+    self::assertStringNotContainsString('data-cma-sign="51"', $html, 'Lo firmado no se reenvía.');
   }
 
   /** @param array<string,mixed> $query @param array<string,mixed> $post */
@@ -321,7 +323,8 @@ final class CommercialMandatesTest extends TestCase
     self::assertStringContainsString('Datos internos', $html);
     self::assertStringContainsString('mandato.php?m=50.', $html);
     self::assertStringContainsString('Enviar al propietario por correo y WhatsApp', $html);
-    self::assertStringContainsString('edit-mandato/formulario.php?id_mandato=50', $html);
+    self::assertStringContainsString('index.php?tab=mandatos&amp;abrir_mandato=50', $html, 'Editar y firmar se hacen en el panel.');
+    self::assertStringNotContainsString('formularios/', $html);
     self::assertStringContainsString('name="_csrf_token"', $html);
 
     $token = (string) $_SESSION['scm_csrf']['mandate_staff'];

@@ -36,7 +36,8 @@ final class CommercialMandatesView
     $html = '<section class="cqt cqt-page cst" data-cma-page>'
       . '<header class="cqt-head"><div><p class="cqt-eyebrow">Actividades comerciales · Registros</p><h1>' . ($listing['mine'] ? 'Mis mandatos' : 'Contratos de mandato') . '</h1><p>'
       . ($mine ? 'Los contratos de mandato que has creado.' : 'Los contratos de mandato de todo el equipo.')
-      . ' Antes de enviarlo a firma, envía el contrato al propietario: lo revisa, deja observaciones por sección o lo aprueba. Se crean y se editan en los formularios de WordPress mientras se migran al panel.</p></div></header>'
+      . ' Antes de enviarlo a firma, envía el contrato al propietario: lo revisa, deja observaciones por sección o lo aprueba. Se crean desde la tarea (Gestión operativa › Contrato de mandato) o aquí con Nuevo mandato.</p></div>'
+      . ($listing['can_create'] ? '<button type="button" class="cqt-primary" data-cma-form>' . self::icon('add') . 'Nuevo mandato</button>' : '') . '</header>'
       . '<form class="cqt-filters cqt-list-filters" data-cma-list-filters aria-label="Filtros de mandatos">'
       . ($listing['mine'] ? '<input type="hidden" name="portafolio" value="1">' : '')
       . '<input type="hidden" name="ma_estado" value="' . self::e($f['estado']) . '">'
@@ -79,8 +80,7 @@ final class CommercialMandatesView
         . ($row['pendientes'] > 0 ? '<small>' . $row['pendientes'] . ' observación(es) pendiente(s)</small>' : '') . ($row['envios'] > 1 ? '<small>Enviado ' . $row['envios'] . ' veces</small>' : '') . '</td>'
         . '<td data-label="Consultor/a">' . self::e($row['consultor'] ?: 'Sin consultor/a') . '</td>'
         . '<td data-label="Acciones"><div class="cqt-row-actions cst-row-actions">'
-        . '<button type="button" class="' . ($row['revision'] === 'observaciones' || $row['revision'] === 'sin_enviar' ? 'cqt-primary' : 'cqt-secondary') . ' cqt-small" data-cma-view="' . $id . '">' . self::icon($row['revision'] === 'observaciones' ? 'rate_review' : 'visibility') . ($row['revision'] === 'observaciones' ? 'Revisar' : 'Ver') . '</button>'
-        . ($row['pdf'] !== '' ? '<a class="cqt-secondary cqt-small" href="' . self::e($row['pdf']) . '" target="_blank" rel="noopener">' . self::icon('picture_as_pdf') . 'PDF firmado</a>' : '')
+        . self::actions($row, $listing['can_create'] ?? false, $listing['can_sign'] ?? false)
         . '</div></td></tr>';
     }
     $html .= '</tbody></table></div>';
@@ -90,6 +90,65 @@ final class CommercialMandatesView
       $html .= '<nav class="cqt-pager" aria-label="Páginas de mandatos"><button type="button" class="cqt-secondary" data-cma-list-page="' . ($page - 1) . '"' . ($page <= 1 ? ' disabled' : '') . '>Anterior</button><span>Página ' . $page . ' de ' . $pages . '</span><button type="button" class="cqt-secondary" data-cma-list-page="' . ($page + 1) . '"' . ($page >= $pages ? ' disabled' : '') . '>Siguiente</button></nav>';
     }
     return $html;
+  }
+
+  /**
+   * Ventana del popup de la tarea (Gestión operativa › Contrato de mandato): los mandatos de la tarea con su revisión y
+   * sus acciones, y "Nuevo mandato".
+   * @param array{ticket:int,asunto:string,rows:list<array<string,mixed>>,can_create:bool,can_sign:bool,flash:string} $data
+   */
+  public static function taskPanel(array $data): string
+  {
+    $pk = (int) $data['ticket'];
+    $html = '<section class="cqt cqt-task cst cma" data-cma-task data-ticket-pk="' . $pk . '">'
+      . '<header class="cqt-task-head"><button type="button" class="cqt-back" data-commercial-return-case="' . $pk . '">' . self::icon('arrow_back') . 'Volver a la tarea</button>'
+      . '<div><p class="cqt-eyebrow">Tarea #' . $pk . ($data['asunto'] !== '' ? ' · ' . self::e($data['asunto']) : '') . '</p><h1 tabindex="-1">Contrato de mandato</h1>'
+      . '<p>Después del estudio aprobado: crea el mandato, envíaselo al propietario para que lo revise y, cuando lo apruebe, envíalo a firma digital.</p></div>'
+      . '<button type="button" class="cqt-icon" data-commercial-close-case aria-label="Cerrar">' . self::icon('close') . '</button></header>'
+      . ($data['flash'] !== '' ? '<p class="cma-flash" role="status">' . self::e($data['flash']) . '</p>' : '')
+      . ($data['can_create'] ? '<p><button type="button" class="cqt-primary" data-cma-form data-ticket-pk="' . $pk . '">' . self::icon('add') . 'Nuevo mandato</button></p>' : '');
+    if ($data['rows'] === []) {
+      return $html . '<p class="cqt-empty">Esta tarea todavía no tiene contrato de mandato.</p></section>';
+    }
+    $html .= '<div class="cma-cards">';
+    foreach ($data['rows'] as $row) {
+      $html .= '<article class="cst-card cma-card"><header><strong>Mandato #' . (int) $row['id'] . '</strong>' . self::badges($row) . '</header>'
+        . '<p>' . self::e($row['propietarios'] !== [] ? implode(', ', $row['propietarios']) : 'Sin propietario') . ($row['inmueble'] !== '' ? ' · Inmueble #' . self::e($row['inmueble']) : '') . ($row['canon'] !== '' ? ' · Canon ' . self::e($row['canon']) : '') . '</p>'
+        . ($row['pendientes'] > 0 ? '<p class="cma-warn">' . self::icon('rate_review') . $row['pendientes'] . ' observación(es) del propietario sin resolver.</p>' : '')
+        . '<div class="cst-actions">' . self::actions($row, $data['can_create'], $data['can_sign'], $pk) . '</div></article>';
+    }
+    return $html . '</div></section>';
+  }
+
+  /** @param array<string,mixed> $row */
+  private static function badges(array $row): string
+  {
+    [$label, $tone] = CommercialMandatesService::REVIEW_STATES[$row['revision']] ?? ['', 'wait'];
+    return '<span class="cst-state cst-state--' . (self::STATE_TONES[$row['estado']] ?? 'wait') . '">' . self::e($row['estado'] === 'Enviado' ? 'Enviado a firma' : $row['estado']) . '</span>'
+      . ($row['revision'] !== 'firmado' ? '<span class="cst-state cst-state--' . self::e($tone) . '">' . self::e($label) . '</span>' : '');
+  }
+
+  /** Acciones de un mandato (tarea y pestaña). @param array<string,mixed> $row */
+  private static function actions(array $row, bool $canEdit, bool $canSign, int $ticket = 0): string
+  {
+    $id = (int) $row['id'];
+    $open = $row['estado'] !== 'Firmado';
+    $ticketAttr = $ticket > 0 ? ' data-ticket-pk="' . $ticket . '"' : '';
+    return '<button type="button" class="' . ($row['revision'] === 'observaciones' ? 'cqt-primary' : 'cqt-secondary') . ' cqt-small" data-cma-view="' . $id . '">' . self::icon('rate_review') . 'Revisión del propietario</button>'
+      . ($canEdit && $open ? '<button type="button" class="cqt-secondary cqt-small" data-cma-form data-id="' . $id . '"' . $ticketAttr . '>' . self::icon('edit') . 'Editar</button>' : '')
+      . ($canSign && $open ? '<button type="button" class="cqt-secondary cqt-small" data-cma-sign="' . $id . '" data-approved="' . ($row['revision'] === 'aprobado' ? '1' : '0') . '" data-resend="' . ($row['estado'] === 'Enviado' ? '1' : '0') . '"' . $ticketAttr . '>' . self::icon('draw') . ($row['estado'] === 'Enviado' ? 'Reenviar a firma' : 'Enviar a firma') . '</button>' : '')
+      . ($row['pdf'] !== '' ? '<a class="cqt-secondary cqt-small" href="' . self::e($row['pdf']) . '" target="_blank" rel="noopener">' . self::icon('picture_as_pdf') . 'PDF firmado</a>' : '');
+  }
+
+  /** Formulario del mandato con su encabezado (en la tarea o en el popup de la pestaña). */
+  public static function formPanel(string $form, int $id, int $ticket, string $subtitle): string
+  {
+    $back = $ticket > 0 ? '<button type="button" class="cqt-back" data-cma-task-open data-ticket-pk="' . $ticket . '">' . self::icon('arrow_back') . 'Volver a los mandatos</button>' : '<span></span>';
+    $close = $ticket > 0 ? '<button type="button" class="cqt-icon" data-commercial-close-case aria-label="Cerrar">' . self::icon('close') . '</button>' : '<button type="button" class="cqt-icon" data-cma-viewer-close aria-label="Cerrar">' . self::icon('close') . '</button>';
+    return '<section class="cqt cqt-task cst cma" data-cma-form-panel data-ticket-pk="' . ($ticket > 0 ? $ticket : '') . '">'
+      . '<header class="cqt-task-head">' . $back . '<div><p class="cqt-eyebrow">' . self::e($subtitle) . '</p><h1 tabindex="-1">' . ($id > 0 ? 'Editar mandato #' . $id : 'Nuevo contrato de mandato') . '</h1>'
+      . '<p>Completa cada paso; los valores de comisión, garantías y primas se calculan solos con las tasas de la configuración.</p></div>' . $close . '</header>'
+      . $form . '</section>';
   }
 
   /** Popup con la vista interna de mandato.php (revisión del propietario y acciones del equipo). */

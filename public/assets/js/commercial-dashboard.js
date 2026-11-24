@@ -903,7 +903,7 @@
     detailRequest = new AbortController();
     caseContent.innerHTML = loadingMarkup();
     caseContent.setAttribute("aria-busy", "true");
-    var action = kind === "sign" ? "commercial_task_sign_form" : (kind === "media" ? "commercial_property_media_form" : (kind === "quote" ? "commercial_quote_form" : (kind === "study" ? "commercial_study_form" : "commercial_property_entry_form")));
+    var action = kind === "sign" ? "commercial_task_sign_form" : (kind === "media" ? "commercial_property_media_form" : (kind === "quote" ? "commercial_quote_form" : (kind === "study" ? "commercial_study_form" : (kind === "mandate" ? "commercial_mandate_task" : "commercial_property_entry_form"))));
     request(action, { ticket_pk: ticketPk, id_inmueble: propertyCode }, detailRequest.signal).then(function (response) {
       caseContent.innerHTML = response.html || "";
       caseContent.removeAttribute("aria-busy");

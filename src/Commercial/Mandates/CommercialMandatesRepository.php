@@ -193,6 +193,37 @@ final class CommercialMandatesRepository
     return [$where, $args];
   }
 
+  /**
+   * Mandatos de una tarea: los creados desde ella (id_ticket, si la columna existe), los de sus estudios de aseguradora
+   * y los de su inmueble. El más reciente primero.
+   * @param list<int> $studies
+   * @return list<array<string,mixed>>
+   */
+  public function forTask(int $ticket, array $studies, string $property): array
+  {
+    $where = [];
+    $args = [];
+    if ($ticket > 0 && (new \SCM\Support\SchemaInspector($this->db))->columnExists($this->mandates(), 'id_ticket')) {
+      $where[] = 'CAST(m.id_ticket AS CHAR) = ?';
+      $args[] = (string) $ticket;
+    }
+    $studies = array_values(array_filter(array_map('intval', $studies), static fn(int $id): bool => $id > 0));
+    if ($studies !== []) {
+      $where[] = 'CAST(m.id_estudio_aseguradora AS CHAR) IN (' . implode(',', array_fill(0, count($studies), '?')) . ')';
+      array_push($args, ...array_map('strval', $studies));
+    }
+    if (trim($property) !== '') {
+      $where[] = 'TRIM(m.id_inmueble) = ?';
+      $args[] = trim($property);
+    }
+    if ($where === []) {
+      return [];
+    }
+    return $this->db->getResults('SELECT m.*, r.envios AS rev_envios, r.visto_at AS rev_visto_at, r.aprobado_at AS rev_aprobado_at, r.huella_aprobado AS rev_huella_aprobado,'
+      . ' (SELECT COUNT(*) FROM `' . $this->notesTable() . "` o WHERE o.mandato_id = m.`_ID` AND o.estado = 'pendiente') AS rev_pendientes"
+      . ' FROM `' . $this->mandates() . '` m LEFT JOIN `' . $this->reviewTable() . '` r ON r.mandato_id = m.`_ID` WHERE ' . implode(' OR ', $where) . ' ORDER BY m.`_ID` DESC LIMIT 20', $args);
+  }
+
   /** @return array<string,string> id_empleado => nombre de quien creó mandatos */
   public function creators(): array
   {

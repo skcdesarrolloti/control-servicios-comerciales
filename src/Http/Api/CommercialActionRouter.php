@@ -107,6 +107,12 @@ final class CommercialActionRouter
   public const MANDATE_ACTIONS = [
     'commercial_mandates_list' => 'list',
     'commercial_mandate_view' => 'view',
+    'commercial_mandate_task' => 'task',
+    'commercial_mandate_form' => 'form',
+    'commercial_mandate_save' => 'save',
+    'commercial_mandate_sign' => 'sign',
+    'commercial_mandate_search' => 'search',
+    'commercial_mandate_property' => 'property',
   ];
 
   private CommercialApiController $controller;

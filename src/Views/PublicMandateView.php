@@ -13,7 +13,7 @@ use SCM\Commercial\Mandates\MandateDocument;
  * - el propietario (enlace firmado) lee el contrato por secciones, deja observaciones donde algo deba cambiar y, cuando
  *   todo está correcto, lo aprueba;
  * - el equipo (sesión del panel) ve lo mismo, más el enlace del propietario, el envío a revisión, las respuestas a las
- *   observaciones y los formularios de WordPress (editar y enviar a firma) mientras se migran.
+ *   observaciones y el enlace al panel para editarlo o enviarlo a firma.
  * Estilos de public-study.css más public-mandate.css; sin JavaScript salvo el botón de copiar.
  */
 final class PublicMandateView
@@ -283,13 +283,12 @@ final class PublicMandateView
         . ($internal['envios'] > 0 ? 'Enviar de nuevo al propietario' : 'Enviar al propietario por correo y WhatsApp') . '</button></form>';
     }
     if (!$data['firmado']) {
-      $html .= '<a class="ps-button ps-button--light" href="' . self::e($internal['editar']) . '" target="_blank" rel="noopener">Editar mandato</a>'
-        . '<a class="ps-button ps-button--light" href="' . self::e($internal['firmar']) . '" target="_blank" rel="noopener">Enviar a firma</a>';
+      $html .= '<a class="ps-button ps-button--light" href="' . self::e($internal['panel']) . '" target="_top">Editar o enviar a firma en el panel</a>';
     }
     if ($internal['pdf'] !== '') {
       $html .= '<a class="ps-button ps-button--light" href="' . self::e($internal['pdf']) . '" target="_blank" rel="noopener">Ver PDF firmado</a>';
     }
-    return $html . '</div>' . $warning . '<p class="ps-hint">Editar y Enviar a firma abren los formularios de WordPress mientras se migran al panel.</p></section>';
+    return $html . '</div>' . $warning . '</section>';
   }
 
   /** @param array{nombre:string,correo:string,celular:string} $advisor */

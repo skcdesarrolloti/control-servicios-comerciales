@@ -12,9 +12,9 @@ use SCM\Support\PublicMandateAccess;
 /**
  * Contratos de mandato en el panel: la pestaña Mandatos / Mis mandatos y la revisión del propietario antes de la firma.
  *
- * Flujo: el mandato se crea en el formulario de WordPress (mientras se migra) → el equipo lo envía al propietario
+ * Flujo: el mandato se crea en el panel (tarea o pestaña Mandatos) → el equipo lo envía al propietario
  * (correo y WhatsApp con el enlace de public/mandato.php) → el propietario deja observaciones por sección o lo aprueba
- * → el equipo corrige, responde y lo envía a firma (eSignatures, desde el formulario de WordPress por ahora).
+ * → el equipo corrige, responde y lo envía a firma (eSignatures) desde el panel.
  * La aprobación guarda la huella del contenido: si el mandato cambia después, vuelve a pedir revisión.
  */
 final class CommercialMandatesService
@@ -36,8 +36,6 @@ final class CommercialMandatesService
     'firmado' => ['Firmado', 'done'],
   ];
 
-  /** Formularios de WordPress del mandato mientras se migran al panel. */
-  public const FORMS_URL = 'https://sucasainmobiliaria.com.co/formularios';
 
   private CommercialMandatesRepository $repository;
   private CommercialAccessPolicy $policy;
@@ -103,7 +101,7 @@ final class CommercialMandatesService
   /**
    * Pestaña Mandatos (todo el equipo si el cargo lo ve) o Mis mandatos (?portafolio=1, siempre los de la persona).
    * @param array<string,mixed> $input
-   * @return array{rows:list<array<string,mixed>>,total:int,page:int,per_page:int,filters:array{q:string,estado:string,empleado:string},estados:array<string,int>,mine:bool,team:bool}
+   * @return array{rows:list<array<string,mixed>>,total:int,page:int,per_page:int,filters:array{q:string,estado:string,empleado:string},estados:array<string,int>,mine:bool,team:bool,can_create:bool,can_sign:bool}
    */
   public function listing(array $input): array
   {
@@ -117,15 +115,16 @@ final class CommercialMandatesService
     $employee = $mine ? trim(Auth::employeeId()) : null;
     $page = max(1, (int) ($input['ma_pag'] ?? 1));
     $result = $this->repository->search($filters, $employee, $page, self::PER_PAGE);
-    $rows = array_map(fn(array $row): array => $this->row($row), $result['rows']);
+    $rows = array_map(fn(array $row): array => $this->summary($row), $result['rows']);
     return [
       'rows' => $rows, 'total' => $result['total'], 'page' => $page, 'per_page' => self::PER_PAGE, 'filters' => $filters,
       'estados' => $this->repository->stateCounts($filters, $employee), 'mine' => $mine, 'team' => $team,
+      'can_create' => $this->policy->canAct(CommercialMandateFormService::ACTION_CREATE), 'can_sign' => $this->policy->canAct(CommercialMandateFormService::ACTION_SIGN),
     ];
   }
 
-  /** @param array<string,mixed> $row @return array<string,mixed> */
-  private function row(array $row): array
+  /** Resumen de un mandato para los listados (pestaña y tarea). @param array<string,mixed> $row @return array<string,mixed> */
+  public function summary(array $row): array
   {
     $id = (int) $row['_ID'];
     $owners = MandateDocument::owners($row);
@@ -148,6 +147,7 @@ final class CommercialMandatesService
       'pendientes' => (int) ($row['rev_pendientes'] ?? 0),
       'envios' => (int) ($row['rev_envios'] ?? 0),
       'pdf' => trim((string) ($row['pdf_firmado'] ?? '')),
+      'enlace' => PublicMandateAccess::url($id),
     ];
   }
 
@@ -200,8 +200,7 @@ final class CommercialMandatesService
         'envios' => (int) ($review['envios'] ?? 0),
         'enviado_por' => trim((string) ($review['enviado_por_nombre'] ?? '')),
         'visto_at' => self::when((string) ($review['visto_at'] ?? '')),
-        'editar' => self::formUrl('edit-mandato', $mandate),
-        'firmar' => self::formUrl('enviar-mandato', $mandate),
+        'panel' => rtrim(defined('SCM_BASE_URL') ? (string) SCM_BASE_URL : '', '/') . '/index.php?tab=mandatos&abrir_mandato=' . $id,
         'pdf' => trim((string) ($mandate['pdf_firmado'] ?? '')),
         'puede_enviar' => $this->canSend() && trim((string) ($mandate['estado'] ?? '')) !== 'Firmado',
         'puede_responder' => $this->canAnswer(),
@@ -211,20 +210,6 @@ final class CommercialMandatesService
     return $data;
   }
 
-  /**
-   * Formulario de WordPress (edit-mandato o enviar-mandato) con los mismos datos que manda el listado de WordPress.
-   * @param array<string,mixed> $mandate
-   */
-  public static function formUrl(string $form, array $mandate): string
-  {
-    return self::FORMS_URL . '/' . $form . '/formulario.php?' . http_build_query(array_filter([
-      'id_mandato' => (int) ($mandate['_ID'] ?? 0),
-      'id_inmueble' => trim((string) ($mandate['id_inmueble'] ?? '')),
-      'id_propietario' => trim((string) ($mandate['id_propietario'] ?? '')),
-      'id_copropiedad' => trim((string) ($mandate['id_copropiedad'] ?? '')),
-      'id_funcionario' => trim((string) ($mandate['id_empleado'] ?? '')),
-    ], static fn($value): bool => (string) $value !== '' && (string) $value !== '0'));
-  }
 
   /**
    * Envía el enlace de revisión a los propietarios (correo y WhatsApp).
