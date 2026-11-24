@@ -107,6 +107,8 @@ final class CommercialApiController
       $html = \SCM\Views\CommercialCallsView::page($input, new \SCM\Commercial\Calls\CommercialCallsService($this->db, $this->settings, $this->policy, $this->config), $this->policy);
     } elseif ($bucket === 'cotizaciones') {
       $html = \SCM\Views\CommercialQuotesView::page($input, new \SCM\Commercial\Quotes\CommercialQuotesService(new \SCM\Commercial\Quotes\CommercialQuotesRepository($this->db), $this->settings, $this->policy), $this->policy);
+    } elseif ($bucket === 'estudios') {
+      $html = \SCM\Views\CommercialStudiesView::page($input, new \SCM\Commercial\Studies\CommercialStudiesService(new \SCM\Commercial\Studies\CommercialStudiesRepository($this->db), $this->settings, $this->policy), $this->policy);
     } elseif ($bucket === 'precaptacion') {
       $html = CommercialDashboardView::renderPrecaptacion($this->baseUrl, $input);
     } elseif ($bucket === 'inicio') {
@@ -289,6 +291,13 @@ final class CommercialApiController
       $detail['reply_guides'] = (new \SCM\Commercial\CommercialReplyGuides($this->db))->forStatus((string) ($detail['ticket']['estado_comercial'] ?? ''));
     } catch (\Throwable $exception) {
       error_log('[tareas:respuestas-guia] ' . $exception->getMessage());
+    }
+    // Estudios de aseguradora de la tarea: con alguno, el botón sale aunque la tarea sea de otro tema (para responderlos).
+    $detail['studies_count'] = 0;
+    try {
+      $detail['studies_count'] = count((new \SCM\Commercial\Studies\CommercialStudiesRepository($this->db))->forTask($ticketPk));
+    } catch (\Throwable $exception) {
+      error_log('[tareas:estudios] ' . $exception->getMessage());
     }
     JsonResponse::success([
       'html' => CommercialTicketModalView::render(

@@ -7,6 +7,7 @@ namespace SCM\Http\Api;
 use SCM\Http\Controller\CampaignApiController;
 use SCM\Http\Controller\CommercialCallsApiController;
 use SCM\Http\Controller\CommercialQuotesApiController;
+use SCM\Http\Controller\CommercialStudiesApiController;
 use SCM\Http\Controller\CommercialApiController;
 use SCM\Http\Controller\CommercialReportsApiController;
 use SCM\Http\Controller\PromotionApiController;
@@ -88,6 +89,19 @@ final class CommercialActionRouter
     'commercial_quote_view' => 'view',
   ];
 
+  /** Estudios de aseguradora (popup de la tarea y Actividades comerciales › Estudios): CommercialStudiesApiController. */
+  public const STUDY_ACTIONS = [
+    'commercial_study_form' => 'form',
+    'commercial_study_create' => 'create',
+    'commercial_study_update' => 'update',
+    'commercial_study_respond' => 'respond',
+    'commercial_study_properties' => 'properties',
+    'commercial_study_desist' => 'desist',
+    'commercial_study_desist_form' => 'desistForm',
+    'commercial_studies_list' => 'list',
+    'commercial_study_view' => 'view',
+  ];
+
   private CommercialApiController $controller;
   /** @var (\Closure():PromotionApiController)|null */
   private ?\Closure $promotion;
@@ -101,6 +115,8 @@ final class CommercialActionRouter
   private ?\Closure $calls;
   /** @var (\Closure():CommercialQuotesApiController)|null */
   private ?\Closure $quotes;
+  /** @var (\Closure():CommercialStudiesApiController)|null */
+  private ?\Closure $studies;
 
   /**
    * @param (\Closure():PromotionApiController)|null $promotion
@@ -109,8 +125,9 @@ final class CommercialActionRouter
    * @param (\Closure():CommercialReportsApiController)|null $reports
    * @param (\Closure():CommercialCallsApiController)|null $calls
    * @param (\Closure():CommercialQuotesApiController)|null $quotes
+   * @param (\Closure():CommercialStudiesApiController)|null $studies
    */
-  public function __construct(CommercialApiController $controller, ?\Closure $promotion = null, ?\Closure $strategy = null, ?\Closure $campaigns = null, ?\Closure $reports = null, ?\Closure $calls = null, ?\Closure $quotes = null)
+  public function __construct(CommercialApiController $controller, ?\Closure $promotion = null, ?\Closure $strategy = null, ?\Closure $campaigns = null, ?\Closure $reports = null, ?\Closure $calls = null, ?\Closure $quotes = null, ?\Closure $studies = null)
   {
     $this->controller = $controller;
     $this->promotion = $promotion;
@@ -119,6 +136,7 @@ final class CommercialActionRouter
     $this->reports = $reports;
     $this->calls = $calls;
     $this->quotes = $quotes;
+    $this->studies = $studies;
   }
 
   /** @param array<string,mixed> $input */
@@ -160,6 +178,12 @@ final class CommercialActionRouter
       }
       $target = ($this->quotes)();
       $method = self::QUOTE_ACTIONS[$action];
+    } elseif (isset(self::STUDY_ACTIONS[$action])) {
+      if ($this->studies === null) {
+        return false;
+      }
+      $target = ($this->studies)();
+      $method = self::STUDY_ACTIONS[$action];
     } else {
       $target = $this->controller;
       $method = self::controllerMethod($action);

@@ -330,6 +330,25 @@
         return { notas: form.elements.notas.value, nota_arriendo: form.elements.nota_arriendo.value };
       },
     },
+    // Estudios de aseguradora: quién recibe el caso de entrega ("Revisión antes de la ocupación") al aprobar un estudio.
+    estudios: {
+      title: "Estudios de aseguradora",
+      html: function (settings) {
+        var current = String(settings.responsable_entrega || "");
+        var automatic = settings.automatico ? "Automático: quien atendió la última entrega (" + settings.automatico + ")" : "Automático: quien atendió la última entrega";
+        var options = '<option value="">' + esc(automatic) + "</option>" + (settings.empleados || []).map(function (row) {
+          return '<option value="' + esc(row.id) + '"' + (String(row.id) === current ? " selected" : "") + ">" + esc(row.nombre) + "</option>";
+        }).join("");
+        return '<form data-config-form class="text-left space-y-4">' +
+          '<p class="text-sm text-secondary mb-3 text-left">Al aprobar un estudio se crea el caso de entrega <strong>Revisión antes de la ocupación</strong> y se le asigna a esta persona, que también recibe el aviso por correo. Quién más recibe copia se elige en <strong>Notificaciones internas › Estudios de aseguradora</strong>.</p>' +
+          '<label class="block text-left"><span class="block text-sm font-semibold text-on-surface mb-1">Responsable de las entregas</span>' +
+          '<select name="responsable_entrega" class="w-full px-3 py-2 rounded-xl border border-outline-variant bg-surface-container-lowest text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/30">' + options + "</select></label>" +
+          "</form>";
+      },
+      collect: function (form) {
+        return { responsable_entrega: form.elements.responsable_entrega.value };
+      },
+    },
     // Banco de respuestas guía de la categoría Comercial (tabla jet_cct_respuesta_de_ticket, la del plugin "Gestor de
     // Respuestas de Tickets"): salen en Responder del popup de la tarea. Se guarda la lista completa; eliminar pide confirmación.
     respuestas: {
@@ -1204,7 +1223,7 @@
   // Grupos del menú Configuración (los mismos del menú principal): cada uno abre un solo popup con una pestaña por
   // sección. Una entrada que no es grupo (Notificaciones internas) abre su sección sola, sin pestañas.
   var groups = {
-    actividades: { title: "Actividades comerciales", tabs: [["calendario", "Calendario"], ["tiempos", "Tiempos de atención"], ["cotizaciones", "Cotizaciones"], ["respuestas", "Respuestas guía"]] },
+    actividades: { title: "Actividades comerciales", tabs: [["calendario", "Calendario"], ["tiempos", "Tiempos de atención"], ["cotizaciones", "Cotizaciones"], ["estudios", "Estudios"], ["respuestas", "Respuestas guía"]] },
     inmuebles: { title: "Inmuebles", tabs: [["avisos", "Avisos en fachada"], ["actualizaciones", "Actualizaciones"], ["destacados", "Cupos de destacados"]] },
     herramientas: { title: "Herramientas", tabs: [["aseo", "Calculadora de aseo"], ["utm", "Generador UTM"], ["plan", "Plan estratégico"]] },
     promocion: { title: "Promoción", tabs: [["medios", "Medios"], ["analitica", "Analítica web"], ["material_pop", "Material POP"], ["banner_revista", "Banner y revista"]] },

@@ -14,7 +14,7 @@ use SCM\Commercial\CommercialTimelineEditor;
 final class CommercialTicketModalView
 {
   /**
-   * @param array{ticket:array<string,mixed>,timeline:array<int,array<string,mixed>>,analyses?:array<int,array<string,mixed>>,reply_guides?:array<int,array<string,mixed>>} $detail
+   * @param array{ticket:array<string,mixed>,timeline:array<int,array<string,mixed>>,analyses?:array<int,array<string,mixed>>,reply_guides?:array<int,array<string,mixed>>,studies_count?:int} $detail
    * @param array<int,array<string,string>> $employees
    */
   public static function render(array $detail, CommercialAccessPolicy $policy, array $employees): string
@@ -207,6 +207,10 @@ final class CommercialTicketModalView
           <?php endif; ?>
           <?php if ($policy->canAct('cotizacion_crear') && CommercialTaskTools::allowsTask(CommercialTaskTools::QUOTE, $ticket)): ?>
             <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-[#EBF1FB] text-slate-700 border border-slate-200 text-xs font-semibold transition-all cursor-pointer" data-commercial-task-form="quote" data-ticket-pk="<?php echo esc_attr((string) $pk); ?>"><span class="material-symbols-outlined text-[16px]">request_quote</span><span>Cotizar inmuebles</span></button>
+          <?php endif; ?>
+          <?php $studiesCount = (int) ($detail['studies_count'] ?? 0); ?>
+          <?php if (($policy->canAct('estudio_crear') || $policy->canAct('estudio_responder') || $policy->canAct('estudio_desistir')) && (CommercialTaskTools::allowsTask(CommercialTaskTools::STUDY, $ticket) || $studiesCount > 0)): ?>
+            <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-[#EBF1FB] text-slate-700 border border-slate-200 text-xs font-semibold transition-all cursor-pointer" data-commercial-task-form="study" data-ticket-pk="<?php echo esc_attr((string) $pk); ?>"><span class="material-symbols-outlined text-[16px]">verified_user</span><span>Estudio de aseguradora</span><?php if ($studiesCount > 0): ?><span class="ml-auto min-w-[20px] h-5 px-1.5 rounded-full bg-[#F8CF4A] text-[#061D49] text-[11px] font-bold inline-flex items-center justify-center" aria-label="<?php echo esc_attr($studiesCount . ($studiesCount === 1 ? ' estudio' : ' estudios')); ?>"><?php echo esc_html((string) $studiesCount); ?></span><?php endif; ?></button>
           <?php endif; ?>
           <?php if ($policy->canAct('responder')): ?>
             <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-[#EBF1FB] hover:text-[#1E3C76] text-slate-700 border border-slate-200 text-xs font-semibold transition-all group cursor-pointer" data-commercial-open-workflow="reply">

@@ -1,0 +1,67 @@
+/* Estudio de aseguradora (public/estudio.php). Colores de SKC SuCasa Inmobiliaria; sin JavaScript. */
+:root { --ps-navy:#061d49; --ps-blue:#1e3c76; --ps-gold:#f8cf4a; --ps-orange:#f59120; --ps-ink:#1f2a3d; --ps-muted:#5b6780; --ps-line:#e2e6ef; --ps-soft:#f4f6fb; }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--ps-soft); color:var(--ps-ink); font:16px/1.55 Poppins,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; -webkit-text-size-adjust:100%; }
+a { color:var(--ps-blue); }
+a:focus-visible { outline:3px solid var(--ps-orange); outline-offset:2px; }
+.ps-wrap { width:100%; max-width:980px; margin:0 auto; padding:0 16px; }
+.ps-pre { white-space:pre-line; overflow-wrap:anywhere; }
+.ps-hint { margin:8px 0 0; font-size:13px; color:var(--ps-muted); }
+
+/* El logo del portal es blanco: el encabezado va en el azul de la marca. */
+.ps-top { background:var(--ps-navy); }
+.ps-top-in { display:flex; align-items:center; gap:12px; min-height:64px; }
+.ps-logo { height:40px; width:auto; }
+.ps-brand { font-weight:700; color:#fff; }
+
+.ps-main { display:flex; flex-direction:column; gap:16px; padding-top:24px; padding-bottom:40px; }
+.ps-card { background:#fff; border:1px solid var(--ps-line); border-radius:18px; padding:20px; }
+.ps-card h2 { margin:0 0 12px; font-size:18px; color:var(--ps-navy); }
+.ps-card h3 { margin:16px 0 4px; font-size:15px; color:var(--ps-navy); }
+.ps-card p { margin:6px 0; }
+.ps-empty h1 { margin:0 0 8px; color:var(--ps-navy); }
+.ps-eyebrow { margin:0; font-size:12px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--ps-muted); }
+
+.ps-hero { background:linear-gradient(135deg,var(--ps-navy),var(--ps-blue)); color:#fff; border:0; }
+.ps-hero .ps-eyebrow { color:var(--ps-gold); }
+.ps-hero h1 { margin:4px 0 8px; font-size:clamp(24px,4vw,32px); line-height:1.2; }
+.ps-hero p { color:#dbe3f5; max-width:70ch; }
+.ps-state { margin:4px 0 8px!important; }
+.ps-badge { display:inline-block; padding:4px 14px; border-radius:999px; font-weight:700; font-size:14px; background:#e7ecf7; color:var(--ps-navy); }
+.ps-badge--ok { background:#d9f2e4; color:#0b5d35; }
+.ps-badge--warn { background:#fdeccb; color:#7a4a00; }
+.ps-badge--bad { background:#fde3e1; color:#8c1d18; }
+.ps-badge--off { background:#e5e7eb; color:#374151; }
+.ps-callout { margin-top:14px; padding:14px 16px; border-radius:14px; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.25); }
+.ps-callout h2 { margin:0 0 4px; font-size:15px; color:#fff; }
+.ps-callout p, .ps-callout .ps-hint { color:#fff; }
+
+.ps-steps { list-style:none; margin:0; padding:16px 20px; display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; background:#fff; border:1px solid var(--ps-line); border-radius:18px; }
+.ps-step { display:flex; gap:10px; align-items:flex-start; color:var(--ps-muted); }
+.ps-step strong { display:block; color:var(--ps-ink); font-size:14px; }
+.ps-step small { display:block; font-size:12px; }
+.ps-dot { flex:0 0 16px; width:16px; height:16px; margin-top:3px; border-radius:50%; border:3px solid #c6cddc; background:#fff; }
+.ps-step--done .ps-dot { border-color:#0f7a45; background:#0f7a45; }
+.ps-step--current .ps-dot { border-color:var(--ps-orange); background:var(--ps-gold); }
+.ps-step--stop .ps-dot { border-color:#8c1d18; background:#fde3e1; }
+
+.ps-grid { display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:16px; align-items:start; }
+.ps-facts { margin:0; display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px 18px; }
+.ps-facts div { min-width:0; }
+.ps-facts dt { font-size:12px; font-weight:700; color:var(--ps-muted); text-transform:uppercase; letter-spacing:.03em; }
+.ps-facts dd { margin:2px 0 0; font-weight:600; overflow-wrap:anywhere; }
+.ps-advisor h2 { margin:4px 0 8px; }
+.ps-button { display:inline-flex; align-items:center; justify-content:center; min-height:44px; padding:0 18px; border-radius:12px; background:var(--ps-blue); color:#fff; font-weight:600; text-decoration:none; }
+.ps-button:hover { background:var(--ps-navy); }
+.ps-button--light { background:#eef1f8; color:var(--ps-blue); }
+.ps-button--light:hover { background:#dfe5f3; }
+.ps-internal { border-style:dashed; border-color:#b9c3da; background:#fbfcff; }
+.ps-internal h2 small { font-size:12px; font-weight:600; color:var(--ps-muted); margin-left:6px; }
+
+.ps-foot { background:var(--ps-navy); color:#dbe3f5; padding:20px 0; text-align:center; font-size:14px; }
+.ps-motto { margin:0 0 4px; font-weight:700; color:#fff; }
+
+@media (max-width:760px) {
+  .ps-grid { grid-template-columns:minmax(0,1fr); }
+  .ps-card { padding:16px; }
+}

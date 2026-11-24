@@ -1,0 +1,142 @@
+// Estudios de aseguradora con base SQLite aislada (tests/Fixtures/commercial-studies.php). Servir el repositorio en
+// 127.0.0.1:8776 (php -S 127.0.0.1:8776 -t .) y ejecutar:
+//   node tools/check-commercial-studies.cjs RUTA_A_NODE_MODULES [CARPETA_DE_CAPTURAS]
+const path = require('node:path');
+const assert = require('node:assert/strict');
+const { chromium } = require(process.argv[2] ? path.join(process.argv[2], 'playwright') : 'playwright');
+const endpoint = 'http://127.0.0.1:8776/tests/Fixtures/commercial-studies.php';
+const shots = process.argv[3] || '';
+
+(async () => {
+  const browser = await chromium.launch({ headless: true, channel: process.env.SCM_BROWSER_CHANNEL || 'msedge' });
+  try {
+    const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+    // El visor y los enlaces abren public/estudio.php: aquí lo atiende el fixture sobre la misma base.
+    await context.route('http://127.0.0.1:8776/public/estudio.php?**', route => route.continue({ url: endpoint + '?' + new URL(route.request().url()).searchParams.toString() }));
+    const page = await context.newPage();
+    const errors = [];
+    page.on('pageerror', error => errors.push(error.message));
+    await page.goto(endpoint + '?as=101');
+    await page.locator('[data-cst-page]').waitFor();
+    const menu = page.locator('[data-commercial-dropdown-menu="comerciales"]');
+    assert.equal(await menu.locator('[data-commercial-tab="estudios"]:not([href*="portafolio"]) span:last-child').innerText(), 'Estudios', 'Falta Estudios en Registros');
+    assert.equal(await menu.locator('[data-commercial-tab="estudios"][href*="portafolio=1"]').count(), 1, 'Falta Mis estudios en Mi portafolio');
+    assert.ok(await page.locator('[data-commercial-dropdown-menu="mobile"] [data-commercial-tab="estudios"]').count() >= 2, 'Faltan las entradas móviles');
+    assert.ok((await page.locator('[data-cst-list] .cqt-empty').innerText()).includes('No hay estudios'));
+
+    // Popup de la tarea: el botón Estudio de aseguradora abre su ventana dentro del mismo popup.
+    await page.evaluate(() => {
+      const modal = document.getElementById('commercial-case-modal');
+      modal.classList.add('open');
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.setAttribute('data-commercial-task-form', 'study');
+      button.setAttribute('data-ticket-pk', '700');
+      modal.querySelector('[data-commercial-case-content]').appendChild(button);
+      button.click();
+    });
+    const task = page.locator('[data-cst-task]');
+    await task.waitFor();
+    assert.ok((await task.locator('.cqt-empty').innerText()).includes('todavía no tiene estudios'));
+    const create = task.locator('[data-cst-form="create"]');
+    assert.equal(await create.locator('[name="cliente"]').inputValue(), 'Laura Cliente', 'El cliente sale de la tarea');
+    await create.locator('[name="aseguradora"]').selectOption('El libertador');
+    await create.locator('[name="num_solicitud"]').fill('12548532');
+    await create.locator('[name="valor"]').pressSequentially('1500000');
+    assert.equal(await create.locator('[name="valor"]').inputValue(), '$ 1.500.000');
+    if (shots) await page.screenshot({ path: path.join(shots, 'estudio-nuevo.png') });
+    await create.locator('[type="submit"]').click();
+    await page.locator('[data-cst-task] .cst-flash').waitFor();
+    assert.ok((await page.locator('.cst-flash').innerText()).includes('Estudio #1 creado'));
+    const card = page.locator('[data-cst-card="1"]');
+    assert.equal(await card.locator('.cst-state').innerText(), 'Esperando respuesta');
+
+    // Respuesta: Aprobado pide inmueble, llaves, fecha y Drive.
+    await card.locator('.cst-actions [data-cst-toggle="respond-1"]').click();
+    const respond = card.locator('[data-cst-form="respond"]');
+    assert.equal(await respond.isVisible(), true);
+    assert.equal(await respond.locator('[data-cst-when="Aprobado"]').isVisible(), false, 'Los datos de aprobación salen solo al aprobar');
+    await respond.locator('[name="estado"]').selectOption('Aplazado');
+    assert.equal(await respond.locator('[data-cst-when="Aplazado"]').isVisible(), true);
+    await respond.locator('[name="estado"]').selectOption('Aprobado');
+    assert.equal(await respond.locator('[data-cst-when="Aplazado"]').isVisible(), false);
+    await respond.locator('[type="submit"]').click();
+    await respond.locator('[data-cst-error]:not([hidden])').waitFor();
+    assert.ok((await respond.locator('[data-cst-error]').innerText()).includes('inmueble'), 'Sin inmueble no se aprueba');
+    await respond.locator('[data-cst-property-search]').fill('Calle 900');
+    await respond.locator('[data-cst-pick]').first().waitFor();
+    const codes = await respond.locator('[data-cst-pick]').evaluateAll(nodes => nodes.map(node => node.getAttribute('data-cst-pick')).sort());
+    assert.deepEqual(codes, ['9001', '9002', '9004'], 'Solo públicos o en borrador');
+    await respond.locator('[data-cst-pick="9001"]').click();
+    assert.ok((await respond.locator('[data-cst-property-picked]').innerText()).includes('#9001'));
+    assert.deepEqual(await respond.locator('[data-cst-service]:checked').evaluateAll(nodes => nodes.map(node => node.value)), ['Agua', 'Energia'], 'Los servicios salen del inmueble');
+    await respond.locator('[name="ubicacion_llaves"]').fill('Portería');
+    await respond.locator('[name="persona_llaves"]').fill('Recepción');
+    await respond.locator('[name="contacto_llaves"]').fill('3216999529');
+    await respond.locator('[name="fecha_posible_entrega"]').fill('2026-12-15');
+    await respond.locator('[name="link_drive"]').fill('https://drive.google.com/drive/folders/abc');
+    if (shots) await page.screenshot({ path: path.join(shots, 'estudio-aprobar.png'), fullPage: false });
+    await respond.locator('[type="submit"]').click();
+    await page.waitForFunction(() => (document.querySelector('.cst-flash') || {}).innerText && document.querySelector('.cst-flash').innerText.includes('caso de entrega'));
+    assert.equal(await page.locator('[data-cst-card="1"] .cst-state').innerText(), 'Aprobado');
+    assert.equal(await page.locator('[data-cst-card="1"] .cst-actions [data-cst-toggle="respond-1"]').count(), 0, 'Un estudio respondido no se vuelve a aprobar');
+    assert.equal(await page.locator('[data-cst-card="1"] .cst-actions [data-cst-toggle="desist-1"]').count(), 1);
+
+    // Visor: la vista interna del estudio dentro del panel.
+    await page.locator('[data-cst-card="1"] [data-cst-view="1"]').click();
+    const frame = page.frameLocator('#cst-viewer iframe');
+    await frame.locator('.ps-internal').waitFor();
+    assert.ok((await frame.locator('.ps-internal').innerText()).includes('Portería'));
+    const clientLink = await page.locator('#cst-viewer [data-cqt-copy]').getAttribute('data-cqt-copy');
+    if (shots) await page.screenshot({ path: path.join(shots, 'estudio-visor.png') });
+    await page.keyboard.press('Escape');
+    assert.equal(await page.locator('#cst-viewer').count(), 0);
+
+    // Vista del cliente con su enlace firmado: sin datos internos.
+    const client = await context.newPage();
+    await client.goto(clientLink);
+    await client.locator('.ps-hero').waitFor();
+    assert.equal(await client.locator('.ps-internal').count(), 0, 'El cliente no ve los datos internos');
+    assert.ok((await client.locator('.ps-badge').innerText()).includes('Aprobado'));
+    if (shots) await client.screenshot({ path: path.join(shots, 'estudio-cliente.png'), fullPage: true });
+    await client.setViewportSize({ width: 390, height: 844 });
+    if (shots) await client.screenshot({ path: path.join(shots, 'estudio-cliente-movil.png'), fullPage: true });
+    await client.close();
+
+    // Listado: Desistir negocio en un popup.
+    await page.goto(endpoint + '?as=101');
+    await page.locator('[data-cst-page] .cqt-table').waitFor();
+    assert.equal(await page.locator('[data-cst-state="Aprobado"] strong').innerText(), '1');
+    await page.locator('[data-cst-desist="1"]').click();
+    const dialog = page.locator('#cst-dialog');
+    await dialog.locator('[name="motivo"]').waitFor();
+    await dialog.locator('[name="motivo"]').selectOption('Arrendatario desistio');
+    await dialog.locator('[type="submit"]').click();
+    await dialog.locator('[data-cst-error]:not([hidden])').waitFor();
+    await dialog.locator('[name="confirmar"]').check();
+    if (shots) await page.screenshot({ path: path.join(shots, 'estudio-desistir.png') });
+    await dialog.locator('[type="submit"]').click();
+    await page.waitForFunction(() => !document.getElementById('cst-dialog'));
+    await page.waitForFunction(() => (document.querySelector('[data-cst-list] .cst-state') || {}).innerText === 'Negocio desistido');
+    await page.locator('[data-cst-state="Negocio desistido"]').click();
+    await page.waitForFunction(() => document.querySelector('[data-cst-state="Negocio desistido"]').getAttribute('aria-pressed') === 'true');
+    assert.equal(await page.locator('[data-cst-list] tbody tr').count(), 1);
+    assert.equal(await page.locator('[data-cst-desist]').count(), 0, 'Un negocio desistido no se vuelve a desistir');
+    if (shots) await page.screenshot({ path: path.join(shots, 'estudios-listado.png') });
+
+    const notices = await page.evaluate(async () => {
+      const body = new FormData();
+      body.set('action', 'fixture_notices');
+      const response = await fetch(location.href.split('?')[0], { method: 'POST', body });
+      return (await response.json()).data.lines;
+    });
+    assert.ok(notices.some(line => line.startsWith('whatsapp|+573001234567|scm_estudio_aseguradora_enviado_v1')), 'WhatsApp al crear');
+    assert.ok(notices.some(line => line.startsWith('whatsapp|+573001234567|scm_estudio_aseguradora_respuesta_v1')), 'WhatsApp con la respuesta');
+    assert.ok(notices.some(line => line.includes('404@example.test') && line.includes('caso de entrega')), 'Aviso al responsable de las entregas');
+    assert.ok(notices.some(line => line.includes('Negocio desistido')), 'Aviso del negocio desistido');
+    assert.deepEqual(errors, [], 'Errores de JavaScript: ' + errors.join(' | '));
+    console.log('Estudios de aseguradora: OK');
+  } finally {
+    await browser.close();
+  }
+})().catch(error => { console.error(error); process.exit(1); });

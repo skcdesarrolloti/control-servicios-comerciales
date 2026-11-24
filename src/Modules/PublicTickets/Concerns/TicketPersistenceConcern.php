@@ -422,7 +422,8 @@ trait TicketPersistenceConcern
       return '';
     }
 
-    return 'https://sucasainmobiliaria.com.co/estudio-aseguradora/?id_estudio=' . rawurlencode($studyPk);
+    // Enlace firmado de la vista del estudio para el cliente (public/estudio.php).
+    return ctype_digit($studyPk) ? \SCM\Support\PublicStudyAccess::url((int) $studyPk) : '';
   }
 
   private function insertTicketHistory(int $ticketPk, string $logicalTicket, string $actor, string $solicitante, string $responsableId): void

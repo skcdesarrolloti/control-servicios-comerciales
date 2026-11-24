@@ -3560,7 +3560,7 @@
           var contactoLlavesHead = (btn.dataset.contactoLlaves || "").trim();
           if (tabKeyHead === "entrega" && idEstudioHead) {
             headActions.innerHTML +=
-              '<a href="https://sucasainmobiliaria.com.co/estudio-aseguradora/?id_estudio=' +
+              '<a href="estudio.php?id=' +
               encodeURIComponent(idEstudioHead) +
               '" class="scm-case-side-link" target="_blank" rel="noopener">Ver asegurable</a>';
           }

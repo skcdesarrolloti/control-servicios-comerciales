@@ -16,6 +16,7 @@ final class CommercialTaskTools
   public const PROPERTY = 'property';
   public const MEDIA = 'media';
   public const QUOTE = 'quote';
+  public const STUDY = 'study';
 
   /** Temas (clave normalizada) en que sale cada herramienta. */
   private const TOPICS = [
@@ -23,6 +24,7 @@ final class CommercialTaskTools
     self::PROPERTY => ['captacion', 'recaptacion'],
     self::MEDIA => ['captacion', 'recaptacion', 'actualizacion'],
     self::QUOTE => ['arriendo', 'venta', 'arriendo o venta'],
+    self::STUDY => ['arriendo', 'arriendo o venta'],
   ];
 
   private const LABELS = [
@@ -30,6 +32,7 @@ final class CommercialTaskTools
     self::PROPERTY => 'Ingresar inmueble',
     self::MEDIA => 'Multimedia del inmueble',
     self::QUOTE => 'Cotizar inmuebles',
+    self::STUDY => 'Estudio de aseguradora',
   ];
 
   public static function allows(string $tool, string $topic): bool

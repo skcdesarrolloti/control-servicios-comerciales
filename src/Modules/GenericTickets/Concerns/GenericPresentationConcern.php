@@ -209,12 +209,10 @@ trait GenericPresentationConcern
 
     $estudio = trim((string) ($item['id_estudio_aseguradora'] ?? ''));
     if ($estudio !== '') {
-      $ticket = trim((string) ($item['id_ticket'] ?? ''));
-      $url = 'https://sucasainmobiliaria.com.co/estudio-aseguradora/?id_estudio=' . rawurlencode($estudio);
-      if ($ticket !== '') {
-        $url .= '&id_ticket=' . rawurlencode($ticket);
+      // Vista propia del panel (public/estudio.php), ya no la página de WordPress.
+      if (ctype_digit($estudio)) {
+        $out[] = ['url' => \SCM\Support\PublicStudyAccess::staffUrl((int) $estudio), 'label' => 'Ver estudio aseguradora'];
       }
-      $out[] = ['url' => $url, 'label' => 'Ver estudio aseguradora'];
     }
 
     $hojaCierre = trim((string) ($item['id_hoja_cierre'] ?? ''));

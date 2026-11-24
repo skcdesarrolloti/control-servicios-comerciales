@@ -54,7 +54,8 @@ final class HistoryLinkMap
       'id_cierre' => ['label' => 'Ver cierre', 'base' => 'https://sucasainmobiliaria.com.co/hoja-de-cierre/?numero='],
 
       // Aseguradora
-      'id_estudio_aseguradora' => ['label' => 'Ver estudio aseguradora', 'base' => 'https://sucasainmobiliaria.com.co/estudio-aseguradora/?id_estudio='],
+      // Vista del estudio del panel (public/estudio.php con la sesión), ya no /estudio-aseguradora/ de WordPress.
+      'id_estudio_aseguradora' => ['label' => 'Ver estudio aseguradora', 'base' => rtrim(defined('SCM_BASE_URL') ? (string) SCM_BASE_URL : '', '/') . '/estudio.php?id='],
     ];
   }
 }

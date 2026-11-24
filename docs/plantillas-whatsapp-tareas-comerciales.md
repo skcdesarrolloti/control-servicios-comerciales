@@ -1,6 +1,6 @@
 # Plantillas de WhatsApp de las tareas comerciales
 
-Crea las plantillas 1 a 5, 9 y 10 en **Meta Business Suite → Administrador de WhatsApp → Plantillas de mensajes → Crear plantilla**, en la misma cuenta que usa el panel.
+Crea las plantillas 1 a 5 y 9 a 12 en **Meta Business Suite → Administrador de WhatsApp → Plantillas de mensajes → Crear plantilla**, en la misma cuenta que usa el panel.
 
 Para todas: categoría **Utilidad**, idioma **Spanish (COL)** (`es_CO`), tipo de variable **Número**, pie de página `SKC SuCasa Inmobiliaria` y un botón **Ir al sitio web** con URL **Dinámica**. Usa los nombres exactos. La 2 lleva encabezado de imagen y la 5 de documento (PDF).
 
@@ -158,6 +158,48 @@ Ejemplos: `{{1}}` Luis Prada · `{{2}}` 1686 · `{{3}}` Firmaste el contrato de 
 
 Botón `Ver tarea`. URL del sitio web `https://sucasainmobiliaria.com.co/dashboard-comercial/public/tarea.php?t=`. URL de muestra `https://sucasainmobiliaria.com.co/dashboard-comercial/public/tarea.php?t=1686.1893456000.ejemplo`.
 
+## 11. `scm_estudio_aseguradora_enviado_v1`
+
+Para el cliente, al registrar un estudio de aseguradora desde el popup de la tarea (**Gestión operativa › Estudio de aseguradora**). Código: `CommercialStudiesNotifier::TEMPLATE_CREATED`. Sin encabezado.
+
+```text
+Hola *{{1}}.*
+
+Enviamos tus documentos a la aseguradora *{{2}}* para el estudio *#{{3}}*. Te avisaremos en cuanto tengamos respuesta.
+
+*Su consultor/a asignado es* {{4}}.
+
+Desde el botón puedes ver el estado de tu estudio.
+
+*Construimos confianza, protegemos su patrimonio.*
+```
+
+Ejemplos: `{{1}}` Jairo Pérez · `{{2}}` El libertador · `{{3}}` 652 · `{{4}}` Kellys Roqueme · Correo: kellys@ejemplo.com · Celular: 3126810594
+
+Botón `Ver mi estudio`. URL del sitio web `https://sucasainmobiliaria.com.co/dashboard-comercial/public/estudio.php?e=`. URL de muestra `https://sucasainmobiliaria.com.co/dashboard-comercial/public/estudio.php?e=652.1893456000.ejemplo`.
+
+## 12. `scm_estudio_aseguradora_respuesta_v1`
+
+Para el cliente, cada vez que se registra la respuesta del estudio (aplazado, aprobado, rechazado, desistido o de nuevo en estudio). `{{4}}` es el estado como lo lee el cliente y `{{5}}` el detalle que arma el sistema (lo que falta, la fecha posible de entrega o el motivo). Código: `CommercialStudiesNotifier::TEMPLATE_ANSWERED`. Sin encabezado.
+
+```text
+Hola *{{1}}.*
+
+La aseguradora *{{2}}* actualizó tu estudio *#{{3}}*: *{{4}}*.
+
+*Detalle:* {{5}}.
+
+*Su consultor/a asignado es* {{6}}.
+
+Desde el botón puedes ver el estado de tu estudio.
+
+*Construimos confianza, protegemos su patrimonio.*
+```
+
+Ejemplos: `{{1}}` Jairo Pérez · `{{2}}` El libertador · `{{3}}` 652 · `{{4}}` Aplazado: faltan documentos · `{{5}}` Necesitamos: certificado laboral y extractos de los últimos 3 meses · `{{6}}` Kellys Roqueme · Correo: kellys@ejemplo.com · Celular: 3126810594
+
+Botón `Ver mi estudio`. URL del sitio web `https://sucasainmobiliaria.com.co/dashboard-comercial/public/estudio.php?e=`. URL de muestra `https://sucasainmobiliaria.com.co/dashboard-comercial/public/estudio.php?e=652.1893456000.ejemplo`.
+
 ## Plantillas compartidas con el panel inmobiliario (6, 7 y 8)
 
 Las usan este panel y `control-servicios-inmobiliarios`, con los mismos nombres de siempre. Se **editan** en Meta (texto y botón); no se crean nuevas. Tenían fija en el botón la página de tickets anterior (`https://sucasainmobiliaria.com.co/ticket/?id_ticket={{1}}`) y el texto decía "solicitud" o "ticket".
@@ -232,4 +274,4 @@ Botón `Ver detalle`. URL del sitio web `https://sucasainmobiliaria.com.co/`. UR
 
 ## Si Meta exige otro nombre
 
-Cámbialo en la constante `TEMPLATE_*` de `src/Commercial/Calls/CommercialCallsNotifier.php` (o `TEMPLATE` de `src/Commercial/Quotes/CommercialQuotesNotifier.php` para la cotización, y `TEMPLATE_EMPLOYEE`/`TEMPLATE_REQUESTER` de `src/Commercial/CommercialCalendarNotifier.php` para las citas). No borres una plantilla para volver a crearla: Meta no deja reusar ese nombre por varias semanas.
+Cámbialo en la constante `TEMPLATE_*` de `src/Commercial/Calls/CommercialCallsNotifier.php` (o `TEMPLATE` de `src/Commercial/Quotes/CommercialQuotesNotifier.php` para la cotización, `TEMPLATE_CREATED`/`TEMPLATE_ANSWERED` de `src/Commercial/Studies/CommercialStudiesNotifier.php` para los estudios de aseguradora, y `TEMPLATE_EMPLOYEE`/`TEMPLATE_REQUESTER` de `src/Commercial/CommercialCalendarNotifier.php` para las citas). No borres una plantilla para volver a crearla: Meta no deja reusar ese nombre por varias semanas.

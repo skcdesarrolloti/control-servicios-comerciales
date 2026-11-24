@@ -41,6 +41,15 @@ final class CommercialInternalNotifications
         'cotizacion_creada' => ['label' => 'Cotización enviada a un cliente', 'description' => 'Copia del correo con la cotización, los inmuebles y el enlace. Quien la hizo la recibe siempre.', 'channel' => 'Correo'],
       ],
     ],
+    'estudios' => [
+      'label' => 'Estudios de aseguradora',
+      'items' => [
+        'estudio_creado' => ['label' => 'Estudio enviado a una aseguradora', 'description' => 'Copia del aviso del estudio nuevo. Quien lo hizo lo recibe siempre.', 'channel' => 'Correo'],
+        'estudio_respondido' => ['label' => 'Respuesta de un estudio', 'description' => 'Aplazado, aprobado, rechazado o desistido. Quien hizo el estudio lo recibe siempre.', 'channel' => 'Correo'],
+        'estudio_aprobado' => ['label' => 'Estudio aprobado: caso de entrega creado', 'description' => 'Inmueble, llaves y fecha posible de entrega. El responsable de las entregas lo recibe siempre.', 'channel' => 'Correo'],
+        'estudio_negocio_desistido' => ['label' => 'Negocio desistido desde un estudio', 'description' => 'El inmueble vuelve a borrador y el caso de entrega se cierra. Quien hizo el estudio y el responsable de la entrega lo reciben siempre.', 'channel' => 'Correo'],
+      ],
+    ],
     'promocion' => [
       'label' => 'Promoción',
       'items' => [

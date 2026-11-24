@@ -457,6 +457,7 @@ final class CommercialDashboardView
   <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/commercial-calendar.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/commercial-calendar.css')); ?>">
   <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/commercial-calls.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/commercial-calls.css')); ?>">
   <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/commercial-quotes.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/commercial-quotes.css')); ?>">
+  <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/commercial-studies.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/commercial-studies.css')); ?>">
   <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/scm-loader.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/scm-loader.css')); ?>">
   <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/commercial-signs.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/commercial-signs.css')); ?>">
   <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/commercial-tools.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/commercial-tools.css')); ?>">
@@ -655,6 +656,8 @@ final class CommercialDashboardView
             echo (string) ($data['calls_html'] ?? '');
           } elseif ($bucket === 'cotizaciones') {
             echo (string) ($data['quotes_html'] ?? '');
+          } elseif ($bucket === 'estudios') {
+            echo (string) ($data['studies_html'] ?? '');
           } elseif ($bucket === 'precaptacion') {
             echo self::renderPrecaptacion($baseUrl, $_GET);
           } elseif ($bucket === 'anadir_aviso') {
@@ -709,6 +712,7 @@ final class CommercialDashboardView
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-calls.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-calls.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/scm-loader.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/scm-loader.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-quotes.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-quotes.js')); ?>"></script>
+  <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-studies.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-studies.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-calendar-form.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-calendar-form.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-calendar-schedule.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-calendar-schedule.js')); ?>"></script>
   <script src="<?php echo esc_url($baseUrl . '/assets/js/commercial-notifications.js?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/js/commercial-notifications.js')); ?>"></script>
@@ -821,10 +825,10 @@ final class CommercialDashboardView
       <?php endif; ?>
 
       <!-- Actividades comerciales: registrar (precaptación, aviso), gestión de tareas, actualizaciones y avisos en fachada -->
-      <?php $commercialViews = array_merge(['llamadas', 'precaptacion', 'cotizaciones', 'anadir_aviso', 'actualizaciones', 'avisos'], $taskViews); ?>
+      <?php $commercialViews = array_merge(['llamadas', 'precaptacion', 'cotizaciones', 'estudios', 'anadir_aviso', 'actualizaciones', 'avisos'], $taskViews); ?>
       <?php if (array_intersect($commercialViews, $views) !== []): ?>
         <div class="relative group/nav" data-commercial-dropdown="comerciales">
-          <button type="button" class="flex items-center gap-space-xs px-2 xl:px-3 py-space-xs font-label-md text-label-md <?php echo ($isTaskActive || in_array($bucket, ['llamadas', 'precaptacion', 'cotizaciones', 'anadir_aviso', 'actualizaciones', 'avisos'], true)) ? ($activeClasses . ' active') : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-tab="comerciales" data-commercial-dropdown-trigger="comerciales" aria-expanded="false">
+          <button type="button" class="flex items-center gap-space-xs px-2 xl:px-3 py-space-xs font-label-md text-label-md <?php echo ($isTaskActive || in_array($bucket, ['llamadas', 'precaptacion', 'cotizaciones', 'estudios', 'anadir_aviso', 'actualizaciones', 'avisos'], true)) ? ($activeClasses . ' active') : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-tab="comerciales" data-commercial-dropdown-trigger="comerciales" aria-expanded="false">
             <span class="material-symbols-outlined text-[16px]" aria-hidden="true">business_center</span>
             <span>Actividades comerciales</span>
             <span class="material-symbols-outlined text-[16px] group-hover/nav:rotate-180 transition-transform" aria-hidden="true">expand_more</span>
@@ -853,7 +857,7 @@ final class CommercialDashboardView
               </div>
             </div>
             <?php endif; ?>
-            <?php if (array_intersect(['llamadas', 'precaptacion', 'cotizaciones', 'anadir_aviso', 'actualizaciones', 'avisos'], $views)): ?>
+            <?php if (array_intersect(['llamadas', 'precaptacion', 'cotizaciones', 'estudios', 'anadir_aviso', 'actualizaciones', 'avisos'], $views)): ?>
             <div class="min-w-[250px]">
             <?php if (array_intersect(['llamadas', 'precaptacion', 'anadir_aviso'], $views)): ?>
               <div class="flex items-center gap-1.5 px-3 pt-2 pb-1 font-label-sm text-[11px] uppercase font-semibold text-secondary"><span class="material-symbols-outlined text-[15px]" aria-hidden="true">edit_note</span><span>Registrar</span></div>
@@ -873,11 +877,18 @@ final class CommercialDashboardView
               </a>
               <?php endif; ?>
             <?php endif; ?>
-            <?php if (in_array('cotizaciones', $views, true)): ?>
+            <?php if (array_intersect(['cotizaciones', 'estudios'], $views) !== []): ?>
               <div class="flex items-center gap-1.5 px-3 pt-2 pb-1 font-label-sm text-[11px] uppercase font-semibold text-secondary"><span class="material-symbols-outlined text-[15px]" aria-hidden="true">folder_open</span><span>Registros</span></div>
+              <?php if (in_array('cotizaciones', $views, true)): ?>
               <a class="flex items-center gap-2 px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="cotizaciones" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'cotizaciones'])); ?>">
                 <span class="material-symbols-outlined text-[18px] text-secondary" aria-hidden="true">request_quote</span><span>Cotizaciones</span>
               </a>
+              <?php endif; ?>
+              <?php if (in_array('estudios', $views, true)): ?>
+              <a class="flex items-center gap-2 px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="estudios" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'estudios'])); ?>">
+                <span class="material-symbols-outlined text-[18px] text-secondary" aria-hidden="true">verified_user</span><span>Estudios</span>
+              </a>
+              <?php endif; ?>
             <?php endif; ?>
             <?php if (in_array('actualizaciones', $views, true)): ?>
               <div class="flex items-center gap-1.5 px-3 pt-2 pb-1 font-label-sm text-[11px] uppercase font-semibold text-secondary"><span class="material-symbols-outlined text-[15px]" aria-hidden="true">published_with_changes</span><span><?php echo esc_html(self::controlTitle('actualizaciones', $policy)); ?></span></div>
@@ -1300,6 +1311,7 @@ final class CommercialDashboardView
       ['tab' => 'inmuebles', 'label' => 'Mis inmuebles', 'icon' => 'person_pin', 'params' => ['property_subtab' => 'mis_inmuebles']],
       ['tab' => 'precaptacion', 'label' => 'Mis precaptaciones', 'icon' => 'add_home_work', 'params' => ['portafolio' => '1']],
       ['tab' => 'cotizaciones', 'label' => 'Mis cotizaciones', 'icon' => 'request_quote', 'params' => ['portafolio' => '1']],
+      ['tab' => 'estudios', 'label' => 'Mis estudios', 'icon' => 'verified_user', 'params' => ['portafolio' => '1']],
       // Ayudas de control: abren solo lo que pide acción. El subtítulo sale sobre la primera que el cargo pueda abrir.
       ['tab' => 'actualizaciones', 'label' => 'Inmuebles por vencer', 'icon' => 'published_with_changes', 'params' => ['portafolio' => '1', 'estado_actualizacion' => 'Pendientes'], 'pending' => true],
       ['tab' => 'avisos', 'label' => 'Avisos pendientes', 'icon' => 'signpost', 'params' => ['portafolio' => '1', 'estado_aviso' => 'Pendientes'], 'pending' => true],
@@ -4965,6 +4977,7 @@ final class CommercialDashboardView
     'Notificaciones' => ['enviar_notificacion', 'eliminar_notificacion', 'campanas_enviar', 'campanas_eliminar', 'plantillas_editar'],
     'Llamadas' => ['llamadas_crear', 'llamadas_editar', 'llamadas_tarea'],
     'Cotizaciones' => ['cotizacion_crear'],
+    'Estudios de aseguradora' => ['estudio_crear', 'estudio_responder', 'estudio_desistir'],
     'Precaptación' => ['precaptacion_crear', 'precaptacion_editar', 'precaptacion_ticket', 'precaptacion_catalogos'],
     'Inmuebles y avisos' => ['ingresar_inmueble', 'registrar_aviso', 'editar_actor'],
     'Herramientas' => ['mercado_vista_completa', 'aseo_vista_interna', 'plan_estrategico_editar'],

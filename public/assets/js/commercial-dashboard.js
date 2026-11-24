@@ -467,7 +467,7 @@
     if (["enviar_notificaciones", "campanas", "plantillas_correo"].indexOf(tab) >= 0) return "notificaciones";
     if (["mis_reportes", "reportes_consolidado", "cuentas_cobro"].indexOf(tab) >= 0) return "reportes_comerciales";
     // Tareas, llamadas, precaptación, avisos y actualizaciones van dentro del menú Actividades comerciales.
-    return ["abiertos", "postergados", "cerrados", "mis_tickets", "llamadas", "precaptacion", "cotizaciones", "anadir_aviso", "actualizaciones", "avisos"].indexOf(tab) >= 0 ? "comerciales" : tab;
+    return ["abiertos", "postergados", "cerrados", "mis_tickets", "llamadas", "precaptacion", "cotizaciones", "estudios", "anadir_aviso", "actualizaciones", "avisos"].indexOf(tab) >= 0 ? "comerciales" : tab;
   }
 
   function setActiveTab(tab) {
@@ -741,7 +741,7 @@
     detailRequest = new AbortController();
     caseContent.innerHTML = loadingMarkup();
     caseContent.setAttribute("aria-busy", "true");
-    var action = kind === "sign" ? "commercial_task_sign_form" : (kind === "media" ? "commercial_property_media_form" : (kind === "quote" ? "commercial_quote_form" : "commercial_property_entry_form"));
+    var action = kind === "sign" ? "commercial_task_sign_form" : (kind === "media" ? "commercial_property_media_form" : (kind === "quote" ? "commercial_quote_form" : (kind === "study" ? "commercial_study_form" : "commercial_property_entry_form")));
     request(action, { ticket_pk: ticketPk, id_inmueble: propertyCode }, detailRequest.signal).then(function (response) {
       caseContent.innerHTML = response.html || "";
       caseContent.removeAttribute("aria-busy");
