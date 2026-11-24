@@ -1,0 +1,43 @@
+/* Contrato de mandato (public/mandato.php): sobre public-study.css (ps-*), lo propio de la revisión (pm-*). */
+.pm-flash, .pm-error { margin:0; padding:12px 16px; border-radius:14px; font-weight:600; }
+.pm-flash { background:#d9f2e4; color:#0b5d35; }
+.pm-error { background:#fde3e1; color:#8c1d18; }
+.pm-section h3 { margin:14px 0 6px; font-size:15px; color:var(--ps-navy); }
+.pm-owner + .pm-owner { margin-top:16px; padding-top:12px; border-top:1px dashed var(--ps-line); }
+.pm-owner h3 { margin-top:0; }
+.pm-table-wrap { overflow-x:auto; margin-top:12px; }
+.pm-table { width:100%; border-collapse:collapse; font-size:14px; }
+.pm-table th, .pm-table td { padding:8px 10px; border-bottom:1px solid var(--ps-line); text-align:left; }
+.pm-table th { font-size:12px; text-transform:uppercase; letter-spacing:.03em; color:var(--ps-muted); }
+
+.pm-notes { margin-top:16px; padding-top:12px; border-top:1px solid var(--ps-line); }
+.pm-notes ul { list-style:none; margin:0; padding:0; display:grid; gap:10px; }
+.pm-note { padding:12px 14px; border-radius:14px; background:#fffbeb; border:1px solid #f6e2a8; }
+.pm-note--done { background:#f3f8f5; border-color:#cfe8da; }
+.pm-note-head { margin:0 0 4px!important; font-size:13px; color:var(--ps-muted); }
+.pm-note .ps-badge { font-size:12px; padding:2px 10px; }
+.pm-old { font-size:12px; color:var(--ps-muted); font-style:italic; }
+.pm-answer { margin-top:8px; padding:10px 12px; border-radius:12px; background:#fff; border:1px solid var(--ps-line); }
+
+.pm-ask { margin-top:14px; }
+.pm-ask summary { cursor:pointer; display:inline-flex; align-items:center; min-height:44px; padding:0 16px; border-radius:12px; background:#eef1f8; color:var(--ps-blue); font-weight:600; list-style:none; }
+.pm-ask summary::-webkit-details-marker { display:none; }
+.pm-ask summary:focus-visible { outline:3px solid var(--ps-orange); outline-offset:2px; }
+.pm-ask[open] summary { margin-bottom:10px; }
+.pm-form { display:grid; gap:10px; margin-top:8px; }
+.pm-field { display:grid; gap:4px; font-size:14px; font-weight:600; color:var(--ps-ink); }
+.pm-field textarea, .pm-field select, .pm-field input { width:100%; min-height:44px; padding:10px 12px; border:1px solid #c6cddc; border-radius:12px; font:inherit; font-weight:400; background:#fff; }
+.pm-field textarea:focus, .pm-field select:focus, .pm-field input:focus { outline:3px solid var(--ps-gold); outline-offset:1px; border-color:var(--ps-blue); }
+.pm-check { display:flex; gap:10px; align-items:flex-start; font-size:14px; }
+.pm-check input { width:20px; height:20px; margin-top:2px; }
+.pm-form .ps-button { justify-self:start; border:0; cursor:pointer; font:inherit; font-weight:600; }
+.pm-reply { margin-top:10px; padding-top:10px; border-top:1px dashed #e8d9a8; }
+.pm-approve { border:2px solid var(--ps-gold); }
+.pm-link { display:flex; gap:8px; }
+.pm-link input { flex:1; min-width:0; }
+.pm-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+.pm-actions form { margin:0; }
+.pm-actions button { border:0; cursor:pointer; font:inherit; font-weight:600; }
+.pm-warn { margin:12px 0 0!important; padding:10px 14px; border-radius:12px; background:#fdeccb; color:#7a4a00; font-weight:600; }
+.ps-hero--done .ps-badge { background:#d9f2e4; color:#0b5d35; }
+@media (max-width:760px) { .pm-link { flex-direction:column; } }

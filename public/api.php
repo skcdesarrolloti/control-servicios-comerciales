@@ -40,7 +40,8 @@ $router = new \SCM\Http\Api\CommercialActionRouter(
   static fn(): \SCM\Http\Controller\CommercialReportsApiController => new \SCM\Http\Controller\CommercialReportsApiController($scmDb, $scmSettings, $scmCsrf, $scmConfig),
   static fn(): \SCM\Http\Controller\CommercialCallsApiController => new \SCM\Http\Controller\CommercialCallsApiController($scmDb, $scmSettings, $scmCsrf, $scmConfig),
   static fn(): \SCM\Http\Controller\CommercialQuotesApiController => new \SCM\Http\Controller\CommercialQuotesApiController($scmDb, $scmSettings, $scmCsrf, $scmConfig),
-  static fn(): \SCM\Http\Controller\CommercialStudiesApiController => new \SCM\Http\Controller\CommercialStudiesApiController($scmDb, $scmSettings, $scmCsrf, $scmConfig)
+  static fn(): \SCM\Http\Controller\CommercialStudiesApiController => new \SCM\Http\Controller\CommercialStudiesApiController($scmDb, $scmSettings, $scmCsrf, $scmConfig),
+  static fn(): \SCM\Http\Controller\CommercialMandatesApiController => new \SCM\Http\Controller\CommercialMandatesApiController($scmDb, $scmSettings, $scmCsrf, $scmConfig)
 );
 
 session_write_close();

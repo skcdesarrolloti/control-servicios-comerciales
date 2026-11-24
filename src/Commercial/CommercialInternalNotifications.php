@@ -50,6 +50,14 @@ final class CommercialInternalNotifications
         'estudio_negocio_desistido' => ['label' => 'Negocio desistido desde un estudio', 'description' => 'El inmueble vuelve a borrador y el caso de entrega se cierra. Quien hizo el estudio y el responsable de la entrega lo reciben siempre.', 'channel' => 'Correo'],
       ],
     ],
+    'mandatos' => [
+      'label' => 'Contratos de mandato',
+      'items' => [
+        'mandato_revision_enviada' => ['label' => 'Mandato enviado al propietario para revisión', 'description' => 'Copia del envío del contrato al propietario antes de la firma. Quien lo envía y quien creó el mandato la reciben siempre.', 'channel' => 'Correo'],
+        'mandato_observaciones' => ['label' => 'Observación del propietario en un mandato', 'description' => 'El propietario pidió un cambio en una sección del contrato. Quien creó el mandato lo recibe siempre.', 'channel' => 'Correo'],
+        'mandato_aprobado' => ['label' => 'Mandato aprobado por el propietario', 'description' => 'El propietario revisó y aprobó el contrato: ya puede enviarse a firma. Quien creó el mandato lo recibe siempre.', 'channel' => 'Correo'],
+      ],
+    ],
     'promocion' => [
       'label' => 'Promoción',
       'items' => [

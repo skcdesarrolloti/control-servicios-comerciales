@@ -6,6 +6,7 @@ namespace SCM\Http\Api;
 
 use SCM\Http\Controller\CampaignApiController;
 use SCM\Http\Controller\CommercialCallsApiController;
+use SCM\Http\Controller\CommercialMandatesApiController;
 use SCM\Http\Controller\CommercialQuotesApiController;
 use SCM\Http\Controller\CommercialStudiesApiController;
 use SCM\Http\Controller\CommercialApiController;
@@ -102,6 +103,12 @@ final class CommercialActionRouter
     'commercial_study_view' => 'view',
   ];
 
+  /** Contratos de mandato (Actividades comerciales › Mandatos): CommercialMandatesApiController. */
+  public const MANDATE_ACTIONS = [
+    'commercial_mandates_list' => 'list',
+    'commercial_mandate_view' => 'view',
+  ];
+
   private CommercialApiController $controller;
   /** @var (\Closure():PromotionApiController)|null */
   private ?\Closure $promotion;
@@ -117,6 +124,8 @@ final class CommercialActionRouter
   private ?\Closure $quotes;
   /** @var (\Closure():CommercialStudiesApiController)|null */
   private ?\Closure $studies;
+  /** @var (\Closure():CommercialMandatesApiController)|null */
+  private ?\Closure $mandates;
 
   /**
    * @param (\Closure():PromotionApiController)|null $promotion
@@ -126,8 +135,9 @@ final class CommercialActionRouter
    * @param (\Closure():CommercialCallsApiController)|null $calls
    * @param (\Closure():CommercialQuotesApiController)|null $quotes
    * @param (\Closure():CommercialStudiesApiController)|null $studies
+   * @param (\Closure():CommercialMandatesApiController)|null $mandates
    */
-  public function __construct(CommercialApiController $controller, ?\Closure $promotion = null, ?\Closure $strategy = null, ?\Closure $campaigns = null, ?\Closure $reports = null, ?\Closure $calls = null, ?\Closure $quotes = null, ?\Closure $studies = null)
+  public function __construct(CommercialApiController $controller, ?\Closure $promotion = null, ?\Closure $strategy = null, ?\Closure $campaigns = null, ?\Closure $reports = null, ?\Closure $calls = null, ?\Closure $quotes = null, ?\Closure $studies = null, ?\Closure $mandates = null)
   {
     $this->controller = $controller;
     $this->promotion = $promotion;
@@ -137,6 +147,7 @@ final class CommercialActionRouter
     $this->calls = $calls;
     $this->quotes = $quotes;
     $this->studies = $studies;
+    $this->mandates = $mandates;
   }
 
   /** @param array<string,mixed> $input */
@@ -184,6 +195,12 @@ final class CommercialActionRouter
       }
       $target = ($this->studies)();
       $method = self::STUDY_ACTIONS[$action];
+    } elseif (isset(self::MANDATE_ACTIONS[$action])) {
+      if ($this->mandates === null) {
+        return false;
+      }
+      $target = ($this->mandates)();
+      $method = self::MANDATE_ACTIONS[$action];
     } else {
       $target = $this->controller;
       $method = self::controllerMethod($action);

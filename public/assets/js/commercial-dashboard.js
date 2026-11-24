@@ -626,7 +626,7 @@
     if (["enviar_notificaciones", "campanas", "plantillas_correo"].indexOf(tab) >= 0) return "notificaciones";
     if (["mis_reportes", "reportes_consolidado", "cuentas_cobro"].indexOf(tab) >= 0) return "reportes_comerciales";
     // Tareas, llamadas, precaptación, avisos y actualizaciones van dentro del menú Actividades comerciales.
-    return ["abiertos", "postergados", "cerrados", "mis_tickets", "llamadas", "precaptacion", "cotizaciones", "estudios", "anadir_aviso", "actualizaciones", "avisos"].indexOf(tab) >= 0 ? "comerciales" : tab;
+    return ["abiertos", "postergados", "cerrados", "mis_tickets", "llamadas", "precaptacion", "cotizaciones", "estudios", "mandatos", "anadir_aviso", "actualizaciones", "avisos"].indexOf(tab) >= 0 ? "comerciales" : tab;
   }
 
   function setActiveTab(tab) {

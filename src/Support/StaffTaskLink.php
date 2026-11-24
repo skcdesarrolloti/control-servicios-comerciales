@@ -22,7 +22,7 @@ final class StaffTaskLink
   public const TTL = 30 * 86400;
   private const EMPLOYEE = '[0-9A-Za-z_-]{1,40}';
   /** Lo único que se conserva al pasar por el login (?next=): nunca una dirección completa. */
-  private const NEXT_KEYS = ['tab', 'ticket_id', 'abrir_tarea'];
+  private const NEXT_KEYS = ['tab', 'ticket_id', 'abrir_tarea', 'abrir_mandato'];
 
   /** Referencia firmada que ata la tarea al funcionario; sin id_empleado válido queda el número de la tarea. */
   public static function reference(int $id, string $employeeId, ?int $expires = null): string

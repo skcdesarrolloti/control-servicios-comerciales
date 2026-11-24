@@ -17,6 +17,7 @@ final class CommercialAccessPolicy
     'precaptacion' => 'Precaptación',
     'cotizaciones' => 'Cotizaciones de inmuebles',
     'estudios' => 'Estudios de aseguradora',
+    'mandatos' => 'Contratos de mandato',
     'anadir_aviso' => 'Añadir aviso',
     'inmuebles' => 'Inmuebles',
     'abiertos' => 'Tareas abiertas',
@@ -53,6 +54,8 @@ final class CommercialAccessPolicy
     'estudio_crear' => 'Estudios de aseguradora: crear y editar desde una tarea',
     'estudio_responder' => 'Estudios de aseguradora: registrar la respuesta (aprobar crea el caso de entrega y el contrato por entregar)',
     'estudio_desistir' => 'Estudios de aseguradora: desistir el negocio de un estudio aprobado',
+    'mandato_enviar_revision' => 'Mandatos: enviar el contrato al propietario para que lo revise antes de la firma',
+    'mandato_responder_observaciones' => 'Mandatos: responder y marcar resueltas las observaciones del propietario',
     'precaptacion_crear' => 'Registrar precaptaciones',
     'precaptacion_editar' => 'Editar resultados de precaptación',
     'precaptacion_ticket' => 'Crear tarea desde precaptación',
@@ -148,7 +151,7 @@ final class CommercialAccessPolicy
   /** Grupos del menú del encabezado, en el mismo orden, para la configuración de accesos. */
   public const VIEW_GROUPS = [
     'General' => ['inicio', 'calendario'],
-    'Actividades comerciales' => ['llamadas', 'precaptacion', 'cotizaciones', 'estudios', 'anadir_aviso', 'actualizaciones', 'avisos', 'abiertos', 'mis_tickets', 'postergados', 'cerrados', 'reportes_comerciales'],
+    'Actividades comerciales' => ['llamadas', 'precaptacion', 'cotizaciones', 'estudios', 'mandatos', 'anadir_aviso', 'actualizaciones', 'avisos', 'abiertos', 'mis_tickets', 'postergados', 'cerrados', 'reportes_comerciales'],
     'Inventario' => ['inmuebles'],
     'Promoción' => ['promocion'],
     'Comunicación y herramientas' => ['notificaciones', 'herramientas'],
@@ -165,6 +168,7 @@ final class CommercialAccessPolicy
     'precaptacion' => ['Solo sus precaptaciones', 'Precaptaciones de todo el equipo'],
     'cotizaciones' => ['Solo sus cotizaciones', 'Cotizaciones de todo el equipo'],
     'estudios' => ['Solo sus estudios', 'Estudios de todo el equipo'],
+    'mandatos' => ['Solo sus mandatos', 'Mandatos de todo el equipo'],
     'actualizaciones' => ['Solo sus inmuebles', 'Inmuebles de todo el equipo'],
     'avisos' => ['Solo sus avisos', 'Avisos de todo el equipo'],
     'abiertos' => ['Solo sus tareas', 'Tareas de todo el equipo'],
