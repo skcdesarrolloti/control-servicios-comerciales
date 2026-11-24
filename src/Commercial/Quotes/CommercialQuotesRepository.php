@@ -18,6 +18,27 @@ final class CommercialQuotesRepository
   public const TABLE = 'jet_cct_cotizacion_inmuebles';
   /** Estados con los que un inmueble se puede cotizar. */
   public const PUBLIC_STATES = ['Publico', 'Publicado'];
+  /**
+   * TEMPORAL (pruebas de cotizaciones, 2026-11-24): los inmuebles de prueba "Inmuebles para pruebas #1-#3" se pueden
+   * cotizar también en borrador. Quitar esta lista (y su uso en quotableSql/isQuotable) cuando terminen las pruebas.
+   */
+  public const TEST_DRAFT_CODES = ['84016', '152715', '152716'];
+
+  /** Si el inmueble se puede cotizar: público o, temporalmente, uno de los de prueba en borrador. @param array<string,mixed> $row */
+  public static function isQuotable(array $row): bool
+  {
+    $state = trim((string) ($row['estado'] ?? ''));
+    return in_array($state, self::PUBLIC_STATES, true)
+      || ($state === 'En borrador' && in_array(trim((string) ($row['codigo'] ?? '')), self::TEST_DRAFT_CODES, true));
+  }
+
+  /** Condición SQL de isQuotable sobre la columna de estado y de código dadas. @return array{0:string,1:list<string>} */
+  private static function quotableSql(string $estado, string $codigo): array
+  {
+    $in = implode(',', array_fill(0, count(self::PUBLIC_STATES), '?'));
+    $test = implode(',', array_fill(0, count(self::TEST_DRAFT_CODES), '?'));
+    return ["(TRIM({$estado}) IN ({$in}) OR (TRIM({$estado}) = 'En borrador' AND CAST({$codigo} AS CHAR) IN ({$test})))", array_merge(self::PUBLIC_STATES, self::TEST_DRAFT_CODES)];
+  }
   /** Inmuebles que se leen para elegir: los públicos más recientes. */
   private const CANDIDATE_LIMIT = 1500;
 
@@ -43,9 +64,8 @@ final class CommercialQuotesRepository
    */
   public function candidates(array $filters): array
   {
-    $in = implode(',', array_fill(0, count(self::PUBLIC_STATES), '?'));
-    $where = ["TRIM(i.`estado`) IN ({$in})"];
-    $args = self::PUBLIC_STATES;
+    [$quotable, $args] = self::quotableSql('i.`estado`', 'i.`codigo`');
+    $where = [$quotable];
     $q = trim($filters['q'] ?? '');
     if ($q !== '') {
       $like = '%' . $q . '%';
@@ -80,13 +100,13 @@ final class CommercialQuotesRepository
    */
   public function options(): array
   {
-    $in = implode(',', array_fill(0, count(self::PUBLIC_STATES), '?'));
+    [$quotable, $quotableArgs] = self::quotableSql('`estado`', '`codigo`');
     $table = $this->db->table('jet_cct_inmuebles');
     $out = [];
     foreach (['tipo_inmueble' => 'tipos_inmueble', 'barrio' => 'barrios', 'ciudad' => 'ciudades'] as $column => $key) {
       $values = array_values(array_filter(array_map(static fn($value): string => trim((string) $value), $this->db->getCol(
-        "SELECT DISTINCT TRIM(`{$column}`) FROM `{$table}` WHERE TRIM(`estado`) IN ({$in}) AND TRIM(COALESCE(`{$column}`, '')) <> ''",
-        self::PUBLIC_STATES
+        "SELECT DISTINCT TRIM(`{$column}`) FROM `{$table}` WHERE {$quotable} AND TRIM(COALESCE(`{$column}`, '')) <> ''",
+        $quotableArgs
       )), static fn(string $value): bool => $value !== ''));
       natcasesort($values);
       $out[$key] = array_values(array_unique($values));

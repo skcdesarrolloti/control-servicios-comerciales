@@ -235,7 +235,7 @@ final class CommercialQuotesService
     }
     foreach ($rows as $row) {
       $code = trim((string) $row['codigo']);
-      if (!in_array(trim((string) ($row['estado'] ?? '')), CommercialQuotesRepository::PUBLIC_STATES, true)) {
+      if (!CommercialQuotesRepository::isQuotable($row)) {
         throw new \InvalidArgumentException('El inmueble ' . $code . ' no está público y no se puede cotizar.');
       }
       if (PropertyUpdateState::evaluate($row, $this->limits())['status'] === 'vencido') {
@@ -454,7 +454,7 @@ final class CommercialQuotesService
         'descripcion' => trim(strip_tags((string) ($row['descripcion'] ?? ''))),
         'copropiedad' => trim((string) ($row['copropiedad'] ?? '')),
         'video' => self::safeUrl((string) ($row['video'] ?? '')),
-        'disponible' => in_array(trim((string) ($row['estado'] ?? '')), CommercialQuotesRepository::PUBLIC_STATES, true),
+        'disponible' => CommercialQuotesRepository::isQuotable($row),
         'url_portal' => self::portalUrl($code),
       ];
     }
