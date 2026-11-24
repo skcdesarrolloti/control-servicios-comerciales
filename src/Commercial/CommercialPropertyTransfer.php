@@ -13,8 +13,8 @@ use SCM\Support\SchemaInspector;
  *  - meta del post del inmueble: id_empleado, empleado, email-empleado y celular-empleado;
  *  - CCT de inmuebles: id_funcionario y funcionario;
  *  - relación JetEngine 941 (funcionario → inmueble) en modo "append", como el formulario;
- *  - historial del inmueble "Traslado";
- *  - panel_inmueble de la base panelapi (id_consultor y consultor), si su conexión está en el .env (PANELAPI_DB_*).
+ *  - historial del inmueble "Traslado".
+ * La actualización de panel_inmueble (base panelapi) del hook ya no se usa y no se hace.
  */
 final class CommercialPropertyTransfer
 {
@@ -22,20 +22,9 @@ final class CommercialPropertyTransfer
 
   private Database $db;
   private SchemaInspector $schema;
-  /** @var array{host?:string,port?:int,name?:string,user?:string,pass?:string} */
-  private array $panelApi;
-  /** @var (\Closure(string,string,string):bool)|null */
-  private ?\Closure $panelApiWriter;
-
-  /**
-   * @param array{host?:string,port?:int,name?:string,user?:string,pass?:string} $panelApi
-   * @param (\Closure(string,string,string):bool)|null $panelApiWriter Para pruebas: reemplaza la escritura en panelapi.
-   */
-  public function __construct(Database $db, array $panelApi = [], ?\Closure $panelApiWriter = null, ?SchemaInspector $schema = null)
+  public function __construct(Database $db, ?SchemaInspector $schema = null)
   {
     $this->db = $db;
-    $this->panelApi = $panelApi;
-    $this->panelApiWriter = $panelApiWriter;
     $this->schema = $schema ?? new SchemaInspector($db);
   }
 
@@ -61,7 +50,7 @@ final class CommercialPropertyTransfer
 
   /**
    * @param string|null $ownerEmployeeId Si no es null, solo se transfieren los inmuebles de esa persona.
-   * @return array{ok:bool,message:string,funcionario?:string,panelapi?:bool}
+   * @return array{ok:bool,message:string,funcionario?:string}
    */
   public function transfer(string $code, string $targetEmployeeId, string $actorEmployeeId, ?string $ownerEmployeeId = null): array
   {
@@ -131,8 +120,7 @@ final class CommercialPropertyTransfer
       throw $error;
     }
 
-    $synced = $this->syncPanelApi($propertyCode, $targetEmployeeId, $name);
-    return ['ok' => true, 'message' => 'El inmueble #' . $propertyCode . ' quedó asignado a ' . $name . '.', 'funcionario' => $name, 'panelapi' => $synced];
+    return ['ok' => true, 'message' => 'El inmueble #' . $propertyCode . ' quedó asignado a ' . $name . '.', 'funcionario' => $name];
   }
 
   private function setPostMeta(int $postId, string $key, string $value): void
@@ -146,24 +134,4 @@ final class CommercialPropertyTransfer
     }
   }
 
-  /** panel_inmueble de panelapi, como el hook del formulario. Si falla, el traslado ya quedó hecho: solo se registra. */
-  private function syncPanelApi(string $code, string $employeeId, string $name): bool
-  {
-    if ($this->panelApiWriter !== null) {
-      return ($this->panelApiWriter)($code, $employeeId, $name);
-    }
-    $host = trim((string) ($this->panelApi['host'] ?? ''));
-    $database = trim((string) ($this->panelApi['name'] ?? ''));
-    if ($host === '' || $database === '') {
-      return false;
-    }
-    try {
-      $pdo = new \PDO('mysql:host=' . $host . ';port=' . (int) ($this->panelApi['port'] ?? 3306) . ';dbname=' . $database . ';charset=utf8mb4', (string) ($this->panelApi['user'] ?? ''), (string) ($this->panelApi['pass'] ?? ''), [\PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION, \PDO::ATTR_TIMEOUT => 5]);
-      $pdo->prepare('UPDATE panel_inmueble SET id_consultor = ?, consultor = ? WHERE codigo = ?')->execute([$employeeId, $name, $code]);
-      return true;
-    } catch (\Throwable $error) {
-      error_log('[commercial-property-transfer] No se pudo actualizar panelapi para el inmueble ' . $code . ': ' . $error->getMessage());
-      return false;
-    }
-  }
 }

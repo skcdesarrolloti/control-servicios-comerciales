@@ -31,15 +31,6 @@ return [
   'db_prefix' => $env('DB_PREFIX', 'wp_'),
   'db_charset' => $env('DB_CHARSET', 'utf8mb4'),
 
-  // Base externa panelapi (panel_inmueble): Inmuebles › Transferir actualiza id_consultor y consultor, como el hook
-  // transferir-codigo-inmueble del formulario. Sin PANELAPI_DB_HOST no se actualiza.
-  'panelapi' => [
-    'host' => $env('PANELAPI_DB_HOST', ''),
-    'port' => (int) $env('PANELAPI_DB_PORT', '3306'),
-    'name' => $env('PANELAPI_DB_DATABASE', ''),
-    'user' => $env('PANELAPI_DB_USERNAME', ''),
-    'pass' => $env('PANELAPI_DB_PASSWORD', ''),
-  ],
 
   'sla_risk_days' => (int) $env('SLA_RISK_DAYS', '8'),
   'sla_overdue_days' => (int) $env('SLA_OVERDUE_DAYS', '15'),

@@ -91,17 +91,10 @@ final class CommercialPropertyHistoryTransferTest extends TestCase
 
   public function testTransferUpdatesThePostTypeTheCctTheRelationAndTheHistory(): void
   {
-    $calls = [];
-    $transfer = new CommercialPropertyTransfer($this->db, [], static function (string $code, string $id, string $name) use (&$calls): bool {
-      $calls[] = [$code, $id, $name];
-      return true;
-    });
-
-    $result = $transfer->transfer('96957', '901', '999');
+    $result = (new CommercialPropertyTransfer($this->db))->transfer('96957', '901', '999');
 
     self::assertTrue($result['ok']);
-    self::assertTrue($result['panelapi']);
-    self::assertSame([['96957', '901', 'Royner Guardo']], $calls, 'panel_inmueble recibe el nuevo consultor.');
+    self::assertSame('Royner Guardo', $result['funcionario']);
     $meta = array_column($this->db->getResults("SELECT meta_key, meta_value FROM wp_postmeta WHERE post_id = 96957"), 'meta_value', 'meta_key');
     self::assertSame(['id_empleado' => '901', 'empleado' => 'Royner Guardo', 'email-empleado' => 'f901@example.test', 'celular-empleado' => '300000901'], $meta);
     self::assertSame('1', (string) $this->db->getVar("SELECT COUNT(*) FROM wp_postmeta WHERE post_id = 96957 AND meta_key = 'id_empleado'"), 'Actualiza el meta, no lo duplica.');
@@ -114,7 +107,7 @@ final class CommercialPropertyHistoryTransferTest extends TestCase
 
   public function testTransferRejectsTheSamePersonUnknownPeopleAndOtherPeoplesProperties(): void
   {
-    $transfer = new CommercialPropertyTransfer($this->db, [], static fn(): bool => true);
+    $transfer = new CommercialPropertyTransfer($this->db);
     self::assertFalse($transfer->transfer('96957', '900', '999')['ok']);
     self::assertFalse($transfer->transfer('96957', '777', '999')['ok']);
     self::assertFalse($transfer->transfer('96957', '', '999')['ok']);
@@ -124,12 +117,6 @@ final class CommercialPropertyHistoryTransferTest extends TestCase
     self::assertSame('0', (string) $this->db->getVar("SELECT COUNT(*) FROM wp_jet_cct_historial_del_inmueble WHERE tipo_reporte = 'Traslado'"));
   }
 
-  public function testWithoutPanelApiConfigTheTransferStillHappens(): void
-  {
-    $result = (new CommercialPropertyTransfer($this->db))->transfer('96957', '901', '999');
-    self::assertTrue($result['ok']);
-    self::assertFalse($result['panelapi']);
-  }
 
   public function testTheTransferListOnlyHasActiveEmployees(): void
   {

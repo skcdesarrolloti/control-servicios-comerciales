@@ -1781,7 +1781,7 @@ final class CommercialApiController
 
   private function propertyTransferService(): \SCM\Commercial\CommercialPropertyTransfer
   {
-    return new \SCM\Commercial\CommercialPropertyTransfer($this->db, is_array($this->config['panelapi'] ?? null) ? $this->config['panelapi'] : []);
+    return new \SCM\Commercial\CommercialPropertyTransfer($this->db);
   }
 
   /** @param array<string,mixed> $input */
