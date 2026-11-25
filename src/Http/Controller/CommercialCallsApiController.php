@@ -88,6 +88,15 @@ final class CommercialCallsApiController
   }
 
   /** @param array<string,mixed> $input */
+  public function property(array $input): never
+  {
+    $this->guarded($input, function () use ($input): array {
+      $text = static fn(string $key): string => is_scalar($input[$key] ?? null) ? mb_substr(trim((string) $input[$key]), 0, 40) : '';
+      return $this->service->property($text('codigo'), $text('tema'));
+    });
+  }
+
+  /** @param array<string,mixed> $input */
   public function card(array $input): never
   {
     $this->guarded($input, function () use ($input): array {

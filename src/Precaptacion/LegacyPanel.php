@@ -106,9 +106,9 @@ final class LegacyPanel
         >
             <header class="precap-heading">
                 <div class="precap-heading-copy">
-                    <nav class="precap-breadcrumb" aria-label="Ruta de navegación">Gestión Inmobiliaria <span>›</span> Captaciones &amp; Oportunidades <span>›</span> <strong><?php echo 'Precaptaciones'; ?></strong></nav>
-                    <h1><?php echo 'Precaptaciones'; ?></h1>
-                    <p>Registra oportunidades de prospección en campo, valida avisos exteriores, depura duplicados y gestiona resultados para asignación de tareas comerciales.</p>
+                    <nav class="precap-breadcrumb" aria-label="Ruta de navegación">Gestión Inmobiliaria <span>›</span> Captaciones &amp; Oportunidades <span>›</span> <strong><?php echo $is_control ? 'Precaptaciones' : 'Mis precaptaciones'; ?></strong></nav>
+                    <h1><?php echo $is_control ? 'Precaptaciones' : 'Mis precaptaciones'; ?></h1>
+                    <p><?php if (!$is_control) : ?>Solo las precaptaciones que tienes a cargo. <?php endif; ?>Registra oportunidades de prospección en campo, valida avisos exteriores, depura duplicados y gestiona resultados para asignación de tareas comerciales.</p>
                 </div>
                 <div class="precap-heading-actions">
                     <button type="button" class="precap-export" data-precap-export>↓ Exportar CSV</button>
@@ -1760,18 +1760,18 @@ final class LegacyPanel
         $where = ['1=1'];
         $values = [];
 
+        // Lo de una persona va exacto por su id_empleado (texto, sin pasarlo a número) y, si no se sabe quién es, no se ve nada.
         if (!$is_control) {
-            $employee_col = self::first_existing_column($table, ['id_empleado', 'cct_author_id', 'captador_precat']);
-            if ($employee_col) {
-                $where[] = 'COALESCE(' . Module::workflow()->expression($table, 'responsible_id') . ", {$employee_col}) = %s";
-                $values[] = (string) get_current_user_id();
+            $me = trim(\SCM\Core\Auth::employeeId());
+            if ($me === '') {
+                $where[] = '1=0';
+            } else {
+                $where[] = self::responsible_expression($table) . ' = %s';
+                $values[] = $me;
             }
         } elseif ($filters['funcionario'] !== '') {
-            $employee_col = self::first_existing_column($table, ['id_empleado', 'cct_author_id', 'captador_precat']);
-            if ($employee_col) {
-                $where[] = 'COALESCE(' . Module::workflow()->expression($table, 'responsible_id') . ", {$employee_col}) = %s";
-                $values[] = $filters['funcionario'];
-            }
+            $where[] = self::responsible_expression($table) . ' = %s';
+            $values[] = $filters['funcionario'];
         }
 
         $date_col = self::first_existing_column($table, ['fecha', 'cct_created', '_created']);
@@ -2135,6 +2135,16 @@ final class LegacyPanel
         $cache[$cache_key] = array_values($values);
 
         return $cache[$cache_key];
+    }
+
+    /** Responsable del registro: el del proceso y, si está vacío, quien lo registró (como Workflow::responsible). */
+    private static function responsible_expression(string $table): string
+    {
+        $parts = ["NULLIF(TRIM(" . Module::workflow()->expression($table, 'responsible_id') . "), '')"];
+        foreach (['id_empleado', 'cct_author_id', 'captador_precat'] as $candidate) {
+            if (self::first_existing_column($table, [$candidate])) $parts[] = "NULLIF(TRIM(`{$candidate}`), '')";
+        }
+        return 'COALESCE(' . implode(', ', $parts) . ", '')";
     }
 
     private static function first_existing_column(string $table, array $candidates): string

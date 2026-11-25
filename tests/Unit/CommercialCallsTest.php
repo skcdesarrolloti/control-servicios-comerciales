@@ -220,6 +220,30 @@ final class CommercialCallsTest extends TestCase
     self::assertArrayNotHasKey('medio', $data['call']);
   }
 
+  public function testRepeatRequestAlwaysDeservesTaskAndAsksForThePropertyCodeFirst(): void
+  {
+    $service = $this->service();
+    $id = $this->create();
+    $repeat = CommercialCallsView::form($service->formData(['desde_llamada' => (string) $id]), $service->options());
+    self::assertStringNotContainsString('¿Merece tarea?', $repeat);
+    self::assertStringContainsString('<input type="hidden" name="merece_ticket" value="Si">', $repeat);
+    $new = CommercialCallsView::form($service->formData([]), $service->options());
+    self::assertStringContainsString('¿Merece tarea?', $new);
+    self::assertLessThan(strpos($new, 'name="tipo_inmueble"'), strpos($new, 'name="tiene_codigo"'), 'Primero se pregunta por el código.');
+    self::assertStringContainsString('data-ccl-property-code', $new);
+  }
+
+  public function testPropertyCodeBringsTypeDestinationAndPriceFromItsLists(): void
+  {
+    $result = $this->service()->property('84016', 'Arriendo');
+    self::assertSame(['tipo_inmueble' => 'Apartamento', 'destinacion' => 'Vivienda', 'presupuesto' => '1.500.000'], $result['campos'], 'El uso que no está en su lista se deja para llenarlo a mano.');
+    self::assertStringContainsString('Laureles', $result['resumen']);
+    self::assertSame('350.000.000', $this->service()->property('84016', 'Venta')['campos']['presupuesto']);
+    self::assertSame('property', CommercialActionRouter::CALL_ACTIONS['commercial_calls_property']);
+    $this->expectException(\InvalidArgumentException::class);
+    $this->service()->property('99999', 'Arriendo');
+  }
+
   public function testDoubleClickDoesNotDuplicate(): void
   {
     $this->create();

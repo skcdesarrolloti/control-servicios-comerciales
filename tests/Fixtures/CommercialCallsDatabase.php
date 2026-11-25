@@ -26,6 +26,7 @@ final class CommercialCallsDatabase
     'jet_cct_cct_llamadas' => ['id_ticket', 'id_inmueble', 'id_empleado', 'sucursal', 'merece_ticket', 'cliente', 'celular', 'email', 'tipo_inmueble', 'medio', 'presupuesto', 'destinacion', 'uso', 'factores_importantes', 'precio', 'tema_ayuda', 'observacion', 'descripcion', 'id_pph', 'tarjeta_pph', 'nombre_pph', 'celular_wsp', 'id_cliente', 'indicativo', 'cliente_inmediato', 'mes_inmueble', 'comisionista', 'usuario_wsp'],
     'jet_cct_tickets' => ['id_creador', 'id_cliente', 'id_inmueble', 'nombre_empleado', 'correo_empleado', 'celular_empleado', 'asunto', 'descripcion', 'empleado', 'prioridad', 'tema_ayuda', 'departamento', 'estado', 'estado_comercial', 'medio', 'tipo_inmueble', 'destinacion', 'uso', 'factores', 'presupuesto', 'precio', 'solicitante', 'correo_solicitante', 'celular_solicitante', 'sucursal', 'id_empleado', 'id_llamada', 'id_solicitante', 'tuvo_seguimiento', 'tuvo_reporte', 'id_pph', 'tarjeta_pph', 'nombre_pph', 'bandera', 'celular_wsp', 'indicativo', 'creador_por', 'usuario_wsp'],
     'jet_cct_historial_del_ticket' => ['id_ticket', 'nombre', 'correo', 'celular', 'respuesta', 'id_empleado', 'fue_editada', 'imagen', 'archivos'],
+    'jet_cct_inmuebles' => ['codigo', 'tipo_inmueble', 'destinacion', 'uso', 'precio_arriendo', 'precio_venta', 'barrio', 'ciudad', 'estado'],
     'jet_cct_historial_del_inmueble' => ['reporte_realizado_por_his', 'fecha_his', 'id_del_inmueble_his', 'observacion_his', 'id_inmueble', 'funcionario', 'observacion', 'id_empleado', 'id_ticket', 'tipo_de_reporte_his', 'tipo_reporte'],
   ];
 
@@ -48,6 +49,7 @@ final class CommercialCallsDatabase
     $db->insert('wp_jet_cct_sucursales', ['_ID' => 1, 'nombre' => 'Principal', 'gerente_comercial' => 'Gerencia Comercial', 'celular_ge_comercial' => '3009999999']);
     $db->insert('wp_jet_cct_cargos', ['_ID' => 9, 'nombre_cargo' => 'Consultor']);
     $db->insert('wp_jet_cct_paises', ['pais' => 'Colombia', 'codigo' => '57']);
+    $db->insert('wp_jet_cct_inmuebles', ['codigo' => '84016', 'tipo_inmueble' => 'apartamento', 'destinacion' => 'Vivienda', 'uso' => 'Otro uso', 'precio_arriendo' => '1500000', 'precio_venta' => '350000000', 'barrio' => 'Laureles', 'ciudad' => 'Medellín', 'estado' => 'Publicado']);
     foreach ([['Aliada Uno', 'TAR-1', 'Si'], ['Aliado Inactivo', 'TAR-2', 'No'], ['Repetido A', 'TAR-3', 'Si'], ['Repetido B', 'TAR-3', 'Si']] as [$name, $card, $active]) {
       $db->insert('wp_jet_cct_club_pph', ['nombre' => $name, 'tarjeta_bienvenida' => $card, 'activo' => $active, 'total_puntos' => '0']);
     }

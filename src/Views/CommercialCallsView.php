@@ -216,6 +216,10 @@ final class CommercialCallsView
     }
     $money = 'inputmode="numeric" autocomplete="off" data-ccl-money';
     $employees = array_map(static fn(array $employee): array => ['value' => (string) $employee['id'], 'label' => (string) $employee['name']], $options['funcionarios']);
+    // Una solicitud nueva de un contacto conocido siempre lleva tarea: no se pregunta.
+    $merit = $mode === 'repeat'
+      ? '<input type="hidden" name="merece_ticket" value="Si"><p class="ccl-hint ccl-wide">Al guardar se abre su tarea para la persona asignada.</p>'
+      : self::selectField('merece_ticket', '¿Merece tarea?', $yesNo, '', true);
     return $html
       . '<h3>Tipo de cliente</h3><div class="ccl-grid">'
       . self::selectField('comisionista', '¿Es comisionista?', $yesNo, '', true)
@@ -225,17 +229,21 @@ final class CommercialCallsView
       . '<h3>Solicitud</h3><div class="ccl-grid">'
       . self::input('fecha', 'Fecha', (new \DateTimeImmutable('now', new \DateTimeZone('America/Bogota')))->format('Y-m-d'), 'date', true)
       . self::selectField('tema_ayuda', 'Motivo', $options['temas'], '', true)
+      . '<div data-ccl-topic-field="codigo" hidden>' . self::selectField('tiene_codigo', '¿Pregunta por un inmueble con código?', $yesNo, '', false) . '</div>'
+      . '<div data-ccl-code-field hidden>' . self::input('id_inmueble', 'Código del inmueble', '', 'text', false, 'inputmode="numeric" data-ccl-property-code') . '</div>'
+      . '</div>'
+      . '<p class="ccl-hint" data-ccl-property-result role="status" hidden></p>'
+      . '<div class="ccl-grid">'
       . self::selectField('tipo_inmueble', 'Tipo de inmueble', $options['tipos'], '', false)
       . self::selectField('destinacion', 'Destinación', $options['destinaciones'], '', false)
       . self::selectField('uso', 'Uso', $options['usos'], '', false)
-      . '<div data-ccl-topic-field="codigo" hidden>' . self::input('id_inmueble', 'Código del inmueble', '', 'text', false, 'inputmode="numeric"') . '</div>'
       . '<div data-ccl-topic-field="presupuesto" hidden>' . self::input('presupuesto', 'Presupuesto', '', 'text', false, $money) . '</div>'
       . '<div data-ccl-topic-field="precio" hidden>' . self::input('precio', 'Precio', '', 'text', false, $money) . '</div>'
       . '</div>'
       . self::checks('factores_importantes', 'Factores importantes', $options['factores'], $data['factores'])
       . '<label class="ccl-field"><span>Descripción</span><textarea name="descripcion" rows="3"></textarea></label>'
       . '<h3>Asignación</h3><div class="ccl-grid">'
-      . self::selectField('merece_ticket', '¿Merece tarea?', $yesNo, '', true)
+      . $merit
       . self::pairField('id_empleado', 'Asignar a', $employees, $v('id_empleado'), true)
       . '</div></div><footer class="ccl-modal-foot"><button type="button" class="ccl-secondary" data-ccl-close>Cancelar</button><button type="submit" class="ccl-primary">Guardar llamada</button></footer></form>';
   }
@@ -264,7 +272,7 @@ final class CommercialCallsView
       . '</div><h3>Tarea</h3><div class="ccl-grid">'
       . self::selectField('prioridad', 'Prioridad', $options['prioridades'], 'Prioridad comercial', true)
       . self::selectField('tema_ayuda', 'Tema', $options['temas'], $topic, true)
-      . '<div data-ccl-topic-field="codigo" hidden>' . self::input('id_inmueble', 'Código del inmueble', $v('id_inmueble'), 'text', false, 'inputmode="numeric"') . '</div>'
+      . '<div data-ccl-topic-field="codigo" hidden>' . self::input('id_inmueble', 'Código del inmueble', $v('id_inmueble'), 'text', false, 'inputmode="numeric" data-ccl-property-code') . '<p class="ccl-hint" data-ccl-property-result role="status" hidden></p></div>'
       . self::selectField('tipo_inmueble', 'Tipo de inmueble', $options['tipos'], $v('tipo_inmueble'), false)
       . self::selectField('destinacion', 'Destinación', $options['destinaciones'], $v('destinacion'), false)
       . self::selectField('uso', 'Uso', $options['usos'], $v('uso'), false)

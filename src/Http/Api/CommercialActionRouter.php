@@ -79,6 +79,7 @@ final class CommercialActionRouter
     'commercial_calls_task_save' => 'taskSave',
     'commercial_calls_history' => 'history',
     'commercial_calls_card' => 'card',
+    'commercial_calls_property' => 'property',
   ];
 
   /** Cotizaciones de inmuebles (popup de la tarea y Actividades comerciales › Cotizaciones): CommercialQuotesApiController. */

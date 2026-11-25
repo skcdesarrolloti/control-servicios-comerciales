@@ -379,6 +379,47 @@ final class CommercialCallsService
   }
 
   /**
+   * Datos de un inmueble por su código para llenar la solicitud: tipo, destinación y uso (solo si están en sus listas,
+   * porque al guardar se validan contra el glosario) y el precio según el motivo.
+   * @return array{codigo:string,campos:array<string,string>,resumen:string}
+   */
+  public function property(string $code, string $topic): array
+  {
+    if (!$this->policy->canAct('llamadas_crear') && !$this->policy->canAct('llamadas_tarea')) {
+      throw new \RuntimeException('No tienes permiso para consultar inmuebles.');
+    }
+    $code = (string) (int) trim($code);
+    $row = $code === '0' ? null : $this->db->getRow('SELECT * FROM `' . $this->db->table('jet_cct_inmuebles') . '` WHERE CAST(`codigo` AS CHAR) = ? ORDER BY `_ID` DESC LIMIT 1', [$code]);
+    if (!is_array($row)) {
+      throw new \InvalidArgumentException('No encontramos el inmueble ' . $code . '. Revisa el código o llena los datos a mano.');
+    }
+    $v = static fn(string $key): string => trim((string) ($row[$key] ?? ''));
+    $options = $this->options();
+    $match = static function (string $value, array $allowed): string {
+      foreach ($allowed as $option) {
+        if (MedioResolver::key((string) $option) === MedioResolver::key($value)) {
+          return (string) $option;
+        }
+      }
+      return '';
+    };
+    $fields = [
+      'tipo_inmueble' => $match($v('tipo_inmueble'), $options['tipos']),
+      'destinacion' => $match($v('destinacion'), $options['destinaciones']),
+      'uso' => $match($v('uso'), $options['usos']),
+    ];
+    $rent = self::amount($v('precio_arriendo'));
+    $sale = self::amount($v('precio_venta'));
+    $price = $topic === 'Venta' ? $sale : ($topic === 'Arriendo' ? $rent : ($rent !== '' && $rent !== '0' ? $rent : $sale));
+    if ($price !== '' && $price !== '0') {
+      $fields['presupuesto'] = self::money($price);
+    }
+    $place = implode(', ', array_filter([$v('barrio'), $v('ciudad')]));
+    $summary = trim(($fields['tipo_inmueble'] ?: ($v('tipo_inmueble') ?: 'Inmueble')) . ' ' . $code . ($place !== '' ? ' · ' . $place : '') . ($v('estado') !== '' ? ' · ' . $v('estado') : ''));
+    return ['codigo' => $code, 'campos' => array_filter($fields, static fn(string $value): bool => $value !== ''), 'resumen' => $summary];
+  }
+
+  /**
    * Datos para el formulario de la tarea.
    * @return array<string,mixed>
    */

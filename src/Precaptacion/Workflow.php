@@ -32,7 +32,14 @@ final class Workflow
         if (!array_key_exists($id, $this->processes)) $this->processes[$id] = $this->db->getRow('SELECT * FROM `' . $this->table() . '` WHERE precaptacion_id = ?', [$id]);
         return $this->processes[$id];
     }
-    public function responsible(array $row): string { return (string) ($this->get((int) ($row['_ID'] ?? 0))['responsible_id'] ?? $row['id_empleado'] ?? $row['cct_author_id'] ?? ''); }
+    /** El responsable del proceso; si quedó vacío, quien registró la precaptación. */
+    public function responsible(array $row): string
+    {
+        foreach ([$this->get((int) ($row['_ID'] ?? 0))['responsible_id'] ?? '', $row['id_empleado'] ?? '', $row['cct_author_id'] ?? ''] as $candidate) {
+            if (trim((string) $candidate) !== '') return trim((string) $candidate);
+        }
+        return '';
+    }
     public function expression(string $table, string $field): string
     {
         if (!in_array($field, ['status','responsible_id'], true)) throw new \InvalidArgumentException('Campo de proceso inválido.');
@@ -44,7 +51,7 @@ final class Workflow
         $id = (int) $row['_ID'];
         $process = $this->get($id);
         if ($process) return $process;
-        $process = ['precaptacion_id'=>$id,'responsible_id'=>(string) ($row['id_empleado'] ?? $row['cct_author_id'] ?? ''),
+        $process = ['precaptacion_id'=>$id,'responsible_id'=>$this->responsible($row),
             'status'=>$this->status($row),'cycle'=>1,'attempts'=>0,'unanswered'=>0,'closure_reason'=>null,'task_id'=>null,'updated_at'=>date('Y-m-d H:i:s')];
         $this->db->insert($this->table(), $process);
         $this->processes[$id] = $process;
@@ -175,7 +182,7 @@ final class Workflow
         $table = $this->db->table('jet_cct_precaptaciones');
         $adapter = new DatabaseAdapter($this->db);
         if (!$adapter->get_var($adapter->prepare('SHOW TABLES LIKE %s', $table))) return ['available'=>false];
-        $scope = $employee !== '' ? ' WHERE COALESCE(NULLIF(w.responsible_id,\'\'), p.id_empleado) = ?' : '';
+        $scope = $employee !== '' ? ' WHERE COALESCE(NULLIF(TRIM(w.responsible_id),\'\'), NULLIF(TRIM(p.id_empleado),\'\'), NULLIF(TRIM(p.cct_author_id),\'\')) = ?' : '';
         $columns = $adapter->get_col('DESCRIBE ' . $table);
         $ids = [];
         foreach (['id_ticket_asignado','ticket_asignado','id_ticket','ticket','numero_de_ticket'] as $field) if (in_array($field, $columns, true)) $ids[] = "NULLIF(NULLIF(p.`{$field}`, ''), '0')";

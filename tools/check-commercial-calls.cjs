@@ -43,18 +43,19 @@ async function fillCall(modal, values) {
     assert.ok(await modal.locator('[data-ccl-pph]').isHidden());
     await modal.locator('[type="submit"]').click();
     assert.ok(await modal.locator('[data-ccl-form]').isVisible(), 'No debe guardar con campos vacíos');
-    await fillCall(modal, { celular: '3001234567', cliente: 'Laura Prueba', email: 'laura@example.test', indicativo: '57', medio: 'Club PPH', tema_ayuda: 'Arriendo', comisionista: 'No', cliente_inmediato: 'No', merece_ticket: 'Si', id_empleado: '101' });
+    await fillCall(modal, { celular: '3001234567', cliente: 'Laura Prueba', email: 'laura@example.test', indicativo: '57', medio: 'Club PPH', tema_ayuda: 'Arriendo', tiene_codigo: 'No', comisionista: 'No', cliente_inmediato: 'No', merece_ticket: 'Si', id_empleado: '101' });
     assert.ok(await modal.locator('[data-ccl-pph]').isVisible(), 'Club PPH debe pedir la tarjeta');
     assert.ok(await modal.locator('[data-ccl-month]').isVisible(), 'Cliente no inmediato debe pedir el mes');
     await modal.locator('[name="mes_inmueble"]').selectOption('Enero');
     assert.ok(await page.evaluate(() => document.querySelector('.ccl-modal').getBoundingClientRect().width) >= 1200, 'El popup debe ser ancho');
-    assert.ok(await modal.locator('[name="presupuesto"]').isVisible() && await modal.locator('[name="id_inmueble"]').isVisible(), 'Arriendo pide presupuesto y código');
+    assert.ok(await modal.locator('[name="presupuesto"]').isVisible() && await modal.locator('[name="tiene_codigo"]').isVisible(), 'Arriendo pide presupuesto y pregunta por el código');
+    assert.ok(await modal.locator('[name="id_inmueble"]').isHidden(), 'Sin código se llena a mano');
     assert.ok(await modal.locator('[name="precio"]').isHidden(), 'Arriendo no pide precio');
     await modal.locator('[name="presupuesto"]').pressSequentially('1500000');
     assert.equal(await modal.locator('[name="presupuesto"]').inputValue(), '1.500.000');
     await modal.locator('[name="tema_ayuda"]').selectOption('Captacion');
     assert.ok(await modal.locator('[name="precio"]').isVisible(), 'Captación pide precio');
-    assert.ok(await modal.locator('[name="presupuesto"]').isHidden() && await modal.locator('[name="id_inmueble"]').isHidden(), 'Captación no pide presupuesto ni código');
+    assert.ok(await modal.locator('[name="presupuesto"]').isHidden() && await modal.locator('[name="tiene_codigo"]').isHidden(), 'Captación no pide presupuesto ni código');
     await modal.locator('[name="tema_ayuda"]').selectOption('Arriendo');
     await modal.locator('[name="tarjeta_pph"]').fill('NO-EXISTE');
     await modal.locator('[name="tarjeta_pph"]').blur();
@@ -126,8 +127,20 @@ async function fillCall(modal, values) {
     await modal.locator('[data-ccl-form]').waitFor();
     assert.equal(await modal.locator('[name="cliente"]').inputValue(), 'Laura Prueba Editada');
     assert.equal(await modal.locator('[name="medio"]').inputValue(), '', 'La nueva solicitud elige su propio medio');
-    await fillCall(modal, { medio: 'Referido', tema_ayuda: 'Venta', comisionista: 'No', cliente_inmediato: 'Si', merece_ticket: 'No', id_empleado: '101' });
+    assert.equal(await modal.locator('select[name="merece_ticket"]').count(), 0, 'Una solicitud nueva siempre lleva tarea: no se pregunta');
+    await fillCall(modal, { medio: 'Referido', tema_ayuda: 'Venta', comisionista: 'No', cliente_inmediato: 'Si', id_empleado: '101' });
+    assert.ok(await modal.locator('[data-ccl-code-field]').isHidden(), 'El código se pide solo si lo tiene');
+    await fillCall(modal, { tiene_codigo: 'Si' });
+    await modal.locator('[name="id_inmueble"]').fill('84016');
+    await modal.locator('[name="id_inmueble"]').blur();
+    await modal.locator('[data-ccl-property-result][data-state="ok"]').waitFor();
+    assert.equal(await modal.locator('[name="tipo_inmueble"]').inputValue(), 'Apartamento', 'El código trae el tipo');
+    assert.equal(await modal.locator('[name="destinacion"]').inputValue(), 'Vivienda', 'El código trae la destinación');
+    assert.equal(await modal.locator('[name="presupuesto"]').inputValue(), '350.000.000', 'En venta trae el precio de venta');
+    await page.screenshot({ path: 'output/calls-repeat-property.png' });
     await modal.locator('[type="submit"]').click();
+    await modal.locator('[data-ccl-task-form]').waitFor();
+    await modal.locator('[data-ccl-task-form] [data-ccl-close]').first().click();
     await modal.waitFor({ state: 'hidden' });
     await page.waitForFunction(() => document.querySelectorAll('[data-ccl-row]').length === 2);
 
@@ -158,8 +171,10 @@ async function fillCall(modal, values) {
     assert.ok((await page.locator('[data-ccl-row]').innerText()).includes('Para Enero'));
     await page.locator('[data-ccl-toggle="ll_inmediato"]').click();
     await page.waitForFunction(() => document.querySelectorAll('[data-ccl-row]').length === 2);
+    // La nueva solicitud siempre merece tarea: queda pendiente hasta crearla.
     await page.locator('[data-ccl-state="pendientes"]').click();
-    await page.waitForFunction(() => document.querySelector('.ccl-empty') !== null);
+    await page.waitForFunction(() => document.querySelectorAll('[data-ccl-row]').length === 1);
+    assert.ok((await page.locator('[data-ccl-row]').innerText()).includes('Referido'));
     await page.locator('[data-ccl-state=""]').click();
     await page.waitForFunction(() => document.querySelectorAll('[data-ccl-row]').length === 2);
     await page.screenshot({ path: 'output/calls-list-desktop.png', fullPage: true });

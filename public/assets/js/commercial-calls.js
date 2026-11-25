@@ -93,6 +93,45 @@
     var offer = ["Arriendo", "Venta", "Arriendo o venta"].indexOf(topic) >= 0;
     var visible = { codigo: offer, presupuesto: offer, factores: offer, precio: topic === "Captacion" || topic === "Recaptacion" };
     form.querySelectorAll("[data-ccl-topic-field]").forEach(function (node) { node.hidden = !visible[node.getAttribute("data-ccl-topic-field")]; });
+    // Registrar llamada: primero se pregunta si tiene código; con código se traen sus datos, sin código se llenan a mano.
+    var codeBox = form.querySelector("[data-ccl-code-field]");
+    if (codeBox && form.elements.tiene_codigo) {
+      var hasCode = offer && value(form, "tiene_codigo") === "Si";
+      form.elements.tiene_codigo.required = offer;
+      form.elements.id_inmueble.required = hasCode;
+      codeBox.hidden = !hasCode;
+      if (!hasCode && form.elements.id_inmueble.value) {
+        form.elements.id_inmueble.value = "";
+        var result = form.querySelector("[data-ccl-property-result]");
+        if (result) result.hidden = true;
+      }
+    }
+  }
+  var PROPERTY_LABELS = { tipo_inmueble: "tipo", destinacion: "destinación", uso: "uso", presupuesto: "presupuesto" };
+  function lookupProperty(field) {
+    var form = field.form;
+    var box = form.querySelector("[data-ccl-property-result]");
+    var code = field.value.replace(/\D+/g, "");
+    if (!box) return;
+    if (!code) { box.hidden = true; return; }
+    box.hidden = false;
+    box.dataset.state = "";
+    box.textContent = "Buscando el inmueble " + code + "…";
+    request("commercial_calls_property", { codigo: code, tema: value(form, "tema_ayuda") }).then(function (result) {
+      if (field.value.replace(/\D+/g, "") !== code) return;
+      var filled = [];
+      Object.keys(result.campos || {}).forEach(function (name) {
+        var input = form.elements[name];
+        if (!input) return;
+        input.value = result.campos[name];
+        if (input.value === result.campos[name]) filled.push(PROPERTY_LABELS[name] || name);
+      });
+      box.textContent = result.resumen + (filled.length ? ". Se llenó " + filled.join(", ") + "; revisa y completa lo que falte." : ". No trae datos para llenar: complétalos a mano.");
+      box.dataset.state = "ok";
+    }).catch(function (error) {
+      box.textContent = error.message;
+      box.dataset.state = "error";
+    });
   }
   function syncForm() {
     var form = content() && content().querySelector("[data-ccl-form]");
@@ -252,6 +291,7 @@
     if (!form) return;
     if (event.target.name === "celular") lookupContact(form);
     if (event.target.name === "tarjeta_pph") lookupCard(form);
+    if (event.target.matches("[data-ccl-property-code]")) lookupProperty(event.target);
   });
   document.addEventListener("keydown", function (event) {
     if (event.key === "Escape" && modal() && modal().classList.contains("open") && !document.querySelector(".swal2-container")) closeModal();

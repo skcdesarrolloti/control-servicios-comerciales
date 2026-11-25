@@ -102,6 +102,25 @@ final class PrecaptacionTest extends TestCase
     self::assertStringContainsString('data-precaptaciones-precap-form', $html);
   }
 
+  public function testMyPrecaptacionesMatchTheEmployeeIdAsTextAndFallBackToTheAuthor(): void
+  {
+    // Identificaciones con ceros a la izquierda no deben convertirse a número.
+    $this->db->insert('wp_jet_cct_funcionarios', ['_ID'=>3,'id_empleado'=>'0303','nombre'=>'Consultora con cero','activo'=>'Si','id_cargo'=>'9']);
+    $this->db->insert('wp_jet_cct_precaptaciones', ['_ID'=>30,'id_empleado'=>'0303','origen'=>'Recorrido','contacto'=>'Precaptación con cero','contactado'=>'No','fecha'=>(string) time()]);
+    // Un proceso que quedó sin responsable se le muestra a quien la registró.
+    $this->db->insert('wp_jet_cct_precaptaciones', ['_ID'=>31,'id_empleado'=>'','cct_author_id'=>'0303','origen'=>'Recorrido','contacto'=>'Registrada sin funcionario','contactado'=>'No','fecha'=>(string) time()]);
+    $this->db->insert(Module::workflow()->table(), ['precaptacion_id'=>31,'responsible_id'=>'','status'=>'por_llamar','cycle'=>1,'attempts'=>0,'unanswered'=>0,'updated_at'=>date('Y-m-d H:i:s')]);
+    $_SESSION['scm_employee_id'] = '0303';
+    $html = LegacyPanel::render_shortcode(['modo'=>'mis']);
+    self::assertStringContainsString('<h1>Mis precaptaciones</h1>', $html);
+    self::assertStringContainsString('Precaptación con cero', $html);
+    self::assertStringContainsString('Registrada sin funcionario', $html);
+    self::assertStringNotContainsString('Contacto de prueba', $html);
+    self::assertSame('0303', Module::workflow()->responsible(['_ID'=>31,'id_empleado'=>'','cct_author_id'=>'0303']));
+    $_SESSION['scm_employee_id'] = '';
+    self::assertStringNotContainsString('Contacto de prueba', LegacyPanel::render_shortcode(['modo'=>'mis']), 'Si no se sabe quién es, no ve nada.');
+  }
+
   public function testFormPreservesFieldsAndConditionalCatalogControls(): void
   {
     $html = FormView::render($this->repository);
