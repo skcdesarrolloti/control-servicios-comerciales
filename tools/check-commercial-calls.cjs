@@ -174,6 +174,7 @@ async function fillCall(modal, values) {
     await page.screenshot({ path: 'output/calls-repeat-property.png' });
     await modal.locator('[type="submit"]').click();
     await modal.locator('[data-ccl-task-form]').waitFor();
+    assert.equal(await modal.locator('[data-ccl-task-form] [name="asunto"]').inputValue(), 'Cliente para compra: apartamento en Laureles', 'El asunto se arma corto con tema, tipo y barrio');
     await modal.locator('[data-ccl-task-form] [data-ccl-close]').first().click();
     await modal.waitFor({ state: 'hidden' });
     await page.waitForFunction(() => document.querySelectorAll('[data-ccl-row]').length === 2);

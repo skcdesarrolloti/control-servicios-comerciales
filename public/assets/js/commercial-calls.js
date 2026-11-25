@@ -275,6 +275,7 @@
       box.textContent = result.resumen + (filled.length ? ". Se llenó " + filled.join(", ") + "; revisa y completa lo que falte." : ". No trae datos para llenar: complétalos a mano.");
       box.dataset.state = "ok";
       autoDescription(form, false);
+      autoSubject(form);
     }).catch(function (error) {
       box.textContent = error.message;
       box.dataset.state = "error";
@@ -311,6 +312,23 @@
     if (value(form, "comisionista") === "Si") parts.push("Es comisionista.");
     return parts.join(" ");
   }
+  // Asunto corto de la tarea: "Cliente para arriendo: casa en Laureles · $2.250.000" o "Captación de casa en Laureles".
+  function composeSubject(form) {
+    var topic = value(form, "tema_ayuda");
+    var kind = lower(value(form, "tipo_inmueble")) || "inmueble";
+    var place = value(form, "barrio");
+    var where = kind + (place ? " en " + place : "");
+    var budget = value(form, "tiene_presupuesto") === "Si" && value(form, "presupuesto") ? " · $" + value(form, "presupuesto") : "";
+    var seeking = { "Arriendo": "arriendo", "Venta": "compra", "Arriendo o venta": "arriendo o compra" }[topic];
+    if (seeking) return "Cliente para " + seeking + ": " + where + budget;
+    if (topic === "Captacion") return "Captación de " + where;
+    if (topic === "Recaptacion") return "Recaptación de " + where;
+    return topic ? topic + ": " + where : "";
+  }
+  function autoSubject(form) {
+    var field = form.querySelector("[data-ccl-auto-subject]");
+    if (field && field.getAttribute("data-ccl-auto-subject") === "1") field.value = composeSubject(form).slice(0, 190);
+  }
   function autoDescription(form, force) {
     var area = form.querySelector("[data-ccl-auto-desc]");
     if (!area || (!force && area.getAttribute("data-ccl-auto-desc") !== "1")) return;
@@ -332,7 +350,10 @@
       }
     }
     var task = content() && content().querySelector("[data-ccl-task-form]");
-    if (task) syncTopic(task);
+    if (task) {
+      syncTopic(task);
+      autoSubject(task);
+    }
   }
   function formatMoney(field) {
     var right = field.value.slice(field.selectionStart).replace(/\D/g, "").length;
@@ -489,6 +510,7 @@
     if (event.target.matches("[data-ccl-money]")) formatMoney(event.target);
     // Si la persona escribe la descripción, deja de armarse sola; si la borra toda, vuelve a armarse.
     if (event.target.matches("[data-ccl-auto-desc]")) event.target.setAttribute("data-ccl-auto-desc", event.target.value.trim() === "" ? "1" : "0");
+    if (event.target.matches("[data-ccl-auto-subject]")) event.target.setAttribute("data-ccl-auto-subject", event.target.value.trim() === "" ? "1" : "0");
   });
   document.addEventListener("change", function (event) {
     if (!event.target.closest("[data-ccl-modal]")) return;

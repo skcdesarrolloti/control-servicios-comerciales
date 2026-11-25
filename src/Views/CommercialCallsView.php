@@ -315,7 +315,8 @@ final class CommercialCallsView
       . '<div data-ccl-topic-field="presupuesto" hidden>' . self::selectField('tiene_presupuesto', '¿El cliente cuenta con presupuesto?', ['Si', 'No'], (int) $v('presupuesto') > 0 ? 'Si' : (str_contains((string) ($call['descripcion'] ?? ''), CommercialCallsService::NO_BUDGET_NOTE) ? 'No' : ''), false) . '</div>'
       . '<div data-ccl-budget-field hidden>' . self::input('presupuesto', 'Presupuesto', CommercialCallsService::money($v('presupuesto')), 'text', false, 'inputmode="numeric" autocomplete="off" data-ccl-money') . '</div>'
       . '</div><div data-ccl-topic-field="factores" hidden>' . self::checks('factores', 'Factores importantes', $options['factores'], $data['factores']) . '</div>'
-      . '<label class="ccl-field"><span>Asunto <em aria-hidden="true">*</em></span><input type="text" name="asunto" required maxlength="190"></label>'
+      // El asunto se arma solo y corto con tema, tipo, barrio y presupuesto mientras nadie lo escriba (commercial-calls.js).
+      . '<label class="ccl-field"><span>Asunto <em aria-hidden="true">*</em></span><input type="text" name="asunto" required maxlength="190" data-ccl-auto-subject="1"></label>'
       . '<label class="ccl-field"><span>Resumen <em aria-hidden="true">*</em></span><textarea name="descripcion" rows="4" required>' . self::e($v('descripcion')) . '</textarea></label>'
       . '</div><footer class="ccl-modal-foot"><button type="button" class="ccl-secondary" data-ccl-close>Crear más tarde</button><button type="submit" class="ccl-primary">Crear tarea</button></footer></form>';
   }
