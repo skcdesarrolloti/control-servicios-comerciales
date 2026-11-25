@@ -200,6 +200,7 @@ final class CommercialCallsView
       . '<input type="hidden" name="id" value="' . ($mode === 'edit' ? (int) $call['_ID'] : 0) . '">'
       . '<div class="ccl-modal-body">'
       . '<p class="ccl-error" data-ccl-error role="alert" hidden></p>'
+      . ($editing ? '' : self::smartFill())
       . '<h3>Contacto</h3><div class="ccl-grid-6">'
       . self::input('celular', 'Celular', $v('celular'), 'tel', true, 'inputmode="numeric" data-ccl-phone placeholder="Sin indicativo"')
       . self::input('cliente', 'Nombre', $v('cliente'), 'text', true, '', 'ccl-wide')
@@ -237,7 +238,8 @@ final class CommercialCallsView
       . self::selectField('tipo_inmueble', 'Tipo de inmueble', $options['tipos'], '', false)
       . self::selectField('destinacion', 'Destinación', $options['destinaciones'], '', false)
       . self::selectField('uso', 'Uso', $options['usos'], '', false)
-      . '<div data-ccl-topic-field="presupuesto" hidden>' . self::input('presupuesto', 'Presupuesto', '', 'text', false, $money) . '</div>'
+      . '<div data-ccl-topic-field="presupuesto" hidden>' . self::selectField('tiene_presupuesto', '¿El cliente cuenta con presupuesto?', $yesNo, '', false) . '</div>'
+      . '<div data-ccl-budget-field hidden>' . self::input('presupuesto', 'Presupuesto', '', 'text', false, $money) . '</div>'
       . '<div data-ccl-topic-field="precio" hidden>' . self::input('precio', 'Precio', '', 'text', false, $money) . '</div>'
       . '</div>'
       . self::checks('factores_importantes', 'Factores importantes', $options['factores'], $data['factores'])
@@ -247,6 +249,18 @@ final class CommercialCallsView
       . $merit
       . self::pairField('id_empleado', 'Asignar a', $employees, $v('id_empleado'), true)
       . '</div></div><footer class="ccl-modal-foot"><button type="button" class="ccl-secondary" data-ccl-close>Cancelar</button><button type="submit" class="ccl-primary">Guardar llamada</button></footer></form>';
+  }
+
+  /** Llenado inteligente: dictar o pegar lo que dijo el cliente y que la IA complete el formulario (commercial-calls.js). */
+  private static function smartFill(): string
+  {
+    return '<section class="ccl-smart" data-ccl-smart aria-labelledby="ccl-smart-title">'
+      . '<div class="ccl-smart-head"><span class="scm-head-icon" aria-hidden="true"><span class="material-symbols-outlined">auto_awesome</span></span>'
+      . '<div><h3 id="ccl-smart-title">Llenado inteligente</h3><p>Dicta o pega lo que dijo el cliente y la IA completa el formulario. Marca no comisionista, cliente inmediato y que merece tarea; revisa todo antes de guardar.</p></div></div>'
+      . '<label class="ccl-field"><span>Lo que dijo el cliente</span><textarea rows="3" data-ccl-smart-text placeholder="Ej.: Laura Gómez, interesada en arriendo de apartamento para vivienda en Laureles. Celular 300 123 4567, correo laura arroba gmail punto com. Presupuesto 2.500.000. Nos encontró en Facebook."></textarea></label>'
+      . '<div class="ccl-smart-actions"><button type="button" class="ccl-secondary" data-ccl-dictate aria-pressed="false"><span class="material-symbols-outlined" aria-hidden="true">mic</span><span data-ccl-dictate-label>Dictar</span></button>'
+      . '<button type="button" class="ccl-primary" data-ccl-smart-fill><span class="material-symbols-outlined" aria-hidden="true">auto_awesome</span>Completar formulario</button>'
+      . '<p class="ccl-hint" data-ccl-smart-status role="status" aria-live="polite"></p></div></section>';
   }
 
   /**
@@ -278,7 +292,8 @@ final class CommercialCallsView
       . self::selectField('destinacion', 'Destinación', $options['destinaciones'], $v('destinacion'), false)
       . self::selectField('uso', 'Uso', $options['usos'], $v('uso'), false)
       . '<div data-ccl-topic-field="precio" hidden>' . self::input('precio', 'Precio', CommercialCallsService::money($v('precio')), 'text', false, 'inputmode="numeric" autocomplete="off" data-ccl-money') . '</div>'
-      . '<div data-ccl-topic-field="presupuesto" hidden>' . self::input('presupuesto', 'Presupuesto', CommercialCallsService::money($v('presupuesto')), 'text', false, 'inputmode="numeric" autocomplete="off" data-ccl-money') . '</div>'
+      . '<div data-ccl-topic-field="presupuesto" hidden>' . self::selectField('tiene_presupuesto', '¿El cliente cuenta con presupuesto?', ['Si', 'No'], (int) $v('presupuesto') > 0 ? 'Si' : (str_contains((string) ($call['descripcion'] ?? ''), CommercialCallsService::NO_BUDGET_NOTE) ? 'No' : ''), false) . '</div>'
+      . '<div data-ccl-budget-field hidden>' . self::input('presupuesto', 'Presupuesto', CommercialCallsService::money($v('presupuesto')), 'text', false, 'inputmode="numeric" autocomplete="off" data-ccl-money') . '</div>'
       . '</div><div data-ccl-topic-field="factores" hidden>' . self::checks('factores', 'Factores importantes', $options['factores'], $data['factores']) . '</div>'
       . '<label class="ccl-field"><span>Asunto <em aria-hidden="true">*</em></span><input type="text" name="asunto" required maxlength="190"></label>'
       . '<label class="ccl-field"><span>Resumen <em aria-hidden="true">*</em></span><textarea name="descripcion" rows="4" required>' . self::e($v('descripcion')) . '</textarea></label>'

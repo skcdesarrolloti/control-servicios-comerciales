@@ -7,6 +7,7 @@ namespace Tests\Unit;
 use PHPUnit\Framework\TestCase;
 use SCM\Commercial\Calls\CommercialCallsNotifier;
 use SCM\Commercial\Calls\CommercialCallsService;
+use SCM\Commercial\Calls\CommercialCallsSmartFill;
 use SCM\Commercial\Calls\PublicTaskConversation;
 use SCM\Commercial\CommercialInternalNotifications;
 use SCM\Commercial\CommercialStatusCatalog;
@@ -63,7 +64,7 @@ final class CommercialCallsTest extends TestCase
 
   private function taskInput(int $id, array $override = []): array
   {
-    return $override + ['id' => (string) $id, 'solicitante' => 'Laura Prueba', 'correo_solicitante' => 'laura@example.test', 'celular_solicitante' => '3001234567', 'prioridad' => 'Prioridad comercial', 'tema_ayuda' => 'Arriendo', 'asunto' => 'Busca arriendo', 'descripcion' => 'Detalle'];
+    return $override + ['id' => (string) $id, 'solicitante' => 'Laura Prueba', 'correo_solicitante' => 'laura@example.test', 'celular_solicitante' => '3001234567', 'prioridad' => 'Prioridad comercial', 'tema_ayuda' => 'Arriendo', 'asunto' => 'Busca arriendo', 'descripcion' => 'Detalle', 'tiene_presupuesto' => 'Si', 'presupuesto' => '1.000.000'];
   }
 
   public function testRegisteredInPermissionsAndRouter(): void
@@ -238,12 +239,12 @@ final class CommercialCallsTest extends TestCase
     self::assertStringContainsString('data-ccl-property-code', $new);
   }
 
-  public function testPropertyCodeBringsTypeDestinationAndPriceFromItsLists(): void
+  public function testPropertyCodeBringsTypeAndDestinationButNeverTheBudget(): void
   {
     $result = $this->service()->property('84016', 'Arriendo');
-    self::assertSame(['tipo_inmueble' => 'Apartamento', 'destinacion' => 'Vivienda', 'presupuesto' => '1.500.000'], $result['campos'], 'El uso que no está en su lista se deja para llenarlo a mano.');
+    self::assertSame(['tipo_inmueble' => 'Apartamento', 'destinacion' => 'Vivienda'], $result['campos'], 'El uso que no está en su lista se deja para llenarlo a mano y el presupuesto es del cliente.');
     self::assertStringContainsString('Laureles', $result['resumen']);
-    self::assertSame('350.000.000', $this->service()->property('84016', 'Venta')['campos']['presupuesto']);
+    self::assertArrayNotHasKey('presupuesto', $this->service()->property('84016', 'Venta')['campos']);
     self::assertSame('property', CommercialActionRouter::CALL_ACTIONS['commercial_calls_property']);
     $this->expectException(\InvalidArgumentException::class);
     $this->service()->property('99999', 'Arriendo');
@@ -813,5 +814,55 @@ final class CommercialCallsTest extends TestCase
     $this->service(new CommercialCallsNotifier($this->db, new Settings($this->db), $queue))->createTask($this->taskInput($id, ['tema_ayuda' => 'Venta']));
     self::assertSame(['303@example.test'], $sent[1][0]);
     self::assertStringNotContainsString('ticket', strtolower($sent[0][1]));
+  }
+
+  public function testBudgetIsAskedFirstAndANoLeavesTheNoteInTheDescription(): void
+  {
+    $none = $this->row($this->create(['tema_ayuda' => 'Arriendo', 'tiene_presupuesto' => 'No', 'presupuesto' => '2.000.000', 'descripcion' => 'Busca en Laureles']));
+    self::assertSame('', $none['presupuesto'], 'Sin presupuesto no se guarda valor.');
+    self::assertSame("Busca en Laureles
+" . CommercialCallsService::NO_BUDGET_NOTE, $none['descripcion']);
+    $with = $this->row($this->create(['tema_ayuda' => 'Venta', 'celular' => '3009998888', 'tiene_presupuesto' => 'Si', 'presupuesto' => '350.000.000']));
+    self::assertSame('350000000', $with['presupuesto']);
+    try {
+      $this->create(['tema_ayuda' => 'Arriendo', 'celular' => '3007776666', 'tiene_presupuesto' => 'Si', 'presupuesto' => '']);
+      self::fail('Con Sí se exige el valor.');
+    } catch (\InvalidArgumentException $exception) {
+      self::assertSame('Escribe el presupuesto del cliente.', $exception->getMessage());
+    }
+    $this->expectExceptionMessage('Indica si el cliente cuenta con presupuesto.');
+    $this->create(['tema_ayuda' => 'Arriendo', 'celular' => '3005554444', 'tiene_presupuesto' => '', 'presupuesto' => '']);
+  }
+
+  public function testSmartFillTakesSpokenEmailAndPhoneAndFixesTheClientType(): void
+  {
+    $result = $this->service()->smartFill('Laura Gómez busca arriendo, celular 300 123 45 67, correo laura punto gomez arroba gmail punto com, no tiene presupuesto', new \SCM\Commercial\MiniMaxChat(''));
+    self::assertSame('3001234567', $result['campos']['celular']);
+    self::assertSame('laura.gomez@gmail.com', $result['campos']['email'], 'El correo dictado se arma con sus puntos.');
+    self::assertSame('57', $result['campos']['indicativo']);
+    self::assertSame(['comisionista' => 'No', 'cliente_inmediato' => 'Si', 'merece_ticket' => 'Si'], array_intersect_key($result['campos'], CommercialCallsSmartFill::FIXED));
+    self::assertFalse($result['ia']);
+    self::assertStringContainsString('MINIMAX_API_KEY', $result['aviso']);
+    self::assertSame('smartFill', CommercialActionRouter::CALL_ACTIONS['commercial_calls_smart_fill']);
+  }
+
+  public function testSmartFillOnlyKeepsValuesFromTheFormLists(): void
+  {
+    $options = $this->service()->options();
+    $fields = CommercialCallsSmartFill::validate([
+      'cliente' => 'laura GÓMEZ', 'celular' => '+57 300 123 4567', 'email' => 'Laura@Gmail.com', 'tema_ayuda' => 'arriendo',
+      'tipo_inmueble' => 'apartamento', 'destinacion' => 'Oficinas en la luna', 'presupuesto' => '2.500.000', 'id_inmueble' => 'código 84016',
+      'tiene_presupuesto' => '', 'descripcion' => 'Busca apartamento ${solicitante} en Laureles 가치.',
+    ], $options);
+    self::assertSame('Laura Gómez', $fields['cliente']);
+    self::assertSame('3001234567', $fields['celular']);
+    self::assertSame('laura@gmail.com', $fields['email']);
+    self::assertSame('Arriendo', $fields['tema_ayuda']);
+    self::assertSame('Apartamento', $fields['tipo_inmueble']);
+    self::assertArrayNotHasKey('destinacion', $fields, 'Lo que no está en la lista se deja vacío.');
+    self::assertSame('2500000', $fields['presupuesto']);
+    self::assertSame('84016', $fields['id_inmueble']);
+    self::assertSame('Busca apartamento en Laureles.', $fields['descripcion']);
+    self::assertSame(['tiene_presupuesto' => 'No'], array_intersect_key(CommercialCallsSmartFill::validate(['tiene_presupuesto' => 'no'], $options), ['tiene_presupuesto' => 1]));
   }
 }

@@ -6,22 +6,16 @@ namespace SCM\Commercial;
 
 final class CommercialTaskAssistant
 {
-  private string $apiKey;
-  private string $baseUrl;
-  private string $model;
-  private int $timeout;
+  private MiniMaxChat $chat;
 
   public function __construct(string $apiKey, string $baseUrl = 'https://api.minimax.io/v1', string $model = 'MiniMax-M3', int $timeout = 45)
   {
-    $this->apiKey = trim($apiKey);
-    $this->baseUrl = rtrim(trim($baseUrl), '/');
-    $this->model = trim($model) !== '' ? trim($model) : 'MiniMax-M3';
-    $this->timeout = max(10, min(55, $timeout));
+    $this->chat = new MiniMaxChat($apiKey, $baseUrl, $model, $timeout);
   }
 
   public function isConfigured(): bool
   {
-    return $this->apiKey !== '' && $this->baseUrl !== '';
+    return $this->chat->isConfigured();
   }
 
   /**
@@ -158,10 +152,6 @@ final class CommercialTaskAssistant
     }
 
     $payload = [
-      'model' => $this->model,
-      'temperature' => 0.2,
-      'max_completion_tokens' => 1800,
-      'thinking' => ['type' => 'disabled'],
       'messages' => [
         [
           'role' => 'system',
@@ -174,113 +164,7 @@ final class CommercialTaskAssistant
       ],
     ];
 
-    $response = $this->postJson($this->baseUrl . '/chat/completions', $payload);
-    $content = $response['choices'][0]['message']['content'] ?? '';
-    if (is_array($content)) {
-      $content = implode("\n", array_map(static fn($part): string => is_array($part) ? (string) ($part['text'] ?? '') : (string) $part, $content));
-    }
-    $content = trim((string) $content);
-    if ($content === '') {
-      throw new \RuntimeException('MiniMax no devolvió contenido para esta tarea.');
-    }
-    return $content;
-  }
-
-  /**
-   * @param array<string,mixed> $payload
-   * @return array<string,mixed>
-   */
-  private function postJson(string $url, array $payload): array
-  {
-    $body = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    if (!is_string($body)) {
-      throw new \RuntimeException('No fue posible preparar la solicitud a MiniMax.');
-    }
-
-    if (function_exists('curl_init')) {
-      $raw = $this->postJsonWithCurl($url, $body);
-    } else {
-      $raw = $this->postJsonWithStreams($url, $body);
-    }
-
-    $decoded = json_decode($raw, true);
-    if (!is_array($decoded)) {
-      throw new \RuntimeException('MiniMax devolvió una respuesta no válida.');
-    }
-    if (isset($decoded['error'])) {
-      $message = is_array($decoded['error']) ? (string) ($decoded['error']['message'] ?? 'MiniMax rechazó la solicitud.') : 'MiniMax rechazó la solicitud.';
-      throw new \RuntimeException($message);
-    }
-    return $decoded;
-  }
-
-  private function postJsonWithCurl(string $url, string $body): string
-  {
-    $handle = curl_init($url);
-    if ($handle === false) {
-      throw new \RuntimeException('No fue posible iniciar la conexión con MiniMax.');
-    }
-    curl_setopt_array($handle, [
-      CURLOPT_POST => true,
-      CURLOPT_RETURNTRANSFER => true,
-      CURLOPT_CONNECTTIMEOUT => 10,
-      CURLOPT_TIMEOUT => $this->timeout,
-      CURLOPT_HTTPHEADER => [
-        'Authorization: Bearer ' . $this->apiKey,
-        'Content-Type: application/json',
-      ],
-      CURLOPT_POSTFIELDS => $body,
-    ]);
-    $raw = curl_exec($handle);
-    $status = (int) curl_getinfo($handle, CURLINFO_RESPONSE_CODE);
-    $error = curl_error($handle);
-    curl_close($handle);
-
-    if (!is_string($raw) || $raw === '') {
-      throw new \RuntimeException($error !== '' ? ('No fue posible consultar MiniMax: ' . $error) : 'MiniMax no respondió.');
-    }
-    if ($status >= 400) {
-      $this->throwHttpError($raw, $status);
-    }
-    return $raw;
-  }
-
-  private function postJsonWithStreams(string $url, string $body): string
-  {
-    $context = stream_context_create([
-      'http' => [
-        'method' => 'POST',
-        'timeout' => $this->timeout,
-        'ignore_errors' => true,
-        'header' => "Authorization: Bearer {$this->apiKey}\r\nContent-Type: application/json\r\n",
-        'content' => $body,
-      ],
-    ]);
-    $raw = @file_get_contents($url, false, $context);
-    if (!is_string($raw) || $raw === '') {
-      throw new \RuntimeException('No fue posible consultar MiniMax.');
-    }
-
-    $status = 0;
-    foreach (($http_response_header ?? []) as $header) {
-      if (preg_match('/^HTTP\/\S+\s+(\d+)/', (string) $header, $matches)) {
-        $status = (int) $matches[1];
-        break;
-      }
-    }
-    if ($status >= 400) {
-      $this->throwHttpError($raw, $status);
-    }
-    return $raw;
-  }
-
-  private function throwHttpError(string $raw, int $status): never
-  {
-    $decoded = json_decode($raw, true);
-    $message = is_array($decoded) && is_array($decoded['error'] ?? null)
-      ? (string) ($decoded['error']['message'] ?? '')
-      : '';
-    throw new \RuntimeException($message !== '' ? $message : "MiniMax respondió con estado HTTP {$status}.");
+    return $this->chat->complete($payload['messages'], 1800);
   }
 
   /** @return array<string,mixed> */
@@ -301,7 +185,7 @@ final class CommercialTaskAssistant
       'proximos_pasos' => $this->normalizeList($decoded['proximos_pasos'] ?? []),
       'mensaje_sugerido' => $this->text($decoded['mensaje_sugerido'] ?? '', 1800),
       'datos_faltantes' => $this->normalizeList($decoded['datos_faltantes'] ?? []),
-      'model' => $this->model,
+      'model' => $this->chat->model(),
       'generated_at' => date('d/m/Y h:i a'),
     ];
   }

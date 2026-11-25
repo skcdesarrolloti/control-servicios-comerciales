@@ -97,6 +97,12 @@ final class CommercialCallsApiController
   }
 
   /** @param array<string,mixed> $input */
+  public function smartFill(array $input): never
+  {
+    $this->guarded($input, fn(): array => $this->service->smartFill(is_scalar($input['texto'] ?? null) ? (string) $input['texto'] : ''));
+  }
+
+  /** @param array<string,mixed> $input */
   public function card(array $input): never
   {
     $this->guarded($input, function () use ($input): array {

@@ -72,6 +72,7 @@ final class CommercialCallsDatabase
     return $override + [
       'id' => '0', 'fecha' => '', 'tema_ayuda' => 'Arriendo', 'comisionista' => 'No', 'cliente_inmediato' => 'Si', 'merece_ticket' => 'Si', 'id_empleado' => '101',
       'cliente' => 'Laura Prueba', 'email' => 'laura@example.test', 'indicativo' => '57', 'celular' => '300 123-4567', 'medio' => 'Referido', 'descripcion' => 'Busca apartamento',
+      'tiene_presupuesto' => 'Si', 'presupuesto' => '1.000.000',
     ];
   }
 

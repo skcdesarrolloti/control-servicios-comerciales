@@ -40,6 +40,7 @@
   function closeModal() {
     var node = modal();
     if (!node) return;
+    stopDictation();
     node.classList.remove("open");
     content().innerHTML = "";
     document.body.classList.remove("commercial-modal-open");
@@ -109,8 +110,126 @@
         if (result) result.hidden = true;
       }
     }
+    // Primero se pregunta si cuenta con presupuesto: con Sí se pide el valor; con No queda en la descripción que falta.
+    var budgetBox = form.querySelector("[data-ccl-budget-field]");
+    if (budgetBox && form.elements.tiene_presupuesto) {
+      var hasBudget = offer && value(form, "tiene_presupuesto") === "Si";
+      form.elements.tiene_presupuesto.required = offer;
+      form.elements.presupuesto.required = hasBudget;
+      budgetBox.hidden = !hasBudget;
+      if (!hasBudget) form.elements.presupuesto.value = "";
+    }
   }
-  var PROPERTY_LABELS = { tipo_inmueble: "tipo", destinacion: "destinación", uso: "uso", presupuesto: "presupuesto" };
+  var PROPERTY_LABELS = { tipo_inmueble: "tipo", destinacion: "destinación", uso: "uso" };
+
+  // Llenado inteligente: dictado con el reconocimiento de voz del navegador y la IA del servidor para completar el formulario.
+  var Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  var listening = null;
+  // Primero lo que cambia qué campos se ven (motivo, código, presupuesto), luego el resto.
+  var SMART_ORDER = ["tema_ayuda", "tiene_codigo", "id_inmueble", "tiene_presupuesto", "presupuesto", "precio", "medio", "indicativo", "celular", "cliente", "email", "celular_wsp", "tipo_inmueble", "destinacion", "uso", "descripcion", "comisionista", "cliente_inmediato", "merece_ticket"];
+
+  function smartStatus(box, text, state) {
+    var status = box.querySelector("[data-ccl-smart-status]");
+    if (!status) return;
+    status.textContent = text;
+    status.dataset.state = state || "";
+  }
+  function stopDictation() {
+    if (listening) listening.stop();
+  }
+  function toggleDictation(button) {
+    var box = button.closest("[data-ccl-smart]");
+    var area = box.querySelector("[data-ccl-smart-text]");
+    if (listening) { stopDictation(); return; }
+    if (!Recognition) {
+      smartStatus(box, "Este navegador no permite dictar. Usa Chrome o Edge, o escribe o pega el texto.", "error");
+      return;
+    }
+    var recognition = new Recognition();
+    recognition.lang = "es-CO";
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    var base = area.value.trim();
+    recognition.onresult = function (event) {
+      var finalText = "";
+      var interim = "";
+      for (var i = 0; i < event.results.length; i++) {
+        if (event.results[i].isFinal) finalText += event.results[i][0].transcript + " ";
+        else interim += event.results[i][0].transcript;
+      }
+      area.value = (base ? base + " " : "") + finalText.trim();
+      smartStatus(box, interim ? "Escuchando: " + interim : "Escuchando… habla con normalidad.", "");
+    };
+    recognition.onerror = function (event) {
+      var denied = event.error === "not-allowed" || event.error === "service-not-allowed";
+      smartStatus(box, denied ? "Permite el uso del micrófono en el navegador para dictar." : "No se pudo dictar (" + event.error + "). Intenta de nuevo o escribe el texto.", "error");
+    };
+    recognition.onend = function () {
+      listening = null;
+      button.setAttribute("aria-pressed", "false");
+      button.classList.remove("is-recording");
+      button.querySelector("[data-ccl-dictate-label]").textContent = "Dictar";
+      if (box.querySelector("[data-ccl-smart-status]").dataset.state !== "error") smartStatus(box, area.value.trim() ? "Listo. Revisa el texto y pulsa Completar formulario." : "", "");
+    };
+    try {
+      recognition.start();
+    } catch (_error) {
+      smartStatus(box, "No se pudo iniciar el micrófono. Intenta de nuevo.", "error");
+      return;
+    }
+    listening = recognition;
+    button.setAttribute("aria-pressed", "true");
+    button.classList.add("is-recording");
+    button.querySelector("[data-ccl-dictate-label]").textContent = "Detener";
+    smartStatus(box, "Escuchando… habla con normalidad.", "");
+  }
+  function setField(form, name, val) {
+    if (name === "factores_importantes") {
+      form.querySelectorAll('[name="factores_importantes[]"]').forEach(function (box) { box.checked = val.indexOf(box.value) >= 0; });
+      return true;
+    }
+    var field = form.elements[name];
+    if (!field || field.readOnly || field.disabled) return false;
+    field.value = val;
+    if (field.value !== val) return false;
+    if (field.matches && field.matches("[data-ccl-money]")) formatMoney(field);
+    var label = field.closest(".ccl-field");
+    if (label) {
+      label.classList.add("ccl-smart-filled");
+      window.setTimeout(function () { label.classList.remove("ccl-smart-filled"); }, 2400);
+    }
+    return true;
+  }
+  function smartFill(button) {
+    var box = button.closest("[data-ccl-smart]");
+    var form = button.closest("form");
+    var text = box.querySelector("[data-ccl-smart-text]").value.trim();
+    stopDictation();
+    if (text.length < 15) { smartStatus(box, "Dicta o escribe un poco más de lo que dijo el cliente.", "error"); return; }
+    button.disabled = true;
+    smartStatus(box, "Leyendo lo que dijo el cliente…", "");
+    if (window.SCMLoader) window.SCMLoader.show({ icon: "ai", title: "Completando el formulario", detail: "La IA está leyendo lo que dijo el cliente." });
+    request("commercial_calls_smart_fill", { texto: text }).then(function (result) {
+      var fields = result.campos || {};
+      var touched = false;
+      SMART_ORDER.concat(Object.keys(fields)).forEach(function (name, index, all) {
+        if (all.indexOf(name) !== index || fields[name] === undefined) return;
+        if (setField(form, name, fields[name])) touched = true;
+        syncForm();
+      });
+      if (fields.celular) lookupContact(form);
+      if (fields.id_inmueble && form.elements.id_inmueble) lookupProperty(form.elements.id_inmueble);
+      var message = touched ? "Se llenó: " + (result.llenados || []).join(", ") + "." : "No se encontraron datos para llenar.";
+      if ((result.faltantes || []).length) message += " Falta: " + result.faltantes.join(", ") + ".";
+      if (result.aviso) message += " " + result.aviso;
+      smartStatus(box, message + " Revisa todo antes de guardar.", result.aviso ? "warn" : "ok");
+    }).catch(function (error) {
+      smartStatus(box, error.message, "error");
+    }).finally(function () {
+      button.disabled = false;
+      if (window.SCMLoader) window.SCMLoader.hide();
+    });
+  }
   function lookupProperty(field) {
     var form = field.form;
     var box = form.querySelector("[data-ccl-property-result]");
@@ -231,6 +350,12 @@
   }
 
   document.addEventListener("click", function (event) {
+    var smartButton = event.target.closest("[data-ccl-dictate],[data-ccl-smart-fill]");
+    if (smartButton) {
+      if (smartButton.hasAttribute("data-ccl-dictate")) toggleDictation(smartButton);
+      else smartFill(smartButton);
+      return;
+    }
     var target = event.target.closest("[data-ccl-new],[data-ccl-edit],[data-ccl-repeat],[data-ccl-history],[data-ccl-task],[data-ccl-close],[data-ccl-state],[data-ccl-toggle],[data-ccl-page-to],[data-ccl-clear]");
     if (!target) {
       // Abrir una tarea desde el historial la muestra en su propio modal.

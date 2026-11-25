@@ -139,6 +139,39 @@ final class CommercialCallsService
     ];
   }
 
+  /** Lo que queda en la descripción cuando el cliente aún no tiene presupuesto. */
+  public const NO_BUDGET_NOTE = 'Presupuesto: aún no lo tiene definido, consultar.';
+
+  /**
+   * ¿El cliente cuenta con presupuesto? (solo arriendo y venta). Sí: se exige el valor. No: no se guarda valor y la
+   * descripción dice que aún no lo tiene definido. Sin respuesta pero con valor cuenta como Sí.
+   * @param array<string,mixed> $input
+   * @return array{0:string,1:string} Presupuesto y descripción.
+   */
+  private static function budget(array $input, string $description, bool $offer): array
+  {
+    if (!$offer) {
+      return ['', $description];
+    }
+    $amount = self::amount(is_scalar($input['presupuesto'] ?? null) ? (string) $input['presupuesto'] : '');
+    $amount = $amount === '0' ? '' : $amount;
+    $answer = is_scalar($input['tiene_presupuesto'] ?? null) ? trim((string) $input['tiene_presupuesto']) : '';
+    if ($answer === '' && $amount !== '') {
+      $answer = 'Si';
+    }
+    if ($answer === 'No') {
+      $note = str_contains($description, self::NO_BUDGET_NOTE) ? '' : self::NO_BUDGET_NOTE;
+      return ['', trim($description . ($description !== '' && $note !== '' ? "\n" : '') . $note)];
+    }
+    if ($answer !== 'Si') {
+      throw new \InvalidArgumentException('Indica si el cliente cuenta con presupuesto.');
+    }
+    if ($amount === '') {
+      throw new \InvalidArgumentException('Escribe el presupuesto del cliente.');
+    }
+    return [$amount, $description];
+  }
+
   /**
    * Motivos de una llamada: el glosario de temas hasta antes de "Entrega de inmuebles" (lo de ahí para abajo es de otras
    * áreas) y sin Actualización. El glosario no se modifica porque lo usan otros formularios.
@@ -317,6 +350,7 @@ final class CommercialCallsService
       throw new \InvalidArgumentException('Selecciona un funcionario activo para asignar la llamada.');
     }
     $factors = array_values(array_intersect((array) ($input['factores_importantes'] ?? []), $options['factores']));
+    [$budget, $description] = self::budget($input, is_scalar($input['descripcion'] ?? null) ? trim(strip_tags((string) $input['descripcion'])) : '', $offer);
     return $contact + [
       'tema_ayuda' => $topic,
       'comisionista' => $yesNo('comisionista', 'si es comisionista'),
@@ -326,10 +360,10 @@ final class CommercialCallsService
       'destinacion' => $choice('destinacion', $options['destinaciones'], 'la destinación', false),
       'uso' => $choice('uso', $options['usos'], 'el uso', false),
       'id_inmueble' => $offer && $code > 0 ? (string) $code : '',
-      'presupuesto' => $offer ? self::amount($text('presupuesto')) : '',
+      'presupuesto' => $budget,
       'precio' => in_array($topic, self::LISTING_TOPICS, true) ? self::amount($text('precio')) : '',
       'factores_importantes' => implode(', ', $factors),
-      'descripcion' => is_scalar($input['descripcion'] ?? null) ? trim(strip_tags((string) $input['descripcion'])) : '',
+      'descripcion' => $description,
       'merece_ticket' => $yesNo('merece_ticket', 'si merece tarea'),
       'id_empleado' => trim((string) $employee['id_empleado']),
     ] + $this->originFields($input, null, $options);
@@ -395,8 +429,24 @@ final class CommercialCallsService
   }
 
   /**
+   * Llenado inteligente de Registrar llamada: lo dictado o pegado se vuelve campos del formulario (CommercialCallsSmartFill).
+   * @return array<string,mixed>
+   */
+  public function smartFill(string $text, ?\SCM\Commercial\MiniMaxChat $chat = null): array
+  {
+    if (!$this->policy->canAct('llamadas_crear')) {
+      throw new \RuntimeException('No tienes permiso para registrar llamadas.');
+    }
+    $text = trim(mb_substr($text, 0, 4000));
+    if (mb_strlen($text) < 15) {
+      throw new \InvalidArgumentException('Dicta o escribe un poco más de lo que dijo el cliente.');
+    }
+    return (new CommercialCallsSmartFill($chat ?? \SCM\Commercial\MiniMaxChat::fromConfig($this->config)))->fill($text, $this->options());
+  }
+
+  /**
    * Datos de un inmueble por su código para llenar la solicitud: tipo, destinación y uso (solo si están en sus listas,
-   * porque al guardar se validan contra el glosario) y el precio según el motivo.
+   * porque al guardar se validan contra el glosario). El presupuesto no: es del cliente, no el precio del inmueble.
    * @return array{codigo:string,campos:array<string,string>,resumen:string}
    */
   public function property(string $code, string $topic): array
@@ -424,12 +474,7 @@ final class CommercialCallsService
       'destinacion' => $match($v('destinacion'), $options['destinaciones']),
       'uso' => $match($v('uso'), $options['usos']),
     ];
-    $rent = self::amount($v('precio_arriendo'));
-    $sale = self::amount($v('precio_venta'));
-    $price = $topic === 'Venta' ? $sale : ($topic === 'Arriendo' ? $rent : ($rent !== '' && $rent !== '0' ? $rent : $sale));
-    if ($price !== '' && $price !== '0') {
-      $fields['presupuesto'] = self::money($price);
-    }
+    // El presupuesto es del cliente: no se copia del precio del inmueble.
     $place = implode(', ', array_filter([$v('barrio'), $v('ciudad')]));
     $summary = trim(($fields['tipo_inmueble'] ?: ($v('tipo_inmueble') ?: 'Inmueble')) . ' ' . $code . ($place !== '' ? ' · ' . $place : '') . ($v('estado') !== '' ? ' · ' . $v('estado') : ''));
     return ['codigo' => $code, 'campos' => array_filter($fields, static fn(string $value): bool => $value !== ''), 'resumen' => $summary];
@@ -527,6 +572,7 @@ final class CommercialCallsService
     $hasPartner = !in_array(trim((string) ($call['id_pph'] ?? '')), ['', '0'], true);
     $clientId = $this->repository->clientId($celular);
     $inmueble = (int) $text('id_inmueble');
+    [$budget, $descripcion] = self::budget($input, $descripcion, $offer);
     return [
       'cct_status' => 'publish', 'cct_author_id' => $me, 'cct_created' => $now, 'cct_modified' => $now,
       'id_creador' => $me,
@@ -550,7 +596,7 @@ final class CommercialCallsService
       'uso' => $text('uso'),
       'medio' => $medio,
       'precio' => in_array($topic, self::LISTING_TOPICS, true) ? self::amount($text('precio')) : '',
-      'presupuesto' => $offer ? self::amount($text('presupuesto')) : '',
+      'presupuesto' => $budget,
       'factores' => implode(', ', $factors),
       'asunto' => $asunto,
       'descripcion' => $descripcion,

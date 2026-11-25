@@ -80,6 +80,7 @@ final class CommercialActionRouter
     'commercial_calls_history' => 'history',
     'commercial_calls_card' => 'card',
     'commercial_calls_property' => 'property',
+    'commercial_calls_smart_fill' => 'smartFill',
   ];
 
   /** Cotizaciones de inmuebles (popup de la tarea y Actividades comerciales › Cotizaciones): CommercialQuotesApiController. */
