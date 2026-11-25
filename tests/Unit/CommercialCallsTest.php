@@ -894,4 +894,18 @@ final class CommercialCallsTest extends TestCase
     self::assertSame([$first], array_column($filtered['rows'], 'id'), 'Con filtro se muestra la solicitud de la persona que lo cumple.');
     self::assertStringContainsString('2 solicitudes', CommercialCallsView::results($listing, $this->service(), CommercialCallsDatabase::policy($this->db)));
   }
+
+  public function testCreateTaskCanReassignAndTheCallFollows(): void
+  {
+    $id = $this->create(['id_empleado' => '101']);
+    self::assertStringContainsString('name="id_empleado"', CommercialCallsView::taskForm($this->service()->taskData($id), $this->service()->options()), 'Crear tarea deja elegir el responsable.');
+    $task = $this->service()->createTask($this->taskInput($id, ['id_empleado' => '202']));
+    self::assertSame('202', $this->db->getRow('SELECT id_empleado FROM wp_jet_cct_tickets WHERE _ID = ?', [$task['id']])['id_empleado']);
+    self::assertSame('202', $this->row($id)['id_empleado'], 'La llamada queda con el nuevo responsable.');
+
+    $inactive = $this->create(['celular' => '3012223333']);
+    $this->db->update('wp_jet_cct_funcionarios', ['activo' => 'No'], ['id_empleado' => '404']);
+    $this->expectExceptionMessage('Elige en Asignar a un funcionario activo para la tarea.');
+    $this->service()->createTask($this->taskInput($inactive, ['celular_solicitante' => '3012223333', 'id_empleado' => '404']));
+  }
 }

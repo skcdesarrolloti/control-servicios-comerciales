@@ -298,7 +298,7 @@ final class CommercialCallsView
     return self::modalHead('Crear tarea', 'Llamada #' . (int) $call['_ID'] . ' · ' . $v('cliente'))
       . '<form class="ccl-form" data-ccl-task-form novalidate><input type="hidden" name="id" value="' . (int) $call['_ID'] . '">'
       . '<div class="ccl-modal-body"><p class="ccl-error" data-ccl-error role="alert" hidden></p>'
-      . '<div class="ccl-locked"><span class="material-symbols-outlined" aria-hidden="true">lock</span><div><strong>Medio: ' . self::e($v('medio') ?: 'Sin medio') . '</strong><p>Asignada a ' . self::e($data['responsable'] ?: 'sin responsable') . '. La tarea conserva el medio de su llamada.</p></div></div>'
+      . '<div class="ccl-locked"><span class="material-symbols-outlined" aria-hidden="true">lock</span><div><strong>Medio: ' . self::e($v('medio') ?: 'Sin medio') . '</strong><p>La tarea conserva el medio de su llamada. El responsable se puede cambiar en Asignar a.</p></div></div>'
       . ($partner ? '<p class="ccl-partner-box"><span class="material-symbols-outlined" aria-hidden="true">loyalty</span>Aliado Club PPH: <strong>' . self::e(trim($v('nombre_pph') . ' · ' . $v('tarjeta_pph'), ' ·')) . '</strong></p>' : '')
       . '<h3>Solicitante</h3><div class="ccl-grid-6">'
       . self::input('solicitante', 'Nombre', $v('cliente'), 'text', true, '', 'ccl-wide')
@@ -307,6 +307,8 @@ final class CommercialCallsView
       . self::input('celular_wsp', 'Celular WhatsApp', $v('celular_wsp'), 'tel', false, 'inputmode="numeric"')
       . self::input('usuario_wsp', 'Usuario WhatsApp', $v('usuario_wsp'), 'text', false, '', 'ccl-wide')
       . '</div><h3>Tarea</h3><div class="ccl-grid">'
+      // El responsable de la llamada viene puesto; si se cambia, la llamada queda con el nuevo responsable.
+      . self::pairField('id_empleado', 'Asignar a', array_map(static fn(array $employee): array => ['value' => (string) $employee['id'], 'label' => (string) $employee['name']], $options['funcionarios']), $v('id_empleado'), true)
       . self::selectField('prioridad', 'Prioridad', $options['prioridades'], 'Prioridad comercial', true)
       . self::selectField('tema_ayuda', 'Tema', $options['temas'], $topic, true)
       . '<div data-ccl-topic-field="codigo" hidden>' . self::input('id_inmueble', 'Código del inmueble', $v('id_inmueble'), 'text', false, 'inputmode="numeric" data-ccl-property-code') . '<p class="ccl-hint" data-ccl-property-result role="status" hidden></p></div>'

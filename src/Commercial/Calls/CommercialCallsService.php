@@ -528,9 +528,16 @@ final class CommercialCallsService
     try {
       $call = $this->accessible($id, true);
       $this->assertTaskPossible($call);
-      $employee = $this->repository->employee(trim((string) ($call['id_empleado'] ?? '')));
+      // Responsable: el elegido en Asignar a (por defecto el de la llamada); si cambia, la llamada queda con él.
+      $chosen = is_scalar($input['id_empleado'] ?? null) && trim((string) $input['id_empleado']) !== '' ? trim((string) $input['id_empleado']) : trim((string) ($call['id_empleado'] ?? ''));
+      $employee = $this->repository->employee($chosen);
       if ($employee === null || ($employee['activo'] ?? '') !== 'Si') {
-        throw new \InvalidArgumentException('La llamada está asignada a un funcionario inactivo. Edítala y asígnala a otra persona.');
+        throw new \InvalidArgumentException('Elige en Asignar a un funcionario activo para la tarea.');
+      }
+      $assignee = trim((string) $employee['id_empleado']);
+      if ($assignee !== trim((string) ($call['id_empleado'] ?? ''))) {
+        $this->repository->update($id, ['id_empleado' => $assignee]);
+        $call['id_empleado'] = $assignee;
       }
       $task = $this->taskRow($call, $input, $employee, $me);
       $taskId = $this->repository->insertTask($task);
