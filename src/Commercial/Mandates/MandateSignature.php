@@ -41,6 +41,8 @@ final class MandateSignature
   private const MONEY = ['precio_canon', 'precio_administracion', 'precio_canon_total', 'iva_canon', 'comision_sin_iva', 'iva_comision', 'total_comision', 'valor_garantia', 'valor_asegurado_garantia_servicios', 'prima_mes_garantia_servicios', 'prima_anual_garantia_servicios', 'precio_clausula_penal', 'valor_asegurado_berkley', 'prima_mes_berkley', 'prima_anual_berkley', 'valor_asegurado_seguros_mundial', 'prima_mes_seguros_mundial', 'total_prima_seguros_mundial'];
   private const PERCENT = ['tasa_comision', 'tasa_garantia', 'tasa_clausula_penal', 'tasa_berkley', 'tasa_seguros_mundial', 'rete_fuente', 'rete_ica', 'rete_iva', 'adulto_mayor', 'pro_universitario', 'recreacion_deporte'];
   private const ONLY_IF = [
+    // Sin propiedad horizontal no hay copropiedad (el formulario no la guarda; datos viejos del inmueble no deben salir).
+    'propiedad_horizontal' => ['nombre_copropiedad', 'nit_copropiedad', 'administrador', 'telefono_copropiedad', 'correo_copropiedad', 'tipo_cuenta_copropiedad', 'numero_cuenta_copropiedad', 'banco_copropiedad', 'responsable_admin'],
     'incluye_garantia' => ['aseguradora', 'tasa_garantia', 'valor_garantia', 'meses_cobertura_garantia'],
     'incluye_garantia_servicios' => ['valor_asegurado_garantia_servicios', 'cobertura_garantia_servicios', 'forma_pago_garantia_servicios', 'prima_mes_garantia_servicios', 'prima_anual_garantia_servicios'],
     'incluye_clausula_penal' => ['tasa_clausula_penal', 'precio_clausula_penal'],

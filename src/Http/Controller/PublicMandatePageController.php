@@ -98,7 +98,7 @@ final class PublicMandatePageController
       return;
     }
     $service->ownerSeen($id);
-    $this->page(200, $service->viewData($id), ['action' => $action, 'flash' => self::flash($query)], '');
+    $this->page(200, $service->viewData($id), ['action' => $action, 'flash' => self::flash($query), 'contract' => self::contract($action, $query)], '');
   }
 
   /**
@@ -119,6 +119,11 @@ final class PublicMandatePageController
       return;
     }
     $action = $this->self . '?id=' . $id . (($query['embed'] ?? '') === '1' ? '&embed=1' : '');
+    if (($query['como'] ?? '') === 'propietario' && $method !== 'POST') {
+      // Vista previa: lo que ve el propietario con su enlace, sin marcarlo como visto y sin formularios.
+      $this->page(200, $service->viewData($id), ['action' => $action, 'preview' => $action, 'contract' => self::contract($action . '&como=propietario', $query)], '');
+      return;
+    }
     if ($method === 'POST') {
       if (!$this->csrf->verify(self::CSRF, self::str($post, '_csrf_token', 200), false)) {
         $this->page(403, $service->viewData($id, true), ['action' => $action], 'La página venció. Vuelve a cargarla e intenta de nuevo.');
@@ -145,7 +150,7 @@ final class PublicMandatePageController
       $flash = $_SESSION['scm_mandate_flash'];
       unset($_SESSION['scm_mandate_flash']);
     }
-    $this->page(200, $service->viewData($id, true), ['action' => $action, 'flash' => $flash], '');
+    $this->page(200, $service->viewData($id, true), ['action' => $action, 'flash' => $flash, 'contract' => self::contract($action, $query)], '');
   }
 
   private function service(CommercialAccessPolicy $policy): CommercialMandatesService
@@ -177,6 +182,8 @@ final class PublicMandatePageController
       'flash' => (string) ($page['flash'] ?? ''),
       'error' => $error,
       'draft' => is_array($page['draft'] ?? null) ? $page['draft'] : [],
+      'preview' => (string) ($page['preview'] ?? ''),
+      'contract' => is_array($page['contract'] ?? null) ? $page['contract'] : ['url' => '', 'open' => false],
     ]);
   }
 
@@ -190,6 +197,16 @@ final class PublicMandatePageController
   private function asset(string $path): string
   {
     return rtrim((string) SCM_BASE_URL, '/') . '/assets/' . $path . '?v=' . substr((string) @hash_file('sha256', SCM_PUBLIC_PATH . '/assets/' . $path), 0, 12);
+  }
+
+  /**
+   * Enlace "Ver el contrato completo" (abre su sección) y si ya llega abierta (?contrato=1).
+   * @param array<string,mixed> $query
+   * @return array{url:string,open:bool}
+   */
+  private static function contract(string $base, array $query): array
+  {
+    return ['url' => $base . '&contrato=1#contrato', 'open' => ($query['contrato'] ?? '') === '1'];
   }
 
   /** @param array<string,mixed> $query */

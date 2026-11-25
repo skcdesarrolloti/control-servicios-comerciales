@@ -38,7 +38,7 @@
   function openViewer(id, button) {
     returnFocus = button || document.activeElement;
     if (button) button.disabled = true;
-    request("commercial_mandate_view", { id: id }).then(function (result) {
+    request("commercial_mandate_view", { id: id, vista: (button && button.getAttribute("data-cma-mode")) || "" }).then(function (result) {
       var old = document.getElementById("cma-viewer");
       if (old) old.remove();
       var viewer = document.createElement("div");
@@ -193,6 +193,8 @@
     var view = target.closest("[data-cma-view]");
     if (view) { event.preventDefault(); openViewer(view.getAttribute("data-cma-view"), view); return; }
     if (target.closest("[data-cma-viewer-close]") || target.id === "cma-viewer") { closeViewer(); return; }
+    var tab = target.closest("[data-cma-viewer-tab]");
+    if (tab) tab.parentNode.querySelectorAll("[data-cma-viewer-tab]").forEach(function (item) { item.setAttribute("aria-pressed", item === tab ? "true" : "false"); });
     var state = target.closest("[data-cma-state]");
     if (state) {
       var filters = document.querySelector("[data-cma-list-filters]");

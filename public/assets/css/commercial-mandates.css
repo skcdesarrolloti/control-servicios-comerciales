@@ -74,3 +74,7 @@
 /* Separación entre los filtros y las pestañas de estado del listado */
 [data-cma-page] [data-cma-list] { padding-top:16px; }
 [data-cma-page] .cst-pills { margin-bottom:16px; }
+/* Visor: revisión, contrato completo y vista del propietario */
+.cma-viewer-tabs { margin:0; flex:1 1 auto; justify-content:center; }
+.cma-viewer-tabs .cst-pill { display:inline-flex; align-items:center; gap:6px; text-decoration:none; }
+.cma-viewer-tabs .material-symbols-outlined { font-size:18px; }

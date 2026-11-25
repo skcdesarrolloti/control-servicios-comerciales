@@ -40,12 +40,14 @@ final class CommercialMandatesService
   ];
 
 
+  private Database $db;
   private CommercialMandatesRepository $repository;
   private CommercialAccessPolicy $policy;
   private ?CommercialMandatesNotifier $notifier;
 
   public function __construct(Database $db, CommercialAccessPolicy $policy, ?CommercialMandatesNotifier $notifier = null, ?CommercialMandatesRepository $repository = null)
   {
+    $this->db = $db;
     $this->repository = $repository ?? new CommercialMandatesRepository($db);
     $this->policy = $policy;
     $this->notifier = $notifier;
@@ -225,6 +227,8 @@ final class CommercialMandatesService
       'propietarios' => $owners,
       'lugar' => CommercialMandatesNotifier::place($mandate),
       'secciones' => MandateDocument::sections($mandate),
+      // El contrato completo (cláusulas y anexos) con los valores que recibirá eSignatures.
+      'contrato' => MandateContractText::html($mandate, new MandateCalculator($this->db)),
       'observaciones' => array_map(static fn(array $note): array => [
         'id' => (int) $note['id'], 'seccion' => (string) $note['seccion'], 'nombre' => (string) $note['nombre'], 'mensaje' => (string) $note['mensaje'],
         'estado' => (string) $note['estado'], 'respuesta' => (string) ($note['respuesta'] ?? ''), 'respondido_por' => (string) $note['respondido_por'],

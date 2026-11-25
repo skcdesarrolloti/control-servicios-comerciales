@@ -44,13 +44,21 @@ final class PublicMandateView
       return $html . '<section class="ps-card ps-empty"><h1>' . self::e($title) . '</h1><p role="alert">' . self::e($page['error']) . '</p></section></main></body></html>';
     }
     $staff = is_array($data['interno']);
+    $preview = (string) ($page['preview'] ?? '') !== '';
+    $contract = is_array($page['contract'] ?? null) ? $page['contract'] : ['url' => '', 'open' => false];
+    $hasContract = (string) ($data['contrato'] ?? '') !== '';
     $state = (string) $data['revision'];
     [$label, $tone] = CommercialMandatesService::REVIEW_STATES[$state] ?? ['', 'wait'];
     $names = $data['propietarios'];
     $html .= '<section class="ps-card ps-hero ps-hero--' . self::e($tone) . '"><p class="ps-eyebrow">Contrato de mandato #' . (int) $data['id'] . ' · ' . self::e($data['lugar']) . '</p>'
       . '<h1>' . ($staff ? 'Revisión del propietario' : 'Hola, ' . self::e($names !== [] ? implode(' y ', $names) : 'apreciado propietario')) . '</h1>'
       . '<p class="ps-state"><span class="ps-badge ps-badge--' . self::e($tone) . '">' . self::e($label) . '</span></p>'
-      . '<p>' . self::e(self::stateText($data, $staff)) . '</p></section>';
+      . '<p>' . self::e(self::stateText($data, $staff)) . '</p>'
+      . ($hasContract && $contract['url'] !== '' ? '<p class="pm-hero-actions"><a class="ps-button ps-button--light" href="' . self::e($contract['url']) . '">Ver el contrato completo</a></p>' : '')
+      . '</section>';
+    if ($preview) {
+      $html .= '<p class="pm-preview" role="status">Vista previa: así ve el propietario esta página con su enlace. Aquí no se pueden dejar observaciones ni aprobar. <a href="' . self::e((string) $page['preview']) . '">Volver a la vista del equipo</a></p>';
+    }
     if ($page['flash'] !== '') {
       $html .= '<p class="pm-flash" role="status">' . self::e($page['flash']) . '</p>';
     }
@@ -66,7 +74,7 @@ final class PublicMandateView
     foreach ($data['observaciones'] as $note) {
       $notes[$note['seccion']][] = $note;
     }
-    $open = !$data['firmado'];
+    $open = !$data['firmado'] && !$preview;
     foreach ($data['secciones'] as $section) {
       $html .= '<section class="ps-card pm-section" id="seccion-' . self::e($section['key']) . '"><h2>' . self::e($section['title']) . '</h2>' . self::sectionBody($section)
         . self::notes($notes[$section['key']] ?? [], $staff, $data, $page)
@@ -80,6 +88,11 @@ final class PublicMandateView
     }
     if (!$staff && $open) {
       $html .= self::approval($data, $page);
+    }
+    if ($hasContract) {
+      $html .= '<section class="ps-card pm-contract" id="contrato"><details' . ($contract['open'] ? ' open' : '') . '><summary><span>Contrato completo</span><small>Cláusulas y anexos, tal como se enviará a firma digital</small></summary>'
+        . '<p class="ps-hint">Es el texto del contrato con los datos de esta página. La fecha del encabezado será la del día en que se envíe a firma.</p>'
+        . '<div class="pm-contract-body">' . (string) $data['contrato'] . '</div></details></section>';
     }
     $html .= self::advisor($data['consultor']);
     return $html . self::foot($assets['js']);

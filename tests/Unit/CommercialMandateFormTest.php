@@ -9,6 +9,7 @@ use SCM\Commercial\CommercialAccessPolicy;
 use SCM\Commercial\Mandates\CommercialMandateFormService;
 use SCM\Commercial\Mandates\CommercialMandatesService;
 use SCM\Commercial\Mandates\CommercialMandatesRepository;
+use SCM\Commercial\Mandates\MandateContractText;
 use SCM\Commercial\Mandates\MandateDocument;
 use SCM\Commercial\Mandates\MandateCalculator;
 use SCM\Commercial\Mandates\MandateFields;
@@ -401,5 +402,56 @@ final class CommercialMandateFormTest extends TestCase
     self::assertStringContainsString('Propietario 10 · 21235713', $known);
     $typed = CommercialMandateFormView::render(['cantidad_propietarios' => '1', 'nombre_1' => 'Pedro Nuevo'], $empty, [], $context);
     self::assertStringContainsString('name="registrado_1" value="no" data-cmf-mode checked>', $typed, 'Con datos sin ficha: "No, es nuevo".');
+  }
+
+  public function testTheFullContractIsTheESignaturesTemplateWithTheMandateValues(): void
+  {
+    $html = MandateContractText::render("**Cartagena,** **{{fecha}}.**`{\"alignment\":\"justify\"}`
+# **ANEXO 1**
+{{tabla_propietarios}}
+| Escritura | {{escritura}} |
+| --- | --- |
+| **Canon** | {{precio_canon}} |
+| Vacío | {{no_existe}} |
+Acepto.`{\"input_type\":\"every_signer\"}`",
+      ['fecha' => '25 de noviembre de 2026', 'escritura' => '891 <b>', 'precio_canon' => '$1.650.000'],
+      ['tabla_propietarios' => "**PROPIETARIO 1: Lilia**
+
+| Dato | Valor |
+| --- | --- |
+| **Nombre** | Lilia |"]);
+    self::assertStringContainsString('<strong>Cartagena,</strong> <strong><span class="pm-contract-value">25 de noviembre de 2026</span>.</strong>', $html);
+    self::assertStringNotContainsString('alignment', $html, 'Las marcas de eSignatures se quitan.');
+    self::assertStringContainsString('<h3><strong>ANEXO 1</strong></h3>', $html);
+    self::assertStringContainsString('<strong>PROPIETARIO 1: Lilia</strong>', $html, 'La tabla de propietarios entra como Markdown.');
+    self::assertStringContainsString('891 &lt;b&gt;', $html, 'Los valores se escapan.');
+    self::assertStringContainsString('<tr class="pm-contract-head"><td class="pm-contract-key">Escritura</td>', $html);
+    self::assertStringContainsString('<td class="pm-contract-key"><strong>Canon</strong></td><td><span class="pm-contract-value">$1.650.000</span></td>', $html);
+    self::assertStringContainsString('<span class="pm-contract-value">No aplica</span>', $html, 'Sin valor: "No aplica", como en eSignatures.');
+    self::assertStringNotContainsString('---', $html);
+    self::assertStringContainsString('class="pm-contract-accept"', $html);
+
+    $id = $this->service()->save($this->post())['id'];
+    $mandate = $this->db->getRow('SELECT * FROM wp_jet_cct_contrato_mandato WHERE _ID = ?', [$id]);
+    $full = MandateContractText::html($mandate, new MandateCalculator(null, self::CONFIG));
+    self::assertStringContainsString('CLAUSULA PRIMERA', $full, 'Por defecto: su plantilla.');
+    self::assertStringContainsString('6.1). GARANTÍA INMOBILIARIA', $full);
+    self::assertStringContainsString('PROPIETARIO 2: Pedro Nuevo', $full);
+    self::assertStringContainsString('$1.650.000', $full);
+    self::assertStringNotContainsString('{{', $full, 'Todos los campos se llenan.');
+    foreach (MandateContractText::FILES as $type => $file) {
+      self::assertFileExists(dirname(__DIR__, 2) . '/resources/mandatos/' . $file, $type);
+      self::assertArrayHasKey($type, MandateSignature::TEMPLATES, 'Cada plantilla de eSignatures tiene su copia.');
+    }
+    self::assertStringContainsString('Berkley', MandateContractText::html(['tipo_contrato' => 'Berkley', 'cantidad_propietarios' => '1']));
+    self::assertSame('', MandateContractText::html(['tipo_contrato' => 'Otro']));
+  }
+
+  public function testTheViewerOffersTheContractAndThePublicView(): void
+  {
+    $html = CommercialMandatesView::viewer(5, 'contrato');
+    self::assertStringContainsString('&amp;contrato=1#contrato" target="cma-frame-5" data-cma-viewer-tab aria-pressed="true"', $html);
+    self::assertStringContainsString('&amp;como=propietario', $html, 'Vista pública sin marcarla como vista por el propietario.');
+    self::assertStringContainsString('name="cma-frame-5" src="', $html);
   }
 }

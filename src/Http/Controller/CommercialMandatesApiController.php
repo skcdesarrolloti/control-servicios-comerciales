@@ -77,7 +77,7 @@ final class CommercialMandatesApiController
   /** @param array<string,mixed> $input */
   public function view(array $input): never
   {
-    $this->guarded($input, fn(): array => ['html' => CommercialMandatesView::viewer($this->openable((int) ($input['id'] ?? 0)))]);
+    $this->guarded($input, fn(): array => ['html' => CommercialMandatesView::viewer($this->openable((int) ($input['id'] ?? 0)), (string) ($input['vista'] ?? ''))]);
   }
 
   /** Mandato que la persona puede abrir. */

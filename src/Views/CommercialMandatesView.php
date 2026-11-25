@@ -158,6 +158,8 @@ final class CommercialMandatesView
     $open = $row['estado'] !== 'Firmado';
     $ticketAttr = $ticket > 0 ? ' data-ticket-pk="' . $ticket . '"' : '';
     return '<button type="button" class="' . ($row['revision'] === 'observaciones' ? 'cqt-primary' : 'cqt-secondary') . ' cqt-small" data-cma-view="' . $id . '">' . self::icon('rate_review') . 'Revisión del propietario</button>'
+      . '<button type="button" class="cqt-secondary cqt-small" data-cma-view="' . $id . '" data-cma-mode="contrato">' . self::icon('description') . 'Ver contrato</button>'
+      . '<button type="button" class="cqt-secondary cqt-small" data-cma-view="' . $id . '" data-cma-mode="propietario">' . self::icon('visibility') . 'Vista pública</button>'
       . ($canEdit && $open ? '<button type="button" class="cqt-secondary cqt-small" data-cma-form data-id="' . $id . '"' . $ticketAttr . '>' . self::icon('edit') . 'Editar</button>' : '')
       . ($canSign && $open ? '<button type="button" class="cqt-secondary cqt-small' . (($row['bloqueos'] ?? []) !== [] ? ' cma-blocked" aria-disabled="true" title="Falta lo que se indica para enviar a firma' : '') . '" data-review-notice="' . self::e((string) ($row['aviso_revision'] ?? '')) . '" data-cma-sign="' . $id . '" data-blockers="' . self::e((string) json_encode($row['bloqueos'] ?? [], JSON_UNESCAPED_UNICODE)) . '" data-resend="' . ($row['estado'] === 'Enviado' ? '1' : '0') . '"' . $ticketAttr . '>' . self::icon('draw') . ($row['estado'] === 'Enviado' ? 'Reenviar a firma' : 'Enviar a firma') . '</button>' : '')
       . ($row['pdf'] !== '' ? '<a class="cqt-secondary cqt-small" href="' . self::e($row['pdf']) . '" target="_blank" rel="noopener">' . self::icon('picture_as_pdf') . 'PDF firmado</a>' : '');
@@ -175,12 +177,25 @@ final class CommercialMandatesView
   }
 
   /** Popup con la vista interna de mandato.php (revisión del propietario y acciones del equipo). */
-  public static function viewer(int $id): string
+  public static function viewer(int $id, string $mode = ''): string
   {
     $staff = PublicMandateAccess::staffUrl($id);
-    return '<div class="cqt-viewer-box" role="document"><header class="cqt-viewer-head"><h2 id="cma-viewer-title">Contrato de mandato #' . $id . '</h2><div class="cqt-viewer-actions">'
+    // Tres vistas en el mismo popup: la revisión (equipo), el contrato completo y lo que ve el propietario.
+    $views = [
+      '' => ['rate_review', 'Revisión', $staff . '&embed=1'],
+      'contrato' => ['description', 'Contrato completo', $staff . '&embed=1&contrato=1#contrato'],
+      'propietario' => ['visibility', 'Como el propietario', $staff . '&embed=1&como=propietario'],
+    ];
+    $mode = isset($views[$mode]) ? $mode : '';
+    $tabs = '';
+    foreach ($views as $key => [$icon, $label, $url]) {
+      $tabs .= '<a class="cst-pill" href="' . self::e($url) . '" target="cma-frame-' . $id . '" data-cma-viewer-tab aria-pressed="' . ($key === $mode ? 'true' : 'false') . '">' . self::icon($icon) . self::e($label) . '</a>';
+    }
+    return '<div class="cqt-viewer-box" role="document"><header class="cqt-viewer-head"><h2 id="cma-viewer-title">Contrato de mandato #' . $id . '</h2>'
+      . '<nav class="cst-pills cma-viewer-tabs" aria-label="Vistas del mandato">' . $tabs . '</nav><div class="cqt-viewer-actions">'
       . '<a class="cqt-secondary" href="' . self::e($staff) . '" target="_blank" rel="noopener">' . self::icon('open_in_new') . 'Abrir</a>'
       . '<button type="button" class="cqt-icon" data-cma-viewer-close aria-label="Cerrar">' . self::icon('close') . '</button></div></header>'
-      . '<iframe class="cqt-frame" src="' . self::e($staff . '&embed=1') . '" title="Contrato de mandato #' . $id . '"></iframe></div>';
+      . '<iframe class="cqt-frame" name="cma-frame-' . $id . '" src="' . self::e($views[$mode][2]) . '" title="Contrato de mandato #' . $id . '"></iframe></div>';
   }
+
 }
