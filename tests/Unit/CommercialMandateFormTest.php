@@ -330,6 +330,8 @@ final class CommercialMandateFormTest extends TestCase
     self::assertStringContainsString('Mandato #' . $id, $panel);
     self::assertStringContainsString('data-cma-sign="' . $id . '" data-blockers="[&quot;El propietario no ha revisado', $panel);
     self::assertStringContainsString('Sin hoja de cierre', $panel);
+    self::assertStringContainsString('Para enviar a firma falta:', $panel, 'Lo que falta se ve sin pulsar el botón.');
+    self::assertStringContainsString('cma-blocked" aria-disabled="true"', $panel);
     self::assertStringContainsString('data-cma-form data-ticket-pk="700"', $panel);
   }
 

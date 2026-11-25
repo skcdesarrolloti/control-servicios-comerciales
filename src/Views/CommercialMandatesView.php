@@ -65,7 +65,7 @@ final class CommercialMandatesView
     if ($listing['rows'] === []) {
       return $html . '<p class="cqt-empty">No hay mandatos con estos filtros.</p>';
     }
-    $html .= '<div class="cqt-table-wrap"><table class="cqt-table"><thead><tr><th>Mandato</th><th>Propietario</th><th>Inmueble</th><th>Revisión del propietario</th><th>Consultor/a</th><th><span class="sr-only">Acciones</span></th></tr></thead><tbody>';
+    $html .= '<div class="cqt-table-wrap"><table class="cqt-table"><thead><tr><th>Mandato</th><th>Propietario</th><th>Inmueble</th><th>Revisión y hoja de cierre</th><th>Consultor/a</th><th><span class="sr-only">Acciones</span></th></tr></thead><tbody>';
     foreach ($listing['rows'] as $row) {
       $id = (int) $row['id'];
       [$label, $tone] = CommercialMandatesService::REVIEW_STATES[$row['revision']] ?? ['', 'wait'];
@@ -77,7 +77,8 @@ final class CommercialMandatesView
           ? '<button type="button" class="cqt-link cst-property-link" data-commercial-property-detail="' . self::e($row['inmueble']) . '" title="Ver la ficha del inmueble">' . self::icon('home') . '#' . self::e($row['inmueble']) . '</button>'
           : '<span class="cqt-muted">Sin inmueble</span>') . '<small>' . self::e($row['direccion']) . '</small>' . ($row['canon'] !== '' ? '<small>Canon ' . self::e($row['canon']) . '</small>' : '') . '</td>'
         . '<td data-label="Revisión"><span class="cst-state cst-state--' . self::e($tone) . '">' . self::e($label) . '</span>'
-        . ($row['pendientes'] > 0 ? '<small>' . $row['pendientes'] . ' observación(es) pendiente(s)</small>' : '') . ($row['envios'] > 1 ? '<small>Enviado ' . $row['envios'] . ' veces</small>' : '') . '</td>'
+        . ($row['pendientes'] > 0 ? '<small>' . $row['pendientes'] . ' observación(es) pendiente(s)</small>' : '') . ($row['envios'] > 1 ? '<small>Enviado ' . $row['envios'] . ' veces</small>' : '')
+        . ($row['revision'] !== 'firmado' ? self::closingBadge($row['hoja'] ?? ['id' => 0, 'estado' => '']) : '') . self::missing($row) . '</td>'
         . '<td data-label="Consultor/a">' . self::e($row['consultor'] ?: 'Sin consultor/a') . '</td>'
         . '<td data-label="Acciones"><div class="cqt-row-actions cst-row-actions">'
         . self::actions($row, $listing['can_create'] ?? false, $listing['can_sign'] ?? false)
@@ -114,7 +115,7 @@ final class CommercialMandatesView
     foreach ($data['rows'] as $row) {
       $html .= '<article class="cst-card cma-card"><header><strong>Mandato #' . (int) $row['id'] . '</strong>' . self::badges($row) . '</header>'
         . '<p>' . self::e($row['propietarios'] !== [] ? implode(', ', $row['propietarios']) : 'Sin propietario') . ($row['inmueble'] !== '' ? ' · Inmueble #' . self::e($row['inmueble']) : '') . ($row['canon'] !== '' ? ' · Canon ' . self::e($row['canon']) : '') . '</p>'
-        . ($row['pendientes'] > 0 ? '<p class="cma-warn">' . self::icon('rate_review') . $row['pendientes'] . ' observación(es) del propietario sin resolver.</p>' : '')
+        . self::missing($row)
         . '<div class="cst-actions">' . self::actions($row, $data['can_create'], $data['can_sign'], $pk) . '</div></article>';
     }
     return $html . '</div></section>';
@@ -126,6 +127,17 @@ final class CommercialMandatesView
     [$label, $tone] = CommercialMandatesService::REVIEW_STATES[$row['revision']] ?? ['', 'wait'];
     return '<span class="cst-state cst-state--' . (self::STATE_TONES[$row['estado']] ?? 'wait') . '">' . self::e($row['estado'] === 'Enviado' ? 'Enviado a firma' : $row['estado']) . '</span>'
       . ($row['revision'] !== 'firmado' ? '<span class="cst-state cst-state--' . self::e($tone) . '">' . self::e($label) . '</span>' . self::closingBadge($row['hoja'] ?? ['id' => 0, 'estado' => '']) : '');
+  }
+
+  /** Lo que falta para enviar a firma, a la vista (el botón y el servidor lo exigen). @param array<string,mixed> $row */
+  private static function missing(array $row): string
+  {
+    $blockers = $row['estado'] === 'Firmado' ? [] : (array) ($row['bloqueos'] ?? []);
+    if ($blockers === []) {
+      return $row['estado'] === 'Firmado' ? '' : '<p class="cma-ready">' . self::icon('check_circle') . 'Listo para enviar a firma.</p>';
+    }
+    return '<div class="cma-missing"><strong>' . self::icon('info') . 'Para enviar a firma falta:</strong><ul>'
+      . implode('', array_map(static fn($reason): string => '<li>' . self::e($reason) . '</li>', $blockers)) . '</ul></div>';
   }
 
   /** Estado de la hoja de cierre (debe estar aprobada para enviar a firma). @param array{id:int,estado:string} $closing */
@@ -145,7 +157,7 @@ final class CommercialMandatesView
     $ticketAttr = $ticket > 0 ? ' data-ticket-pk="' . $ticket . '"' : '';
     return '<button type="button" class="' . ($row['revision'] === 'observaciones' ? 'cqt-primary' : 'cqt-secondary') . ' cqt-small" data-cma-view="' . $id . '">' . self::icon('rate_review') . 'Revisión del propietario</button>'
       . ($canEdit && $open ? '<button type="button" class="cqt-secondary cqt-small" data-cma-form data-id="' . $id . '"' . $ticketAttr . '>' . self::icon('edit') . 'Editar</button>' : '')
-      . ($canSign && $open ? '<button type="button" class="cqt-secondary cqt-small" data-cma-sign="' . $id . '" data-blockers="' . self::e((string) json_encode($row['bloqueos'] ?? [], JSON_UNESCAPED_UNICODE)) . '" data-resend="' . ($row['estado'] === 'Enviado' ? '1' : '0') . '"' . $ticketAttr . '>' . self::icon('draw') . ($row['estado'] === 'Enviado' ? 'Reenviar a firma' : 'Enviar a firma') . '</button>' : '')
+      . ($canSign && $open ? '<button type="button" class="cqt-secondary cqt-small' . (($row['bloqueos'] ?? []) !== [] ? ' cma-blocked" aria-disabled="true" title="Falta lo que se indica para enviar a firma' : '') . '" data-cma-sign="' . $id . '" data-blockers="' . self::e((string) json_encode($row['bloqueos'] ?? [], JSON_UNESCAPED_UNICODE)) . '" data-resend="' . ($row['estado'] === 'Enviado' ? '1' : '0') . '"' . $ticketAttr . '>' . self::icon('draw') . ($row['estado'] === 'Enviado' ? 'Reenviar a firma' : 'Enviar a firma') . '</button>' : '')
       . ($row['pdf'] !== '' ? '<a class="cqt-secondary cqt-small" href="' . self::e($row['pdf']) . '" target="_blank" rel="noopener">' . self::icon('picture_as_pdf') . 'PDF firmado</a>' : '');
   }
 
