@@ -281,7 +281,8 @@
       box.dataset.state = "error";
     });
   }
-  // Descripción armada con los datos del formulario: motivo, inmueble, código, presupuesto, factores y urgencia.
+  // Descripción armada con los datos de la solicitud: motivo, inmueble, barrio, código, presupuesto y factores.
+  // Lo del tipo de cliente (inmediato, mes, comisionista) ya queda en sus campos y no se repite aquí.
   function lower(text) { return String(text || "").toLocaleLowerCase("es-CO"); }
   function listText(items) {
     return items.length > 1 ? items.slice(0, -1).join(", ") + " y " + items[items.length - 1] : (items[0] || "");
@@ -307,9 +308,6 @@
     if (value(form, "precio") && (topic === "Captacion" || topic === "Recaptacion")) parts.push("Precio esperado: $" + value(form, "precio") + ".");
     var factors = Array.prototype.map.call(form.querySelectorAll('[name="factores_importantes[]"]:checked'), function (box) { return lower(box.value); });
     if (factors.length) parts.push("Le importa: " + listText(factors) + ".");
-    if (value(form, "cliente_inmediato") === "Si") parts.push("Lo necesita de inmediato.");
-    else if (value(form, "cliente_inmediato") === "No" && value(form, "mes_inmueble")) parts.push("Lo necesita para " + lower(value(form, "mes_inmueble")) + ".");
-    if (value(form, "comisionista") === "Si") parts.push("Es comisionista.");
     return parts.join(" ");
   }
   // Asunto corto de la tarea: "Cliente para arriendo: casa en Laureles · $2.250.000" o "Captación de casa en Laureles".
