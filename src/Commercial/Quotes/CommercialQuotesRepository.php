@@ -278,6 +278,16 @@ final class CommercialQuotesRepository
     $this->db->insert($this->db->table('jet_cct_historial_del_ticket'), $this->existing('jet_cct_historial_del_ticket', $data));
   }
 
+  /** Nota interna de la tarea (jet_cct_notas_ticket): trazabilidad que no es respuesta al cliente. @param array<string,mixed> $data */
+  public function insertTaskNote(array $data): void
+  {
+    if ($this->columns->columns('jet_cct_notas_ticket') === []) {
+      $this->insertTaskHistory(['respuesta' => $data['observacion'] ?? ''] + $data);
+      return;
+    }
+    $this->db->insert($this->db->table('jet_cct_notas_ticket'), $this->existing('jet_cct_notas_ticket', $data));
+  }
+
   /** @param array<string,mixed> $data */
   public function updateTask(int $id, array $data): void
   {

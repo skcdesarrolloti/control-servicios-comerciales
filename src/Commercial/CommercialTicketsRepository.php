@@ -1664,7 +1664,8 @@ final class CommercialTicketsRepository
         'estado_comercial' => $status,
         'fecha_actualizacion' => time(),
       ], ['_ID' => $ticketPk]);
-      $this->insertHistory($ticketPk, sprintf('Estado comercial actualizado de "%s" a "%s".', $previous ?: 'Sin estado', $status));
+      // El cambio de estado es trazabilidad interna: va como nota (no cuenta como respuesta ni lo ve el cliente en su enlace).
+      $this->insertStatusNote($ticketPk, sprintf('Estado comercial actualizado de "%s" a "%s".', $previous ?: 'Sin estado', $status));
       $pdo->commit();
     } catch (\Throwable $exception) {
       if ($pdo->inTransaction()) {
@@ -2286,6 +2287,28 @@ final class CommercialTicketsRepository
       throw new \RuntimeException('La tarea comercial no existe.');
     }
     return $row;
+  }
+
+  private function insertStatusNote(int $ticketPk, string $message): void
+  {
+    $table = $this->db->table('jet_cct_notas_ticket');
+    if (!$this->schema->tableExists($table)) {
+      $this->insertHistory($ticketPk, $message);
+      return;
+    }
+    $now = date('Y-m-d H:i:s');
+    $employee = Auth::employeeId() !== '' ? Auth::employeeId() : (string) Auth::userId();
+    $this->db->insert($table, [
+      'cct_status' => 'publish',
+      'cct_author_id' => $employee,
+      'cct_created' => $now,
+      'cct_modified' => $now,
+      'id_ticket' => $ticketPk,
+      'fecha' => time(),
+      'nombre' => Auth::user(),
+      'id_empleado' => $employee,
+      'observacion' => $message,
+    ]);
   }
 
   private function insertHistory(int $ticketPk, string $message): void

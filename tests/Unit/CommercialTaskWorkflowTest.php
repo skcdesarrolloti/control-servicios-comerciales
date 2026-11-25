@@ -106,6 +106,16 @@ final class CommercialTaskWorkflowTest extends TestCase
     self::assertStringContainsString('closeTicket($ticketPk, $message, true)', $source);
   }
 
+  public function testStatusChangeIsAnInternalNoteNotAClientReply(): void
+  {
+    $before = (int) $this->db->getVar('SELECT COUNT(*) FROM wp_jet_cct_historial_del_ticket');
+    (new CommercialTicketsRepository($this->db))->changeStatus(900, 'Contactado');
+    self::assertSame($before, (int) $this->db->getVar('SELECT COUNT(*) FROM wp_jet_cct_historial_del_ticket'), 'No suma una respuesta al cliente.');
+    $note = $this->db->getRow('SELECT * FROM wp_jet_cct_notas_ticket WHERE id_ticket = ?', ['900']);
+    self::assertSame('Estado comercial actualizado de "Mostrando" a "Contactado".', $note['observacion']);
+    self::assertSame(['101', '101'], [(string) $note['id_empleado'], (string) $note['cct_author_id']]);
+  }
+
   public function testResumeDateIsStoredShownInTheCalendarAndCleared(): void
   {
     $tickets = new CommercialTicketsRepository($this->db);

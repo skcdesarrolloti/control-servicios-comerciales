@@ -301,9 +301,9 @@ final class CommercialQuotesService
       // Como el formulario anterior: la tarea pasa a Mostrando, salvo que esté postergada o cerrada.
       if ($previous !== 'Mostrando' && !CommercialStatusCatalog::isPostponed($previous, $general) && !CommercialStatusCatalog::isClosed($previous, $general)) {
         $update['estado_comercial'] = 'Mostrando';
-        $this->repository->insertTaskHistory($common + [
+        $this->repository->insertTaskNote($common + [
           'id_ticket' => $ticketPk, 'fecha' => $now, 'nombre' => $advisor['nombre'], 'id_empleado' => $employeeId,
-          'respuesta' => sprintf('Estado comercial actualizado de "%s" a "Mostrando".', $previous !== '' ? $previous : 'Sin estado'),
+          'observacion' => sprintf('Estado comercial actualizado de "%s" a "Mostrando".', $previous !== '' ? $previous : 'Sin estado'),
         ]);
       }
       $this->repository->updateTask($ticketPk, $update);
