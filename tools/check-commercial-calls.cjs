@@ -175,6 +175,7 @@ async function fillCall(modal, values) {
     await modal.locator('[type="submit"]').click();
     await modal.locator('[data-ccl-task-form]').waitFor();
     assert.equal(await modal.locator('[data-ccl-task-form] [name="asunto"]').inputValue(), 'Cliente para compra: apartamento en Laureles', 'El asunto se arma corto con tema, tipo y barrio');
+    assert.ok((await modal.locator('[data-ccl-task-form] [name="descripcion"]').inputValue()).length > 0, 'El resumen de la tarea no queda vacío');
     await modal.locator('[data-ccl-task-form] [data-ccl-close]').first().click();
     await modal.waitFor({ state: 'hidden' });
     // Una fila por persona: la solicitud nueva queda arriba y el distintivo abre todas sus solicitudes.

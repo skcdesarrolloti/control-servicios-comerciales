@@ -299,14 +299,15 @@
     if (seeking) parts.push(seeking + ": " + what + ".");
     else if (topic === "Captacion" || topic === "Recaptacion") parts.push("Ofrece su inmueble para arrendar o vender: " + what + ".");
     else if (topic) parts.push("Motivo: " + topic + (kind || destination ? ", " + what : "") + ".");
-    if (value(form, "tiene_codigo") === "Si" && value(form, "id_inmueble")) {
+    // En la llamada el código va tras "¿tiene código?"; en la tarea se escribe directo.
+    if ((!form.elements.tiene_codigo || value(form, "tiene_codigo") === "Si") && value(form, "id_inmueble")) {
       var found = form.querySelector('[data-ccl-property-result][data-state="ok"]');
       var summary = found ? found.textContent.split(". Se llenó")[0].split(". No trae")[0] : "";
       parts.push("Pregunta por el inmueble " + value(form, "id_inmueble") + (summary ? " (" + summary + ")" : "") + ".");
     }
     if (value(form, "tiene_presupuesto") === "Si" && value(form, "presupuesto")) parts.push("Presupuesto: $" + value(form, "presupuesto") + ".");
     if (value(form, "precio") && (topic === "Captacion" || topic === "Recaptacion")) parts.push("Precio esperado: $" + value(form, "precio") + ".");
-    var factors = Array.prototype.map.call(form.querySelectorAll('[name="factores_importantes[]"]:checked'), function (box) { return lower(box.value); });
+    var factors = Array.prototype.map.call(form.querySelectorAll('[name="factores_importantes[]"]:checked, [name="factores[]"]:checked'), function (box) { return lower(box.value); });
     if (factors.length) parts.push("Le importa: " + listText(factors) + ".");
     return parts.join(" ");
   }
@@ -351,6 +352,7 @@
     if (task) {
       syncTopic(task);
       autoSubject(task);
+      autoDescription(task, false);
     }
   }
   function formatMoney(field) {

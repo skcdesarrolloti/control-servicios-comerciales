@@ -914,6 +914,9 @@ final class CommercialCallsTest extends TestCase
   {
     $id = $this->create(['id_empleado' => '101']);
     self::assertStringContainsString('name="id_empleado"', CommercialCallsView::taskForm($this->service()->taskData($id), $this->service()->options()), 'Crear tarea deja elegir el responsable.');
+    self::assertStringContainsString('data-ccl-auto-desc="0">Busca apartamento</textarea>', CommercialCallsView::taskForm($this->service()->taskData($id), $this->service()->options()), 'Con descripción de la llamada se respeta.');
+    $blank = $this->create(['celular' => '3014445555', 'descripcion' => '']);
+    self::assertStringContainsString('data-ccl-auto-desc="1"></textarea>', CommercialCallsView::taskForm($this->service()->taskData($blank), $this->service()->options()), 'Sin descripción, el resumen se arma solo.');
     $task = $this->service()->createTask($this->taskInput($id, ['id_empleado' => '202']));
     self::assertSame('202', $this->db->getRow('SELECT id_empleado FROM wp_jet_cct_tickets WHERE _ID = ?', [$task['id']])['id_empleado']);
     self::assertSame('202', $this->row($id)['id_empleado'], 'La llamada queda con el nuevo responsable.');

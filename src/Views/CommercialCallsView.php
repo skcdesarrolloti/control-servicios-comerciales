@@ -324,7 +324,10 @@ final class CommercialCallsView
       . '</div><div data-ccl-topic-field="factores" hidden>' . self::checks('factores', 'Factores importantes', $options['factores'], $data['factores']) . '</div>'
       // El asunto se arma solo y corto con tema, tipo, barrio y presupuesto mientras nadie lo escriba (commercial-calls.js).
       . '<label class="ccl-field"><span>Asunto <em aria-hidden="true">*</em></span><input type="text" name="asunto" required maxlength="190" data-ccl-auto-subject="1"></label>'
-      . '<label class="ccl-field"><span>Resumen <em aria-hidden="true">*</em></span><textarea name="descripcion" rows="4" required>' . self::e($v('descripcion')) . '</textarea></label>'
+      // Con la descripción de la llamada se respeta; sin ella el resumen se arma solo con los datos (commercial-calls.js).
+      . '<div class="ccl-field"><div class="ccl-desc-head"><label for="ccl-task-resumen">Resumen <em aria-hidden="true">*</em></label>'
+      . '<button type="button" class="ccl-desc-compose" data-ccl-compose><span class="material-symbols-outlined" aria-hidden="true">auto_fix_high</span>Armar con los datos</button></div>'
+      . '<textarea id="ccl-task-resumen" name="descripcion" rows="4" required data-ccl-auto-desc="' . ($v('descripcion') === '' ? '1' : '0') . '">' . self::e($v('descripcion')) . '</textarea></div>'
       . '</div><footer class="ccl-modal-foot"><button type="button" class="ccl-secondary" data-ccl-close>Crear más tarde</button><button type="submit" class="ccl-primary">Crear tarea</button></footer></form>';
   }
 
