@@ -29,5 +29,12 @@
 - Quien atiende al cliente es **consultor/a**, nunca "asesor": en textos visibles (vistas, PDFs, correos, plantillas) se dice "Su consultor/a asignado" (no "Te atiende" ni "Tu asesor") y "consultor/a" donde iría "asesor".
 - Todo lo que tarde en generarse o cargar (PDF, imágenes, videos, exportaciones) muestra el loader de la marca mientras tanto: `SCMLoader` (`public/assets/js/scm-loader.js` + `scm-loader.css`; en un enlace basta `data-scm-loader-download="archivo.pdf"`). Nunca dejar a la persona esperando sin aviso.
 - Los PDF para clientes llevan el membrete completo de la empresa (`resources/assets/membrete-sucasa.jpg`, el mismo del panel inmobiliario) de fondo en **cada hoja**: con Chromium, `@page{margin:0}`, el membrete en `html` repetido cada 279,4 mm y el relleno del contenido con `box-decoration-break: clone` (ver `QuotePdf` y `quote-document.css`).
+- Toda vista, pestaña, popup o menú nuevo sigue el estilo visual de Inmuebles (`CommercialDashboardView::renderPropertiesPage`); no se inventa otro ni se cambia:
+  - encabezado en tarjeta (`bg-surface-container-lowest p-6 rounded-3xl border border-surface-container`) con ícono en recuadro `bg-primary/10 text-primary`, título, píldora de conteo y descripción;
+  - estados como píldoras con su conteo (activa `bg-inverse-surface text-on-secondary`, las demás `bg-surface-container`);
+  - filtros en tarjeta con campos `rounded-xl bg-surface-container-low border-outline-variant/40`, botón **Filtrar** `bg-primary text-white` y otro para limpiar;
+  - tablas y vacíos en tarjeta (el vacío con ícono);
+  - en los menús, cada entrada con ícono y descripción.
+  Usar los tokens del panel (`surface-container*`, `primary`, `secondary`, `on-surface`, `inverse-surface`), nunca `slate-*` ni colores sueltos. Las vistas con CSS propio (`ccl-*`, `cqt-*`, `cst-pill`) toman ese estilo de `public/assets/css/commercial-unified.css`, y sus encabezados llevan `scm-head-icon`. Ejemplos: `public/assets/js/commercial-reports.js` y Llamadas. Al traer una vista de `control-servicios-inmobiliarios`, adaptarla a este estilo. Se exceptúa el motor del calendario compartido (`admin-dashboard-runtime.js`).
 - Al agregar clases de Tailwind en PHP o JS, regenerar `public/assets/css/tailwind.css` con `npm run build:css`.
 - Verificar con `php tools/lint.php`, `phpunit` (`.vendor-test-junction/bin/phpunit`), `phpstan` y, para el calendario y la configuración, `node tools/check-commercial-calendar.cjs` con el servidor `php -S 127.0.0.1:8769 -t .`.
