@@ -191,6 +191,29 @@ final class CommercialPropertyEntryTest extends TestCase
     self::assertStringNotContainsString('data-commercial-task-form="property"', $touchUp);
   }
 
+  public function testStudyMandateAndClosingFollowTheTaskProgress(): void
+  {
+    $task = ['tema_ayuda'=>'Arriendo'] + $this->db->getRow('SELECT * FROM wp_jet_cct_tickets WHERE _ID=100');
+    $render = fn(array $extra): string => CommercialTicketModalView::render(['ticket'=>$task,'timeline'=>[]] + $extra, $this->policy, []);
+    $fresh = $render([]);
+    self::assertStringContainsString('data-commercial-task-form="quote"', $fresh);
+    self::assertStringNotContainsString('data-commercial-task-form="study"', $fresh, 'Sin cotización no hay estudio.');
+    self::assertStringNotContainsString('data-commercial-task-form="mandate"', $fresh);
+    self::assertStringNotContainsString('data-cma-closing=', $fresh);
+
+    $quoted = $render(['quotes_count'=>1, 'studies_count'=>1]);
+    self::assertStringContainsString('data-commercial-task-form="study"', $quoted);
+    self::assertStringNotContainsString('data-commercial-task-form="mandate"', $quoted, 'Sin estudio aprobado no hay mandato.');
+
+    $approved = $render(['quotes_count'=>1, 'studies_count'=>1, 'studies_approved'=>1]);
+    self::assertStringContainsString('data-commercial-task-form="mandate"', $approved);
+    self::assertStringNotContainsString('data-cma-closing=', $approved, 'Sin mandato no hay hoja de cierre.');
+
+    $withMandate = $render(['studies_count'=>1, 'studies_approved'=>1, 'mandates_count'=>1, 'closing_mandate'=>['id'=>7, 'hoja'=>['id'=>0, 'estado'=>''], 'total'=>1]]);
+    self::assertStringContainsString('data-commercial-task-form="mandate"', $withMandate);
+    self::assertStringContainsString('data-cma-closing="7"', $withMandate);
+  }
+
   public function testWorkflowFormsHaveNoNotificationCheckboxes(): void
   {
     $task = $this->db->getRow('SELECT * FROM wp_jet_cct_tickets WHERE _ID=100');

@@ -297,26 +297,39 @@ final class CommercialApiController
     } catch (\Throwable $exception) {
       error_log('[tareas:respuestas-guia] ' . $exception->getMessage());
     }
-    // Estudios de aseguradora de la tarea: con alguno, el botón sale aunque la tarea sea de otro tema (para responderlos).
+    // Gestión operativa en orden: Estudio de aseguradora sale si la tarea tiene cotización (o ya tiene estudios), Contrato
+    // de mandato si tiene un estudio aprobado (o ya tiene mandatos) y Hoja de cierre si ya tiene mandato.
+    $detail['quotes_count'] = 0;
+    try {
+      $detail['quotes_count'] = count((new \SCM\Commercial\Quotes\CommercialQuotesRepository($this->db))->forTask($ticketPk));
+    } catch (\Throwable $exception) {
+      error_log('[tareas:cotizaciones] ' . $exception->getMessage());
+    }
     $detail['studies_count'] = 0;
+    $detail['studies_approved'] = 0;
     $studies = [];
     try {
       $studies = (new \SCM\Commercial\Studies\CommercialStudiesRepository($this->db))->forTask($ticketPk);
       $detail['studies_count'] = count($studies);
+      $detail['studies_approved'] = count(array_filter($studies, static fn(array $study): bool => self::approvedStudy($study)));
     } catch (\Throwable $exception) {
       error_log('[tareas:estudios] ' . $exception->getMessage());
     }
-    // Hoja de cierre: el botón sale solo si la tarea ya tiene contrato de mandato (abre la del más reciente).
+    $detail['mandates_count'] = 0;
     $detail['closing_mandate'] = null;
     try {
       $mandates = new \SCM\Commercial\Mandates\CommercialMandatesService($this->db, $this->policy);
-      if ($mandates->canClosing()) {
+      if ($this->policy->canView('mandatos')) {
         $rows = $mandates->repository()->forTask($ticketPk, array_map(static fn(array $study): int => (int) $study['_ID'], $studies), \SCM\Commercial\Mandates\CommercialMandatesRepository::taskProperty($detail['ticket'], $studies));
         $rows = array_values(array_filter($rows, static fn(array $row): bool => $mandates->canOpen($row)));
-        $detail['closing_mandate'] = $rows !== [] ? ['id' => (int) $rows[0]['_ID'], 'hoja' => $mandates->repository()->closing($rows[0]), 'total' => count($rows)] : null;
+        $detail['mandates_count'] = count($rows);
+        // Hoja de cierre: abre la del mandato más reciente.
+        if ($mandates->canClosing() && $rows !== []) {
+          $detail['closing_mandate'] = ['id' => (int) $rows[0]['_ID'], 'hoja' => $mandates->repository()->closing($rows[0]), 'total' => count($rows)];
+        }
       }
     } catch (\Throwable $exception) {
-      error_log('[tareas:hoja-cierre] ' . $exception->getMessage());
+      error_log('[tareas:mandatos] ' . $exception->getMessage());
     }
     JsonResponse::success([
       'html' => CommercialTicketModalView::render(
@@ -326,6 +339,12 @@ final class CommercialApiController
       ),
     ]);
   }
+  /** Estudio aprobado que sigue en curso (no desistido): habilita el contrato de mandato. @param array<string,mixed> $study */
+  private static function approvedStudy(array $study): bool
+  {
+    return trim((string) ($study['estado'] ?? '')) === 'Aprobado' && mb_strtolower(trim((string) ($study['estado_contrato'] ?? '')), 'UTF-8') !== 'desistido';
+  }
+
 
   /**
    * Crea o edita una respuesta guía comercial desde la ventana de guías de la tarea y devuelve las tarjetas actualizadas.
