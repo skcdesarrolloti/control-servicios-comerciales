@@ -275,10 +275,15 @@ final class CommercialCallsTest extends TestCase
     $this->service()->createTask($this->taskInput($id));
   }
 
-  public function testTaskRequiresCallThatDeservesIt(): void
+  public function testACallWithoutTaskCanGetOneAndThenDeservesIt(): void
   {
     $id = $this->create(['merece_ticket' => 'No']);
-    $this->expectException(\InvalidArgumentException::class);
+    $html = CommercialCallsView::results($this->service()->listing([]), $this->service(), CommercialCallsDatabase::policy($this->db));
+    self::assertStringContainsString('data-ccl-task="' . $id . '"', $html, 'Sin tarea siempre se puede crear.');
+    $task = $this->service()->createTask($this->taskInput($id));
+    self::assertGreaterThan(0, $task['id']);
+    self::assertSame('Si', $this->row($id)['merece_ticket'], 'Al crearla queda que la merecía.');
+    $this->expectExceptionMessage('ya tiene la tarea');
     $this->service()->createTask($this->taskInput($id));
   }
 

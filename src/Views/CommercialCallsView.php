@@ -89,7 +89,9 @@ final class CommercialCallsView
       } elseif ($row['merece'] === 'Si') {
         $task = $canTask && $row['editable'] ? '<button type="button" class="ccl-task-button" data-ccl-task="' . $id . '">Crear tarea</button>' : '<span class="ccl-status is-warning">Pendiente</span>';
       } else {
-        $task = '<span class="ccl-muted">' . ($row['merece'] === 'No' ? 'No merece' : 'Sin definir') . '</span>';
+        // Sin tarea y sin marcar que la merece (o marcada que no): igual se puede crear; al crearla queda que sí la merecía.
+        $label = '<span class="ccl-muted">' . ($row['merece'] === 'No' ? 'No merecía' : 'Sin definir') . '</span>';
+        $task = $canTask && $row['editable'] ? '<button type="button" class="ccl-task-button" data-ccl-task="' . $id . '">Crear tarea</button>' . $label : $label;
       }
       $actions = '<button type="button" class="ccl-icon" data-ccl-history="' . $id . '" aria-label="Historial del contacto de ' . self::e($row['cliente']) . '" title="Historial del contacto"><span class="material-symbols-outlined" aria-hidden="true">history</span></button>';
       if ($row['editable']) {

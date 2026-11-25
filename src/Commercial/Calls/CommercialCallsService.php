@@ -539,6 +539,11 @@ final class CommercialCallsService
         $this->repository->update($id, ['id_empleado' => $assignee]);
         $call['id_empleado'] = $assignee;
       }
+      // Una llamada sin marcar (o marcada que no) a la que se le crea tarea queda como que sí la merecía.
+      if (trim((string) ($call['merece_ticket'] ?? '')) !== 'Si') {
+        $this->repository->update($id, ['merece_ticket' => 'Si']);
+        $call['merece_ticket'] = 'Si';
+      }
       $task = $this->taskRow($call, $input, $employee, $me);
       $taskId = $this->repository->insertTask($task);
       $this->repository->update($id, ['id_ticket' => (string) $taskId, 'cct_modified' => $task['cct_modified']]);
@@ -751,9 +756,6 @@ final class CommercialCallsService
   {
     if (self::taskId($call) > 0) {
       throw new \InvalidArgumentException('Esta llamada ya tiene la tarea #' . self::taskId($call) . '. Si la persona hace otra solicitud, registra una llamada nueva.');
-    }
-    if (trim((string) ($call['merece_ticket'] ?? '')) !== 'Si') {
-      throw new \InvalidArgumentException('Marca primero que la llamada merece tarea.');
     }
   }
 

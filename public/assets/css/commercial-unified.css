@@ -177,3 +177,6 @@
 }
 .ccl-requests:hover { background: var(--scm-soft-hover); }
 .ccl-requests .material-symbols-outlined { font-size: 14px !important; }
+
+/* Llamada sin tarea ni marca de que la merece: botón Crear tarea y debajo su estado. */
+.ccl-task-button + .ccl-muted { display: block; margin-top: 4px; font-size: 11px; }
