@@ -32,6 +32,8 @@ final class CommercialCallsNotifier
   public const TEMPLATE_OFFICER_REPLY = 'scm_tarea_comercial_respuesta_funcionario_v1';
   public const TEMPLATE_POSTPONED = 'scm_tarea_comercial_postergada_v1';
   public const TEMPLATE_CLOSED = 'scm_tarea_comercial_cerrada_v1';
+  public const TEMPLATE_FOLLOW_UP = 'scm_tarea_comercial_seguimiento_v1';
+  public const EVENT_FOLLOW_UP = 'tarea_seguimiento_registrado';
   /** Cierres que no se le cuentan al cliente: la gestión sigue en otra tarea o con otro responsable. */
   public const SILENT_CLOSURES = ['Duplicado', 'Trasladado'];
   /** Compartida con control-servicios-inmobiliarios: su botón es el dominio + {{1}} (SharedButtonUrl). */
@@ -254,6 +256,44 @@ final class CommercialCallsNotifier
       . '<blockquote style="margin:12px 0;padding:12px 16px;background:#f1f5f9;border-left:4px solid #1e3c76;">' . nl2br($e($text)) . '</blockquote>'
       . '<p>Desde el botón puedes ver tu tarea y escribirnos.</p>',
       $this->buttons(PublicTaskAccess::url($id), 'Ver y responder'), 'llamadas:tarea:' . $id . ':' . $kind . ':' . substr(hash('sha256', $text), 0, 16), $replyTo);
+  }
+
+  /**
+   * Seguimiento registrado en una tarea: al responsable (si lo registró otra persona, como un coordinador) con su enlace
+   * individual, y a las copias de Notificaciones internas. Quien lo registró no recibe aviso de lo suyo.
+   * @param array<string,mixed> $task
+   */
+  public function followUpRegistered(int $id, array $task, string $message, string $author, string $employee): void
+  {
+    $text = trim($message);
+    if ($text === '') {
+      return;
+    }
+    $e = static fn($value): string => EmailTemplate::e((string) $value);
+    $employee = trim($employee);
+    $author = trim($author) !== '' ? trim($author) : 'Un funcionario';
+    $key = 'llamadas:tarea:' . $id . ':seguimiento:' . substr(hash('sha256', $employee . '|' . $text), 0, 16);
+    $people = array_values(array_filter($this->staff($task, self::EVENT_FOLLOW_UP), static fn(array $person): bool => $person['id'] !== '' && $person['id'] !== $employee));
+    $client = trim((string) ($task['solicitante'] ?? '')) ?: 'Sin nombre';
+    $body = '<p><strong>' . $e($author) . '</strong> registró un seguimiento en la tarea comercial <strong>#' . $id . '</strong>'
+      . ' del cliente <strong>' . $e($client) . '</strong>' . (trim((string) ($task['nombre_empleado'] ?? '')) !== '' ? ', a cargo de <strong>' . $e($task['nombre_empleado']) . '</strong>' : '') . ':</p>'
+      . '<blockquote style="margin:12px 0;padding:12px 16px;background:#f1f5f9;border-left:4px solid #1e3c76;">' . nl2br($e($text)) . '</blockquote>';
+    $subject = 'Seguimiento en la tarea #' . $id . ' · ' . $client;
+    $assigned = '';
+    foreach ($people as $person) {
+      if (!$person['copia']) {
+        $assigned = trim($person['correo']);
+        $this->send($assigned, $subject, 'Seguimiento registrado', $body, $this->buttons(StaffTaskLink::url($id, $person['id']), 'Ver tarea'), $key);
+      }
+    }
+    $copies = array_values(array_diff(array_unique($this->copies($people)), [$assigned]));
+    if ($copies !== []) {
+      $this->send($copies, $subject, 'Seguimiento registrado', $body, $this->buttons(self::panelUrl($id), 'Ver tarea'), $key . ':copias');
+    }
+    foreach ($people as $person) {
+      $this->whatsappTo($person['celular'], '57', self::TEMPLATE_FOLLOW_UP,
+        [$person['nombre'], $author, (string) $id, $client, $text], StaffTaskLink::reference($id, $person['id']), $key . ':whatsapp:' . $person['id']);
+    }
   }
 
   /**

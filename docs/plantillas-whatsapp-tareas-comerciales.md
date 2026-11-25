@@ -1,6 +1,6 @@
 # Plantillas de WhatsApp de las tareas comerciales
 
-Crea las plantillas 1 a 5 y 9 a 12 en **Meta Business Suite → Administrador de WhatsApp → Plantillas de mensajes → Crear plantilla**, en la misma cuenta que usa el panel.
+Crea las plantillas 1 a 5 y 9 a 13 en **Meta Business Suite → Administrador de WhatsApp → Plantillas de mensajes → Crear plantilla**, en la misma cuenta que usa el panel.
 
 Para todas: categoría **Utilidad**, idioma **Spanish (COL)** (`es_CO`), tipo de variable **Número**, pie de página `SKC SuCasa Inmobiliaria` y un botón **Ir al sitio web** con URL **Dinámica**. Usa los nombres exactos. La 2 lleva encabezado de imagen y la 5 de documento (PDF).
 
@@ -8,7 +8,7 @@ Cada dato es una sola variable: el contacto de un funcionario (nombre, correo y 
 
 En el botón, **URL del sitio web** lleva todo lo que está antes de `{{1}}` (Meta pone `{{1}}` al final) y el panel completa solo el final. En **URL de muestra** va la URL completa. Deja sin marcar **Permite que Meta use el seguimiento de enlaces**.
 
-En las plantillas para funcionarios (1 y 3) el final de `ticket_id=` es el enlace individual firmado de quien recibe el mensaje (`StaffTaskLink::reference`, por ejemplo `1686.1893456000.101.<firma>`): al tocar **Ver tarea** inicia su sesión y abre la tarea en su ventana. Si el enlace venció (30 días), pasa por el login y vuelve a la misma tarea. Las plantillas ya aprobadas no cambian.
+En las plantillas para funcionarios (1, 3 y 13) el final de `ticket_id=` es el enlace individual firmado de quien recibe el mensaje (`StaffTaskLink::reference`, por ejemplo `1686.1893456000.101.<firma>`): al tocar **Ver tarea** inicia su sesión y abre la tarea en su ventana. Si el enlace venció (30 días), pasa por el login y vuelve a la misma tarea. Las plantillas ya aprobadas no cambian.
 
 Los WhatsApp siempre están activos y los nombres de las plantillas son fijos en el código (`CommercialCallsNotifier::TEMPLATE_*`, idioma `es_CO`): llegan en cuanto Meta apruebe cada plantilla.
 
@@ -199,6 +199,26 @@ Desde el botón puedes ver el estado de tu estudio.
 Ejemplos: `{{1}}` Jairo Pérez · `{{2}}` El libertador · `{{3}}` 652 · `{{4}}` Aplazado: faltan documentos · `{{5}}` Necesitamos: certificado laboral y extractos de los últimos 3 meses · `{{6}}` Kellys Roqueme · Correo: kellys@ejemplo.com · Celular: 3126810594
 
 Botón `Ver mi estudio`. URL del sitio web `https://sucasainmobiliaria.com.co/dashboard-comercial/public/estudio.php?e=`. URL de muestra `https://sucasainmobiliaria.com.co/dashboard-comercial/public/estudio.php?e=652.1893456000.ejemplo`.
+
+## 13. `scm_tarea_comercial_seguimiento_v1`
+
+Para el consultor/a asignado (solo cuando el seguimiento lo registra otra persona, como un coordinador) y para quienes estén marcados en **Configuración › Notificaciones internas › Seguimiento registrado en una tarea**. Quien registra el seguimiento no recibe aviso de lo suyo. Cada uno recibe su enlace individual firmado. Código: `CommercialCallsNotifier::TEMPLATE_FOLLOW_UP`. Sin encabezado.
+
+```text
+Hola *{{1}}.*
+
+*{{2}}* registró un seguimiento en la tarea comercial *#{{3}}* del cliente *{{4}}*.
+
+*Seguimiento:* {{5}}.
+
+Consulta los detalles en el panel.
+
+*Construimos confianza, protegemos su patrimonio.*
+```
+
+Ejemplos: `{{1}}` Jocabeth Cantillo · `{{2}}` Royner Guardo · `{{3}}` 1686 · `{{4}}` Luis Prada · `{{5}}` Llamé al cliente y confirmó la visita del sábado a las 10 a. m.
+
+Botón `Ver tarea`. URL del sitio web `https://sucasainmobiliaria.com.co/dashboard-comercial/public/index.php?tab=abiertos&ticket_id=`. URL de muestra `https://sucasainmobiliaria.com.co/dashboard-comercial/public/index.php?tab=abiertos&ticket_id=1686`.
 
 ## Plantillas compartidas con el panel inmobiliario (6, 7 y 8)
 

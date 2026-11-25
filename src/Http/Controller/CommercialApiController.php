@@ -744,6 +744,15 @@ final class CommercialApiController
     );
     $this->ensureWorkflowSucceeded($result);
     $notice = $this->clientUpdate($ticketPk, 'seguimiento', $message);
+    // Al responsable (si lo registró otra persona) y a las copias de Configuración › Notificaciones internas.
+    try {
+      $task = $this->db->getRow('SELECT * FROM `' . $this->db->table('jet_cct_tickets') . '` WHERE `_ID` = ? LIMIT 1', [$ticketPk]);
+      if ($task !== null) {
+        (new \SCM\Commercial\Calls\CommercialCallsNotifier($this->db, $this->settings))->followUpRegistered($ticketPk, $task, wp_strip_all_tags($message, true), \SCM\Core\Auth::user(), \SCM\Core\Auth::employeeId());
+      }
+    } catch (\Throwable $exception) {
+      error_log('[tareas:seguimiento-interno] ' . $exception->getMessage());
+    }
     JsonResponse::success(['message' => 'Seguimiento guardado.' . $notice, 'refresh' => true]);
   }
 

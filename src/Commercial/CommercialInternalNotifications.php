@@ -26,6 +26,7 @@ final class CommercialInternalNotifications
       'items' => [
         'llamada_tarea_creada' => ['label' => 'Tarea creada desde una llamada', 'description' => 'Copia del aviso de la tarea nueva. El responsable asignado la recibe siempre.', 'channel' => 'Correo y WhatsApp'],
         'llamada_respuesta_cliente' => ['label' => 'El cliente respondió una tarea', 'description' => 'Copia del mensaje que el cliente escribe desde su enlace. El responsable lo recibe siempre.', 'channel' => 'Correo y WhatsApp'],
+        'tarea_seguimiento_registrado' => ['label' => 'Seguimiento registrado en una tarea', 'description' => 'Copia del seguimiento que se registra en una tarea. El responsable lo recibe siempre que lo registra otra persona; nadie recibe aviso de lo que registra él mismo.', 'channel' => 'Correo y WhatsApp'],
       ],
     ],
     'precaptacion' => [

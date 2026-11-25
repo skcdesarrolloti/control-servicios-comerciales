@@ -106,6 +106,32 @@ final class CommercialTaskWorkflowTest extends TestCase
     self::assertStringContainsString('closeTicket($ticketPk, $message, true)', $source);
   }
 
+  public function testFollowUpNotifiesTheAssignedConsultantOnlyWhenSomeoneElseRegistersItPlusInternalCopies(): void
+  {
+    self::assertContains(CommercialCallsNotifier::EVENT_FOLLOW_UP, \SCM\Commercial\CommercialInternalNotifications::events());
+    (new \SCM\Commercial\CommercialInternalNotifications($this->db, new Settings($this->db)))->save([CommercialCallsNotifier::EVENT_FOLLOW_UP => ['404', '303']]);
+
+    // Lo registra la coordinación (303): al responsable (101) con su enlace firmado y la copia a 404; a 303 nada.
+    [$notifier, $log] = $this->recorder();
+    $notifier->followUpRegistered(900, $this->task(), 'Llamé y confirmó la visita', 'Coordinación', '303');
+    self::assertCount(2, $log->mail);
+    self::assertSame('101@example.test', $log->mail[0][0]);
+    self::assertStringContainsString('Seguimiento en la tarea #900', $log->mail[0][1]);
+    self::assertStringContainsString('ticket_id=900.', $log->mail[0][2], 'El responsable recibe su enlace individual.');
+    self::assertStringContainsString('Llamé y confirmó la visita', $log->mail[0][2]);
+    self::assertSame(['404@example.test'], $log->mail[1][0]);
+    self::assertStringContainsString('abrir_tarea=900', $log->mail[1][2]);
+    self::assertSame(['+573000000101', '+573000000404'], array_column($log->whatsapp, 0));
+    self::assertSame([CommercialCallsNotifier::TEMPLATE_FOLLOW_UP], array_values(array_unique(array_column($log->whatsapp, 1))));
+    self::assertSame(['Consultora Uno', 'Coordinación', '900', 'Laura Prueba', 'Llamé y confirmó la visita'], array_column($log->whatsapp[0][2][0]['parameters'], 'text'));
+
+    // Lo registra el mismo responsable: él no recibe nada; las copias sí.
+    [$notifier, $log] = $this->recorder();
+    $notifier->followUpRegistered(900, $this->task(), 'Envié fotos', 'Consultora Uno', '101');
+    self::assertSame([['303@example.test', '404@example.test']], array_map(static fn(array $mail) => $mail[0], $log->mail));
+    self::assertNotContains('+573000000101', array_column($log->whatsapp, 0));
+  }
+
   public function testStatusChangeIsAnInternalNoteNotAClientReply(): void
   {
     $before = (int) $this->db->getVar('SELECT COUNT(*) FROM wp_jet_cct_historial_del_ticket');
