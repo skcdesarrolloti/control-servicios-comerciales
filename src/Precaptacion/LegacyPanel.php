@@ -1766,12 +1766,14 @@ final class LegacyPanel
             if ($me === '') {
                 $where[] = '1=0';
             } else {
-                $where[] = self::responsible_expression($table) . ' = %s';
-                $values[] = $me;
+                [$condition, $params] = self::responsible_condition($table, $me);
+                $where[] = $condition;
+                array_push($values, ...$params);
             }
         } elseif ($filters['funcionario'] !== '') {
-            $where[] = self::responsible_expression($table) . ' = %s';
-            $values[] = $filters['funcionario'];
+            [$condition, $params] = self::responsible_condition($table, $filters['funcionario']);
+            $where[] = $condition;
+            array_push($values, ...$params);
         }
 
         $date_col = self::first_existing_column($table, ['fecha', 'cct_created', '_created']);
@@ -2137,14 +2139,29 @@ final class LegacyPanel
         return $cache[$cache_key];
     }
 
-    /** Responsable del registro: el del proceso y, si está vacío, quien lo registró (como Workflow::responsible). */
-    private static function responsible_expression(string $table): string
+    /**
+     * Registros a cargo de $employee: el responsable del proceso y, si el proceso no tiene, quien lo registró
+     * (como Workflow::responsible). Cada columna se compara sola con el valor: la tabla del proceso y la de
+     * JetEngine pueden tener distinto cotejamiento y MySQL rechaza un COALESCE que las mezcle.
+     *
+     * @return array{0:string,1:list<string>}
+     */
+    private static function responsible_condition(string $table, string $employee): array
     {
-        $parts = ["NULLIF(TRIM(" . Module::workflow()->expression($table, 'responsible_id') . "), '')"];
+        $process = '`' . Module::workflow()->table() . '`';
+        $own = "EXISTS (SELECT 1 FROM {$process} rp WHERE rp.precaptacion_id = `{$table}`._ID AND TRIM(rp.responsible_id) = %s)";
+        $values = [$employee];
+        $fallback = [];
+        $earlier = [];
         foreach (['id_empleado', 'cct_author_id', 'captador_precat'] as $candidate) {
-            if (self::first_existing_column($table, [$candidate])) $parts[] = "NULLIF(TRIM(`{$candidate}`), '')";
+            if (!self::first_existing_column($table, [$candidate])) continue;
+            $fallback[] = '(' . implode(' AND ', array_merge($earlier, ["TRIM(COALESCE(`{$candidate}`, '')) = %s"])) . ')';
+            $values[] = $employee;
+            $earlier[] = "TRIM(COALESCE(`{$candidate}`, '')) = ''";
         }
-        return 'COALESCE(' . implode(', ', $parts) . ", '')";
+        if ($fallback === []) return [$own, [$employee]];
+        $orphan = "NOT EXISTS (SELECT 1 FROM {$process} rp WHERE rp.precaptacion_id = `{$table}`._ID AND TRIM(rp.responsible_id) <> '')";
+        return ["({$own} OR ({$orphan} AND (" . implode(' OR ', $fallback) . ')))', $values];
     }
 
     private static function first_existing_column(string $table, array $candidates): string

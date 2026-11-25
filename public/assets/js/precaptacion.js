@@ -387,6 +387,8 @@
       form.closest("dialog").close();
     });
   });
+  // Actividades comerciales › Registrar › Precaptación abre directo el formulario; Registros › Precaptaciones, el listado.
+  if (new URLSearchParams(window.location.search).get('abrir') === 'registrar') openCatalogDialog('precap-create');
   document.addEventListener('submit', async function (event) {
     var form = event.target.closest('[data-precap-process-form]');
     if (!form) return;

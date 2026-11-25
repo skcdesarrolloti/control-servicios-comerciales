@@ -177,17 +177,27 @@ final class Workflow
         return array_values(array_filter($s['items'], static fn(array $item): bool => $item['next'] !== ''));
     }
 
+    /** Como responsible(), pero con el responsable del proceso que ya trae la fila del resumen. */
+    private function rowResponsible(array $row): string
+    {
+        foreach ([$row['responsible_id'] ?? '', $row['id_empleado'] ?? '', $row['cct_author_id'] ?? ''] as $candidate) {
+            if (trim((string) $candidate) !== '') return trim((string) $candidate);
+        }
+        return '';
+    }
+
     private function scan(string $employee): array
     {
         $table = $this->db->table('jet_cct_precaptaciones');
         $adapter = new DatabaseAdapter($this->db);
         if (!$adapter->get_var($adapter->prepare('SHOW TABLES LIKE %s', $table))) return ['available'=>false];
-        $scope = $employee !== '' ? ' WHERE COALESCE(NULLIF(TRIM(w.responsible_id),\'\'), NULLIF(TRIM(p.id_empleado),\'\'), NULLIF(TRIM(p.cct_author_id),\'\')) = ?' : '';
+        // El alcance personal se filtra en PHP: un COALESCE entre la tabla del proceso y la de JetEngine falla en MySQL si sus cotejamientos difieren.
         $columns = $adapter->get_col('DESCRIBE ' . $table);
         $ids = [];
         foreach (['id_ticket_asignado','ticket_asignado','id_ticket','ticket','numero_de_ticket'] as $field) if (in_array($field, $columns, true)) $ids[] = "NULLIF(NULLIF(p.`{$field}`, ''), '0')";
         $taskId = 'COALESCE(' . implode(', ', array_merge(['w.task_id'], $ids, ['0'])) . ')';
-        $rows = $this->db->getResults('SELECT p.*, w.status AS process_status, w.responsible_id, w.unanswered, g.state AS confirmed_state, g.next_contact_at, t._ID AS linked_task FROM `' . $table . '` p LEFT JOIN `' . $this->table() . '` w ON w.precaptacion_id = p._ID LEFT JOIN `' . $this->history->table() . '` g ON g.id = (SELECT MAX(h.id) FROM `' . $this->history->table() . '` h WHERE h.precaptacion_id = p._ID) LEFT JOIN `' . $this->db->table('jet_cct_tickets') . '` t ON t._ID = ' . $taskId . $scope, $employee !== '' ? [$employee] : []);
+        $rows = $this->db->getResults('SELECT p.*, w.status AS process_status, w.responsible_id, w.unanswered, g.state AS confirmed_state, g.next_contact_at, t._ID AS linked_task FROM `' . $table . '` p LEFT JOIN `' . $this->table() . '` w ON w.precaptacion_id = p._ID LEFT JOIN `' . $this->history->table() . '` g ON g.id = (SELECT MAX(h.id) FROM `' . $this->history->table() . '` h WHERE h.precaptacion_id = p._ID) LEFT JOIN `' . $this->db->table('jet_cct_tickets') . '` t ON t._ID = ' . $taskId);
+        if ($employee !== '') $rows = array_values(array_filter($rows, fn(array $row): bool => $this->rowResponsible($row) === $employee));
         $names = [];
         foreach ($this->db->getResults('SELECT id_empleado, nombre FROM `' . $this->db->table('jet_cct_funcionarios') . '`') as $actor) $names[(string) $actor['id_empleado']] = (string) $actor['nombre'];
         $s = array_fill_keys(['total','por_llamar','sin_respuesta','vencidas','hoy','por_vencer','seguimiento','pendiente_tarea','cerradas','convertidas'], 0);

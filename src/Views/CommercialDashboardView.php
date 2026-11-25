@@ -898,7 +898,7 @@ final class CommercialDashboardView
               </a>
               <?php endif; ?>
               <?php if (in_array('precaptacion', $views, true)): ?>
-              <a class="flex items-center gap-2 px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="precaptacion" href="<?php echo esc_url(self::url($baseUrl, ['tab'=>'precaptacion'])); ?>">
+              <a class="flex items-center gap-2 px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="precaptacion" href="<?php echo esc_url(self::url($baseUrl, ['tab'=>'precaptacion', 'abrir'=>'registrar'])); ?>">
                 <span class="material-symbols-outlined text-[18px] text-secondary" aria-hidden="true">add_home_work</span><span>Precaptación</span>
               </a>
               <?php endif; ?>
@@ -908,8 +908,13 @@ final class CommercialDashboardView
               </a>
               <?php endif; ?>
             <?php endif; ?>
-            <?php if (array_intersect(['cotizaciones', 'estudios', 'mandatos', 'cierres'], $views) !== []): ?>
+            <?php if (array_intersect(['precaptacion', 'cotizaciones', 'estudios', 'mandatos', 'cierres'], $views) !== []): ?>
               <div class="flex items-center gap-1.5 px-3 pt-2 pb-1 font-label-sm text-[11px] uppercase font-semibold text-secondary"><span class="material-symbols-outlined text-[15px]" aria-hidden="true">folder_open</span><span>Registros</span></div>
+              <?php if (in_array('precaptacion', $views, true)): ?>
+              <a class="flex items-center gap-2 px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="precaptacion" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'precaptacion'])); ?>">
+                <span class="material-symbols-outlined text-[18px] text-secondary" aria-hidden="true">list_alt</span><span>Precaptaciones</span>
+              </a>
+              <?php endif; ?>
               <?php if (in_array('cotizaciones', $views, true)): ?>
               <a class="flex items-center gap-2 px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="cotizaciones" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'cotizaciones'])); ?>">
                 <span class="material-symbols-outlined text-[18px] text-secondary" aria-hidden="true">request_quote</span><span>Cotizaciones</span>

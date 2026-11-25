@@ -231,6 +231,12 @@ const { chromium } = require(process.argv[2] ? path.join(process.argv[2], 'playw
     await admin.setViewportSize({width:390,height:844});
     assert.equal(await admin.evaluate(() => document.documentElement.scrollWidth > window.innerWidth), false, 'Desbordamiento del panel administrativo en móvil');
     await admin.screenshot({path:'output/precaptacion-admin-mobile.png',fullPage:true});
+    const direct = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+    await direct.route('**/public/precaptacion-api.php', route => route.continue({ url: endpoint }));
+    await direct.goto(endpoint + '?abrir=registrar');
+    await direct.locator('#precap-create').waitFor({state:'visible'});
+    assert.ok(await direct.locator('[data-precaptaciones-panel]').count(), 'Al cerrar el formulario queda el listado');
+    await direct.close();
     assert.deepEqual(errors, []);
     console.log('Precaptación UI: diseño responsive, filtros, exportación, formulario, catálogos, permisos y tarea OK.');
   } finally { await browser.close(); }
