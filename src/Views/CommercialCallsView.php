@@ -233,7 +233,7 @@ final class CommercialCallsView
       . '<div data-ccl-code-field hidden>' . self::input('id_inmueble', 'Código del inmueble', '', 'text', false, 'inputmode="numeric" data-ccl-property-code') . '</div>'
       . '</div>'
       . '<p class="ccl-hint" data-ccl-property-result role="status" hidden></p>'
-      . '<div class="ccl-grid">'
+      . '<div data-ccl-property-fields><div class="ccl-grid">'
       . self::selectField('tipo_inmueble', 'Tipo de inmueble', $options['tipos'], '', false)
       . self::selectField('destinacion', 'Destinación', $options['destinaciones'], '', false)
       . self::selectField('uso', 'Uso', $options['usos'], '', false)
@@ -241,6 +241,7 @@ final class CommercialCallsView
       . '<div data-ccl-topic-field="precio" hidden>' . self::input('precio', 'Precio', '', 'text', false, $money) . '</div>'
       . '</div>'
       . self::checks('factores_importantes', 'Factores importantes', $options['factores'], $data['factores'])
+      . '</div>'
       . '<label class="ccl-field"><span>Descripción</span><textarea name="descripcion" rows="3"></textarea></label>'
       . '<h3>Asignación</h3><div class="ccl-grid">'
       . $merit

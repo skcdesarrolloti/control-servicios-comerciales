@@ -14,9 +14,16 @@ final class Csrf
     $this->secret = $secret;
   }
 
-  /** Genera un token CSRF para una acción. */
+  /**
+   * Token CSRF de una acción. Se reutiliza mientras siga en la sesión: si cada carga lo
+   * cambiara, abrir el panel en otra pestaña dejaría la primera con "Verificación de seguridad fallida".
+   */
   public function token(string $action): string
   {
+    $current = $_SESSION['scm_csrf'][$action] ?? null;
+    if (is_string($current) && $current !== '') {
+      return $current;
+    }
     $salt  = bin2hex(random_bytes(8));
     $value = hash_hmac('sha256', $action . '|' . $salt, $this->secret);
     $token = $salt . '|' . $value;

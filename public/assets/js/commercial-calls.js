@@ -100,6 +100,9 @@
       form.elements.tiene_codigo.required = offer;
       form.elements.id_inmueble.required = hasCode;
       codeBox.hidden = !hasCode;
+      // Tipo, destinación y demás salen cuando ya respondió si tiene código (sí o no); en otros motivos, de una vez.
+      var details = form.querySelector("[data-ccl-property-fields]");
+      if (details) details.hidden = offer && value(form, "tiene_codigo") === "";
       if (!hasCode && form.elements.id_inmueble.value) {
         form.elements.id_inmueble.value = "";
         var result = form.querySelector("[data-ccl-property-result]");

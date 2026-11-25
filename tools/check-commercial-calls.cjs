@@ -130,7 +130,9 @@ async function fillCall(modal, values) {
     assert.equal(await modal.locator('select[name="merece_ticket"]').count(), 0, 'Una solicitud nueva siempre lleva tarea: no se pregunta');
     await fillCall(modal, { medio: 'Referido', tema_ayuda: 'Venta', comisionista: 'No', cliente_inmediato: 'Si', id_empleado: '101' });
     assert.ok(await modal.locator('[data-ccl-code-field]').isHidden(), 'El código se pide solo si lo tiene');
+    assert.ok(await modal.locator('[name="tipo_inmueble"]').isHidden(), 'Tipo y destinación salen después de responder si tiene código');
     await fillCall(modal, { tiene_codigo: 'Si' });
+    assert.ok(await modal.locator('[name="tipo_inmueble"]').isVisible(), 'Con la respuesta aparecen tipo y destinación');
     await modal.locator('[name="id_inmueble"]').fill('84016');
     await modal.locator('[name="id_inmueble"]').blur();
     await modal.locator('[data-ccl-property-result][data-state="ok"]').waitFor();

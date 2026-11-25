@@ -113,6 +113,7 @@ final class Auth
   private function establishSession(array $row, string $fallbackLogin): bool
   {
     session_regenerate_id(true);
+    unset($_SESSION['scm_csrf']);
     $_SESSION['scm_logged_in']  = true;
     $_SESSION['scm_user_id']    = (int) ($row['_ID'] ?? 0);
     $_SESSION['scm_employee_id'] = trim((string) ($row['id_empleado'] ?? ''));
