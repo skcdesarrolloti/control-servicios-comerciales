@@ -69,9 +69,14 @@ el crédito de la garantía (`MandateCalculator`) y lo guarda en `wp_jet_cct_cre
 
 ## Editar las plantillas (Configuración › Actividades comerciales › Contratos de mandato)
 
-Solo administradores. Abre el texto vigente de las tres plantillas en eSignatures (Por defecto, Berkley, Seguros
-mundial) y guarda la que se está viendo (`MandateTemplateEditor`, `POST /api/templates/{id}/content`):
-- **Vista previa** con los campos sin datos; **Campos disponibles** inserta `{{campo}}` donde está el cursor.
+Solo administradores. La pestaña tiene **Abrir el editor de plantillas**, que abre `public/plantillas-mandato.php` en otra
+pestaña: un **editor visual** como el de eSignatures (hoja, negrita, cursiva, títulos, alineación, tablas con filas y
+columnas, **Insertar campo** como etiqueta verde, deshacer, y **Ver código** para el Markdown). Lee el texto vigente de
+las tres plantillas (Por defecto, Berkley, Seguros mundial) y guarda la que se está viendo (`MandateTemplateEditor`,
+`POST /api/templates/{id}/content`; sección `plantillas_mandato` de Configuración):
+- `mandate-template-editor.js` pasa el Markdown de eSignatures a la hoja y de vuelta sin perder las marcas `{"…"}` de
+  cada línea (alineación, casilla de aceptación) ni las tablas; probado ida y vuelta con las tres plantillas reales.
+- **Vista previa con datos vacíos** muestra cómo queda en la página del propietario.
 - Al guardar: hay que confirmar que aplica a todos los contratos nuevos; si la plantilla cambió en eSignatures desde que
   se abrió, no se guarda; un `{{campo}}` que el panel no llena se rechaza; quitar campos pide confirmarlo.
 - La versión anterior queda en `storage/data/mandatos-plantillas/historial/` (quién y cuándo, últimas 30) y se puede

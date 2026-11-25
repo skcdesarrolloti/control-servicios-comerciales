@@ -123,5 +123,10 @@ final class MandateTemplateEditorTest extends TestCase
     $preview = MandateTemplateEditor::preview('Berkley', "Hola {{precio_canon}}\n{{tabla_propietarios}}");
     self::assertStringContainsString('No aplica', $preview);
     self::assertContains('mandatos', CommercialSettingsService::SECTIONS);
+    self::assertContains('plantillas_mandato', CommercialSettingsService::SECTIONS, 'El editor visual (plantillas-mandato.php) carga y guarda por esta sección.');
+    $summary = $this->editor()->summary();
+    self::assertTrue($summary['ready']);
+    self::assertStringEndsWith('/plantillas-mandato.php', $summary['url']);
+    self::assertSame([], $this->calls, 'Configuración no lee eSignatures: solo el enlace y el historial.');
   }
 }

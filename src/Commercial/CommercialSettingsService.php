@@ -58,7 +58,7 @@ final class CommercialSettingsService
     'factor_prestacional' => ['Factor prestacional', 0, 0, 100],
   ];
 
-  public const SECTIONS = ['notificaciones_internas', 'calendario', 'tiempos', 'cotizaciones', 'estudios', 'mandatos', 'avisos', 'actualizaciones', 'destacados', 'aseo', 'utm', 'medios', 'analitica', 'plan', 'material_pop', 'banner_revista'];
+  public const SECTIONS = ['notificaciones_internas', 'calendario', 'tiempos', 'cotizaciones', 'estudios', 'mandatos', 'plantillas_mandato', 'avisos', 'actualizaciones', 'destacados', 'aseo', 'utm', 'medios', 'analitica', 'plan', 'material_pop', 'banner_revista'];
 
   /** Operaciones de la sección "medios" (todas guardan, salvo preview, que solo cuenta). */
   public const MEDIOS_OPS = ['add', 'rename', 'toggle', 'merge', 'aliases', 'alias_raw', 'rewrite_raw', 'preview'];
@@ -124,8 +124,10 @@ final class CommercialSettingsService
       'cotizaciones' => \SCM\Commercial\Quotes\CommercialQuotesService::settingsFrom($this->settings),
       'estudios' => $section === 'estudios' ? \SCM\Commercial\Studies\CommercialStudiesService::settingsView($this->settings, new \SCM\Commercial\Studies\CommercialStudiesRepository($this->db)) : [],
       'respuestas' => $section === 'respuestas' ? $this->replyGuideSettings() : [],
-      // Texto de las plantillas del contrato de mandato en eSignatures: solo al abrir esa sección (lee la API).
-      'mandatos' => $section === 'mandatos' ? $this->mandateTemplates()->load() : [],
+      // Contratos de mandato: en Configuración, el enlace al editor y el historial; el editor (plantillas-mandato.php)
+      // pide 'plantillas_mandato', que lee el texto vigente de eSignatures.
+      'mandatos' => $section === 'mandatos' ? $this->mandateTemplates()->summary() : [],
+      'plantillas_mandato' => $section === 'plantillas_mandato' ? $this->mandateTemplates()->load() : [],
       'avisos' => ['values' => $signs],
       'actualizaciones' => ['limits' => self::propertyUpdateLimits($this->settings)],
       'destacados' => ['portals' => $highlights],
@@ -300,6 +302,7 @@ final class CommercialSettingsService
       case 'respuestas':
         return $this->saveReplyGuides($data);
       case 'mandatos':
+      case 'plantillas_mandato':
         return $this->saveMandateTemplate($data);
       case 'avisos':
         return $this->saveSigns($data);

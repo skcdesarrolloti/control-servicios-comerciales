@@ -349,135 +349,21 @@
         return { responsable_entrega: form.elements.responsable_entrega.value };
       },
     },
-    // Contratos de mandato: el texto de las tres plantillas de eSignatures (MandateTemplateEditor). Se guarda la plantilla
-    // que se está viendo; el servidor revisa que no haya cambiado en eSignatures, los {{campos}} y guarda la anterior.
+    // Contratos de mandato: el texto de las plantillas de eSignatures se edita en su propia pestaña (plantillas-mandato.php,
+    // editor visual); aquí solo el enlace y el historial de cambios.
     mandatos: {
       title: "Contratos de mandato",
-      wide: true,
+      manage: true,
       html: function (settings) {
-        if (!settings.ready) return '<p class="text-sm text-rose-700 text-left">' + esc(settings.message || "No se pudieron leer las plantillas.") + "</p>";
-        var templates = settings.templates || [];
-        var tabs = templates.map(function (tpl, index) {
-          return '<button type="button" class="cmt-tab" data-cmt-tab="' + index + '" aria-pressed="' + (index === 0 ? "true" : "false") + '">' + esc(tpl.tipo) + "</button>";
-        }).join("");
-        var editors = templates.map(function (tpl, index) {
-          return '<div data-cmt-editor="' + index + '"' + (index ? " hidden" : "") + ' data-tipo="' + esc(tpl.tipo) + '" data-huella="' + esc(tpl.huella) + '" data-campos="' + esc((tpl.campos || []).join(",")) + '">' +
-            '<label class="block"><span class="sr-only">Texto de la plantilla ' + esc(tpl.tipo) + "</span>" +
-            '<textarea class="cmt-text" rows="18" spellcheck="true" data-cmt-text>' + esc(tpl.markdown) + "</textarea></label></div>";
-        }).join("");
-        var known = (settings.known || []).map(function (field) { return '<button type="button" class="cmt-field" data-cmt-insert="' + esc(field) + '">{{' + esc(field) + "}}</button>"; }).join("");
+        if (!settings.ready) return '<p class="text-sm text-rose-700 text-left">' + esc(settings.message || "La firma digital no está configurada.") + "</p>";
         var history = (settings.history || []).map(function (row) {
-          return '<li><span><strong>' + esc(row.tipo) + "</strong> · " + esc(row.fecha) + " · " + esc(row.nombre || row.id_empleado || "") + (row.campos_quitados ? ' · quitó {{' + esc(row.campos_quitados) + "}}" : "") + "</span>" +
-            '<button type="button" class="cmt-link" data-cmt-version="' + esc(row.id) + '" data-tipo="' + esc(row.tipo) + '">Cargar versión anterior</button></li>';
+          return "<li><strong>" + esc(row.tipo) + "</strong> · " + esc(row.fecha) + " · " + esc(row.nombre || row.id_empleado || "") + (row.campos_quitados ? " · quitó {{" + esc(row.campos_quitados) + "}}" : "") + "</li>";
         }).join("");
-        return '<form data-config-form class="text-left cmt">' +
-          '<div class="cmt-warn"><span class="material-symbols-outlined" aria-hidden="true">gavel</span><p>Es el <strong>texto legal</strong> del contrato en eSignatures. Lo que guardes aplica a <strong>todos los contratos nuevos</strong> de ese tipo y a la página que revisa el propietario. Los ya enviados no cambian. Se guarda la plantilla que estás viendo y la versión anterior queda en el historial.</p></div>' +
-          '<nav class="cmt-tabs" aria-label="Plantillas">' + tabs + "</nav>" +
-          '<p class="cmt-help">Formato de eSignatures: <code>**negrita**</code>, <code># Título</code>, tablas <code>| Dato | {{campo}} |</code>. Los <code>{{campos}}</code> se llenan con los datos del mandato; no los cambies de nombre.</p>' +
-          editors +
-          '<div class="cmt-removed" data-cmt-removed hidden><p data-cmt-removed-text></p><label class="cmt-check"><input type="checkbox" name="confirmar_campos" value="1"> Quiero quitar estos campos del contrato.</label></div>' +
-          '<div class="cmt-actions"><button type="button" class="cmt-button" data-cmt-preview><span class="material-symbols-outlined" aria-hidden="true">visibility</span>Vista previa</button>' +
-          '<details class="cmt-fields"><summary>Campos disponibles</summary><p class="cmt-help">Toca uno para insertarlo donde está el cursor.</p><div>' + known + "</div></details></div>" +
-          '<div class="cmt-preview" data-cmt-preview-box hidden></div>' +
-          '<label class="cmt-check cmt-confirm"><input type="checkbox" name="confirmo" value="1" required> Entiendo que este cambio aplica a todos los contratos nuevos de <strong data-cmt-current>' + esc(templates[0] ? templates[0].tipo : "") + "</strong>.</label>" +
-          (history ? '<details class="cmt-history"><summary>Historial de cambios</summary><ul>' + history + "</ul></details>" : "") +
-          "</form>";
-      },
-      bind: function (pane) {
-        var form = pane.querySelector("[data-config-form]");
-        if (!form) return;
-        var active = 0;
-        var lastField = null;
-        function editor() { return pane.querySelector('[data-cmt-editor="' + active + '"]'); }
-        function fields(text) {
-          var found = [];
-          String(text || "").replace(/\{\{\s*([\w-]+)\s*\}\}/g, function (_m, name) { if (found.indexOf(name) < 0) found.push(name); return _m; });
-          return found;
-        }
-        // Campos que tenía la plantilla y ya no están: hay que confirmarlo.
-        function checkRemoved() {
-          var box = editor();
-          var before = (box.getAttribute("data-campos") || "").split(",").filter(Boolean);
-          var now = fields(box.querySelector("[data-cmt-text]").value);
-          var removed = before.filter(function (name) { return now.indexOf(name) < 0; });
-          var notice = pane.querySelector("[data-cmt-removed]");
-          notice.hidden = !removed.length;
-          form.elements.confirmar_campos.required = !!removed.length;
-          if (!removed.length) form.elements.confirmar_campos.checked = false;
-          pane.querySelector("[data-cmt-removed-text]").textContent = removed.length ? "Quitaste campos que llenan los datos del contrato: {{" + removed.join("}}, {{") + "}}." : "";
-        }
-        function show(index) {
-          active = index;
-          pane.querySelectorAll("[data-cmt-tab]").forEach(function (tab) { tab.setAttribute("aria-pressed", tab.getAttribute("data-cmt-tab") === String(index) ? "true" : "false"); });
-          pane.querySelectorAll("[data-cmt-editor]").forEach(function (box) { box.hidden = box.getAttribute("data-cmt-editor") !== String(index); });
-          pane.querySelector("[data-cmt-current]").textContent = editor().getAttribute("data-tipo");
-          pane.querySelector("[data-cmt-preview-box]").hidden = true;
-          form.elements.confirmo.checked = false;
-          checkRemoved();
-        }
-        pane.addEventListener("focusin", function (event) { if (event.target.matches("[data-cmt-text]")) lastField = event.target; });
-        pane.addEventListener("input", function (event) { if (event.target.matches("[data-cmt-text]")) checkRemoved(); });
-        pane.addEventListener("click", function (event) {
-          var tab = event.target.closest("[data-cmt-tab]");
-          if (tab) { show(Number(tab.getAttribute("data-cmt-tab"))); return; }
-          var insert = event.target.closest("[data-cmt-insert]");
-          if (insert) {
-            var area = lastField && !lastField.closest("[hidden]") ? lastField : editor().querySelector("[data-cmt-text]");
-            var text = "{{" + insert.getAttribute("data-cmt-insert") + "}}";
-            var start = area.selectionStart || 0;
-            area.value = area.value.slice(0, start) + text + area.value.slice(area.selectionEnd || start);
-            area.focus();
-            area.selectionStart = area.selectionEnd = start + text.length;
-            area.dispatchEvent(new Event("input", { bubbles: true }));
-            return;
-          }
-          var preview = event.target.closest("[data-cmt-preview]");
-          if (preview) {
-            var box = pane.querySelector("[data-cmt-preview-box]");
-            preview.disabled = true;
-            request("commercial_settings_save", { section: "mandatos", payload: JSON.stringify({ accion: "vista_previa", tipo: editor().getAttribute("data-tipo"), markdown: editor().querySelector("[data-cmt-text]").value }) })
-              .then(function (data) {
-                box.innerHTML = '<p class="cmt-help">Vista previa con los campos sin datos ("No aplica"). Así se verá el texto en la página del propietario.</p><div class="pm-contract-body">' + ((data.result && data.result.html) || "") + "</div>";
-                box.hidden = false;
-                box.scrollIntoView({ block: "nearest" });
-              })
-              .catch(function (error) { window.Swal.showValidationMessage(error.message); })
-              .finally(function () { preview.disabled = false; });
-            return;
-          }
-          var version = event.target.closest("[data-cmt-version]");
-          if (version) {
-            var index = -1;
-            pane.querySelectorAll("[data-cmt-editor]").forEach(function (box) { if (box.getAttribute("data-tipo") === version.getAttribute("data-tipo")) index = Number(box.getAttribute("data-cmt-editor")); });
-            if (index < 0) return;
-            if (!window.confirm("Se reemplaza lo que hay en el editor de «" + version.getAttribute("data-tipo") + "» por la versión anterior. No se guarda hasta que pulses Guardar.")) return;
-            version.disabled = true;
-            request("commercial_settings_save", { section: "mandatos", payload: JSON.stringify({ accion: "version", id: version.getAttribute("data-cmt-version") }) })
-              .then(function (data) {
-                show(index);
-                var area = editor().querySelector("[data-cmt-text]");
-                area.value = (data.result && data.result.markdown) || area.value;
-                area.dispatchEvent(new Event("input", { bubbles: true }));
-                area.focus();
-              })
-              .catch(function (error) { window.Swal.showValidationMessage(error.message); })
-              .finally(function () { version.disabled = false; });
-          }
-        });
-        show(0);
-      },
-      collect: function (form) {
-        var box = form.querySelector("[data-cmt-editor]:not([hidden])");
-        if (!box) throw new Error("Elige la plantilla.");
-        var markdown = box.querySelector("[data-cmt-text]").value;
-        if (!markdown.trim()) throw new Error("El texto de la plantilla no puede quedar vacío.");
-        return {
-          tipo: box.getAttribute("data-tipo"),
-          huella: box.getAttribute("data-huella"),
-          markdown: markdown,
-          confirmo: form.elements.confirmo.checked ? "1" : "",
-          confirmar_campos: form.elements.confirmar_campos.checked ? "1" : "",
-        };
+        return '<div data-config-form class="text-left cmt">' +
+          '<div class="cmt-warn"><span class="material-symbols-outlined" aria-hidden="true">gavel</span><p>El <strong>texto legal</strong> de los contratos de mandato (Por defecto, Berkley y Seguros mundial) está en eSignatures. Se edita en un <strong>editor visual</strong>, como el de eSignatures: negrita, títulos, tablas y los campos que se llenan con los datos del mandato. Lo que se guarde aplica a los contratos nuevos.</p></div>' +
+          '<p><a class="cmt-open" href="' + esc(settings.url) + '" target="_blank" rel="noopener"><span class="material-symbols-outlined" aria-hidden="true">edit_document</span>Abrir el editor de plantillas</a></p>' +
+          (history ? '<div class="cmt-history-box"><h4>Últimos cambios</h4><ul>' + history + "</ul></div>" : '<p class="cmt-help">Todavía no se han hecho cambios desde el panel.</p>') +
+          "</div>";
       },
     },
     // Banco de respuestas guía de la categoría Comercial (tabla jet_cct_respuesta_de_ticket, la del plugin "Gestor de

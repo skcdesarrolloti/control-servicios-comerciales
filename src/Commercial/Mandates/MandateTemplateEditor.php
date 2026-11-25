@@ -29,6 +29,20 @@ final class MandateTemplateEditor
     $this->directory = rtrim($directory ?? dirname(__DIR__, 3) . '/storage/data/mandatos-plantillas', '/\\');
   }
 
+  /**
+   * Lo que muestra Configuración (sin leer eSignatures): si está configurada, el enlace al editor y el historial.
+   * @return array{ready:bool,message:string,url:string,history:list<array<string,string>>}
+   */
+  public function summary(): array
+  {
+    return [
+      'ready' => $this->signature !== null,
+      'message' => $this->signature === null ? 'La firma digital no está configurada (ESIGNATURES_TOKEN en el .env).' : '',
+      'url' => rtrim(defined('SCM_BASE_URL') ? (string) SCM_BASE_URL : '', '/') . '/plantillas-mandato.php',
+      'history' => array_slice($this->history(), 0, 15),
+    ];
+  }
+
   /** @return array{ready:bool,message:string,templates:list<array{tipo:string,markdown:string,huella:string,campos:list<string>}>,known:list<string>,history:list<array<string,string>>} */
   public function load(): array
   {
