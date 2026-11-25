@@ -18,7 +18,7 @@ if (\SCM\Core\Auth::isLoggedIn()) {
   exit;
 }
 
-$error = '';
+$error = \SCM\Support\StaffTaskLink::failureMessage(is_string($_GET['enlace'] ?? null) ? $_GET['enlace'] : '');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $user = trim(sanitize_text_field($_POST['username'] ?? ''));

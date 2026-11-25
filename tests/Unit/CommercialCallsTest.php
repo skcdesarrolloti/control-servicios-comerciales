@@ -541,10 +541,14 @@ final class CommercialCallsTest extends TestCase
     self::assertSame($open, StaffTaskLink::redirectFor($auth, ['ticket_id' => StaffTaskLink::reference(7, '202')]), 'Con sesión abre la tarea sin cambiar de usuario.');
     self::assertSame('101', $_SESSION['scm_employee_id']);
     $_SESSION = [];
-    self::assertStringContainsString('/login.php?next=', (string) StaffTaskLink::redirectFor($auth, ['ticket_id' => StaffTaskLink::reference(7, '202', time() - 10)]), 'Vencido pasa por el login.');
+    self::assertStringEndsWith('&enlace=vencido', (string) @StaffTaskLink::redirectFor($auth, ['ticket_id' => StaffTaskLink::reference(7, '202', time() - 10)]), 'Vencido pasa por el login y lo dice.');
+    $forged = substr(StaffTaskLink::reference(7, '202'), 0, -1) . '0';
+    self::assertStringEndsWith('&enlace=firma', (string) @StaffTaskLink::redirectFor($auth, ['ticket_id' => $forged]), 'Una firma que no coincide se explica.');
+    self::assertStringContainsString('APP_SECRET', StaffTaskLink::failureMessage('firma'));
+    self::assertSame('', StaffTaskLink::failureMessage('<script>'));
     self::assertSame([], $_SESSION);
     $this->db->update('wp_jet_cct_funcionarios', ['activo' => 'No'], ['id_empleado' => '404']);
-    self::assertStringContainsString('/login.php?next=', (string) StaffTaskLink::redirectFor($auth, ['ticket_id' => StaffTaskLink::reference(7, '404')]), 'Un funcionario inactivo no entra.');
+    self::assertStringEndsWith('&enlace=funcionario', (string) @StaffTaskLink::redirectFor($auth, ['ticket_id' => StaffTaskLink::reference(7, '404')]), 'Un funcionario inactivo no entra.');
     self::assertSame($open, @StaffTaskLink::redirectFor($auth, ['ticket_id' => StaffTaskLink::reference(7, '202')]));
     self::assertSame('202', $_SESSION['scm_employee_id'], 'Inicia la sesión de quien recibió el enlace.');
   }

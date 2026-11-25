@@ -87,7 +87,20 @@ final class StaffTaskLink
     if ($link !== null && $auth->loginByEmployeeId($link['employee'])) {
       return self::openUrl($link['id']);
     }
-    return self::loginUrl(['tab' => 'abiertos', 'ticket_id' => (string) $parts['id'], 'abrir_tarea' => (string) $parts['id']]);
+    // Por qué no entró: queda en el log del servidor y el login lo dice (sin datos de la firma).
+    $reason = $parts['expires'] <= time() ? 'vencido' : ($link === null ? 'firma' : 'funcionario');
+    error_log(sprintf('[staff-task-link] tarea %d, funcionario %s: no se inició sesión (%s)', $parts['id'], $parts['employee'], $reason));
+    return self::loginUrl(['tab' => 'abiertos', 'ticket_id' => (string) $parts['id'], 'abrir_tarea' => (string) $parts['id']]) . '&enlace=' . $reason;
+  }
+
+  /** Mensaje del login cuando un enlace de aviso no pudo iniciar la sesión (?enlace=). */
+  public static function failureMessage(string $reason): string
+  {
+    return [
+      'vencido' => 'El enlace de la tarea venció. Ingresa y se abrirá la tarea.',
+      'firma' => 'El enlace de la tarea no es válido (la clave APP_SECRET del panel cambió después de enviarlo). Ingresa y se abrirá la tarea.',
+      'funcionario' => 'No se pudo iniciar tu sesión con el enlace: tu usuario no aparece activo en Funcionarios. Ingresa con tu usuario y contraseña.',
+    ][$reason] ?? '';
   }
 
   /**
