@@ -769,7 +769,7 @@ final class CommercialApiController
     }
     $resume = self::resumeDate((string) ($input['fecha_retomar'] ?? ''));
     if ($resume === null) {
-      JsonResponse::error('Elige la fecha para retomar la tarea: desde mañana y hasta un año.', 422);
+      JsonResponse::error('Elige la fecha para retomar la tarea: desde mañana y hasta ' . self::RESUME_MAX_DAYS . ' días (mes y medio).', 422);
     }
     $result = $this->workflow->postponeTicket(
       $ticketPk,
@@ -1410,7 +1410,10 @@ final class CommercialApiController
     }
   }
 
-  /** Fecha para retomar una tarea postergada (8:00 a. m. de Colombia): desde mañana y hasta un año. */
+  /** Máximo de días para retomar una tarea postergada (mes y medio): que no se posterguen sin fin. */
+  public const RESUME_MAX_DAYS = 45;
+
+  /** Fecha para retomar una tarea postergada (8:00 a. m. de Colombia): desde mañana y hasta RESUME_MAX_DAYS días. */
   public static function resumeDate(string $value): ?\DateTimeImmutable
   {
     $zone = new \DateTimeZone(\SCM\Support\ColombiaBusinessCalendar::TIMEZONE);
@@ -1419,7 +1422,7 @@ final class CommercialApiController
       return null;
     }
     $today = new \DateTimeImmutable('today', $zone);
-    if ($date <= $today || $date > $today->modify('+1 year')) {
+    if ($date <= $today || $date > $today->modify('+' . self::RESUME_MAX_DAYS . ' days')) {
       return null;
     }
     return $date->setTime(8, 0);

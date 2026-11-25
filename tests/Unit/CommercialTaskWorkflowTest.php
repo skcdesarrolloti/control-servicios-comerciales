@@ -169,30 +169,36 @@ final class CommercialTaskWorkflowTest extends TestCase
     $tickets = new CommercialTicketsRepository($this->db);
     $tickets->changeStatus(900, 'Postergado');
     $this->db->update('wp_jet_cct_tickets', ['estado_administrativo' => 'Postergado'], ['_ID' => 900]);
-    $resume = strtotime('2026-11-27 08:00:00 America/Bogota');
-    $tickets->setResumeDate(900, $resume);
+    $at = static fn(string $local): int => (new \DateTimeImmutable($local, new \DateTimeZone('America/Bogota')))->getTimestamp();
+    $tickets->setResumeDate(900, $at('2026-11-29 08:00')); // domingo
 
     [$notifier, $log] = $this->recorder();
     $resumer = new \SCM\Commercial\CommercialPostponedResumer($this->db, new Settings($this->db), $notifier);
-    self::assertSame(0, $resumer->run($resume - 60), 'Antes de la fecha sigue postergada.');
+    self::assertSame(0, $resumer->run($at('2026-11-28 10:00')), 'Antes de la fecha sigue postergada.');
+    self::assertSame(0, $resumer->run($at('2026-11-29 09:00')), 'Domingo: no se retoma.');
+    self::assertSame(0, $resumer->run($at('2026-11-30 06:59')), 'Antes de las 7:00 a. m. de Colombia, no.');
     self::assertSame('Postergado', $this->task()['estado_comercial']);
+    self::assertFalse(\SCM\Commercial\CommercialPostponedResumer::isTime($at('2026-12-08 09:00')), 'Festivo (Inmaculada Concepción): no.');
 
-    self::assertSame(1, $resumer->run($resume + 60));
+    self::assertSame(1, $resumer->run($at('2026-11-30 07:00')), 'Lunes 7:00 a. m.: retoma la del domingo.');
     $task = $this->task();
     self::assertSame(['Nuevo', 'Nuevo', 'Postergado'], [$task['estado'], $task['estado_comercial'], $task['estado_administrativo']], 'No toca el estado administrativo.');
     self::assertEmpty($task['fecha_retomar']);
-    self::assertStringContainsString('volvió a "Nuevo" (antes "Postergado")', (string) $this->db->getVar("SELECT observacion FROM wp_jet_cct_notas_ticket WHERE id_ticket = '900' ORDER BY _ID DESC LIMIT 1"));
+    self::assertStringContainsString('volvió a "Nuevo" (antes "Postergado"): se cumplió la fecha para retomarla (29/11/2026)', (string) $this->db->getVar("SELECT observacion FROM wp_jet_cct_notas_ticket WHERE id_ticket = '900' ORDER BY _ID DESC LIMIT 1"));
     self::assertCount(1, $log->mail);
     self::assertSame('101@example.test', $log->mail[0][0]);
     self::assertStringContainsString('ticket_id=900.', $log->mail[0][2], 'El responsable recibe su enlace individual.');
-    self::assertSame(0, $resumer->run($resume + 120), 'Una sola vez.');
+    self::assertSame(0, $resumer->run($at('2026-11-30 08:00')), 'Una sola vez.');
   }
 
-  public function testResumeDateMustBeBetweenTomorrowAndOneYear(): void
+  public function testResumeDateMustBeBetweenTomorrowAndAMonthAndAHalf(): void
   {
     $today = new \DateTimeImmutable('today', new \DateTimeZone('America/Bogota'));
     self::assertNull(CommercialApiController::resumeDate($today->format('Y-m-d')), 'Hoy no: desde mañana.');
     self::assertNull(CommercialApiController::resumeDate($today->modify('+2 years')->format('Y-m-d')));
+    self::assertSame(45, CommercialApiController::RESUME_MAX_DAYS);
+    self::assertNotNull(CommercialApiController::resumeDate($today->modify('+45 days')->format('Y-m-d')), 'Hasta mes y medio, sí.');
+    self::assertNull(CommercialApiController::resumeDate($today->modify('+46 days')->format('Y-m-d')), 'Más de mes y medio, no.');
     self::assertNull(CommercialApiController::resumeDate('2026-02-30'));
     self::assertNull(CommercialApiController::resumeDate(''));
     self::assertSame('08:00', CommercialApiController::resumeDate($today->modify('+1 day')->format('Y-m-d'))?->format('H:i'));

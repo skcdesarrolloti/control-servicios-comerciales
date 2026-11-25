@@ -182,12 +182,12 @@ final class CommercialTicketsRepository
   }
 
   /**
-   * Tareas postergadas cuya fecha para retomar ya llegó: vuelven solas a Nuevo (estado y estado_comercial, como una tarea
+   * Tareas postergadas cuya fecha para retomar es anterior a $cutoff: vuelven solas a Nuevo (estado y estado_comercial, como una tarea
    * recién creada) para que no se acumulen en Postergados. No toca estado_administrativo. Borra la fecha y deja una nota
    * interna de constancia. Devuelve las tareas reactivadas (ya con el estado nuevo) para avisar a su responsable.
    * @return list<array<string,mixed>>
    */
-  public function resumeDuePostponed(?int $now = null): array
+  public function resumeDuePostponed(int $cutoff, ?int $now = null): array
   {
     $now ??= time();
     $table = $this->db->table('jet_cct_tickets');
@@ -196,8 +196,8 @@ final class CommercialTicketsRepository
     }
     [$where, $args] = $this->bucketWhere('postergados');
     $where[] = 'COALESCE(t.`' . self::RESUME_COLUMN . '`, 0) > 0';
-    $where[] = 't.`' . self::RESUME_COLUMN . '` <= ?';
-    $due = $this->db->getResults('SELECT t.* FROM `' . $table . '` t WHERE ' . implode(' AND ', $where) . ' ORDER BY t.`' . self::RESUME_COLUMN . '` ASC LIMIT 500', array_merge($args, [$now]));
+    $where[] = 't.`' . self::RESUME_COLUMN . '` < ?';
+    $due = $this->db->getResults('SELECT t.* FROM `' . $table . '` t WHERE ' . implode(' AND ', $where) . ' ORDER BY t.`' . self::RESUME_COLUMN . '` ASC LIMIT 500', array_merge($args, [$cutoff]));
     $notes = $this->db->table('jet_cct_notas_ticket');
     $hasNotes = $this->schema->tableExists($notes);
     $zone = new \DateTimeZone(\SCM\Support\ColombiaBusinessCalendar::TIMEZONE);
