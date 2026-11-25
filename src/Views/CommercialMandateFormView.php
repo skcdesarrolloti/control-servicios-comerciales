@@ -337,7 +337,7 @@ final class CommercialMandateFormView
       . '<input type="hidden" name="' . $o('indicativo') . '" value="' . self::e($code) . '">'
       . self::registered(['question' => '¿El propietario ya está registrado?', 'yes' => 'Sí, buscarlo', 'no' => 'No, es nuevo', 'search' => 'Buscar propietario', 'placeholder' => 'Nombre o documento (mínimo 3 letras)', 'type' => 'propietario', 'index' => (string) $i], $id, 'registrado_' . $i, $known ? $picked : '')
       . '<div class="cmf-entity-data" data-cmf-entity-data' . ($known ? '' : ' hidden') . '>'
-      . '<div class="cst-grid">'
+      . '<h4 class="cmf-subtitle">Identificación</h4><div class="cst-grid">'
       . self::select($values, $o('calidad'), 'Calidad', self::pairs(['Propietario', 'Poseedor', 'Tenedor', 'Usufructuario']))
       . self::select($values, $o('tipo_persona'), 'Tipo de persona', ['Natural' => 'Natural', 'Juridica' => 'Jurídica'])
       . self::input($values, $o('nombre'), 'Nombre / Empresa', ['required' => true])
@@ -347,12 +347,13 @@ final class CommercialMandateFormView
       . '<p class="cmf-duplicate cmf-wide" data-cmf-duplicate hidden></p>'
       . '</div>'
       . self::when($o('tipo_persona'), 'Juridica', self::input($values, $o('nombre_juridico'), 'Representante legal') . self::input($values, $o('documento_juridico'), 'Documento del representante'))
-      . '<div class="cst-grid">' . $countries
+      . '<h4 class="cmf-subtitle">Contacto</h4><div class="cst-grid">' . $countries
       . self::input($values, $o('expedicion'), 'Lugar de expedición')
       . self::input($values, $o('direccion'), 'Dirección')
       . self::input($values, $o('correo'), 'Correo', ['type' => 'email'])
       . self::input($values, $o('celular'), 'Celular', ['type' => 'tel'])
       . self::input($values, $o('fallecimiento'), 'En caso de fallecimiento se designa a', ['type' => 'textarea', 'wide' => true])
+      . '</div><h4 class="cmf-subtitle">Pago del canon</h4><div class="cst-grid">'
       . self::select($values, $o('tipo_giro'), 'Tipo de giro', self::pairs(['Transferencia electronica', 'Cheque']), false)
       . self::input($values, $o('nombre_giro'), 'A nombre del giro')
       . self::input($values, $o('titular'), 'Titular de la cuenta')
