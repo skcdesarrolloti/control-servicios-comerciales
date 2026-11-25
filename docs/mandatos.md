@@ -43,6 +43,9 @@ el crédito de la garantía (`MandateCalculator`) y lo guarda en `wp_jet_cct_cre
 - Columna `id_ticket` del mandato (tarea de donde se creó): `php bin/add-mandate-task-field.php --aplicar`. Sin ella, la
   tarea encuentra sus mandatos por el estudio y el inmueble.
 - Plantillas, título, roles y representante legal están fijos en `MandateSignature` (como `esignatures_config.php`).
+  Título como lo enviaba Make: `CONTRATO DE MANDATO #<mandato> PARA LA ADMINISTRACION DEL INMUEBLE #<código>`.
+- **Contract owner** en eSignatures: quien creó el mandato (`assigned_user_email`, su correo). Debe ser usuario de la cuenta
+  de eSignatures; si no lo es, el contrato se envía igual, sin dueño (queda en el log).
 
 ## Revisión del propietario
 

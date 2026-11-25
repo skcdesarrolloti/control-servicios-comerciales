@@ -23,7 +23,8 @@ final class MandateSignature
     'Berkley' => 'dfb25187-7be8-40e8-b0a4-3d6bad9519bb',
     'Seguros mundial' => 'd75dd25d-68f0-470c-b6ff-1f1773eb747b',
   ];
-  public const TITLE = 'CONTRATO DE MANDATO #%d';
+  /** Título en eSignatures, como lo enviaba Make: mandato e inmueble. */
+  public const TITLE = 'CONTRATO DE MANDATO #%d PARA LA ADMINISTRACION DEL INMUEBLE #%s';
   public const REDIRECT_URL = 'https://sucasainmobiliaria.com.co/gracias-por-su-firma/';
   public const ROLE_OWNER = 'PROPIETARIO';
   public const ROLE_EMPLOYEE = 'QUIEN ELABORA EN REPRESENTACIÓN DEL ADMINISTRADOR';
@@ -98,7 +99,17 @@ final class MandateSignature
         }
       }
     }
-    $response = ($this->http)('POST', 'contracts', $body);
+    try {
+      $response = ($this->http)('POST', 'contracts', $body);
+    } catch (\RuntimeException $error) {
+      // Si quien creó el mandato no es usuario de eSignatures, se envía sin dueño antes que dejar de enviarlo.
+      if (($body['assigned_user_email'] ?? '') === '') {
+        throw $error;
+      }
+      error_log('[mandatos:firma] Mandato ' . $id . ': no se pudo asignar a ' . $body['assigned_user_email'] . ', se envía sin dueño: ' . $error->getMessage());
+      unset($body['assigned_user_email']);
+      $response = ($this->http)('POST', 'contracts', $body);
+    }
     $new = (string) ($response['data']['contract']['id'] ?? '');
     if ($new === '') {
       throw new \RuntimeException('eSignatures no devolvió el id del contrato.');
@@ -112,6 +123,12 @@ final class MandateSignature
       }
     }
     return $new;
+  }
+
+  public static function title(int $id, string $property): string
+  {
+    $property = self::text($property);
+    return $property === '' ? 'CONTRATO DE MANDATO #' . $id : sprintf(self::TITLE, $id, $property);
   }
 
   /** Texto (Markdown) de la plantilla de eSignatures del tipo de contrato; '' si no tiene. */
@@ -157,13 +174,16 @@ final class MandateSignature
     $fields[] = ['placeholder_key' => 'tabla_acuerdos', 'replace_with_markdown' => self::agreementsTable($post)];
     return [
       'template_id' => $template,
-      'title' => sprintf(self::TITLE, $id),
+      'title' => self::title($id, (string) ($post['id_inmueble'] ?? '')),
       'locale' => 'es',
       'test' => $this->test ? 'yes' : 'no',
       // La API no devuelve el template_id: queda aquí para saber si al reenviar se puede modificar este mismo contrato.
       'metadata' => 'mandato:' . $id . ';plantilla:' . $template,
       'labels' => ['Mandato', $type],
       'signers' => self::signers($post),
+      // "Contract owner" en eSignatures: quien creó el mandato lo administra y recibe sus avisos (debe ser usuario de
+      // la cuenta; si no lo es, send() lo envía sin dueño).
+      'assigned_user_email' => self::text($post['correo_funcionario'] ?? ''),
       'placeholder_fields' => $fields,
     ];
   }

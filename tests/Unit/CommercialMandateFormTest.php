@@ -244,7 +244,8 @@ final class CommercialMandateFormTest extends TestCase
     $result = $service->sendToSign($id);
     self::assertSame(['Enviado', 'c1'], array_values($this->db->getRow('SELECT estado, id_esignatures FROM wp_jet_cct_contrato_mandato WHERE _ID = ?', [$id])));
     $body = $this->calls[0][2];
-    self::assertSame([MandateSignature::TEMPLATES['Por defecto'], 'CONTRATO DE MANDATO #' . $id, 'yes', 'mandato:' . $id . ';plantilla:' . MandateSignature::TEMPLATES['Por defecto']], [$body['template_id'], $body['title'], $body['test'], $body['metadata']]);
+    self::assertSame([MandateSignature::TEMPLATES['Por defecto'], 'CONTRATO DE MANDATO #' . $id . ' PARA LA ADMINISTRACION DEL INMUEBLE #28355', 'yes', 'mandato:' . $id . ';plantilla:' . MandateSignature::TEMPLATES['Por defecto']], [$body['template_id'], $body['title'], $body['test'], $body['metadata']]);
+    self::assertSame('admin@example.test', $body['assigned_user_email'], 'Quien creó el mandato queda como dueño del contrato (Contract owner).');
     self::assertSame(['Lilia Granados - C.C. 21235713', '+573006681522', 1], [$body['signers'][0]['name'], $body['signers'][0]['mobile'], $body['signers'][0]['signing_order']]);
     self::assertSame(['Administrador', 'yes', 2], [$body['signers'][2]['name'], $body['signers'][2]['auto_sign'], $body['signers'][2]['signing_order']], 'Quien creó el mandato firma solo, de segundo.');
     self::assertSame(MandateSignature::LEGAL_REPRESENTATIVE['email'], $body['signers'][3]['email']);
@@ -483,5 +484,24 @@ Acepto.`{\"input_type\":\"every_signer\"}`",
     self::assertSame('observaciones', CommercialMandatesService::reviewState(['estado' => 'Enviado'], $none, 1, 'h'), 'Con observaciones pendientes se sigue viendo.');
     self::assertSame('sin_enviar', CommercialMandatesService::reviewState(['estado' => 'No enviado'], $none, 0, 'h'));
     self::assertSame('', CommercialMandatesService::reviewNotice('aprobado'));
+  }
+
+  public function testIfTheOwnerIsNotAnESignaturesUserTheContractIsSentWithoutOwner(): void
+  {
+    $calls = [];
+    $signature = new MandateSignature('token', true, function (string $method, string $path, ?array $body) use (&$calls): array {
+      $calls[] = $body;
+      if (isset($body['assigned_user_email'])) {
+        throw new \RuntimeException('eSignatures respondió con error 422: assigned_user_email is not a user');
+      }
+      return ['data' => ['contract' => ['id' => 'c9']]];
+    });
+    $post = MandateFields::toForm(['_ID' => 7, 'id_inmueble' => '33593', 'tipo_contrato' => 'Por defecto', 'propietarios' => '1', 'nombre_1' => 'Lilia', 'correo_1' => 'l@example.test'])
+      + ['nombre_funcionario' => 'Ana', 'correo_funcionario' => 'ana@example.test'];
+    self::assertSame('c9', $signature->send($post, 7, null, ''));
+    self::assertCount(2, $calls);
+    self::assertArrayNotHasKey('assigned_user_email', $calls[1], 'Se reintenta sin dueño: la firma no se detiene por eso.');
+    self::assertSame('CONTRATO DE MANDATO #7 PARA LA ADMINISTRACION DEL INMUEBLE #33593', $calls[1]['title']);
+    self::assertSame('CONTRATO DE MANDATO #7', MandateSignature::title(7, ''));
   }
 }
