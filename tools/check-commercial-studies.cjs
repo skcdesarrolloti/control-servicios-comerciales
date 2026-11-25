@@ -63,15 +63,19 @@ const shots = process.argv[3] || '';
     const card = page.locator('[data-cst-card="1"]');
     assert.equal(await card.locator('.cst-state').innerText(), 'Esperando respuesta');
 
-    // Responder desde Registros › Estudios: abre el popup de la tarea ya en el estudio y con la respuesta abierta.
+    // Responder desde Registros › Estudios: un popup encima del listado con el formulario; Cancelar vuelve al listado.
     await page.goto(endpoint + '?as=101');
     await page.locator('[data-cst-page] .cqt-table').waitFor();
-    if (shots) await page.screenshot({ path: path.join(shots, 'estudios-listado-responder.png') });
     await page.locator('[data-cst-list] [data-cst-respond="1"]').click();
-    const respond = card.locator('[data-cst-form="respond"]');
+    await page.locator('#cst-dialog [data-cst-form="respond"]').waitFor();
+    assert.equal(await page.locator('#commercial-case-modal.open').count(), 0, 'No abre la tarea');
+    await page.locator('#cst-dialog [data-cst-dialog-close]').click();
+    assert.equal(await page.locator('#cst-dialog').count(), 0);
+    assert.equal(await page.locator('[data-cst-page] .cqt-table').count(), 1, 'Sigue en el listado');
+    await page.locator('[data-cst-list] [data-cst-respond="1"]').click();
+    const respond = page.locator('#cst-dialog [data-cst-form="respond"]');
     await respond.waitFor();
-    assert.equal(await page.locator('#commercial-case-modal [data-cst-task]').count(), 1, 'Responder abre la tarea en su ventana de estudios');
-    assert.equal(await respond.isVisible(), true, 'Con el formulario de respuesta abierto');
+    if (shots) await page.screenshot({ path: path.join(shots, 'estudios-responder-popup.png') });
     assert.equal(await respond.locator('[data-cst-when="Aprobado"]').isVisible(), false, 'Los datos de aprobación salen solo al aprobar');
     await respond.locator('[name="estado"]').selectOption('Aplazado');
     assert.equal(await respond.locator('[data-cst-when="Aplazado"]').isVisible(), true);
@@ -101,11 +105,28 @@ const shots = process.argv[3] || '';
     await respond.locator('[name="docs_arrendatario[]"]').setInputFiles([{ name: 'cedula.txt', mimeType: 'text/plain', buffer: Buffer.from('no') }]);
     await respond.locator('[type="submit"]').click();
     await page.waitForFunction(() => ((document.querySelector('[data-cst-form="respond"] [data-cst-error]') || {}).innerText || '').includes('debe ser PDF, JPG, PNG'));
-    assert.equal(await page.locator('[data-cst-card="1"] .cst-state').innerText(), 'Esperando respuesta', 'Un archivo inválido no aprueba nada');
+    assert.equal(await page.locator('#cst-dialog').count(), 1, 'Un archivo inválido no aprueba nada: el popup sigue abierto');
     await respond.locator('[name="docs_arrendatario[]"]').setInputFiles([{ name: 'cedula.png', mimeType: 'image/png', buffer: png }]);
     if (shots) await page.screenshot({ path: path.join(shots, 'estudio-aprobar.png'), fullPage: false });
     await respond.locator('[type="submit"]').click();
-    await page.waitForFunction(() => (document.querySelector('.cst-flash') || {}).innerText && document.querySelector('.cst-flash').innerText.includes('caso de entrega'));
+    // Al guardar se cierra el popup y se recarga el listado, sin salir de él.
+    await page.waitForFunction(() => !document.getElementById('cst-dialog'));
+    await page.waitForFunction(() => ((document.querySelector('[data-cst-list] td[data-label="Estudio"]') || {}).innerText || '').includes('Aprobado'));
+    assert.equal(await page.locator('[data-cst-list] [data-cst-respond]').count(), 0, 'Un estudio aprobado ya no se responde');
+    if (shots) await page.screenshot({ path: path.join(shots, 'estudios-respondido.png') });
+
+    // En la tarea, el estudio aprobado con sus documentos.
+    await page.evaluate(() => {
+      const modal = document.getElementById('commercial-case-modal');
+      modal.classList.add('open');
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.setAttribute('data-commercial-task-form', 'study');
+      button.setAttribute('data-ticket-pk', '700');
+      modal.querySelector('[data-commercial-case-content]').appendChild(button);
+      button.click();
+    });
+    await page.locator('[data-cst-card="1"]').waitFor();
     assert.equal(await page.locator('[data-cst-card="1"] .cst-state').innerText(), 'Aprobado');
     assert.equal(await page.locator('[data-cst-card="1"] .cst-actions [data-cst-toggle="respond-1"]').count(), 0, 'Un estudio respondido no se vuelve a aprobar');
     assert.equal(await page.locator('[data-cst-card="1"] .cst-actions [data-cst-toggle="desist-1"]').count(), 1);

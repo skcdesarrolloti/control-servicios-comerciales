@@ -99,6 +99,7 @@ final class CommercialActionRouter
     'commercial_study_properties' => 'properties',
     'commercial_study_desist' => 'desist',
     'commercial_study_desist_form' => 'desistForm',
+    'commercial_study_respond_form' => 'respondForm',
     'commercial_studies_list' => 'list',
     'commercial_study_view' => 'view',
   ];

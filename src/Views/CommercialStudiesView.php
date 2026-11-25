@@ -185,8 +185,21 @@ final class CommercialStudiesView
     return $html . '</article>';
   }
 
+  /**
+   * Popup de Responder del listado: el resumen del estudio y su formulario de respuesta, sin abrir la tarea.
+   * El contenedor lleva data-cst-task para que la búsqueda de inmuebles use la tarea del estudio.
+   * @param array<string,mixed> $study @param array<string,mixed> $data CommercialStudiesService::formData()
+   */
+  public static function respondDialog(array $study, array $data, int $pk): string
+  {
+    $summary = implode(' · ', array_filter([(string) $study['cliente'], trim((string) $study['aseguradora'] . ($study['num_solicitud'] !== '' ? ' · solicitud ' . $study['num_solicitud'] : '')), 'Tarea #' . $pk]));
+    return '<div data-cst-task data-ticket-pk="' . $pk . '"><p class="cqt-eyebrow">' . self::e($summary) . '</p>'
+      . ($study['estado'] === CommercialStudiesService::POSTPONED && $study['faltante'] !== '' ? '<p class="cst-note"><strong>Falta:</strong> ' . nl2br(self::e($study['faltante'])) . '</p>' : '')
+      . self::respondForm($study, $data, $pk, true) . '</div>';
+  }
+
   /** @param array<string,mixed> $study @param array<string,mixed> $data */
-  private static function respondForm(array $study, array $data, int $pk): string
+  private static function respondForm(array $study, array $data, int $pk, bool $dialog = false): string
   {
     $id = (int) $study['id'];
     $options = self::pairs(CommercialStudiesService::RESPONSES);
@@ -197,7 +210,7 @@ final class CommercialStudiesView
     foreach ($data['servicios'] as $service) {
       $services .= '<label class="cqt-check"><input type="checkbox" name="servicios_publicos[]" value="' . self::e($service) . '" data-cst-service> ' . self::e($service) . '</label>';
     }
-    return '<form class="cst-form cst-inline" data-cst-form="respond" data-cst-panel="respond-' . $id . '" hidden novalidate><h3>Respuesta del estudio #' . $id . '</h3>'
+    return '<form class="cst-form cst-inline" data-cst-form="respond"' . ($dialog ? '' : ' data-cst-panel="respond-' . $id . '" hidden') . ' novalidate><h3>Respuesta del estudio #' . $id . '</h3>'
       . '<input type="hidden" name="ticket_pk" value="' . $pk . '"><input type="hidden" name="id" value="' . $id . '">'
       . '<div class="cst-grid">' . self::select('estado', 'Respuesta de la aseguradora', $options, '', 'Elige una opción', true, ' data-cst-response') . '</div>'
       . '<div data-cst-when="' . CommercialStudiesService::POSTPONED . '" hidden><label class="cqt-field"><span>Información o documentación faltante <em aria-hidden="true">*</em></span><textarea name="faltante" rows="3" maxlength="2000" placeholder="Todo lo que falta para obtener la respuesta del estudio">' . self::e($study['faltante']) . '</textarea></label></div>'
@@ -217,7 +230,7 @@ final class CommercialStudiesView
       . self::documentInputs(true)
       . '</div>'
       . '<p class="cqt-error" data-cst-error role="alert" hidden></p>'
-      . '<div class="cst-form-actions"><button type="submit" class="cqt-primary cqt-small">' . self::icon('send') . 'Guardar respuesta y avisar al cliente</button><button type="button" class="cqt-secondary cqt-small" data-cst-toggle="respond-' . $id . '">Cancelar</button></div></form>';
+      . '<div class="cst-form-actions"><button type="submit" class="cqt-primary cqt-small">' . self::icon('send') . 'Guardar respuesta y avisar al cliente</button><button type="button" class="cqt-secondary cqt-small" ' . ($dialog ? 'data-cst-dialog-close' : 'data-cst-toggle="respond-' . $id . '"') . '>Cancelar</button></div></form>';
   }
 
   /** Código del inmueble que abre su ficha interna (la misma de la tarea; dentro está "Ver en la web"). @param array<string,mixed> $study */
@@ -357,8 +370,8 @@ final class CommercialStudiesView
         . '<td data-label="Tarea">' . $task . '</td>'
         . '<td data-label="Consultor/a">' . self::e($row['asesor'] ?: 'Sin consultor/a') . '</td>'
         . '<td data-label="Acciones"><div class="cqt-row-actions cst-row-actions">'
-        // Responder abre el popup de la tarea ya en el estudio y con su formulario de respuesta (el mismo de la tarea).
-        . ($canOpenTask && $row['tarea'] > 0 && $row['respondible'] ? '<button type="button" class="cqt-primary cqt-small" data-commercial-open-case="' . $row['tarea'] . '" data-cst-respond="' . $id . '">' . self::icon('fact_check') . 'Responder</button>' : '')
+        // Responder abre un popup con el mismo formulario de respuesta de la tarea, sin salir del listado.
+        . ($canOpenTask && $row['tarea'] > 0 && $row['respondible'] ? '<button type="button" class="cqt-primary cqt-small" data-cst-respond="' . $id . '">' . self::icon('fact_check') . 'Responder</button>' : '')
         . '<button type="button" class="cqt-secondary cqt-small" data-cst-view="' . $id . '">' . self::icon('visibility') . 'Ver</button>'
         . self::copyButton($row['enlace'], 'Enlace')
         . ($canDesist && $row['desistible'] ? '<button type="button" class="cqt-secondary cqt-small cst-danger" data-cst-desist="' . $id . '">' . self::icon('block') . 'Desistir negocio</button>' : '')

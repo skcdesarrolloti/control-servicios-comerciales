@@ -195,6 +195,33 @@ final class CommercialStudiesApiController
     });
   }
 
+  /**
+   * Formulario de respuesta para el popup del listado (Registros › Estudios / Mis estudios). La respuesta se guarda con
+   * la tarea del estudio, así que pide los mismos permisos que el popup de la tarea.
+   * @param array<string,mixed> $input
+   */
+  public function respondForm(array $input): never
+  {
+    $this->guarded($input, function () use ($input): array {
+      $id = (int) ($input['id'] ?? 0);
+      $pk = (int) ($this->service->studyFor($id)['id_ticket'] ?? 0);
+      if ($pk <= 0) {
+        throw new \RuntimeException('Este estudio no tiene tarea: respóndelo desde su tarea.');
+      }
+      $data = $this->service->formData($this->taskPk(['ticket_pk' => $pk]));
+      $study = null;
+      foreach ($data['studies'] as $row) {
+        if ((int) $row['id'] === $id) {
+          $study = $row;
+        }
+      }
+      if ($study === null || !$data['can']['responder'] || !$study['respondible']) {
+        throw new \RuntimeException('Este estudio ya no se puede responder.');
+      }
+      return ['html' => CommercialStudiesView::respondDialog($study, $data, $pk)];
+    });
+  }
+
   /** @param array<string,mixed> $input */
   public function list(array $input): never
   {

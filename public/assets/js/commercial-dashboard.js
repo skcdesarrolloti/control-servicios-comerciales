@@ -888,15 +888,12 @@
     if (!currentCasePk) return;
     lastFocused = button;
     showCaseModal(true);
-    // Responder desde Registrar › Estudios: la tarea abre directo en su ventana de estudios, con la respuesta abierta.
-    var studyId = button.getAttribute("data-cst-respond") || "";
-    if (studyId) { loadTaskForm(button, studyId); return; }
     loadCase(currentCasePk, false);
   }
 
-  function loadTaskForm(button, respondStudy) {
+  function loadTaskForm(button) {
     var ticketPk = button.getAttribute("data-ticket-pk") || currentCasePk;
-    var kind = button.getAttribute("data-commercial-task-form") || (respondStudy ? "study" : "");
+    var kind = button.getAttribute("data-commercial-task-form");
     var propertyCode = button.getAttribute("data-property-code") || "";
     if (!ticketPk || !caseContent) return;
     if (detailRequest) detailRequest.abort();
@@ -919,8 +916,6 @@
       if ((property && typeof window.initCommercialPropertyEntry !== "function") || (media && typeof window.initCommercialPropertyMedia !== "function")) throw new Error("Actualiza la página para cargar la versión actual del formulario.");
       var heading = caseContent.querySelector("h1");
       if (heading) { heading.setAttribute("tabindex", "-1"); heading.focus({ preventScroll: true }); }
-      var respond = respondStudy ? caseContent.querySelector('[data-cst-card="' + respondStudy + '"] .cst-actions [data-cst-toggle="respond-' + respondStudy + '"]') : null;
-      if (respond) { respond.click(); respond.closest("[data-cst-card]").scrollIntoView({ block: "start" }); }
     }).catch(function (error) {
       if (error.name === "AbortError") return;
       caseContent.removeAttribute("aria-busy");

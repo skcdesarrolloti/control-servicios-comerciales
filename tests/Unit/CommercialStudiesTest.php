@@ -111,7 +111,7 @@ final class CommercialStudiesTest extends TestCase
       self::assertArrayHasKey($action, CommercialAccessPolicy::ACTIONS);
       self::assertContains($action, array_merge(...array_values($groups)));
     }
-    foreach (['commercial_study_form' => 'form', 'commercial_study_create' => 'create', 'commercial_study_update' => 'update', 'commercial_study_respond' => 'respond', 'commercial_study_properties' => 'properties', 'commercial_study_desist' => 'desist', 'commercial_study_desist_form' => 'desistForm', 'commercial_studies_list' => 'list', 'commercial_study_view' => 'view'] as $action => $method) {
+    foreach (['commercial_study_form' => 'form', 'commercial_study_create' => 'create', 'commercial_study_update' => 'update', 'commercial_study_respond' => 'respond', 'commercial_study_properties' => 'properties', 'commercial_study_desist' => 'desist', 'commercial_study_desist_form' => 'desistForm', 'commercial_study_respond_form' => 'respondForm', 'commercial_studies_list' => 'list', 'commercial_study_view' => 'view'] as $action => $method) {
       self::assertSame($method, CommercialActionRouter::STUDY_ACTIONS[$action]);
     }
     self::assertContains('estudios', CommercialSettingsService::SECTIONS);
@@ -470,7 +470,12 @@ final class CommercialStudiesTest extends TestCase
     self::assertTrue($mine['mine']);
     self::assertSame(0, $this->service()->listing(['es_estado' => 'Aprobado'])['total']);
     $waiting = CommercialStudiesView::results($team, CommercialStudiesDatabase::policy($this->db), true);
-    self::assertStringContainsString('data-commercial-open-case="700" data-cst-respond="' . $own . '"', $waiting, 'Responder abre la tarea en el estudio');
+    self::assertStringContainsString('data-cst-respond="' . $own . '"', $waiting, 'Responder en el listado');
+    $dialog = CommercialStudiesView::respondDialog($this->service()->formData(700)['studies'][0], $this->service()->formData(700), 700);
+    self::assertStringContainsString('data-cst-task data-ticket-pk="700"', $dialog, 'La búsqueda de inmuebles usa la tarea del estudio');
+    self::assertStringContainsString('data-cst-form="respond" novalidate', $dialog, 'El formulario sale abierto');
+    self::assertStringContainsString('data-cst-dialog-close>Cancelar', $dialog);
+    self::assertStringNotContainsString('Volver a la tarea', $dialog);
 
     // Columna Inmueble con su ficha y botón del enlace del cliente.
     $this->login('101', '9');

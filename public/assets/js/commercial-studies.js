@@ -82,7 +82,7 @@
     if (uploading && window.SCMLoader) window.SCMLoader.show({ title: "Subiendo los documentos", detail: "Guardamos el asegurable, los servicios públicos y el documento del arrendatario. Puede tardar unos segundos.", icon: "pdf" });
     request(action, data).then(function (result) {
       notify("success", result.message || "Listo.");
-      if (task && result.html) {
+      if (task && result.html && !dialog) {
         var holder = task.parentElement;
         holder.innerHTML = result.html;
         var flash = holder.querySelector(".cst-flash") || holder.querySelector("h1");
@@ -220,23 +220,26 @@
     dialog.remove();
     if (returnFocus && document.contains(returnFocus)) returnFocus.focus();
   }
-  function openDesist(button) {
+  // Popups del listado (Desistir negocio y Responder): el formulario va encima de la tabla y al guardar se recarga.
+  function openDialog(button, action, id, label, wide) {
     returnFocus = button;
     button.disabled = true;
-    request("commercial_study_desist_form", { id: button.getAttribute("data-cst-desist") }).then(function (result) {
+    request(action, { id: id }).then(function (result) {
       closeDialog();
       var dialog = document.createElement("div");
       dialog.id = "cst-dialog";
       dialog.className = "cqt-viewer cst-dialog";
       dialog.setAttribute("role", "dialog");
       dialog.setAttribute("aria-modal", "true");
-      dialog.setAttribute("aria-label", "Desistir negocio");
-      dialog.innerHTML = '<div class="cqt cst cst-dialog-box">' + (result.html || "") + "</div>";
+      dialog.setAttribute("aria-label", label);
+      dialog.innerHTML = '<div class="cqt cst cst-dialog-box' + (wide ? " cst-dialog-box--wide" : "") + '">' + (result.html || "") + "</div>";
       document.body.appendChild(dialog);
       var first = dialog.querySelector("select");
       if (first) first.focus();
     }).catch(function (error) { notify("error", error.message); }).finally(function () { button.disabled = false; });
   }
+  function openDesist(button) { openDialog(button, "commercial_study_desist_form", button.getAttribute("data-cst-desist"), "Desistir negocio", false); }
+  function openRespond(button) { openDialog(button, "commercial_study_respond_form", button.getAttribute("data-cst-respond"), "Responder estudio", true); }
 
   // ── Listado ────────────────────────────────────────
   var listPage = 1;
@@ -282,6 +285,8 @@
     if (target.closest("[data-cst-dialog-close]") || target.id === "cst-dialog") { closeDialog(); return; }
     var desist = target.closest("[data-cst-desist]");
     if (desist) { openDesist(desist); return; }
+    var respondButton = target.closest("[data-cst-respond]");
+    if (respondButton) { openRespond(respondButton); return; }
     var task = target.closest("[data-cst-task]");
     if (task) {
       var toggle = target.closest("[data-cst-toggle]");
