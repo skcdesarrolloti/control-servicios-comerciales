@@ -57,12 +57,12 @@ function assert(condition, message) {
   await page.locator('[data-report-row="3"] [data-report-value]').blur();
   assert((await (await value).json()).data.valor === 6000, 'No se corrige el valor');
   await page.locator('[data-report-filters] [name="funcionario"]').selectOption('900');
-  await page.locator('[data-report-filters] button').click();
+  await page.locator('[data-report-filters] [type="submit"]').click();
   await page.locator('[data-report-row="1"]').waitFor({ state: 'detached' });
   await page.locator('[data-report-state="no_pagados"]').click();
   await page.locator('[data-report-state="no_pagados"][aria-selected="true"]').waitFor();
   await page.locator('[data-report-filters] [name="funcionario"]').selectOption('');
-  await page.locator('[data-report-filters] button').click();
+  await page.locator('[data-report-filters] [type="submit"]').click();
   await page.locator('[data-report-row="4"] [data-report-check]').check();
   await page.locator('[data-report-action="pay"]').click();
   const pay = saved('commercial_reports_pay_reports');

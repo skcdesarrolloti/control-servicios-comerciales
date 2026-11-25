@@ -1179,11 +1179,16 @@ final class CommercialDashboardView
             <span>Reportes</span>
             <span class="material-symbols-outlined text-[16px] group-hover/nav:rotate-180 transition-transform" aria-hidden="true">expand_more</span>
           </button>
-          <div class="absolute right-0 top-full hidden group-hover/nav:block bg-surface-container-lowest shadow-[0_12px_32px_rgba(0,0,0,0.14)] rounded-2xl py-space-xs min-w-[240px] z-50 border border-outline-variant/30 text-on-surface" data-commercial-dropdown-menu="reportes_comerciales">
+          <div class="absolute right-0 top-full hidden group-hover/nav:block bg-surface-container-lowest shadow-[0_12px_32px_rgba(0,0,0,0.14)] rounded-2xl py-space-xs min-w-[280px] z-50 border border-outline-variant/30 text-on-surface" data-commercial-dropdown-menu="reportes_comerciales">
             <?php foreach (CommercialAccessPolicy::SUBVIEWS['reportes_comerciales'] as $reportKey => $reportLabel): ?>
               <?php if (!$policy instanceof CommercialAccessPolicy || $policy->canSubview('reportes_comerciales', $reportKey)): ?>
+              <?php [$reportIcon, $reportHint] = self::REPORT_MENU[$reportKey]; ?>
               <a class="flex items-center gap-2.5 px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="reportes_comerciales" href="<?php echo esc_url(self::url($baseUrl, ['tab' => $reportKey])); ?>">
-                <span class="font-semibold text-on-surface"><?php echo esc_html($reportLabel); ?></span>
+                <span class="material-symbols-outlined text-[18px] text-secondary" aria-hidden="true"><?php echo esc_html($reportIcon); ?></span>
+                <div>
+                  <span class="block font-semibold text-on-surface"><?php echo esc_html($reportLabel); ?></span>
+                  <span class="block text-[11px] text-secondary"><?php echo esc_html($reportHint); ?></span>
+                </div>
               </a>
               <?php endif; ?>
             <?php endforeach; ?>
@@ -3215,22 +3220,29 @@ final class CommercialDashboardView
   /** Cada subpestaña de Reportes comerciales; los datos los carga commercial-reports.js según el permiso de cada endpoint. */
   public static function renderReportsPage(string $sub, CommercialAccessPolicy $policy): string
   {
-    $texts = [
-      'mis_reportes' => ['Mis reportes', 'Tus reportes comerciales y tus cuentas de cobro.'],
-      'reportes_consolidado' => ['Consolidado de reportes', 'Reportes de todo el equipo por exportar, pendientes de pago y pagados.'],
-      'cuentas_cobro' => ['Cuentas de cobro', 'Cuentas comerciales creadas por los funcionarios.'],
-    ];
-    if (!isset($texts[$sub]) || !$policy->canSubview('reportes_comerciales', $sub)) {
-      $allowed = array_values(array_intersect(array_keys($texts), $policy->allowedSubviews('reportes_comerciales')));
+    $labels = CommercialAccessPolicy::SUBVIEWS['reportes_comerciales'];
+    if (!isset(self::REPORT_MENU[$sub]) || !$policy->canSubview('reportes_comerciales', $sub)) {
+      $allowed = array_values(array_intersect(array_keys(self::REPORT_MENU), $policy->allowedSubviews('reportes_comerciales')));
       $sub = $allowed[0] ?? '';
     }
     if ($sub === '') {
       return '';
     }
-    [$title, $description] = $texts[$sub];
-    return '<section class="w-full max-w-[1680px] mx-auto px-4 sm:px-6 pt-5 pb-10 space-y-4 text-slate-800" data-commercial-reports data-sub="' . esc_attr($sub) . '">'
-      . '<header><p class="text-[13px] font-medium text-slate-500">Reportes comerciales</p><h1 class="text-[26px] font-semibold tracking-tight text-slate-900 leading-tight">' . esc_html($title) . '</h1><p class="text-sm text-slate-600">' . esc_html($description) . '</p></header>'
-      . '<div class="space-y-4" data-report-content><p class="text-sm text-slate-500">Cargando...</p></div></section>';
+    [$icon, , $description] = self::REPORT_MENU[$sub];
+    // Mismo diseño que las vistas de Inmuebles (renderPropertiesPage): encabezado en tarjeta, filtros y tabla en tarjetas.
+    return '<section class="w-full px-margin py-6 space-y-6" data-commercial-reports data-sub="' . esc_attr($sub) . '">'
+      . '<div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-surface-container-lowest p-6 rounded-3xl border border-surface-container shadow-xs">'
+      . '<div class="flex items-start gap-4"><div class="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-[28px]" aria-hidden="true">' . esc_html($icon) . '</span></div>'
+      . '<div><div class="flex items-center gap-2.5 flex-wrap"><h1 class="text-xl sm:text-2xl font-bold text-on-surface">' . esc_html($labels[$sub]) . '</h1>'
+      . '<span class="px-3 py-0.5 rounded-full text-xs font-semibold bg-primary-container text-on-surface" data-report-count hidden></span></div>'
+      . '<p class="text-sm text-secondary mt-1 max-w-3xl">' . esc_html($description) . '</p></div></div></div>'
+      . '<div class="space-y-6" data-report-content>' . self::reportsLoading() . '</div></section>';
+  }
+
+  private static function reportsLoading(): string
+  {
+    return '<div class="bg-surface-container-lowest rounded-3xl p-12 text-center border border-surface-container shadow-xs text-xs text-secondary">'
+      . '<span class="material-symbols-outlined text-[28px] text-primary animate-spin" aria-hidden="true">progress_activity</span><p class="mt-2">Cargando…</p></div>';
   }
 
   /**
@@ -5032,6 +5044,13 @@ final class CommercialDashboardView
   ];
 
   /** Ícono y ayuda de cada subpestaña de Notificaciones en el menú de escritorio. */
+  /** Reportes comerciales: ícono, descripción del menú y del encabezado de cada subpestaña. */
+  private const REPORT_MENU = [
+    'mis_reportes' => ['assignment_ind', 'Tus reportes, su cobro y tus cuentas', 'Tus reportes comerciales: los que faltan por cobrar, los que están en cobro, los pagados y tus cuentas de cobro.'],
+    'reportes_consolidado' => ['summarize', 'Reportes del equipo por exportar y pagar', 'Reportes de todo el equipo por exportar, pendientes de pago y pagados. Corrige valores y marca pagos.'],
+    'cuentas_cobro' => ['request_quote', 'Cuentas de cobro de los funcionarios', 'Cuentas de cobro comerciales creadas por los funcionarios: revisa su detalle, descárgalas y márcalas como pagadas.'],
+  ];
+
   private const NOTIFICATION_MENU = [
     'enviar_notificaciones' => ['send', 'WhatsApp, correo o SMS a contactos puntuales'],
     'campanas' => ['campaign', 'A listas completas, por lotes y con informe por campaña'],
