@@ -880,4 +880,18 @@ final class CommercialCallsTest extends TestCase
     self::assertSame('El Poblado', $this->db->getRow('SELECT barrio FROM wp_jet_cct_tickets WHERE _ID = ?', [$task['id']])['barrio']);
     self::assertStringContainsString('list="ccl-barrios"', CommercialCallsView::form($this->service()->formData([]), $this->service()->options()));
   }
+
+  public function testListingShowsOneRowPerPersonWithItsRequestCount(): void
+  {
+    $first = $this->create(['medio' => 'Referido']);
+    $latest = $this->create(['medio' => 'Aviso', 'celular' => '+57 300-123-4567', 'tema_ayuda' => 'Venta']);
+    $other = $this->create(['celular' => '3109998877', 'cliente' => 'Otra Persona', 'medio' => 'Aviso']);
+    $listing = $this->service()->listing([]);
+    self::assertSame([$other, $latest], array_column($listing['rows'], 'id'), 'Cada persona una vez, con su solicitud más reciente.');
+    self::assertSame([1, 2], array_column($listing['rows'], 'solicitudes'));
+    self::assertSame(2, $listing['counts']['total'], 'Los conteos son de personas.');
+    $filtered = $this->service()->listing(['ll_medio' => 'Referido']);
+    self::assertSame([$first], array_column($filtered['rows'], 'id'), 'Con filtro se muestra la solicitud de la persona que lo cumple.');
+    self::assertStringContainsString('2 solicitudes', CommercialCallsView::results($listing, $this->service(), CommercialCallsDatabase::policy($this->db)));
+  }
 }

@@ -113,6 +113,7 @@ final class CommercialCallsService
         'tarea' => $task,
         'tarea_estado' => $task > 0 ? ($tasks[(string) $task] ?? '') : '',
         'editable' => $this->policy->canAct('llamadas_editar') && $this->canAccess($row, $me, $team),
+        'solicitudes' => (int) ($row['_solicitudes'] ?? 1),
       ];
     }, $result['rows']);
     return ['filters' => $filters, 'page' => $page, 'per_page' => self::PER_PAGE, 'total' => $result['total'], 'counts' => $result['counts'], 'rows' => $rows];

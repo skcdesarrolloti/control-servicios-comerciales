@@ -102,7 +102,10 @@ final class CommercialCallsView
         . ($row['mas_adelante'] ? '<span class="ccl-tag is-later">' . self::e($row['mes'] !== '' ? 'Para ' . $row['mes'] : 'Para más adelante') . '</span>' : '');
       $html .= '<tr data-ccl-row="' . $id . '">'
         . '<td data-label="Fecha">' . self::e($row['fecha'] ?: 'Sin fecha') . '</td>'
-        . '<td data-label="Contacto"><strong>' . self::e($row['cliente'] ?: 'Sin nombre') . '</strong><small>' . self::e($row['celular']) . '</small><small>' . self::e($row['email']) . '</small>' . ($tags !== '' ? '<div class="ccl-tags">' . $tags . '</div>' : '') . '</td>'
+        . '<td data-label="Contacto"><strong>' . self::e($row['cliente'] ?: 'Sin nombre') . '</strong><small>' . self::e($row['celular']) . '</small><small>' . self::e($row['email']) . '</small>' . ($tags !== '' ? '<div class="ccl-tags">' . $tags . '</div>' : '')
+          // Una fila por persona: si tiene más solicitudes, se ven en su historial.
+          . ((int) ($row['solicitudes'] ?? 1) > 1 ? '<button type="button" class="ccl-requests" data-ccl-history="' . $id . '" title="Ver todas sus solicitudes"><span class="material-symbols-outlined" aria-hidden="true">history</span>' . (int) $row['solicitudes'] . ' solicitudes</button>' : '')
+          . '</td>'
         . '<td data-label="Motivo">' . self::e($row['tema']) . ($row['tipo'] !== '' || $row['inmueble'] !== '' ? '<small>' . self::e(trim($row['tipo'] . ($row['inmueble'] !== '' ? ' · #' . $row['inmueble'] : ''), ' ·')) . '</small>' : '') . '</td>'
         . '<td data-label="Medio">' . self::e($row['medio'] ?: 'Sin medio') . $partner . '</td>'
         . '<td data-label="Responsable">' . self::e($row['responsable'] ?: 'Sin asignar') . '</td>'

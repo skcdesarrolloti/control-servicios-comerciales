@@ -177,9 +177,11 @@ async function fillCall(modal, values) {
     assert.equal(await modal.locator('[data-ccl-task-form] [name="asunto"]').inputValue(), 'Cliente para compra: apartamento en Laureles', 'El asunto se arma corto con tema, tipo y barrio');
     await modal.locator('[data-ccl-task-form] [data-ccl-close]').first().click();
     await modal.waitFor({ state: 'hidden' });
-    await page.waitForFunction(() => document.querySelectorAll('[data-ccl-row]').length === 2);
-
-    await page.locator('[data-ccl-row] [data-ccl-history]').first().click();
+    // Una fila por persona: la solicitud nueva queda arriba y el distintivo abre todas sus solicitudes.
+    await page.waitForFunction(() => document.querySelectorAll('[data-ccl-row]').length === 1);
+    assert.ok((await page.locator('[data-ccl-row]').innerText()).includes('Referido'), 'La fila muestra la solicitud más reciente');
+    assert.ok((await page.locator('[data-ccl-row] .ccl-requests').innerText()).includes('2 solicitudes'), 'Falta el distintivo de solicitudes');
+    await page.locator('[data-ccl-row] .ccl-requests').click();
     await modal.locator('.ccl-history').waitFor();
     assert.equal(await modal.locator('.ccl-history li').count(), 2);
     const history = await modal.locator('.ccl-history').innerText();
@@ -197,21 +199,24 @@ async function fillCall(modal, values) {
 
     await page.locator('[data-ccl-filters] [name="ll_medio"]').selectOption('Referido');
     await page.locator('[data-ccl-filters] [type="submit"]').click();
-    await page.waitForFunction(() => document.querySelectorAll('[data-ccl-row]').length === 1);
-    assert.ok(new URL(page.url()).searchParams.get('ll_medio') === 'Referido');
+    await page.waitForFunction(() => new URL(location.href).searchParams.get('ll_medio') === 'Referido' && document.querySelectorAll('[data-ccl-row]').length === 1);
+    await page.locator('[data-ccl-filters] [name="ll_medio"]').selectOption('Club PPH');
+    await page.locator('[data-ccl-filters] [type="submit"]').click();
+    await page.waitForFunction(() => document.querySelector('[data-ccl-row]') && document.querySelector('[data-ccl-row]').innerText.includes('Club PPH'));
+    // Con una fila por persona el número de filas no cambia: se espera por el filtro en la dirección y por el contenido.
+    const listed = (param, value, text) => page.waitForFunction(([p, v, t]) => (new URL(location.href).searchParams.get(p) || '') === v
+      && document.querySelectorAll('[data-ccl-row]').length === 1 && document.querySelector('[data-ccl-row]').innerText.includes(t), [param, value, text]);
     await page.locator('[data-ccl-clear]').click();
-    await page.waitForFunction(() => document.querySelectorAll('[data-ccl-row]').length === 2);
+    await listed('ll_medio', '', 'Referido');
     await page.locator('[data-ccl-toggle="ll_inmediato"]').click();
-    await page.waitForFunction(() => document.querySelectorAll('[data-ccl-row]').length === 1);
-    assert.ok((await page.locator('[data-ccl-row]').innerText()).includes('Para Enero'));
+    await listed('ll_inmediato', 'No', 'Para Enero');
     await page.locator('[data-ccl-toggle="ll_inmediato"]').click();
-    await page.waitForFunction(() => document.querySelectorAll('[data-ccl-row]').length === 2);
+    await listed('ll_inmediato', '', 'Referido');
     // La nueva solicitud siempre merece tarea: queda pendiente hasta crearla.
     await page.locator('[data-ccl-state="pendientes"]').click();
-    await page.waitForFunction(() => document.querySelectorAll('[data-ccl-row]').length === 1);
-    assert.ok((await page.locator('[data-ccl-row]').innerText()).includes('Referido'));
+    await listed('ll_estado', 'pendientes', 'Referido');
     await page.locator('[data-ccl-state=""]').click();
-    await page.waitForFunction(() => document.querySelectorAll('[data-ccl-row]').length === 2);
+    await listed('ll_estado', '', 'Referido');
     await page.screenshot({ path: 'output/calls-list-desktop.png', fullPage: true });
 
     await page.setViewportSize({ width: 390, height: 844 });

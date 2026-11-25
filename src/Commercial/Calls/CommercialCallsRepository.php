@@ -39,8 +39,16 @@ final class CommercialCallsRepository
   }
 
   /**
-   * Una página de llamadas con sus conteos. $scope: null = todo el equipo; id_empleado = solo lo suyo; '' = no se sabe
-   * quién es y no se muestra nada.
+   * Contacto de una llamada: los últimos 10 dígitos del celular (como el historial, contactCalls). Una llamada sin celular
+   * es su propio contacto (por su `_ID` negativo, que nunca coincide con un celular).
+   */
+  private const CONTACT_KEY = "CASE WHEN REPLACE(REPLACE(REPLACE(COALESCE(`celular`, ''), ' ', ''), '-', ''), '+', '') = '' THEN CAST(-`_ID` AS CHAR)"
+    . " ELSE SUBSTR(REPLACE(REPLACE(REPLACE(COALESCE(`celular`, ''), ' ', ''), '-', ''), '+', ''), -10) END";
+
+  /**
+   * Una página del listado con una fila por persona: su solicitud más reciente que cumple los filtros y cuántas
+   * solicitudes tiene en total. Los conteos también son de personas. $scope: null = todo el equipo; id_empleado = solo
+   * lo suyo; '' = no se sabe quién es y no se muestra nada.
    * @param array<string,string> $filters
    * @return array{rows:list<array<string,mixed>>,total:int,counts:array{total:int,pendientes:int,con_tarea:int,pph:int,comisionistas:int,mas_adelante:int}}
    */
@@ -50,21 +58,28 @@ final class CommercialCallsRepository
     if ($scope === '') {
       return $empty;
     }
+    $key = self::CONTACT_KEY;
+    $distinct = static fn(string $condition): string => 'COUNT(DISTINCT CASE WHEN ' . $condition . ' THEN ' . $key . ' END)';
     [$where, $args] = $this->where($filters, $scope, false);
     $counts = $this->db->getRow(
-      'SELECT COUNT(*) AS total,'
-      . " SUM(CASE WHEN `merece_ticket` = 'Si' AND NOT (" . self::HAS_TASK . ') THEN 1 ELSE 0 END) AS pendientes,'
-      . ' SUM(CASE WHEN ' . self::HAS_TASK . ' THEN 1 ELSE 0 END) AS con_tarea,'
-      . " SUM(CASE WHEN `comisionista` = 'Si' THEN 1 ELSE 0 END) AS comisionistas,"
-      . " SUM(CASE WHEN `cliente_inmediato` = 'No' THEN 1 ELSE 0 END) AS mas_adelante,"
-      . ' SUM(CASE WHEN `medio` = ? THEN 1 ELSE 0 END) AS pph'
+      'SELECT COUNT(DISTINCT ' . $key . ') AS total,'
+      . ' ' . $distinct("`merece_ticket` = 'Si' AND NOT (" . self::HAS_TASK . ')') . ' AS pendientes,'
+      . ' ' . $distinct(self::HAS_TASK) . ' AS con_tarea,'
+      . ' ' . $distinct("`comisionista` = 'Si'") . ' AS comisionistas,'
+      . ' ' . $distinct("`cliente_inmediato` = 'No'") . ' AS mas_adelante,'
+      . ' ' . $distinct('`medio` = ?') . ' AS pph'
       . ' FROM `' . $this->calls() . '`' . $where,
       array_merge([$pphMedio], $args)
     ) ?? [];
     [$where, $args] = $this->where($filters, $scope, true);
-    $total = (int) $this->db->getVar('SELECT COUNT(*) FROM `' . $this->calls() . '`' . $where, $args);
+    $total = (int) $this->db->getVar('SELECT COUNT(DISTINCT ' . $key . ') FROM `' . $this->calls() . '`' . $where, $args);
     $offset = max(0, ($page - 1) * $perPage);
-    $rows = $this->db->getResults('SELECT * FROM `' . $this->calls() . '`' . $where . ' ORDER BY `_ID` DESC LIMIT ' . $perPage . ' OFFSET ' . $offset, $args);
+    $rows = $this->db->getResults(
+      'SELECT * FROM `' . $this->calls() . '` WHERE `_ID` IN (SELECT MAX(`_ID`) FROM `' . $this->calls() . '`' . $where . ' GROUP BY ' . $key . ')'
+      . ' ORDER BY `_ID` DESC LIMIT ' . $perPage . ' OFFSET ' . $offset,
+      $args
+    );
+    $rows = $this->withRequestCounts($rows, $scope);
     return [
       'rows' => $rows,
       'total' => $total,
@@ -77,6 +92,37 @@ final class CommercialCallsRepository
         'mas_adelante' => (int) ($counts['mas_adelante'] ?? 0),
       ],
     ];
+  }
+
+  /**
+   * Cuántas solicitudes tiene cada contacto de la página (dentro de lo que la persona puede ver), en `_solicitudes`.
+   * @param list<array<string,mixed>> $rows
+   * @return list<array<string,mixed>>
+   */
+  private function withRequestCounts(array $rows, ?string $scope): array
+  {
+    if ($rows === []) {
+      return [];
+    }
+    $ids = array_map(static fn(array $row): int => (int) $row['_ID'], $rows);
+    $scopeSql = '';
+    $args = [];
+    if ($scope !== null) {
+      $scopeSql = " AND (TRIM(COALESCE(c.`id_empleado`, '')) = ? OR CAST(c.`cct_author_id` AS CHAR) = ?)";
+      $args = [$scope, $scope];
+    }
+    // La misma clave de contacto, una vez para la fila de la página (p) y otra para todas sus solicitudes (c).
+    $alias = static fn(string $table): string => str_replace(['`celular`', '`_ID`'], [$table . '.`celular`', $table . '.`_ID`'], self::CONTACT_KEY);
+    $counts = [];
+    foreach ($this->db->getResults(
+      'SELECT p.`_ID` AS id, COUNT(*) AS total FROM `' . $this->calls() . '` p JOIN `' . $this->calls() . '` c ON '
+      . $alias('c') . ' = ' . $alias('p')
+      . ' WHERE p.`_ID` IN (' . implode(',', array_fill(0, count($ids), '?')) . ')' . $scopeSql . ' GROUP BY p.`_ID`',
+      array_merge($ids, $args)
+    ) as $row) {
+      $counts[(int) $row['id']] = (int) $row['total'];
+    }
+    return array_map(static fn(array $row): array => $row + ['_solicitudes' => $counts[(int) $row['_ID']] ?? 1], $rows);
   }
 
   /**
