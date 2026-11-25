@@ -71,6 +71,15 @@ async function fillCall(modal, values) {
     assert.ok(await modal.locator('[name="precio"]').isHidden(), 'Arriendo no pide precio');
     await modal.locator('[name="presupuesto"]').pressSequentially('1500000');
     assert.equal(await modal.locator('[name="presupuesto"]').inputValue(), '1.500.000');
+    await modal.locator('[name="presupuesto"]').blur();
+    const auto = await modal.locator('[name="descripcion"]').inputValue();
+    assert.ok(auto.startsWith('Busca en arriendo') && auto.includes('Presupuesto: $1.500.000'), 'La descripción se arma con los datos: ' + auto);
+    await modal.locator('[name="descripcion"]').fill('Escrita a mano');
+    await modal.locator('[name="tipo_inmueble"]').selectOption({ index: 1 });
+    assert.equal(await modal.locator('[name="descripcion"]').inputValue(), 'Escrita a mano', 'Lo escrito a mano no se pisa');
+    await modal.locator('[data-ccl-compose]').click();
+    await page.locator('.swal2-confirm').click();
+    await page.waitForFunction(() => document.querySelector('[name="descripcion"]').value.startsWith('Busca en arriendo'));
     await modal.locator('[name="tema_ayuda"]').selectOption('Captacion');
     assert.ok(await modal.locator('[name="precio"]').isVisible(), 'Captación pide precio');
     assert.ok(await modal.locator('[name="tiene_presupuesto"]').isHidden() && await modal.locator('[name="tiene_codigo"]').isHidden(), 'Captación no pide presupuesto ni código');

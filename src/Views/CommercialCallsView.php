@@ -244,7 +244,11 @@ final class CommercialCallsView
       . '</div>'
       . self::checks('factores_importantes', 'Factores importantes', $options['factores'], $data['factores'])
       . '</div>'
-      . '<label class="ccl-field"><span>Descripción</span><textarea name="descripcion" rows="3"></textarea></label>'
+      // La descripción se arma sola con los datos de arriba mientras nadie la escriba a mano (commercial-calls.js).
+      . '<div class="ccl-field"><div class="ccl-desc-head"><label for="ccl-descripcion">Descripción</label>'
+      . '<button type="button" class="ccl-desc-compose" data-ccl-compose><span class="material-symbols-outlined" aria-hidden="true">auto_fix_high</span>Armar con los datos</button></div>'
+      . '<textarea id="ccl-descripcion" name="descripcion" rows="3" data-ccl-auto-desc="1"></textarea>'
+      . '<p class="ccl-hint">Se arma sola con lo que eliges arriba; si la escribes tú, se respeta lo tuyo.</p></div>'
       . '<h3>Asignación</h3><div class="ccl-grid">'
       . $merit
       . self::pairField('id_empleado', 'Asignar a', $employees, $v('id_empleado'), true)

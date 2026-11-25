@@ -160,3 +160,12 @@
 @keyframes ccl-pulse { 50% { opacity: .35; } }
 @media (prefers-reduced-motion: reduce) { .ccl-smart .is-recording .material-symbols-outlined { animation: none; } }
 .ccl-smart-filled input, .ccl-smart-filled select, .ccl-smart-filled textarea { box-shadow: 0 0 0 2px var(--scm-gold); background: #fffaf0; }
+
+/* Descripción de Registrar llamada: se arma con los datos y se puede rearmar. */
+.ccl-desc-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ccl-desc-compose {
+  display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border: 0; border-radius: 999px;
+  background: var(--scm-soft); color: var(--scm-primary); font-size: 11px; font-weight: 600; cursor: pointer;
+}
+.ccl-desc-compose:hover { background: var(--scm-line); }
+.ccl-desc-compose .material-symbols-outlined { font-size: 15px !important; }

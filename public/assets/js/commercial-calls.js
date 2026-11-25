@@ -203,6 +203,7 @@
     var field = form.elements[name];
     if (!field || field.readOnly || field.disabled) return false;
     field.value = val;
+    if (field.hasAttribute("data-ccl-auto-desc")) field.setAttribute("data-ccl-auto-desc", "0");
     if (field.value !== val) return false;
     if (field.matches && field.matches("[data-ccl-money]")) formatMoney(field);
     var label = field.closest(".ccl-field");
@@ -262,15 +263,54 @@
       });
       box.textContent = result.resumen + (filled.length ? ". Se llenó " + filled.join(", ") + "; revisa y completa lo que falte." : ". No trae datos para llenar: complétalos a mano.");
       box.dataset.state = "ok";
+      autoDescription(form, false);
     }).catch(function (error) {
       box.textContent = error.message;
       box.dataset.state = "error";
     });
   }
+  // Descripción armada con los datos del formulario: motivo, inmueble, código, presupuesto, factores y urgencia.
+  function lower(text) { return String(text || "").toLocaleLowerCase("es-CO"); }
+  function listText(items) {
+    return items.length > 1 ? items.slice(0, -1).join(", ") + " y " + items[items.length - 1] : (items[0] || "");
+  }
+  function composeDescription(form) {
+    var topic = value(form, "tema_ayuda");
+    var kind = lower(value(form, "tipo_inmueble"));
+    var destination = lower(value(form, "destinacion"));
+    var use = lower(value(form, "uso"));
+    var what = (kind || "inmueble") + (destination ? " para " + destination : "") + (use ? " (uso " + use + ")" : "");
+    var parts = [];
+    var seeking = { "Arriendo": "Busca en arriendo", "Venta": "Busca para comprar", "Arriendo o venta": "Busca en arriendo o para comprar" }[topic];
+    if (seeking) parts.push(seeking + ": " + what + ".");
+    else if (topic === "Captacion" || topic === "Recaptacion") parts.push("Ofrece su inmueble para arrendar o vender: " + what + ".");
+    else if (topic) parts.push("Motivo: " + topic + (kind || destination ? ", " + what : "") + ".");
+    if (value(form, "tiene_codigo") === "Si" && value(form, "id_inmueble")) {
+      var found = form.querySelector('[data-ccl-property-result][data-state="ok"]');
+      var summary = found ? found.textContent.split(". Se llenó")[0].split(". No trae")[0] : "";
+      parts.push("Pregunta por el inmueble " + value(form, "id_inmueble") + (summary ? " (" + summary + ")" : "") + ".");
+    }
+    if (value(form, "tiene_presupuesto") === "Si" && value(form, "presupuesto")) parts.push("Presupuesto: $" + value(form, "presupuesto") + ".");
+    if (value(form, "precio") && (topic === "Captacion" || topic === "Recaptacion")) parts.push("Precio esperado: $" + value(form, "precio") + ".");
+    var factors = Array.prototype.map.call(form.querySelectorAll('[name="factores_importantes[]"]:checked'), function (box) { return lower(box.value); });
+    if (factors.length) parts.push("Le importa: " + listText(factors) + ".");
+    if (value(form, "cliente_inmediato") === "Si") parts.push("Lo necesita de inmediato.");
+    else if (value(form, "cliente_inmediato") === "No" && value(form, "mes_inmueble")) parts.push("Lo necesita para " + lower(value(form, "mes_inmueble")) + ".");
+    if (value(form, "comisionista") === "Si") parts.push("Es comisionista.");
+    return parts.join(" ");
+  }
+  function autoDescription(form, force) {
+    var area = form.querySelector("[data-ccl-auto-desc]");
+    if (!area || (!force && area.getAttribute("data-ccl-auto-desc") !== "1")) return;
+    area.value = composeDescription(form);
+    if (force) area.setAttribute("data-ccl-auto-desc", "1");
+  }
+
   function syncForm() {
     var form = content() && content().querySelector("[data-ccl-form]");
     if (form) {
       syncTopic(form);
+      autoDescription(form, false);
       var box = form.querySelector("[data-ccl-pph]");
       if (box && form.elements.medio) box.hidden = form.elements.medio.value !== form.getAttribute("data-pph-medio");
       var month = form.querySelector("[data-ccl-month]");
@@ -362,6 +402,16 @@
   }
 
   document.addEventListener("click", function (event) {
+    var compose = event.target.closest("[data-ccl-compose]");
+    if (compose) {
+      var composeForm = compose.closest("form");
+      var area = composeForm.querySelector("[data-ccl-auto-desc]");
+      var keep = area.getAttribute("data-ccl-auto-desc") === "0" && area.value.trim() !== "" && window.Swal
+        ? window.Swal.fire({ title: "¿Reemplazar la descripción?", text: "Se cambia lo que escribiste por una descripción armada con los datos del formulario.", icon: "question", showCancelButton: true, confirmButtonText: "Reemplazar", cancelButtonText: "Cancelar" }).then(function (answer) { return answer.isConfirmed; })
+        : Promise.resolve(true);
+      keep.then(function (ok) { if (ok) autoDescription(composeForm, true); });
+      return;
+    }
     var smartButton = event.target.closest("[data-ccl-dictate],[data-ccl-smart-fill]");
     if (smartButton) {
       if (smartButton.hasAttribute("data-ccl-dictate")) toggleDictation(smartButton);
@@ -423,6 +473,8 @@
   });
   document.addEventListener("input", function (event) {
     if (event.target.matches("[data-ccl-money]")) formatMoney(event.target);
+    // Si la persona escribe la descripción, deja de armarse sola; si la borra toda, vuelve a armarse.
+    if (event.target.matches("[data-ccl-auto-desc]")) event.target.setAttribute("data-ccl-auto-desc", event.target.value.trim() === "" ? "1" : "0");
   });
   document.addEventListener("change", function (event) {
     if (!event.target.closest("[data-ccl-modal]")) return;
