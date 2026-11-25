@@ -6,6 +6,7 @@ namespace SCM\Views;
 
 use SCM\Commercial\Mandates\CommercialMandatesRepository;
 use SCM\Commercial\Mandates\CommercialMandatesService;
+use SCM\Commercial\Mandates\MandateClosingSheet;
 use SCM\Support\PublicMandateAccess;
 
 /**
@@ -81,7 +82,7 @@ final class CommercialMandatesView
         . ($row['revision'] !== 'firmado' ? self::closingBadge($row['hoja'] ?? ['id' => 0, 'estado' => '']) : '') . self::missing($row) . '</td>'
         . '<td data-label="Consultor/a">' . self::e($row['consultor'] ?: 'Sin consultor/a') . '</td>'
         . '<td data-label="Acciones"><div class="cqt-row-actions cst-row-actions">'
-        . self::actions($row, $listing['can_create'] ?? false, $listing['can_sign'] ?? false)
+        . self::actions($row, $listing['can_create'] ?? false, $listing['can_sign'] ?? false, 0, $listing['can_closing'] ?? false)
         . '</div></td></tr>';
     }
     $html .= '</tbody></table></div>';
@@ -96,7 +97,7 @@ final class CommercialMandatesView
   /**
    * Ventana del popup de la tarea (Gestión operativa › Contrato de mandato): los mandatos de la tarea con su revisión y
    * sus acciones, y "Nuevo mandato".
-   * @param array{ticket:int,asunto:string,rows:list<array<string,mixed>>,can_create:bool,can_sign:bool,flash:string} $data
+   * @param array{ticket:int,asunto:string,rows:list<array<string,mixed>>,can_create:bool,can_sign:bool,can_closing?:bool,flash:string} $data
    */
   public static function taskPanel(array $data): string
   {
@@ -116,7 +117,7 @@ final class CommercialMandatesView
       $html .= '<article class="cst-card cma-card"><header><strong>Mandato #' . (int) $row['id'] . '</strong>' . self::badges($row) . '</header>'
         . '<p>' . self::e($row['propietarios'] !== [] ? implode(', ', $row['propietarios']) : 'Sin propietario') . ($row['inmueble'] !== '' ? ' · Inmueble #' . self::e($row['inmueble']) : '') . ($row['canon'] !== '' ? ' · Canon ' . self::e($row['canon']) : '') . '</p>'
         . self::missing($row)
-        . '<div class="cst-actions">' . self::actions($row, $data['can_create'], $data['can_sign'], $pk) . '</div></article>';
+        . '<div class="cst-actions">' . self::actions($row, $data['can_create'], $data['can_sign'], $pk, $data['can_closing'] ?? false) . '</div></article>';
     }
     return $html . '</div></section>';
   }
@@ -152,7 +153,7 @@ final class CommercialMandatesView
   }
 
   /** Acciones de un mandato (tarea y pestaña). @param array<string,mixed> $row */
-  private static function actions(array $row, bool $canEdit, bool $canSign, int $ticket = 0): string
+  private static function actions(array $row, bool $canEdit, bool $canSign, int $ticket = 0, bool $canClosing = false): string
   {
     $id = (int) $row['id'];
     $open = $row['estado'] !== 'Firmado';
@@ -162,7 +163,21 @@ final class CommercialMandatesView
       . '<button type="button" class="cqt-secondary cqt-small" data-cma-view="' . $id . '" data-cma-mode="propietario">' . self::icon('visibility') . 'Vista pública</button>'
       . ($canEdit && $open ? '<button type="button" class="cqt-secondary cqt-small" data-cma-form data-id="' . $id . '"' . $ticketAttr . '>' . self::icon('edit') . 'Editar</button>' : '')
       . ($canSign && $open ? '<button type="button" class="cqt-secondary cqt-small' . (($row['bloqueos'] ?? []) !== [] ? ' cma-blocked" aria-disabled="true" title="Falta lo que se indica para enviar a firma' : '') . '" data-review-notice="' . self::e((string) ($row['aviso_revision'] ?? '')) . '" data-cma-sign="' . $id . '" data-blockers="' . self::e((string) json_encode($row['bloqueos'] ?? [], JSON_UNESCAPED_UNICODE)) . '" data-resend="' . ($row['estado'] === 'Enviado' ? '1' : '0') . '"' . $ticketAttr . '>' . self::icon('draw') . ($row['estado'] === 'Enviado' ? 'Reenviar a firma' : 'Enviar a firma') . '</button>' : '')
+      . ($canClosing ? self::closingButton($id, $row['hoja'] ?? ['id' => 0, 'estado' => ''], $ticket) : '')
       . ($row['pdf'] !== '' ? '<a class="cqt-secondary cqt-small" href="' . self::e($row['pdf']) . '" target="_blank" rel="noopener">' . self::icon('picture_as_pdf') . 'PDF firmado</a>' : '');
+  }
+
+  /**
+   * Botón de la hoja de cierre: la crea o la abre en la ventana del panel (páginas del panel inmobiliario).
+   * @param array{id:int,estado:string} $closing
+   */
+  public static function closingButton(int $mandate, array $closing, int $ticket = 0): string
+  {
+    $current = MandateClosingSheet::current($closing);
+    $approved = in_array($closing['estado'], CommercialMandatesService::CLOSING_APPROVED, true);
+    return '<button type="button" class="' . ($current === 0 || $approved ? 'cqt-secondary' : 'cqt-primary') . ' cqt-small" data-cma-closing="' . $mandate . '"'
+      . ($ticket > 0 ? ' data-ticket-pk="' . $ticket . '"' : '') . ' data-cma-closing-title="' . self::e(MandateClosingSheet::label($closing) . ' · Mandato #' . $mandate) . '">'
+      . self::icon($current > 0 ? 'handshake' : 'note_add') . self::e(MandateClosingSheet::label($closing)) . '</button>';
   }
 
   /** Formulario del mandato con su encabezado (en la tarea o en el popup de la pestaña). */

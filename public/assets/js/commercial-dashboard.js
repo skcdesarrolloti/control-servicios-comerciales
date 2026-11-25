@@ -860,6 +860,10 @@
     }
   }
 
+  // La hoja de cierre (commercial-mandates.js) recarga la tarea abierta al cerrar su ventana si se guardó algo.
+  window.SCMCommercialReloadCase = function (ticketPk) {
+    if (caseModal && caseModal.classList.contains("open")) loadCase(String(ticketPk), true);
+  };
   function loadCase(ticketPk, preserveFocus) {
     if (!caseContent || !ticketPk) return Promise.resolve();
     if (detailRequest) detailRequest.abort();

@@ -297,10 +297,24 @@ final class CommercialApiController
     }
     // Estudios de aseguradora de la tarea: con alguno, el botón sale aunque la tarea sea de otro tema (para responderlos).
     $detail['studies_count'] = 0;
+    $studies = [];
     try {
-      $detail['studies_count'] = count((new \SCM\Commercial\Studies\CommercialStudiesRepository($this->db))->forTask($ticketPk));
+      $studies = (new \SCM\Commercial\Studies\CommercialStudiesRepository($this->db))->forTask($ticketPk);
+      $detail['studies_count'] = count($studies);
     } catch (\Throwable $exception) {
       error_log('[tareas:estudios] ' . $exception->getMessage());
+    }
+    // Hoja de cierre: el botón sale solo si la tarea ya tiene contrato de mandato (abre la del más reciente).
+    $detail['closing_mandate'] = null;
+    try {
+      $mandates = new \SCM\Commercial\Mandates\CommercialMandatesService($this->db, $this->policy);
+      if ($mandates->canClosing()) {
+        $rows = $mandates->repository()->forTask($ticketPk, array_map(static fn(array $study): int => (int) $study['_ID'], $studies), \SCM\Commercial\Mandates\CommercialMandatesRepository::taskProperty($detail['ticket'], $studies));
+        $rows = array_values(array_filter($rows, static fn(array $row): bool => $mandates->canOpen($row)));
+        $detail['closing_mandate'] = $rows !== [] ? ['id' => (int) $rows[0]['_ID'], 'hoja' => $mandates->repository()->closing($rows[0]), 'total' => count($rows)] : null;
+      }
+    } catch (\Throwable $exception) {
+      error_log('[tareas:hoja-cierre] ' . $exception->getMessage());
     }
     JsonResponse::success([
       'html' => CommercialTicketModalView::render(

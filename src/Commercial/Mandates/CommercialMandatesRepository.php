@@ -215,6 +215,22 @@ final class CommercialMandatesRepository
   }
 
   /**
+   * Inmueble de la tarea para buscar sus mandatos: el de la tarea o, si no tiene, el del estudio aprobado.
+   * @param array<string,mixed> $task
+   * @param list<array<string,mixed>> $studies
+   */
+  public static function taskProperty(array $task, array $studies): string
+  {
+    $property = trim((string) ($task['id_inmueble'] ?? ''));
+    foreach ($studies as $study) {
+      if ($property === '' && trim((string) ($study['estado'] ?? '')) === 'Aprobado' && trim((string) ($study['id_inmueble'] ?? '')) !== '') {
+        $property = trim((string) $study['id_inmueble']);
+      }
+    }
+    return $property;
+  }
+
+  /**
    * Mandatos de una tarea: los creados desde ella (id_ticket, si la columna existe), los de sus estudios de aseguradora
    * y los de su inmueble. El más reciente primero.
    * @param list<int> $studies

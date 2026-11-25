@@ -7,6 +7,7 @@ namespace SCM\Http\Controller;
 use SCM\Commercial\CommercialAccessPolicy;
 use SCM\Commercial\CommercialTicketsRepository;
 use SCM\Commercial\Mandates\CommercialMandateFormService;
+use SCM\Commercial\Mandates\CommercialMandatesRepository;
 use SCM\Commercial\Mandates\CommercialMandatesService;
 use SCM\Commercial\Mandates\MandateSignature;
 use SCM\Commercial\Studies\CommercialStudiesRepository;
@@ -126,13 +127,7 @@ final class CommercialMandatesApiController
       throw new \InvalidArgumentException('La tarea no existe.');
     }
     $studies = (new CommercialStudiesRepository($this->db))->forTask($pk);
-    $property = trim((string) ($task['id_inmueble'] ?? ''));
-    foreach ($studies as $study) {
-      if ($property === '' && trim((string) ($study['estado'] ?? '')) === 'Aprobado' && trim((string) ($study['id_inmueble'] ?? '')) !== '') {
-        $property = trim((string) $study['id_inmueble']);
-      }
-    }
-    return ['task' => $task, 'studies' => $studies, 'property' => $property];
+    return ['task' => $task, 'studies' => $studies, 'property' => CommercialMandatesRepository::taskProperty($task, $studies)];
   }
 
   /** @return array{html:string} */
@@ -146,7 +141,7 @@ final class CommercialMandatesApiController
     return ['html' => CommercialMandatesView::taskPanel([
       'ticket' => $pk, 'asunto' => trim((string) ($context['task']['asunto'] ?? '')),
       'rows' => array_map(fn(array $row): array => $this->service->summary($row), $rows),
-      'can_create' => $this->form->canEdit(), 'can_sign' => $this->policy->canAct(CommercialMandateFormService::ACTION_SIGN), 'flash' => $flash,
+      'can_create' => $this->form->canEdit(), 'can_sign' => $this->policy->canAct(CommercialMandateFormService::ACTION_SIGN), 'can_closing' => $this->service->canClosing(), 'flash' => $flash,
     ])];
   }
 

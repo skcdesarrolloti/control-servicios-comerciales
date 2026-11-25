@@ -30,9 +30,20 @@
   function closeViewer() {
     var viewer = document.getElementById("cma-viewer");
     if (!viewer) return;
+    var closing = viewer.classList.contains("cma-closing");
     viewer.remove();
-    // Lo que se hizo dentro (enviar al propietario, responder) cambia la revisión: se actualiza el listado.
-    if (document.querySelector("[data-cma-list]")) refreshList(listPage);
+    if (closing) {
+      // Hoja de cierre: solo si se guardó algo allá; en la tarea se vuelve a abrir para ver el estado nuevo.
+      if (closingSaved) {
+        closingSaved = false;
+        if (document.querySelector("[data-cma-list]")) refreshList(listPage);
+        if (closingTicket && document.querySelector("[data-cma-task]")) openTask(closingTicket);
+        else if (closingTicket && window.SCMCommercialReloadCase) window.SCMCommercialReloadCase(closingTicket);
+      }
+    } else if (document.querySelector("[data-cma-list]")) {
+      // Lo que se hizo dentro (enviar al propietario, responder) cambia la revisión: se actualiza el listado.
+      refreshList(listPage);
+    }
     if (returnFocus && document.contains(returnFocus)) returnFocus.focus();
   }
   function openViewer(id, button) {
@@ -53,6 +64,56 @@
       if (close) close.focus();
     }).catch(function (error) { notify("error", error.message); }).finally(function () { if (button) button.disabled = false; });
   }
+
+  // ── Hoja de cierre ─────────────────────────────────
+  // hoja-cierre.php?mandato=ID lleva a la página del panel inmobiliario (crear o ver la hoja, embed=1): la hoja se hace
+  // allá, con sus permisos, políticas y avisos. Esas páginas avisan al guardar (scm-closing-sheet-saved, mismo dominio):
+  // al cerrar la ventana se actualiza el listado o la tarea.
+  var closingSaved = false;
+  var closingTicket = "";
+  function openClosing(button) {
+    var id = button.getAttribute("data-cma-closing");
+    if (!/^[1-9][0-9]{0,17}$/.test(id || "")) return;
+    returnFocus = button;
+    closingSaved = false;
+    closingTicket = button.getAttribute("data-ticket-pk") || "";
+    var old = document.getElementById("cma-viewer");
+    if (old) old.remove();
+    var title = button.getAttribute("data-cma-closing-title") || ("Hoja de cierre · Mandato #" + id);
+    var url = "hoja-cierre.php?mandato=" + encodeURIComponent(id);
+    var viewer = document.createElement("div");
+    viewer.id = "cma-viewer";
+    viewer.className = "cqt-viewer cma-closing";
+    viewer.setAttribute("role", "dialog");
+    viewer.setAttribute("aria-modal", "true");
+    viewer.setAttribute("aria-labelledby", "cma-viewer-title");
+    viewer.innerHTML = '<div class="cqt-viewer-box" role="document"><header class="cqt-viewer-head"><h2 id="cma-viewer-title"></h2><div class="cqt-viewer-actions">'
+      + '<a class="cqt-secondary" target="_blank" rel="noopener" data-cma-closing-tab><span class="material-symbols-outlined" aria-hidden="true">open_in_new</span>Abrir en otra pestaña</a>'
+      + '<button type="button" class="cqt-icon" data-cma-viewer-close aria-label="Cerrar"><span class="material-symbols-outlined" aria-hidden="true">close</span></button></div></header>'
+      + '<p class="cma-closing-loading" data-cma-closing-loading role="status">Abriendo la hoja de cierre…</p><iframe class="cqt-frame" title=""></iframe></div>';
+    viewer.querySelector("#cma-viewer-title").textContent = title;
+    viewer.querySelector("[data-cma-closing-tab]").href = url;
+    var frame = viewer.querySelector("iframe");
+    frame.title = title;
+    frame.addEventListener("load", function () {
+      var loading = viewer.querySelector("[data-cma-closing-loading]");
+      if (loading) loading.remove();
+      // Al navegar dentro (Editar, la hoja recién guardada) una página puede llegar sin embed=1: se quita su barra
+      // superior igual que con embed (mismo dominio; si no se puede leer, se deja como está).
+      try {
+        var doc = frame.contentDocument;
+        if (doc && doc.body && doc.body.classList.contains("scm-review-page")) doc.body.classList.add("is-embed");
+      } catch (_error) {}
+    });
+    frame.src = url;
+    document.body.appendChild(viewer);
+    var close = viewer.querySelector("[data-cma-viewer-close]");
+    if (close) close.focus();
+  }
+  window.addEventListener("message", function (event) {
+    if (event.origin !== window.location.origin || !event.data || event.data.type !== "scm-closing-sheet-saved") return;
+    closingSaved = true;
+  });
 
   // ── Listado ────────────────────────────────────────
   function listValues(page) {
@@ -190,6 +251,8 @@
     if (taskButton) { event.preventDefault(); openTask(taskButton.getAttribute("data-ticket-pk")); return; }
     var signButton = target.closest("[data-cma-sign]");
     if (signButton) { event.preventDefault(); sign(signButton); return; }
+    var closingButton = target.closest("[data-cma-closing]");
+    if (closingButton) { event.preventDefault(); openClosing(closingButton); return; }
     var view = target.closest("[data-cma-view]");
     if (view) { event.preventDefault(); openViewer(view.getAttribute("data-cma-view"), view); return; }
     if (target.closest("[data-cma-viewer-close]") || target.id === "cma-viewer") { closeViewer(); return; }

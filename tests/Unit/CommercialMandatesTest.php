@@ -265,7 +265,7 @@ final class CommercialMandatesTest extends TestCase
     self::assertContains('mandatos', CommercialAccessPolicy::VIEW_GROUPS['Actividades comerciales']);
     self::assertArrayHasKey('mandatos', CommercialAccessPolicy::SCOPED_VIEWS);
     $groups = (new \ReflectionClassConstant(CommercialDashboardView::class, 'PERMISSION_ACTION_GROUPS'))->getValue();
-    self::assertSame(['mandato_crear', CommercialMandatesService::ACTION_SEND, CommercialMandatesService::ACTION_ANSWER, 'mandato_enviar_firma'], $groups['Contratos de mandato']);
+    self::assertSame(['mandato_crear', CommercialMandatesService::ACTION_SEND, CommercialMandatesService::ACTION_ANSWER, 'mandato_enviar_firma', \SCM\Commercial\Mandates\MandateClosingSheet::ACTION], $groups['Contratos de mandato']);
     foreach (['mandato_crear', CommercialMandatesService::ACTION_SEND, CommercialMandatesService::ACTION_ANSWER, 'mandato_enviar_firma'] as $action) {
       self::assertArrayHasKey($action, CommercialAccessPolicy::ACTIONS);
     }

@@ -18,8 +18,9 @@ los de su inmueble) con su revisión y sus acciones:
    - **País** obligatorio: se toma de la ficha sin importar mayúsculas ni tildes ("Estados unidos" = "Estados Unidos")
      o por su indicativo; sin país, Colombia.
 2. **Revisión del propietario** (opcional): se le envía el contrato (correo y WhatsApp); deja observaciones o lo aprueba.
-3. **Hoja de cierre**: se hace y se aprueba en el panel inmobiliario (`hoja-cierre.php`), que refleja su estado en el
-   mandato (`estado_hoja_cierre`, `id_hoja_cierre`).
+3. **Hoja de cierre**: botón **Crear hoja de cierre** / **Hoja de cierre #N** en cada mandato (Mandatos, Mis mandatos y
+   la ventana de mandatos de la tarea) y en Gestión operativa de la tarea (solo si la tarea ya tiene mandato). Se hace en
+   el panel inmobiliario; ver **Hoja de cierre** más abajo.
 4. **Editar**: corrige lo que pidió el propietario. Si ya estaba enviado a firma y la hoja de cierre sigue aprobada,
    actualiza el contrato en eSignatures; si no, queda para **Reenviar a firma**.
 5. **Enviar a firma**: solo cuando **la hoja de cierre está aprobada** (`Aprobada`, o `Realizada` si ya tiene contrato
@@ -46,6 +47,32 @@ el crédito de la garantía (`MandateCalculator`) y lo guarda en `wp_jet_cct_cre
   Título como lo enviaba Make: `CONTRATO DE MANDATO #<mandato> PARA LA ADMINISTRACION DEL INMUEBLE #<código>`.
 - **Contract owner** en eSignatures: quien creó el mandato (`assigned_user_email`, su correo). Debe ser usuario de la cuenta
   de eSignatures; si no lo es, el contrato se envía igual, sin dueño (queda en el log).
+
+## Hoja de cierre
+
+No es una copia: el panel comercial abre las páginas del panel inmobiliario (`control-servicios-inmobiliarios`) en una
+ventana propia, con `embed=1` (sin su barra superior). Esas páginas crean, revisan los servicios, aprueban, editan,
+desisten e imprimen la hoja. Así se comparten con el panel inmobiliario, y lo que se cambie allá se ve aquí sin tocar
+este panel:
+
+- los permisos de cada cargo para la hoja (*Añadir* / *Editar hoja de cierre*, revisión de servicios, aprobar, desistir),
+  que se marcan en **Permisos del panel inmobiliario**;
+- las políticas de la lista de chequeo y los archivos obligatorios (**Configuración hoja de cierre** de allá);
+- **Notificaciones internas** de allá (*Hoja de cierre creada*, *por responder*, *respondida*, *Negocio desistido*) y sus
+  plantillas de WhatsApp;
+- la carpeta de documentos, el borrador automático y el estado que se refleja en el mandato (`estado_hoja_cierre`,
+  `id_hoja_cierre`), que es lo que exige **Enviar a firma**.
+
+Cómo funciona (`MandateClosingSheet`, `public/hoja-cierre.php?mandato=ID`):
+
+- revisa que la persona pueda abrir ese mandato (`canOpen`) y tenga la acción `mandato_hoja_cierre`;
+- sin hoja, o si la última está **Desistida**: `hoja-cierre.php?id_contrato=<mandato>` (lo demás lo toma del mandato);
+- con hoja: `hoja-cierre-ver.php?numero=<hoja>`, desde donde se revisa, aprueba, edita o desiste;
+- al guardar allá, la página avisa (`scm-closing-sheet-saved`) y, al cerrar la ventana, se actualiza el listado o la tarea.
+
+Los dos paneles están en el mismo dominio y usan la misma sesión (cookie `scm_sess`), así que no se vuelve a iniciar
+sesión. Si la ventana pide iniciar sesión, se entra una vez con el mismo usuario. Va en el `.env`:
+`INMOBILIARIO_URL=https://sucasainmobiliaria.com.co/control-servicios-inmobiliarios/public`.
 
 ## Revisión del propietario
 
@@ -109,7 +136,8 @@ el panel alrededor: `https://sucasainmobiliaria.com.co/dashboard-comercial/publi
 - Vista **Contratos de mandato** (`mandatos`), con alcance: solo sus mandatos (por `id_empleado`) o todo el equipo.
   Los cargos ya configurados en Permisos deben marcarla.
 - Acciones (grupo **Contratos de mandato**): `mandato_crear` (crear y editar), `mandato_enviar_revision`,
-  `mandato_responder_observaciones` y `mandato_enviar_firma`.
+  `mandato_responder_observaciones`, `mandato_enviar_firma` y `mandato_hoja_cierre` (abrir y crear la hoja de cierre;
+  lo que cada cargo puede hacer dentro de la hoja lo deciden los permisos del panel inmobiliario).
 
 ## Avisos
 

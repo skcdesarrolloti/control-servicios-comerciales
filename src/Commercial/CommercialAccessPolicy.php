@@ -58,6 +58,7 @@ final class CommercialAccessPolicy
     'mandato_enviar_firma' => 'Mandatos: enviar el contrato a firma digital (eSignatures)',
     'mandato_enviar_revision' => 'Mandatos: enviar el contrato al propietario para que lo revise antes de la firma',
     'mandato_responder_observaciones' => 'Mandatos: responder y marcar resueltas las observaciones del propietario',
+    'mandato_hoja_cierre' => 'Mandatos: abrir y crear la hoja de cierre (se hace en el panel inmobiliario, con los permisos de cada cargo allá)',
     'precaptacion_crear' => 'Registrar precaptaciones',
     'precaptacion_editar' => 'Editar resultados de precaptación',
     'precaptacion_ticket' => 'Crear tarea desde precaptación',

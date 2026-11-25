@@ -104,3 +104,7 @@
 .cmf-subtitle { margin:6px 0 0; font-size:12px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:#1e3c76; }
 .cmf-block { padding:18px 20px; gap:16px; }
 @media (max-width:640px) { .cmf .cst-grid { grid-template-columns:1fr; } .cmf-owner { padding:16px; } }
+
+/* Hoja de cierre (páginas del panel inmobiliario en la ventana del panel). */
+.cma-closing .cqt-viewer-box { position:relative; }
+.cma-closing-loading { position:absolute; inset:64px 0 auto; margin:0; padding:24px; text-align:center; color:#475569; font-weight:600; }

@@ -74,6 +74,12 @@ final class CommercialMandatesService
     return $me !== '' && trim((string) ($mandate['id_empleado'] ?? '')) === $me;
   }
 
+  /** Abrir y crear la hoja de cierre (en el panel inmobiliario, MandateClosingSheet). */
+  public function canClosing(): bool
+  {
+    return $this->policy->canView(self::VIEW) && $this->policy->canAct(MandateClosingSheet::ACTION);
+  }
+
   public function canSend(): bool
   {
     return $this->policy->canAct(self::ACTION_SEND);
@@ -141,7 +147,7 @@ final class CommercialMandatesService
   /**
    * Pestaña Mandatos (todo el equipo si el cargo lo ve) o Mis mandatos (?portafolio=1, siempre los de la persona).
    * @param array<string,mixed> $input
-   * @return array{rows:list<array<string,mixed>>,total:int,page:int,per_page:int,filters:array{q:string,estado:string,empleado:string},estados:array<string,int>,mine:bool,team:bool,can_create:bool,can_sign:bool}
+   * @return array{rows:list<array<string,mixed>>,total:int,page:int,per_page:int,filters:array{q:string,estado:string,empleado:string},estados:array<string,int>,mine:bool,team:bool,can_create:bool,can_sign:bool,can_closing:bool}
    */
   public function listing(array $input): array
   {
@@ -160,6 +166,7 @@ final class CommercialMandatesService
       'rows' => $rows, 'total' => $result['total'], 'page' => $page, 'per_page' => self::PER_PAGE, 'filters' => $filters,
       'estados' => $this->repository->stateCounts($filters, $employee), 'mine' => $mine, 'team' => $team,
       'can_create' => $this->policy->canAct(CommercialMandateFormService::ACTION_CREATE), 'can_sign' => $this->policy->canAct(CommercialMandateFormService::ACTION_SIGN),
+      'can_closing' => $this->canClosing(),
     ];
   }
 

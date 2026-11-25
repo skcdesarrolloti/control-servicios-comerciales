@@ -14,7 +14,7 @@ use SCM\Commercial\CommercialTimelineEditor;
 final class CommercialTicketModalView
 {
   /**
-   * @param array{ticket:array<string,mixed>,timeline:array<int,array<string,mixed>>,analyses?:array<int,array<string,mixed>>,reply_guides?:array<int,array<string,mixed>>,studies_count?:int} $detail
+   * @param array{ticket:array<string,mixed>,timeline:array<int,array<string,mixed>>,analyses?:array<int,array<string,mixed>>,reply_guides?:array<int,array<string,mixed>>,studies_count?:int,closing_mandate?:array{id:int,hoja:array{id:int,estado:string},total:int}|null} $detail
    * @param array<int,array<string,string>> $employees
    */
   public static function render(array $detail, CommercialAccessPolicy $policy, array $employees): string
@@ -215,6 +215,12 @@ final class CommercialTicketModalView
           <?php /* Contrato de mandato: después del estudio aprobado, en los mismos temas (o si la tarea ya tiene estudios). */ ?>
           <?php if ($policy->canView('mandatos') && (CommercialTaskTools::allowsTask(CommercialTaskTools::STUDY, $ticket) || $studiesCount > 0)): ?>
             <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-[#EBF1FB] text-slate-700 border border-slate-200 text-xs font-semibold transition-all cursor-pointer" data-commercial-task-form="mandate" data-ticket-pk="<?php echo esc_attr((string) $pk); ?>"><span class="material-symbols-outlined text-[16px]">contract_edit</span><span>Contrato de mandato</span></button>
+          <?php endif; ?>
+          <?php /* Hoja de cierre: solo si la tarea ya tiene contrato de mandato; se hace en las páginas del panel inmobiliario. */ ?>
+          <?php $closingMandate = $detail['closing_mandate'] ?? null; ?>
+          <?php if (is_array($closingMandate)): ?>
+            <?php $closingId = \SCM\Commercial\Mandates\MandateClosingSheet::current($closingMandate['hoja']); ?>
+            <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-[#EBF1FB] text-slate-700 border border-slate-200 text-xs font-semibold transition-all cursor-pointer" data-cma-closing="<?php echo esc_attr((string) $closingMandate['id']); ?>" data-ticket-pk="<?php echo esc_attr((string) $pk); ?>" data-cma-closing-title="<?php echo esc_attr(\SCM\Commercial\Mandates\MandateClosingSheet::label($closingMandate['hoja']) . ' · Mandato #' . $closingMandate['id']); ?>"><span class="material-symbols-outlined text-[16px]">handshake</span><span><?php echo esc_html($closingId > 0 ? 'Hoja de cierre #' . $closingId : 'Hoja de cierre'); ?></span><?php if ($closingMandate['hoja']['estado'] !== ''): ?><span class="ml-auto text-[11px] font-semibold text-slate-500"><?php echo esc_html($closingMandate['hoja']['estado']); ?></span><?php endif; ?></button>
           <?php endif; ?>
           <?php if ($policy->canAct('responder')): ?>
             <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-[#EBF1FB] hover:text-[#1E3C76] text-slate-700 border border-slate-200 text-xs font-semibold transition-all group cursor-pointer" data-commercial-open-workflow="reply">

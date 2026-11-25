@@ -35,6 +35,8 @@ return [
   // contratos de prueba (sin costo, marcados como demo).
   'esignatures_token' => $env('ESIGNATURES_TOKEN', ''),
   'esignatures_test' => $envBool('ESIGNATURES_TEST', false),
+  // Panel inmobiliario: la hoja de cierre del mandato se hace en sus páginas (MandateClosingSheet).
+  'services_url' => $env('INMOBILIARIO_URL', ''),
 
 
   'sla_risk_days' => (int) $env('SLA_RISK_DAYS', '8'),

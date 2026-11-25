@@ -5039,7 +5039,7 @@ final class CommercialDashboardView
     'Llamadas' => ['llamadas_crear', 'llamadas_editar', 'llamadas_tarea'],
     'Cotizaciones' => ['cotizacion_crear'],
     'Estudios de aseguradora' => ['estudio_crear', 'estudio_responder', 'estudio_desistir'],
-    'Contratos de mandato' => ['mandato_crear', 'mandato_enviar_revision', 'mandato_responder_observaciones', 'mandato_enviar_firma'],
+    'Contratos de mandato' => ['mandato_crear', 'mandato_enviar_revision', 'mandato_responder_observaciones', 'mandato_enviar_firma', 'mandato_hoja_cierre'],
     'Precaptación' => ['precaptacion_crear', 'precaptacion_editar', 'precaptacion_ticket', 'precaptacion_catalogos'],
     'Inmuebles y avisos' => ['ingresar_inmueble', 'inmueble_cambiar_estado', 'inmueble_ver_historial', 'inmueble_transferir', 'registrar_aviso', 'editar_actor'],
     'Herramientas' => ['mercado_vista_completa', 'aseo_vista_interna', 'plan_estrategico_editar'],
