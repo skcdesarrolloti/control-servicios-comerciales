@@ -191,14 +191,14 @@ final class CommercialTaskWorkflowTest extends TestCase
     self::assertSame(0, $resumer->run($at('2026-11-30 08:00')), 'Una sola vez.');
   }
 
-  public function testResumeDateMustBeBetweenTomorrowAndAMonthAndAHalf(): void
+  public function testResumeDateMustBeBetweenTomorrowAndThirtyDays(): void
   {
     $today = new \DateTimeImmutable('today', new \DateTimeZone('America/Bogota'));
     self::assertNull(CommercialApiController::resumeDate($today->format('Y-m-d')), 'Hoy no: desde mañana.');
     self::assertNull(CommercialApiController::resumeDate($today->modify('+2 years')->format('Y-m-d')));
-    self::assertSame(45, CommercialApiController::RESUME_MAX_DAYS);
-    self::assertNotNull(CommercialApiController::resumeDate($today->modify('+45 days')->format('Y-m-d')), 'Hasta mes y medio, sí.');
-    self::assertNull(CommercialApiController::resumeDate($today->modify('+46 days')->format('Y-m-d')), 'Más de mes y medio, no.');
+    self::assertSame(30, CommercialApiController::RESUME_MAX_DAYS);
+    self::assertNotNull(CommercialApiController::resumeDate($today->modify('+30 days')->format('Y-m-d')), 'Hasta 30 días, sí.');
+    self::assertNull(CommercialApiController::resumeDate($today->modify('+31 days')->format('Y-m-d')), 'Más de 30 días, no.');
     self::assertNull(CommercialApiController::resumeDate('2026-02-30'));
     self::assertNull(CommercialApiController::resumeDate(''));
     self::assertSame('08:00', CommercialApiController::resumeDate($today->modify('+1 day')->format('Y-m-d'))?->format('H:i'));
