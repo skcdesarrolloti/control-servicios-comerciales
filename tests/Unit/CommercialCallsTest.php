@@ -242,7 +242,7 @@ final class CommercialCallsTest extends TestCase
   public function testPropertyCodeBringsTypeAndDestinationButNeverTheBudget(): void
   {
     $result = $this->service()->property('84016', 'Arriendo');
-    self::assertSame(['tipo_inmueble' => 'Apartamento', 'destinacion' => 'Vivienda'], $result['campos'], 'El uso que no está en su lista se deja para llenarlo a mano y el presupuesto es del cliente.');
+    self::assertSame(['tipo_inmueble' => 'Apartamento', 'destinacion' => 'Vivienda', 'barrio' => 'Laureles'], $result['campos'], 'El uso que no está en su lista se deja para llenarlo a mano y el presupuesto es del cliente.');
     self::assertStringContainsString('Laureles', $result['resumen']);
     self::assertArrayNotHasKey('presupuesto', $this->service()->property('84016', 'Venta')['campos']);
     self::assertSame('property', CommercialActionRouter::CALL_ACTIONS['commercial_calls_property']);
@@ -864,5 +864,20 @@ final class CommercialCallsTest extends TestCase
     self::assertSame('84016', $fields['id_inmueble']);
     self::assertSame('Busca apartamento en Laureles.', $fields['descripcion']);
     self::assertSame(['tiene_presupuesto' => 'No'], array_intersect_key(CommercialCallsSmartFill::validate(['tiene_presupuesto' => 'no'], $options), ['tiene_presupuesto' => 1]));
+  }
+
+  public function testTaskStoresThePropertyNeighborhoodOrTheChosenOne(): void
+  {
+    $withCode = $this->create(['tema_ayuda' => 'Arriendo', 'id_inmueble' => '84016', 'barrio' => 'Otro barrio']);
+    self::assertSame('Laureles', $this->service()->taskData($withCode, 'Otro barrio')['call']['barrio'], 'Con inmueble manda su barrio.');
+    $task = $this->service()->createTask($this->taskInput($withCode, ['id_inmueble' => '84016', 'barrio' => 'Otro barrio']));
+    $row = $this->db->getRow('SELECT barrio, direccion, inmueble FROM wp_jet_cct_tickets WHERE _ID = ?', [$task['id']]);
+    self::assertSame(['barrio' => 'Laureles', 'direccion' => 'Cra 76 # 33-10', 'inmueble' => '84016'], $row);
+
+    $free = $this->create(['tema_ayuda' => 'Arriendo', 'celular' => '3011112222', 'barrio' => 'El Poblado']);
+    self::assertSame('El Poblado', $this->service()->taskData($free, 'El Poblado')['call']['barrio'], 'Sin inmueble se usa el escogido.');
+    $task = $this->service()->createTask($this->taskInput($free, ['celular_solicitante' => '3011112222', 'barrio' => 'El Poblado']));
+    self::assertSame('El Poblado', $this->db->getRow('SELECT barrio FROM wp_jet_cct_tickets WHERE _ID = ?', [$task['id']])['barrio']);
+    self::assertStringContainsString('list="ccl-barrios"', CommercialCallsView::form($this->service()->formData([]), $this->service()->options()));
   }
 }

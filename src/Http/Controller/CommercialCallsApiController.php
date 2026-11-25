@@ -69,7 +69,7 @@ final class CommercialCallsApiController
   /** @param array<string,mixed> $input */
   public function taskForm(array $input): never
   {
-    $this->guarded($input, fn(): array => ['html' => CommercialCallsView::taskForm($this->service->taskData((int) ($input['id'] ?? 0)), $this->service->options())]);
+    $this->guarded($input, fn(): array => ['html' => CommercialCallsView::taskForm($this->service->taskData((int) ($input['id'] ?? 0), is_scalar($input['barrio'] ?? null) ? (string) $input['barrio'] : ''), $this->service->options())]);
   }
 
   /** @param array<string,mixed> $input */

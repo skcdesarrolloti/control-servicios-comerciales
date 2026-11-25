@@ -22,7 +22,7 @@ final class CommercialCallsSmartFill
   private const LABELS = [
     'cliente' => 'Nombre', 'celular' => 'Celular', 'email' => 'Correo', 'indicativo' => 'País', 'celular_wsp' => 'Celular WhatsApp',
     'medio' => 'Medio', 'tema_ayuda' => 'Motivo', 'tiene_codigo' => 'Código del inmueble', 'id_inmueble' => 'Código del inmueble',
-    'tipo_inmueble' => 'Tipo de inmueble', 'destinacion' => 'Destinación', 'uso' => 'Uso', 'presupuesto' => 'Presupuesto',
+    'tipo_inmueble' => 'Tipo de inmueble', 'destinacion' => 'Destinación', 'uso' => 'Uso', 'barrio' => 'Barrio', 'presupuesto' => 'Presupuesto',
     'precio' => 'Precio', 'tiene_presupuesto' => 'Presupuesto', 'factores_importantes' => 'Factores importantes', 'descripcion' => 'Descripción',
   ];
 
@@ -145,6 +145,8 @@ final class CommercialCallsSmartFill
       if ($value !== '') $factors[] = $value;
     }
     if ($factors !== []) $out['factores_importantes'] = array_values(array_unique($factors));
+    $neighborhood = $text('barrio', 80);
+    if ($neighborhood !== '') $out['barrio'] = mb_convert_case(mb_strtolower($neighborhood), MB_CASE_TITLE);
     $description = $text('descripcion', 1000);
     if ($description !== '') $out['descripcion'] = $description;
     return $out;
@@ -172,7 +174,7 @@ final class CommercialCallsSmartFill
       ],
       [
         'role' => 'user',
-        'content' => "Del texto, devuelve JSON con estas llaves: cliente (nombre completo de la persona), celular (solo dígitos, sin indicativo), celular_wsp (solo si dio otro número de WhatsApp), email, indicativo (código de país, 57 para Colombia), medio, tema_ayuda, tipo_inmueble, destinacion, uso, id_inmueble (código del inmueble si lo menciona), presupuesto (pesos, solo dígitos, lo que puede pagar en arriendo o compra; vacío si no lo dijo), tiene_presupuesto (No solo si dijo que aún no tiene presupuesto definido; si no, vacío), precio (pesos, solo dígitos, el valor de su inmueble si quiere que se lo arrienden o vendan), factores_importantes (arreglo) y descripcion (dos o tres frases en tercera persona con lo que busca: zona, características y condiciones).\n"
+        'content' => "Del texto, devuelve JSON con estas llaves: cliente (nombre completo de la persona), celular (solo dígitos, sin indicativo), celular_wsp (solo si dio otro número de WhatsApp), email, indicativo (código de país, 57 para Colombia), medio, tema_ayuda, tipo_inmueble, destinacion, uso, id_inmueble (código del inmueble si lo menciona), barrio (el barrio o sector donde busca o donde está su inmueble), presupuesto (pesos, solo dígitos, lo que puede pagar en arriendo o compra; vacío si no lo dijo), tiene_presupuesto (No solo si dijo que aún no tiene presupuesto definido; si no, vacío), precio (pesos, solo dígitos, el valor de su inmueble si quiere que se lo arrienden o vendan), factores_importantes (arreglo) y descripcion (dos o tres frases en tercera persona con lo que busca: zona, características y condiciones).\n"
           . "Para medio, tema_ayuda, tipo_inmueble, destinacion, uso y factores_importantes usa exactamente un valor de estas listas o déjalo vacío. tema_ayuda: Arriendo o Venta si busca un inmueble; Captacion si ofrece su inmueble para arrendar o vender.\nListas: {$json}\n\nTexto: {$text}",
       ],
     ];

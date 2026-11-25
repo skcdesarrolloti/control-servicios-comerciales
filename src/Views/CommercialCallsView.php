@@ -238,6 +238,7 @@ final class CommercialCallsView
       . self::selectField('tipo_inmueble', 'Tipo de inmueble', $options['tipos'], '', false)
       . self::selectField('destinacion', 'Destinación', $options['destinaciones'], '', false)
       . self::selectField('uso', 'Uso', $options['usos'], '', false)
+      . self::neighborhoodField('', $options['barrios'] ?? [], false)
       . '<div data-ccl-topic-field="presupuesto" hidden>' . self::selectField('tiene_presupuesto', '¿El cliente cuenta con presupuesto?', $yesNo, '', false) . '</div>'
       . '<div data-ccl-budget-field hidden>' . self::input('presupuesto', 'Presupuesto', '', 'text', false, $money) . '</div>'
       . '<div data-ccl-topic-field="precio" hidden>' . self::input('precio', 'Precio', '', 'text', false, $money) . '</div>'
@@ -253,6 +254,20 @@ final class CommercialCallsView
       . $merit
       . self::pairField('id_empleado', 'Asignar a', $employees, $v('id_empleado'), true)
       . '</div></div><footer class="ccl-modal-foot"><button type="button" class="ccl-secondary" data-ccl-close>Cancelar</button><button type="submit" class="ccl-primary">Guardar llamada</button></footer></form>';
+  }
+
+  /**
+   * Barrio: se escoge de la lista (o se escribe si no está); con código del inmueble se toma el suyo y queda fijo.
+   * @param list<string> $barrios
+   */
+  private static function neighborhoodField(string $value, array $barrios, bool $fromProperty): string
+  {
+    $options = '';
+    foreach ($barrios as $barrio) {
+      $options .= '<option value="' . self::e((string) $barrio) . '"></option>';
+    }
+    return '<label class="ccl-field"><span>Barrio</span><input type="text" name="barrio" value="' . self::e($value) . '" list="ccl-barrios" autocomplete="off" maxlength="120" placeholder="Escoge o escribe el barrio" data-ccl-barrio' . ($fromProperty ? ' readonly title="Es el barrio del inmueble"' : '') . '></label>'
+      . '<datalist id="ccl-barrios">' . $options . '</datalist>';
   }
 
   /** Llenado inteligente: dictar o pegar lo que dijo el cliente y que la IA complete el formulario (commercial-calls.js). */
@@ -295,6 +310,7 @@ final class CommercialCallsView
       . self::selectField('tipo_inmueble', 'Tipo de inmueble', $options['tipos'], $v('tipo_inmueble'), false)
       . self::selectField('destinacion', 'Destinación', $options['destinaciones'], $v('destinacion'), false)
       . self::selectField('uso', 'Uso', $options['usos'], $v('uso'), false)
+      . self::neighborhoodField($v('barrio'), $options['barrios'] ?? [], (int) $v('id_inmueble') > 0 && $v('barrio') !== '')
       . '<div data-ccl-topic-field="precio" hidden>' . self::input('precio', 'Precio', CommercialCallsService::money($v('precio')), 'text', false, 'inputmode="numeric" autocomplete="off" data-ccl-money') . '</div>'
       . '<div data-ccl-topic-field="presupuesto" hidden>' . self::selectField('tiene_presupuesto', '¿El cliente cuenta con presupuesto?', ['Si', 'No'], (int) $v('presupuesto') > 0 ? 'Si' : (str_contains((string) ($call['descripcion'] ?? ''), CommercialCallsService::NO_BUDGET_NOTE) ? 'No' : ''), false) . '</div>'
       . '<div data-ccl-budget-field hidden>' . self::input('presupuesto', 'Presupuesto', CommercialCallsService::money($v('presupuesto')), 'text', false, 'inputmode="numeric" autocomplete="off" data-ccl-money') . '</div>'

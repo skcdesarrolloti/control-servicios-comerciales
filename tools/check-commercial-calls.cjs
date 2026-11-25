@@ -167,6 +167,8 @@ async function fillCall(modal, values) {
     await modal.locator('[data-ccl-property-result][data-state="ok"]').waitFor();
     assert.equal(await modal.locator('[name="tipo_inmueble"]').inputValue(), 'Apartamento', 'El código trae el tipo');
     assert.equal(await modal.locator('[name="destinacion"]').inputValue(), 'Vivienda', 'El código trae la destinación');
+    assert.equal(await modal.locator('[name="barrio"]').inputValue(), 'Laureles', 'El código trae el barrio del inmueble');
+    assert.ok(await modal.locator('[name="barrio"]').evaluate(node => node.readOnly), 'El barrio del inmueble queda fijo');
     assert.equal(await modal.locator('[name="presupuesto"]').inputValue(), '', 'El código no llena el presupuesto: es del cliente');
     await modal.locator('[name="tiene_presupuesto"]').selectOption('No');
     await page.screenshot({ path: 'output/calls-repeat-property.png' });

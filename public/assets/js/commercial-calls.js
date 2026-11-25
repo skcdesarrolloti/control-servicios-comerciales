@@ -106,6 +106,7 @@
       if (details) details.hidden = offer && value(form, "tiene_codigo") === "";
       if (!hasCode && form.elements.id_inmueble.value) {
         form.elements.id_inmueble.value = "";
+        lockNeighborhood(form, false);
         var result = form.querySelector("[data-ccl-property-result]");
         if (result) result.hidden = true;
       }
@@ -120,13 +121,21 @@
       if (!hasBudget) form.elements.presupuesto.value = "";
     }
   }
-  var PROPERTY_LABELS = { tipo_inmueble: "tipo", destinacion: "destinación", uso: "uso" };
+  var PROPERTY_LABELS = { tipo_inmueble: "tipo", destinacion: "destinación", uso: "uso", barrio: "barrio" };
+  // Con inmueble, el barrio es el suyo y queda fijo; sin inmueble se escoge.
+  function lockNeighborhood(form, locked) {
+    var field = form.elements.barrio;
+    if (!field) return;
+    field.readOnly = locked;
+    if (locked) field.title = "Es el barrio del inmueble";
+    else field.removeAttribute("title");
+  }
 
   // Llenado inteligente: dictado con el reconocimiento de voz del navegador y la IA del servidor para completar el formulario.
   var Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   var listening = null;
   // Primero lo que cambia qué campos se ven (motivo, código, presupuesto), luego el resto.
-  var SMART_ORDER = ["tema_ayuda", "tiene_codigo", "id_inmueble", "tiene_presupuesto", "presupuesto", "precio", "medio", "indicativo", "celular", "cliente", "email", "celular_wsp", "tipo_inmueble", "destinacion", "uso", "descripcion", "comisionista", "cliente_inmediato", "merece_ticket"];
+  var SMART_ORDER = ["tema_ayuda", "tiene_codigo", "id_inmueble", "tiene_presupuesto", "presupuesto", "precio", "medio", "indicativo", "celular", "cliente", "email", "celular_wsp", "tipo_inmueble", "destinacion", "uso", "barrio", "descripcion", "comisionista", "cliente_inmediato", "merece_ticket"];
 
   function smartStatus(box, text, state) {
     var status = box.querySelector("[data-ccl-smart-status]");
@@ -248,6 +257,7 @@
     var box = form.querySelector("[data-ccl-property-result]");
     var code = field.value.replace(/\D+/g, "");
     if (!box) return;
+    lockNeighborhood(form, false);
     if (!code) { box.hidden = true; return; }
     box.hidden = false;
     box.dataset.state = "";
@@ -260,6 +270,7 @@
         if (!input) return;
         input.value = result.campos[name];
         if (input.value === result.campos[name]) filled.push(PROPERTY_LABELS[name] || name);
+        if (name === "barrio") lockNeighborhood(form, true);
       });
       box.textContent = result.resumen + (filled.length ? ". Se llenó " + filled.join(", ") + "; revisa y completa lo que falte." : ". No trae datos para llenar: complétalos a mano.");
       box.dataset.state = "ok";
@@ -279,7 +290,8 @@
     var kind = lower(value(form, "tipo_inmueble"));
     var destination = lower(value(form, "destinacion"));
     var use = lower(value(form, "uso"));
-    var what = (kind || "inmueble") + (destination ? " para " + destination : "") + (use ? " (uso " + use + ")" : "");
+    var place = value(form, "barrio");
+    var what = (kind || "inmueble") + (destination ? " para " + destination : "") + (use ? " (uso " + use + ")" : "") + (place ? " en " + place : "");
     var parts = [];
     var seeking = { "Arriendo": "Busca en arriendo", "Venta": "Busca para comprar", "Arriendo o venta": "Busca en arriendo o para comprar" }[topic];
     if (seeking) parts.push(seeking + ": " + what + ".");
@@ -453,10 +465,12 @@
     if (event.target.matches("[data-ccl-filters]")) { event.preventDefault(); refresh(1); return; }
     if (event.target.matches("[data-ccl-form]")) {
       event.preventDefault();
-      submit(event.target, "commercial_calls_save", function (result) {
+      var saved = event.target;
+      submit(saved, "commercial_calls_save", function (result) {
         notify("success", result.message);
         refresh(1);
-        if (result.next === "task") open("commercial_calls_task_form", { id: result.id });
+        // El barrio escogido pasa a la tarea aunque la tabla de llamadas no tenga esa columna.
+        if (result.next === "task") open("commercial_calls_task_form", { id: result.id, barrio: value(saved, "barrio") });
         else closeModal();
       });
       return;

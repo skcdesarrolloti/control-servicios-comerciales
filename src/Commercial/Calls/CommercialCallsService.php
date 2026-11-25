@@ -136,6 +136,7 @@ final class CommercialCallsService
       'medios_filtro' => array_column($this->medios->all(), 'nombre'),
       'funcionarios' => (new CommercialTicketsRepository($this->db))->ticketEmployees($this->commercialCargos()),
       'pph_medio' => $this->pphMedio(),
+      'barrios' => (new CommercialTicketsRepository($this->db))->neighborhoodOptions(),
     ];
   }
 
@@ -360,6 +361,7 @@ final class CommercialCallsService
       'destinacion' => $choice('destinacion', $options['destinaciones'], 'la destinación', false),
       'uso' => $choice('uso', $options['usos'], 'el uso', false),
       'id_inmueble' => $offer && $code > 0 ? (string) $code : '',
+      'barrio' => $this->neighborhood($offer && $code > 0 ? (string) $code : '', $text('barrio')),
       'presupuesto' => $budget,
       'precio' => in_array($topic, self::LISTING_TOPICS, true) ? self::amount($text('precio')) : '',
       'factores_importantes' => implode(', ', $factors),
@@ -455,7 +457,7 @@ final class CommercialCallsService
       throw new \RuntimeException('No tienes permiso para consultar inmuebles.');
     }
     $code = (string) (int) trim($code);
-    $row = $code === '0' ? null : $this->db->getRow('SELECT * FROM `' . $this->db->table('jet_cct_inmuebles') . '` WHERE CAST(`codigo` AS CHAR) = ? ORDER BY `_ID` DESC LIMIT 1', [$code]);
+    $row = $this->findProperty($code);
     if (!is_array($row)) {
       throw new \InvalidArgumentException('No encontramos el inmueble ' . $code . '. Revisa el código o llena los datos a mano.');
     }
@@ -473,6 +475,7 @@ final class CommercialCallsService
       'tipo_inmueble' => $match($v('tipo_inmueble'), $options['tipos']),
       'destinacion' => $match($v('destinacion'), $options['destinaciones']),
       'uso' => $match($v('uso'), $options['usos']),
+      'barrio' => $v('barrio'),
     ];
     // El presupuesto es del cliente: no se copia del precio del inmueble.
     $place = implode(', ', array_filter([$v('barrio'), $v('ciudad')]));
@@ -484,12 +487,29 @@ final class CommercialCallsService
    * Datos para el formulario de la tarea.
    * @return array<string,mixed>
    */
-  public function taskData(int $id): array
+  public function taskData(int $id, string $barrio = ''): array
   {
     $this->requireAct('llamadas_tarea', 'No tienes permiso para crear tareas desde llamadas.');
     $call = $this->accessible($id);
     $this->assertTaskPossible($call);
-    return ['call' => $call, 'factores' => self::factors($call['factores_importantes'] ?? ''), 'responsable' => $this->repository->employeeNames()[trim((string) ($call['id_empleado'] ?? ''))] ?? ''];
+    // El barrio: el del inmueble si la llamada tiene código; si no, el de la llamada o el que se escogió al registrarla.
+    $call['barrio'] = $this->neighborhood(trim((string) ($call['id_inmueble'] ?? '')), trim((string) ($call['barrio'] ?? '')) ?: $barrio);
+    return ['call' => $call, 'factores' => self::factors($call['factores_importantes'] ?? ''), 'responsable' => $this->repository->employeeNames()[trim((string) ($call['id_empleado'] ?? ''))] ?? '', 'barrios' => $this->options()['barrios']];
+  }
+
+  /** @return array<string,mixed>|null El inmueble más reciente con ese código. */
+  private function findProperty(string $code): ?array
+  {
+    $code = (string) (int) trim($code);
+    return $code === '0' ? null : $this->db->getRow('SELECT * FROM `' . $this->db->table('jet_cct_inmuebles') . '` WHERE CAST(`codigo` AS CHAR) = ? ORDER BY `_ID` DESC LIMIT 1', [$code]);
+  }
+
+  /** Barrio de la solicitud: si hay inmueble con barrio manda el suyo; si no, el escogido (texto corto). */
+  private function neighborhood(string $code, string $chosen): string
+  {
+    $property = $code !== '' && $code !== '0' ? $this->findProperty($code) : null;
+    $own = is_array($property) ? trim((string) ($property['barrio'] ?? '')) : '';
+    return $own !== '' ? $own : mb_substr(trim(strip_tags($chosen)), 0, 120);
   }
 
   /**
@@ -573,7 +593,13 @@ final class CommercialCallsService
     $clientId = $this->repository->clientId($celular);
     $inmueble = (int) $text('id_inmueble');
     [$budget, $descripcion] = self::budget($input, $descripcion, $offer);
-    return [
+    $property = $inmueble > 0 && $offer ? $this->findProperty((string) $inmueble) : null;
+    $place = [
+      'barrio' => $this->neighborhood($inmueble > 0 && $offer ? (string) $inmueble : '', $text('barrio', 120)),
+      'direccion' => is_array($property) ? trim((string) ($property['direccion'] ?? '')) : '',
+      'inmueble' => is_array($property) ? (string) $inmueble : '',
+    ];
+    return array_filter($place, static fn(string $value): bool => $value !== '') + [
       'cct_status' => 'publish', 'cct_author_id' => $me, 'cct_created' => $now, 'cct_modified' => $now,
       'id_creador' => $me,
       'empleado' => (string) ($employee['nombre'] ?? ''),

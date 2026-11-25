@@ -2139,7 +2139,8 @@ final class CommercialTicketsRepository
   }
 
   /** @return array<int,string> */
-  private function neighborhoodOptions(): array
+  /** Barrios para escoger (tabla de barrios o, si no existe, los usados en tareas e inmuebles). */
+  public function neighborhoodOptions(): array
   {
     $barriosTable = $this->db->table('jet_cct_barrios');
     try {
