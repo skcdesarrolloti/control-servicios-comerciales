@@ -49,13 +49,6 @@
 .pm-hero-actions { margin:14px 0 0!important; }
 .pm-preview { margin:0 0 16px; padding:12px 16px; border-radius:14px; background:#e8eefc; color:#1e3c76; font-size:14px; font-weight:500; }
 .pm-preview a { color:#1e3c76; font-weight:700; }
-.pm-contract details > summary { display:flex; flex-direction:column; gap:2px; cursor:pointer; list-style:none; padding:4px 0; }
-.pm-contract details > summary::-webkit-details-marker { display:none; }
-.pm-contract details > summary span { font-size:18px; font-weight:700; color:var(--ps-navy); }
-.pm-contract details > summary span::after { content:" ▸"; color:var(--ps-muted); }
-.pm-contract details[open] > summary span::after { content:" ▾"; }
-.pm-contract details > summary small { font-size:13px; color:var(--ps-muted); }
-.pm-contract details > summary:focus-visible { outline:3px solid #f8cf4a; outline-offset:4px; border-radius:8px; }
 .pm-contract-body { font-size:14px; line-height:1.65; color:#24334c; }
 .pm-contract-body p { margin:0 0 12px; text-align:justify; }
 .pm-contract-body h3 { margin:24px 0 10px; font-size:17px; color:var(--ps-navy); }
@@ -65,5 +58,9 @@
 .pm-contract-key { width:45%; background:#f6f8fc; }
 .pm-contract-value { font-weight:600; color:var(--ps-navy); }
 .pm-contract-accept { margin-top:18px!important; font-weight:600; }
-@media print { .ps-top, .pm-hero-actions, .pm-preview, .pm-section, .pm-approve, .ps-steps, .ps-internal { display:none!important; } .pm-contract details > summary small, .pm-contract .ps-hint { display:none; } }
+@media print { .ps-top, .pm-hero-actions, .pm-preview, .pm-section, .pm-approve, .ps-steps, .ps-internal, .pm-contract .ps-hint { display:none!important; } }
 .pm-contract-head td { background:#eef1f8; font-weight:700; color:var(--ps-navy); }
+
+.pm-contract-head-card { margin:0 0 18px; padding:0 0 14px; border-bottom:1px solid var(--ps-line); }
+.pm-contract-head-card h2 { margin:4px 0 0; }
+.pm-contract-head-card .ps-eyebrow { color:var(--ps-blue); }

@@ -54,7 +54,7 @@ final class PublicMandateView
       . '<h1>' . ($staff ? 'Revisión del propietario' : 'Hola, ' . self::e($names !== [] ? implode(' y ', $names) : 'apreciado propietario')) . '</h1>'
       . '<p class="ps-state"><span class="ps-badge ps-badge--' . self::e($tone) . '">' . self::e($label) . '</span></p>'
       . '<p>' . self::e(self::stateText($data, $staff)) . '</p>'
-      . ($hasContract && $contract['url'] !== '' ? '<p class="pm-hero-actions"><a class="ps-button ps-button--light" href="' . self::e($contract['url']) . '">Ver el contrato completo</a></p>' : '')
+      . ($hasContract && $contract['url'] !== '' ? '<p class="pm-hero-actions"><a class="ps-button ps-button--light" href="' . self::e($contract['url']) . '">Ir al contrato completo</a></p>' : '')
       . '</section>';
     if ($preview) {
       $html .= '<p class="pm-preview" role="status">Vista previa: así ve el propietario esta página con su enlace. Aquí no se pueden dejar observaciones ni aprobar. <a href="' . self::e((string) $page['preview']) . '">Volver a la vista del equipo</a></p>';
@@ -90,9 +90,10 @@ final class PublicMandateView
       $html .= self::approval($data, $page);
     }
     if ($hasContract) {
-      $html .= '<section class="ps-card pm-contract" id="contrato"><details' . ($contract['open'] ? ' open' : '') . '><summary><span>Contrato completo</span><small>Cláusulas y anexos, tal como se enviará a firma digital</small></summary>'
-        . '<p class="ps-hint">Es el texto del contrato con los datos de esta página. La fecha del encabezado será la del día en que se envíe a firma.</p>'
-        . '<div class="pm-contract-body">' . (string) $data['contrato'] . '</div></details></section>';
+      // Siempre completo (cláusulas y anexos): es el texto vigente de la plantilla de eSignatures con los datos del mandato.
+      $html .= '<section class="ps-card pm-contract" id="contrato"><header class="pm-contract-head-card"><p class="ps-eyebrow">Texto que se enviará a firma digital</p><h2>Contrato completo</h2>'
+        . '<p class="ps-hint">Cláusulas y anexos con los datos de esta página. La fecha del encabezado será la del día en que se envíe a firma.</p></header>'
+        . '<div class="pm-contract-body">' . (string) $data['contrato'] . '</div></section>';
     }
     $html .= self::advisor($data['consultor']);
     return $html . self::foot($assets['js']);

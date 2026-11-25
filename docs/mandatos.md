@@ -57,10 +57,11 @@ el crédito de la garantía (`MandateCalculator`) y lo guarda en `wp_jet_cct_cre
   - `?id=<mandato>`: la ve el **equipo** con la sesión del panel. Muestra lo mismo, más el enlace del propietario
     (Copiar), **Enviar al propietario por correo y WhatsApp**, la respuesta a cada observación (y marcarla resuelta) y el
     enlace al panel para editarlo o enviarlo a firma.
-- **Contrato completo**: la página tiene **Ver el contrato completo** con las cláusulas y los anexos tal como se enviarán a
-  firma, llenos con los datos del mandato (`MandateContractText`). Las plantillas son copia de las de eSignatures en
-  `resources/mandatos/` (`por-defecto.md`, `berkley.md`, `seguros-mundial.md`): **si se cambia una plantilla en
-  eSignatures, hay que reemplazar también su archivo aquí** (exportarla en Markdown).
+- **Contrato completo**: la página siempre muestra el contrato completo (cláusulas y anexos) tal como se enviará a firma,
+  lleno con los datos del mandato (`MandateContractText`). El texto se lee de la plantilla vigente en eSignatures
+  (`GET /api/templates/{id}/content`) y se guarda una hora en `storage/data/mandatos-plantillas/`; si eSignatures no
+  responde, se usa la última copia o la de `resources/mandatos/` (`por-defecto.md`, `berkley.md`, `seguros-mundial.md`).
+  Cambiar el texto en eSignatures basta: en máximo una hora se ve aquí.
 - En el panel, cada mandato tiene **Revisión del propietario**, **Ver contrato** y **Vista pública** (lo que ve el
   propietario con su enlace: `mandato.php?id=…&como=propietario`, sin marcarlo como visto ni dejar escribir); el popup
   cambia entre las tres vistas.

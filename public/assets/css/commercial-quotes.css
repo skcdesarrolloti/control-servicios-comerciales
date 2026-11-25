@@ -112,7 +112,7 @@
 .cqt-page { max-width:1400px; margin:0 auto; padding:24px 24px 64px; }
 .cqt-head h1 { margin:0; font-size:26px; font-weight:700; }
 .cqt-head p:last-child { margin:4px 0 0; color:var(--cqt-muted); font-size:14px; }
-.cqt-list-filters { background:#fff; border:1px solid var(--cqt-line); margin:18px 0 0; }
+.cqt-list-filters { background:#fff; border:1px solid var(--cqt-line); margin:18px 0 16px; }
 .cqt-chips { display:flex; flex-wrap:wrap; gap:8px; margin:16px 0; }
 .cqt-chip { display:inline-flex; align-items:center; gap:8px; min-height:44px; padding:6px 14px; border:1px solid var(--cqt-line); border-radius:12px; background:#fff; font-size:13px; color:#35425c; }
 .cqt-chip strong { font-size:17px; color:var(--cqt-navy); }

@@ -454,4 +454,24 @@ Acepto.`{\"input_type\":\"every_signer\"}`",
     self::assertStringContainsString('&amp;como=propietario', $html, 'Vista pública sin marcarla como vista por el propietario.');
     self::assertStringContainsString('name="cma-frame-5" src="', $html);
   }
+
+  public function testTheTemplateIsReadFromESignaturesAndCachedForAnHour(): void
+  {
+    $cache = sys_get_temp_dir() . '/scm-mandatos-' . bin2hex(random_bytes(4));
+    $reads = 0;
+    $signature = new MandateSignature('token', true, function (string $method, string $path) use (&$reads): array {
+      $reads++;
+      self::assertSame('GET templates/' . MandateSignature::TEMPLATES['Berkley'] . '/content', $method . ' ' . $path);
+      return ['data' => ['markdown' => "Texto vigente {{fecha}}"]];
+    });
+    self::assertSame('Texto vigente {{fecha}}', MandateContractText::template('Berkley', $signature, $cache));
+    self::assertSame('Texto vigente {{fecha}}', MandateContractText::template('Berkley', $signature, $cache), 'La segunda vez sale de la copia.');
+    self::assertSame(1, $reads);
+    $down = new MandateSignature('token', true, static function (): array { throw new \RuntimeException('caído'); });
+    touch($cache . '/berkley.md', time() - 2 * MandateContractText::CACHE_SECONDS);
+    self::assertSame('Texto vigente {{fecha}}', MandateContractText::template('Berkley', $down, $cache), 'Si eSignatures falla, la última copia.');
+    self::assertStringContainsString('CLAUSULA PRIMERA', MandateContractText::template('Por defecto', $down, $cache), 'Sin copia: el archivo de resources/.');
+    array_map('unlink', glob($cache . '/*') ?: []);
+    @rmdir($cache);
+  }
 }

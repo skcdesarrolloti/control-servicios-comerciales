@@ -114,6 +114,13 @@ final class MandateSignature
     return $new;
   }
 
+  /** Texto (Markdown) de la plantilla de eSignatures del tipo de contrato; '' si no tiene. */
+  public function templateMarkdown(string $type): string
+  {
+    $template = self::TEMPLATES[$type] ?? '';
+    return $template === '' ? '' : (string) (($this->http)('GET', 'templates/' . rawurlencode($template) . '/content', null)['data']['markdown'] ?? '');
+  }
+
   /** Estado y PDF del contrato (para el aviso de firma). @return array<string,mixed> */
   public function contractInfo(string $contract): array
   {

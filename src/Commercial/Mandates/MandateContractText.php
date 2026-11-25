@@ -8,14 +8,16 @@ namespace SCM\Commercial\Mandates;
  * Texto completo del contrato de mandato (cláusulas y anexos) para leerlo antes de la firma, con los mismos valores
  * que recibe eSignatures (MandateSignature::values, ownersTable y agreementsTable).
  *
- * Las plantillas son copia de las de eSignatures (MandateSignature::TEMPLATES), exportadas en Markdown a
- * resources/mandatos/: si se cambia una plantilla en eSignatures, reemplazar también su archivo aquí.
+ * La plantilla se lee de eSignatures (GET templates/{id}/content, MandateSignature::templateMarkdown) y se guarda una
+ * hora en storage/data/mandatos-plantillas/: así lo que lee el propietario es siempre el texto vigente de eSignatures.
+ * Si eSignatures no responde, se usa la última copia guardada o, si no hay, la de resources/mandatos/.
  * Del Markdown de eSignatures se entiende: párrafos, **negrita**, "# título", tablas "| a | b |" y las marcas
  * `{"…"}` (alineación, casilla de aceptación), que se quitan.
  */
 final class MandateContractText
 {
   public const FILES = ['Por defecto' => 'por-defecto.md', 'Berkley' => 'berkley.md', 'Seguros mundial' => 'seguros-mundial.md'];
+  public const CACHE_SECONDS = 3600;
   /** Campos que llegan como Markdown (tablas) y no como texto. */
   private const MARKDOWN_FIELDS = ['tabla_propietarios', 'tabla_acuerdos'];
 
@@ -23,12 +25,11 @@ final class MandateContractText
    * El contrato del mandato en HTML, o '' si su tipo no tiene plantilla.
    * @param array<string,mixed> $mandate fila de wp_jet_cct_contrato_mandato
    */
-  public static function html(array $mandate, ?MandateCalculator $calculator = null, ?string $directory = null): string
+  public static function html(array $mandate, ?MandateCalculator $calculator = null, ?MandateSignature $signature = null, ?string $cacheDirectory = null): string
   {
     $post = MandateFields::toForm($mandate);
-    $file = self::FILES[trim((string) ($post['tipo_contrato'] ?? ''))] ?? '';
-    $path = rtrim($directory ?? dirname(__DIR__, 3) . '/resources/mandatos', '/\\') . '/' . $file;
-    if ($file === '' || !is_file($path)) {
+    $template = self::template(trim((string) ($post['tipo_contrato'] ?? '')), $signature, $cacheDirectory);
+    if ($template === '') {
       return '';
     }
     try {
@@ -36,10 +37,41 @@ final class MandateContractText
     } catch (\InvalidArgumentException) {
       $credit = null;
     }
-    return self::render((string) file_get_contents($path), MandateSignature::values($post, $credit), [
+    return self::render($template, MandateSignature::values($post, $credit), [
       'tabla_propietarios' => MandateSignature::ownersTable($post),
       'tabla_acuerdos' => MandateSignature::agreementsTable($post),
     ]);
+  }
+
+  /** Markdown vigente de la plantilla: eSignatures (con caché de una hora), la última copia o la de resources/. */
+  public static function template(string $type, ?MandateSignature $signature = null, ?string $cacheDirectory = null): string
+  {
+    $file = self::FILES[$type] ?? '';
+    if ($file === '') {
+      return '';
+    }
+    $cache = rtrim($cacheDirectory ?? dirname(__DIR__, 3) . '/storage/data/mandatos-plantillas', '/\\') . '/' . $file;
+    if ($signature !== null && (!is_file($cache) || filemtime($cache) < time() - self::CACHE_SECONDS)) {
+      try {
+        $markdown = $signature->templateMarkdown($type);
+        if (trim($markdown) !== '') {
+          if (!is_dir(dirname($cache))) {
+            @mkdir(dirname($cache), 0775, true);
+          }
+          @file_put_contents($cache, $markdown);
+          return $markdown;
+        }
+      } catch (\Throwable $error) {
+        error_log('[mandatos:plantilla] No se pudo leer la plantilla ' . $type . ' de eSignatures: ' . $error->getMessage());
+        @touch($cache); // No volver a intentarlo en cada visita durante la próxima hora.
+      }
+    }
+    foreach ([$cache, dirname(__DIR__, 3) . '/resources/mandatos/' . $file] as $path) {
+      if (is_file($path) && filesize($path) > 0) {
+        return (string) file_get_contents($path);
+      }
+    }
+    return '';
   }
 
   /**

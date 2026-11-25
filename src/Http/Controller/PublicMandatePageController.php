@@ -7,6 +7,7 @@ namespace SCM\Http\Controller;
 use SCM\Commercial\CommercialAccessPolicy;
 use SCM\Commercial\Mandates\CommercialMandatesNotifier;
 use SCM\Commercial\Mandates\CommercialMandatesService;
+use SCM\Commercial\Mandates\MandateSignature;
 use SCM\Core\Auth;
 use SCM\Core\Csrf;
 use SCM\Core\Database;
@@ -78,7 +79,7 @@ final class PublicMandatePageController
     $action = $this->self . '?m=' . rawurlencode($reference);
     if ($method === 'POST') {
       if (!$this->limiter->consume('public-mandate-post-ip:' . $ip, 15, 600) || !$this->limiter->consume('public-mandate-post:' . $id, 30, 3600)) {
-        $this->page(429, $service->viewData($id), ['action' => $action], 'Envió varias observaciones seguidas. Espere unos minutos e intente de nuevo.');
+        $this->page(429, $service->viewData($id, false, true), ['action' => $action], 'Envió varias observaciones seguidas. Espere unos minutos e intente de nuevo.');
         return;
       }
       $draft = ['seccion' => self::str($post, 'seccion', 30), 'nombre' => self::str($post, 'nombre', 190), 'mensaje' => self::str($post, 'mensaje', CommercialMandatesService::MAX_NOTE + 1)];
@@ -91,14 +92,14 @@ final class PublicMandatePageController
           $done = 'observacion';
         }
       } catch (\InvalidArgumentException $exception) {
-        $this->page(422, $service->viewData($id), ['action' => $action, 'draft' => $draft], $exception->getMessage());
+        $this->page(422, $service->viewData($id, false, true), ['action' => $action, 'draft' => $draft], $exception->getMessage());
         return;
       }
       header('Location: ' . $action . '&ok=' . $done . '#' . ($done === 'aprobado' ? 'aprobar' : 'seccion-' . rawurlencode($draft['seccion'] ?: 'general')), true, 303);
       return;
     }
     $service->ownerSeen($id);
-    $this->page(200, $service->viewData($id), ['action' => $action, 'flash' => self::flash($query), 'contract' => self::contract($action, $query)], '');
+    $this->page(200, $service->viewData($id, false, true), ['action' => $action, 'flash' => self::flash($query), 'contract' => self::contract($action, $query)], '');
   }
 
   /**
@@ -121,12 +122,12 @@ final class PublicMandatePageController
     $action = $this->self . '?id=' . $id . (($query['embed'] ?? '') === '1' ? '&embed=1' : '');
     if (($query['como'] ?? '') === 'propietario' && $method !== 'POST') {
       // Vista previa: lo que ve el propietario con su enlace, sin marcarlo como visto y sin formularios.
-      $this->page(200, $service->viewData($id), ['action' => $action, 'preview' => $action, 'contract' => self::contract($action . '&como=propietario', $query)], '');
+      $this->page(200, $service->viewData($id, false, true), ['action' => $action, 'preview' => $action, 'contract' => self::contract($action . '&como=propietario', $query)], '');
       return;
     }
     if ($method === 'POST') {
       if (!$this->csrf->verify(self::CSRF, self::str($post, '_csrf_token', 200), false)) {
-        $this->page(403, $service->viewData($id, true), ['action' => $action], 'La página venció. Vuelve a cargarla e intenta de nuevo.');
+        $this->page(403, $service->viewData($id, true, true), ['action' => $action], 'La página venció. Vuelve a cargarla e intenta de nuevo.');
         return;
       }
       try {
@@ -139,7 +140,7 @@ final class PublicMandatePageController
           $done = 'respuesta';
         }
       } catch (\InvalidArgumentException | \RuntimeException $exception) {
-        $this->page(422, $service->viewData($id, true), ['action' => $action], $exception->getMessage());
+        $this->page(422, $service->viewData($id, true, true), ['action' => $action], $exception->getMessage());
         return;
       }
       header('Location: ' . $action . '&ok=' . $done, true, 303);
@@ -150,12 +151,12 @@ final class PublicMandatePageController
       $flash = $_SESSION['scm_mandate_flash'];
       unset($_SESSION['scm_mandate_flash']);
     }
-    $this->page(200, $service->viewData($id, true), ['action' => $action, 'flash' => $flash, 'contract' => self::contract($action, $query)], '');
+    $this->page(200, $service->viewData($id, true, true), ['action' => $action, 'flash' => $flash, 'contract' => self::contract($action, $query)], '');
   }
 
   private function service(CommercialAccessPolicy $policy): CommercialMandatesService
   {
-    return new CommercialMandatesService($this->db, $policy, $this->notifier);
+    return new CommercialMandatesService($this->db, $policy, $this->notifier, null, MandateSignature::fromConfig($this->config));
   }
 
   /**

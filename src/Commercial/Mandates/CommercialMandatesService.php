@@ -41,13 +41,16 @@ final class CommercialMandatesService
 
 
   private Database $db;
+  /** Para leer la plantilla vigente del contrato completo (MandateContractText). */
+  private ?MandateSignature $signature;
   private CommercialMandatesRepository $repository;
   private CommercialAccessPolicy $policy;
   private ?CommercialMandatesNotifier $notifier;
 
-  public function __construct(Database $db, CommercialAccessPolicy $policy, ?CommercialMandatesNotifier $notifier = null, ?CommercialMandatesRepository $repository = null)
+  public function __construct(Database $db, CommercialAccessPolicy $policy, ?CommercialMandatesNotifier $notifier = null, ?CommercialMandatesRepository $repository = null, ?MandateSignature $signature = null)
   {
     $this->db = $db;
+    $this->signature = $signature;
     $this->repository = $repository ?? new CommercialMandatesRepository($db);
     $this->policy = $policy;
     $this->notifier = $notifier;
@@ -199,7 +202,7 @@ final class CommercialMandatesService
    * el enlace del propietario, los formularios de WordPress y si se puede enviar o responder.
    * @return array<string,mixed>|null
    */
-  public function viewData(int $id, bool $staff = false): ?array
+  public function viewData(int $id, bool $staff = false, bool $contract = false): ?array
   {
     $mandate = $this->repository->find($id);
     if ($mandate === null) {
@@ -228,7 +231,7 @@ final class CommercialMandatesService
       'lugar' => CommercialMandatesNotifier::place($mandate),
       'secciones' => MandateDocument::sections($mandate),
       // El contrato completo (cláusulas y anexos) con los valores que recibirá eSignatures.
-      'contrato' => MandateContractText::html($mandate, new MandateCalculator($this->db)),
+      'contrato' => $contract ? MandateContractText::html($mandate, new MandateCalculator($this->db), $this->signature) : '',
       'observaciones' => array_map(static fn(array $note): array => [
         'id' => (int) $note['id'], 'seccion' => (string) $note['seccion'], 'nombre' => (string) $note['nombre'], 'mensaje' => (string) $note['mensaje'],
         'estado' => (string) $note['estado'], 'respuesta' => (string) ($note['respuesta'] ?? ''), 'respondido_por' => (string) $note['respondido_por'],
