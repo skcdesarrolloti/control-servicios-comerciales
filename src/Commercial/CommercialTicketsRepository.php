@@ -70,12 +70,14 @@ final class CommercialTicketsRepository
     $perPage = min(60, max(12, (int) ($filters['per_page'] ?? 24)));
     $whereSql = implode(' AND ', $where);
 
+    // Fecha para retomar: el semáforo de las postergadas muestra hasta cuándo lo están.
+    $resumeSql = $this->schema->columnExists($table, self::RESUME_COLUMN) ? ', t.`' . self::RESUME_COLUMN . '`' : '';
     $selectSql = "SELECT t.`_ID`, t.`id_ticket`, t.`estado_comercial`, t.`asunto`, t.`descripcion`,
               t.`solicitante`, t.`correo_solicitante`, t.`celular_solicitante`,
               t.`id_empleado`, t.`nombre_empleado`, t.`correo_empleado`, t.`celular_empleado`,
               t.`inmueble`, t.`id_inmueble`, t.`direccion`, t.`barrio`, t.`tipo_inmueble`,
               t.`medio`, t.`prioridad`, t.`tema_ayuda`, t.`tuvo_seguimiento`, t.`fecha_seguimiento`,
-              t.`fecha`, t.`fecha_actualizacion`, t.`cct_created`, t.`cct_modified`
+              t.`fecha`, t.`fecha_actualizacion`, t.`cct_created`, t.`cct_modified`{$resumeSql}
          FROM `{$table}` t
         WHERE {$whereSql}
         ORDER BY COALESCE(NULLIF(t.`fecha_actualizacion`, 0), NULLIF(t.`fecha`, 0), UNIX_TIMESTAMP(t.`cct_created`)) DESC, t.`_ID` DESC";

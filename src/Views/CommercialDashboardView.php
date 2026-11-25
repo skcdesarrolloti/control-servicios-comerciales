@@ -2445,6 +2445,7 @@ final class CommercialDashboardView
     $generalEstado = (string) ($row['estado'] ?? '');
     $isTicketClosed = ($slaStatus === 'cerrado' || CommercialStatusCatalog::isClosed($status, $generalEstado));
     $isTicketPostponed = (!$isTicketClosed && ($slaStatus === 'postergado' || CommercialStatusCatalog::isPostponed($status, $generalEstado)));
+    $postponedLabel = '';
 
     $isOverdue = (!$isTicketClosed && !$isTicketPostponed && $slaStatus === 'atrasado');
     $isWarning = (!$isTicketClosed && !$isTicketPostponed && !$isOverdue && $attentionDays >= (int) ($dueDays * 0.8));
@@ -2465,6 +2466,18 @@ final class CommercialDashboardView
       $slaBarFill = 'bg-amber-500';
       $slaBarPct = 50;
       $slaDaysColor = 'text-amber-700';
+      // En vez de días de atención: hasta cuándo está postergada (fecha para retomar) y cuántos días faltan.
+      $postponedLabel = 'Sin fecha para retomar';
+      $resumeTs = (int) ($row['fecha_retomar'] ?? 0);
+      if ($resumeTs > 0) {
+        $zone = new \DateTimeZone(\SCM\Support\ColombiaBusinessCalendar::TIMEZONE);
+        $resumeDay = (new \DateTimeImmutable('@' . $resumeTs))->setTimezone($zone)->setTime(0, 0);
+        $today = new \DateTimeImmutable('today', $zone);
+        $left = (int) $today->diff($resumeDay)->format('%r%a');
+        $postponedLabel = 'Hasta ' . $resumeDay->format('d/m/Y');
+        $slaBadgeLabel = $left > 1 ? 'Faltan ' . $left . ' días' : ($left === 1 ? 'Mañana' : 'Hoy');
+        $slaBarPct = max(5, min(100, (int) round((1 - max(0, $left) / \SCM\Http\Controller\CommercialApiController::RESUME_MAX_DAYS) * 100)));
+      }
     } elseif ($isOverdue) {
       $slaBadgeLabel = 'Vencido';
       $slaBadgeBg = 'bg-error-container';
@@ -2559,9 +2572,9 @@ final class CommercialDashboardView
         </span>
       </td>
       <td class="py-space-md px-space-md whitespace-nowrap">
-        <div class="space-y-1 w-36">
-          <div class="flex items-center justify-between text-[11px]">
-            <span class="font-semibold <?php echo esc_attr($slaDaysColor); ?>"><?php echo esc_html((string) $attentionDays); ?> / <?php echo esc_html((string) $dueDays); ?> días</span>
+        <div class="space-y-1 <?php echo $isTicketPostponed ? 'w-48' : 'w-36'; ?>">
+          <div class="flex items-center justify-between gap-2 text-[11px]">
+            <span class="font-semibold <?php echo esc_attr($slaDaysColor); ?>"><?php echo esc_html($isTicketPostponed ? $postponedLabel : $attentionDays . ' / ' . $dueDays . ' días'); ?></span>
             <span class="px-1.5 py-0.2 rounded <?php echo esc_attr($slaBadgeBg . ' ' . $slaBadgeText); ?> font-bold text-[10px]"><?php echo esc_html($slaBadgeLabel); ?></span>
           </div>
           <div class="w-full h-1.5 rounded-full <?php echo esc_attr($slaBarBg); ?> overflow-hidden">

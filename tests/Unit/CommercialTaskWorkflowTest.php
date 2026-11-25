@@ -224,6 +224,20 @@ final class CommercialTaskWorkflowTest extends TestCase
     self::assertSame([], $tickets->postponedWithoutResumeDate());
   }
 
+  public function testPostponedRowShowsUntilWhenInsteadOfAttentionDays(): void
+  {
+    $policy = CommercialCallsDatabase::policy($this->db);
+    $row = static fn(array $extra): string => (string) (new \ReflectionMethod(\SCM\Views\CommercialDashboardView::class, 'renderTicketRow'))->invoke(null, $extra + ['_ID' => 900, 'id_ticket' => '900', 'estado_comercial' => 'Postergado', 'estado' => 'En proceso', 'scm_sla_status' => 'postergado', 'scm_attention_days' => 0, 'scm_sla_due_days' => 30], $policy);
+    $zone = new \DateTimeZone('America/Bogota');
+    $resume = (new \DateTimeImmutable('today', $zone))->modify('+12 days')->setTime(8, 0);
+    $html = $row(['fecha_retomar' => $resume->getTimestamp()]);
+    self::assertStringContainsString('Hasta ' . $resume->format('d/m/Y'), $html);
+    self::assertStringContainsString('Faltan 12 días', $html);
+    self::assertStringNotContainsString('0 / 30 días', $html);
+    self::assertStringContainsString('Sin fecha para retomar', $row([]));
+    self::assertStringContainsString('0 / 30 días', $row(['estado_comercial' => 'Nuevo', 'estado' => 'Nuevo', 'scm_sla_status' => 'a_tiempo']), 'Las abiertas siguen con su semáforo.');
+  }
+
   public function testResumeDateMustBeBetweenTomorrowAndThirtyDays(): void
   {
     $today = new \DateTimeImmutable('today', new \DateTimeZone('America/Bogota'));
