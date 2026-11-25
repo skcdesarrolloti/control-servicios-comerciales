@@ -24,6 +24,8 @@ final class CommercialMandatesService
   public const ACTION_ANSWER = 'mandato_responder_observaciones';
   public const PER_PAGE = 25;
   public const MAX_NOTE = 2000;
+  /** Estados de la hoja de cierre que permiten enviar a firma ("Realizada": aprobada y ya con contrato de arrendamiento). */
+  public const CLOSING_APPROVED = ['Aprobada', 'Realizada'];
 
   /** Estado de la revisión del propietario: etiqueta y tono. */
   public const REVIEW_STATES = [
@@ -99,6 +101,33 @@ final class CommercialMandatesService
   }
 
   /**
+   * Por qué todavía no se puede enviar a firma (vacío = se puede): el propietario debe haber aprobado la versión actual
+   * en su revisión y la hoja de cierre del negocio debe estar aprobada.
+   * @param array{id:int,estado:string} $closing CommercialMandatesRepository::closing()
+   * @return list<string>
+   */
+  public static function signBlockers(string $review, array $closing): array
+  {
+    $reasons = [];
+    $message = [
+      'sin_enviar' => 'El propietario no ha revisado el contrato: envíaselo con "Revisión del propietario".',
+      'enviado' => 'El propietario todavía no ha aprobado el contrato en su revisión.',
+      'visto' => 'El propietario abrió el contrato pero todavía no lo ha aprobado.',
+      'observaciones' => 'Hay observaciones del propietario sin resolver: corrige, respóndelas y pídele que lo apruebe.',
+      'cambio' => 'El mandato cambió después de que el propietario lo aprobó: envíaselo otra vez para que apruebe los cambios.',
+    ][$review] ?? null;
+    if ($message !== null) {
+      $reasons[] = $message;
+    }
+    if ($review !== 'firmado' && !in_array($closing['estado'], self::CLOSING_APPROVED, true)) {
+      $reasons[] = $closing['estado'] === ''
+        ? 'Falta la hoja de cierre del negocio, y debe estar aprobada.'
+        : 'La hoja de cierre' . ($closing['id'] > 0 ? ' #' . $closing['id'] : '') . ' está "' . $closing['estado'] . '": debe estar aprobada.';
+    }
+    return $reasons;
+  }
+
+  /**
    * Pestaña Mandatos (todo el equipo si el cargo lo ve) o Mis mandatos (?portafolio=1, siempre los de la persona).
    * @param array<string,mixed> $input
    * @return array{rows:list<array<string,mixed>>,total:int,page:int,per_page:int,filters:array{q:string,estado:string,empleado:string},estados:array<string,int>,mine:bool,team:bool,can_create:bool,can_sign:bool}
@@ -131,6 +160,7 @@ final class CommercialMandatesService
     $names = array_values(array_filter(array_map(static fn(array $owner): string => $owner['nombre'], $owners)));
     $review = ['envios' => $row['rev_envios'] ?? 0, 'visto_at' => $row['rev_visto_at'] ?? '', 'aprobado_at' => $row['rev_aprobado_at'] ?? '', 'huella_aprobado' => $row['rev_huella_aprobado'] ?? ''];
     $state = self::reviewState($row, $review, (int) ($row['rev_pendientes'] ?? 0));
+    $closing = $this->repository->closing($row);
     $created = trim((string) ($row['cct_created'] ?? ''));
     return [
       'id' => $id,
@@ -144,6 +174,8 @@ final class CommercialMandatesService
       'canon' => MandateDocument::money((string) ($row['precio'] ?? '')),
       'consultor' => trim((string) ($row['creador'] ?? '')),
       'revision' => $state,
+      'hoja' => $closing,
+      'bloqueos' => self::signBlockers($state, $closing),
       'pendientes' => (int) ($row['rev_pendientes'] ?? 0),
       'envios' => (int) ($row['rev_envios'] ?? 0),
       'pdf' => trim((string) ($row['pdf_firmado'] ?? '')),
@@ -174,11 +206,15 @@ final class CommercialMandatesService
     $pending = count(array_filter($notes, static fn(array $note): bool => $note['estado'] === 'pendiente'));
     $creator = $this->repository->creator($mandate);
     $owners = array_values(array_filter(array_map(static fn(array $owner): string => $owner['nombre'], MandateDocument::owners($mandate))));
+    $revision = self::reviewState($mandate, $review, $pending, $fingerprint);
+    $closing = $this->repository->closing($mandate);
     $data = [
       'id' => $id,
       'estado' => trim((string) ($mandate['estado'] ?? '')) ?: 'No enviado',
       'firmado' => trim((string) ($mandate['estado'] ?? '')) === 'Firmado',
-      'revision' => self::reviewState($mandate, $review, $pending, $fingerprint),
+      'revision' => $revision,
+      'hoja' => $closing,
+      'bloqueos' => self::signBlockers($revision, $closing),
       'aprobado_por' => trim((string) ($review['aprobado_por'] ?? '')),
       'aprobado_at' => self::when((string) ($review['aprobado_at'] ?? '')),
       'enviado_at' => self::when((string) ($review['enviado_at'] ?? '')),

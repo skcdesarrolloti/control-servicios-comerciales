@@ -47,7 +47,18 @@
 
     function field(name) { return form.elements[name] || null; }
     function value(name) { var el = field(name); return el && el.value != null ? String(el.value) : ""; }
-    function set(name, text) { var el = field(name); if (el && !(el instanceof RadioNodeList)) el.value = text == null ? "" : text; }
+    function key(text) { return String(text == null ? "" : text).normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase(); }
+    function set(name, text) {
+      var el = field(name);
+      if (!el || el instanceof RadioNodeList) return;
+      var wanted = text == null ? "" : String(text);
+      el.value = wanted;
+      // En las listas, el valor guardado puede venir con otras mayúsculas o tildes ("Estados unidos").
+      if (el.tagName === "SELECT" && wanted !== "" && el.value !== wanted) {
+        var match = Array.prototype.find.call(el.options, function (option) { return option.value !== "" && key(option.value) === key(wanted); });
+        el.value = match ? match.value : "";
+      }
+    }
 
     // ── Condicionales: un bloque [data-cmf-when] se ve si su campo tiene uno de sus valores; lo oculto no se valida
     // ni se envía (como toggleVisibilityUniversal de utils.js).
@@ -211,6 +222,19 @@
     }
     // Campos obligatorios que se ven en un paso (lo oculto no cuenta).
     function validStep(index) {
+      var entities = steps[index].querySelectorAll("[data-cmf-entity]");
+      for (var e = 0; e < entities.length; e++) {
+        var entity = entities[e];
+        if (entity.closest("[hidden]")) continue;
+        var who = entity.getAttribute("data-cmf-entity") === "copropiedad" ? "la copropiedad" : "el propietario #" + entity.getAttribute("data-cmf-entity");
+        var mode = modeOf(entity);
+        if (!mode) { showError("Indica si " + who + " ya está registrado."); entity.querySelector("[data-cmf-mode]").focus(); return false; }
+        if (mode === "si" && !entity.querySelector("[data-cmf-entity-id]").value) {
+          showError("Busca y elige " + who + " (o marca que es nuevo).");
+          entity.querySelector("[data-cmf-search-input]").focus();
+          return false;
+        }
+      }
       var controls = steps[index].querySelectorAll("input, select, textarea");
       for (var i = 0; i < controls.length; i++) {
         var control = controls[i];
@@ -241,25 +265,113 @@
       return true;
     };
 
-    // ── Buscadores (propietario registrado y copropiedad) ──
+    // ── "¿Ya está registrado?" (propietarios y copropiedad), como formularios/comun/js/propietario_registrado.js ──
+    // "Sí": buscador; al elegir se cargan los datos de su ficha (si se cambia alguno, también se actualiza en la ficha).
+    // "No": datos en blanco y se registra al guardar; si el documento ya existe, avisa y ofrece usar ese propietario.
     var timers = {};
+    // Lo que no es de la ficha y no se borra al cambiar de propietario o copropiedad.
+    var KEEP = /^(calidad|porcentaje)_\d+$|^responsable_admin$/;
+    function entityOf(index) { return form.querySelector('[data-cmf-entity="' + (index || "copropiedad") + '"]'); }
+    function modeOf(entity) { var checked = entity.querySelector("[data-cmf-mode]:checked"); return checked ? checked.value : ""; }
+    function dataControls(entity) {
+      return Array.prototype.filter.call(entity.querySelectorAll("[data-cmf-entity-data] input, [data-cmf-entity-data] select, [data-cmf-entity-data] textarea"), function (control) {
+        return control.name && control.type !== "radio" && control.type !== "checkbox" && !KEEP.test(control.name);
+      });
+    }
+    function clearEntity(entity) {
+      entity.querySelector("[data-cmf-entity-id]").value = "";
+      dataControls(entity).forEach(function (control) { control.value = ""; });
+      var index = entity.getAttribute("data-cmf-entity");
+      if (index !== "copropiedad") { set("indicativo_" + index, ""); syncCountry(index); }
+    }
+    function syncCountry(index) {
+      var select = field("pais_" + index);
+      if (!select) return;
+      if (!select.value) {
+        var colombia = Array.prototype.find.call(select.options, function (option) { return key(option.value) === "colombia"; });
+        if (colombia) select.value = colombia.value;
+      }
+      var option = select.selectedOptions[0];
+      if (option && !/^\+\d+$/.test(value("indicativo_" + index))) set("indicativo_" + index, option.getAttribute("data-codigo") || "");
+    }
+    // Muestra u oculta buscador, registro elegido y datos según la opción (y el registro elegido).
+    function applyMode(entity) {
+      var mode = modeOf(entity);
+      var id = entity.querySelector("[data-cmf-entity-id]").value;
+      entity.querySelector("[data-cmf-search-box]").hidden = mode !== "si";
+      entity.querySelector("[data-cmf-picked]").hidden = !(mode === "si" && id);
+      entity.querySelector("[data-cmf-entity-data]").hidden = !(mode === "no" || (mode === "si" && id));
+      var duplicate = entity.querySelector("[data-cmf-duplicate]");
+      if (duplicate && mode !== "no") duplicate.hidden = true;
+    }
+    function pick(entity, item) {
+      var index = entity.getAttribute("data-cmf-entity");
+      clearEntity(entity);
+      entity.querySelector('[data-cmf-mode][value="si"]').checked = true;
+      fill(item.campos, index === "copropiedad" ? "" : index);
+      if (index !== "copropiedad") syncCountry(index);
+      entity.querySelector("[data-cmf-picked-label]").textContent = item.label;
+      applyMode(entity);
+      showError("");
+    }
+    // Tras cargar el inmueble por su código: el propietario #1 y la copropiedad que trae quedan como "Sí" (registrados).
+    function syncEntities() {
+      form.querySelectorAll("[data-cmf-entity]").forEach(function (entity) {
+        var index = entity.getAttribute("data-cmf-entity");
+        var id = entity.querySelector("[data-cmf-entity-id]").value;
+        if (id) {
+          entity.querySelector('[data-cmf-mode][value="si"]').checked = true;
+          var label = index === "copropiedad"
+            ? value("nombre_copropiedad") + (value("nit_copropiedad") ? " · NIT " + value("nit_copropiedad") : "")
+            : value("nombre_" + index) + (value("documento_" + index) ? " · " + value("documento_" + index) : "");
+          entity.querySelector("[data-cmf-picked-label]").textContent = label;
+        }
+        if (index !== "copropiedad") syncCountry(index);
+        applyMode(entity);
+      });
+    }
     function fill(values, index) {
-      Object.keys(values || {}).forEach(function (key) {
-        var name = index ? key.replace(/_0$/, "_" + index) : key;
-        if (field(name) && values[key] !== "") set(name, values[key]);
+      Object.keys(values || {}).forEach(function (name) {
+        var target = index ? name.replace(/_0$/, "_" + index) : name;
+        if (field(target) && values[name] !== "") set(target, values[name]);
       });
       refresh();
       calculate();
+    }
+    // Igual que normalizar_doc() de formularios/comun/propietarios.php.
+    function normalizeDocument(text) { return String(text || "").trim().replace(/[\s.,]+/g, "").toUpperCase().replace(/-\d$/, "").replace(/-/g, ""); }
+    function checkDuplicate(input) {
+      var index = input.getAttribute("data-cmf-document");
+      var entity = entityOf(index);
+      var box = entity.querySelector("[data-cmf-duplicate]");
+      var wanted = normalizeDocument(input.value);
+      window.clearTimeout(timers["doc" + index]);
+      box.hidden = true;
+      if (modeOf(entity) !== "no" || wanted.length < 4) return;
+      timers["doc" + index] = window.setTimeout(function () {
+        request("commercial_mandate_search", { tipo: "propietario", q: input.value.trim() }).then(function (data) {
+          var found = (data.items || []).find(function (item) { return normalizeDocument(item.campos && item.campos.documento_0) === wanted; });
+          if (!found || modeOf(entity) !== "no" || normalizeDocument(input.value) !== wanted) return;
+          box.textContent = "Ya hay un propietario registrado con este documento: " + (found.campos.nombre_0 || found.label) + ". Si sigues como nuevo, el contrato quedará con ese propietario igual. ";
+          var use = document.createElement("button");
+          use.type = "button";
+          use.className = "cmf-link";
+          use.textContent = "Usar ese propietario";
+          use.addEventListener("click", function () { pick(entity, found); });
+          box.appendChild(use);
+          box.hidden = false;
+        }).catch(function () {});
+      }, 400);
     }
     form.addEventListener("input", function (event) {
       var target = event.target;
       if (target.matches("[data-cmf-search-input]")) {
         var box = target.closest("[data-cmf-search]");
         var results = box.querySelector("[data-cmf-search-results]");
-        var key = box.getAttribute("data-cmf-search") + (box.getAttribute("data-index") || "");
-        window.clearTimeout(timers[key]);
+        var timer = box.getAttribute("data-cmf-search") + (box.getAttribute("data-index") || "");
+        window.clearTimeout(timers[timer]);
         if (target.value.trim().length < 3) { results.innerHTML = ""; return; }
-        timers[key] = window.setTimeout(function () {
+        timers[timer] = window.setTimeout(function () {
           request("commercial_mandate_search", { tipo: box.getAttribute("data-cmf-search"), q: target.value.trim() }).then(function (data) {
             results.innerHTML = "";
             (data.items || []).forEach(function (item) {
@@ -269,18 +381,19 @@
               button.className = "cst-result";
               button.textContent = item.label;
               button.addEventListener("click", function () {
-                fill(item.campos, box.getAttribute("data-index"));
+                pick(box.closest("[data-cmf-entity]"), item);
                 results.innerHTML = "";
                 target.value = "";
               });
               li.appendChild(button);
               results.appendChild(li);
             });
-            if (!results.children.length) results.innerHTML = '<li class="cqt-muted">Sin resultados: escribe los datos abajo.</li>';
+            if (!results.children.length) results.innerHTML = '<li class="cqt-muted">Sin resultados. Si no está registrado, marca "No, es nuevo".</li>';
           }).catch(function (err) { results.innerHTML = '<li class="cqt-muted">' + String(err.message).replace(/</g, "&lt;") + "</li>"; });
         }, 300);
         return;
       }
+      if (target.matches("[data-cmf-document]")) checkDuplicate(target);
       if (target.matches("[data-cmf-money]")) {
         var raw = target.value.replace(/[^\d]/g, "");
         target.value = raw ? nf.format(parseInt(raw, 10)) : "";
@@ -289,13 +402,22 @@
     });
     form.addEventListener("change", function (event) {
       var target = event.target;
+      if (target.matches("[data-cmf-mode]")) {
+        var entity = target.closest("[data-cmf-entity]");
+        // Si traía uno registrado y ahora es nuevo, es otra persona: se vacían sus datos.
+        if (target.value === "no" && entity.querySelector("[data-cmf-entity-id]").value) clearEntity(entity);
+        applyMode(entity);
+        showError("");
+        if (target.value === "si") { var search = entity.querySelector("[data-cmf-search-input]"); if (search) search.focus(); }
+        return;
+      }
       if (target.matches("[data-cmf-country]")) {
         var option = target.selectedOptions[0];
         set("indicativo_" + target.getAttribute("data-cmf-country"), option ? option.getAttribute("data-codigo") || "" : "");
       }
       if (target.matches("[data-cmf-owner-count]")) splitPercentages();
       if (target.matches("[data-cmf-property-code]") && target.value.trim()) {
-        request("commercial_mandate_property", { codigo: target.value.trim() }).then(function (data) { fill(data.campos); showError(""); }).catch(function (err) { showError(err.message); });
+        request("commercial_mandate_property", { codigo: target.value.trim() }).then(function (data) { fill(data.campos); syncEntities(); showError(""); }).catch(function (err) { showError(err.message); });
       }
       refresh();
       calculate();
@@ -308,6 +430,7 @@
       input.value = raw ? nf.format(parseInt(raw, 10)) : "";
     });
     refresh();
+    syncEntities();
     calculate();
     go(0);
   }

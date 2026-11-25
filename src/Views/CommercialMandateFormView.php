@@ -132,10 +132,14 @@ final class CommercialMandateFormView
       . self::select($values, 'tiene_vigilancia', '¿Tiene vigilancia?', self::YES_NO)
       . self::input($values, 'observaciones', 'Observaciones', ['wide' => true])
       . '</div>';
-    $html .= self::when('propiedad_horizontal', 'Si', '<h3>Copropiedad</h3>'
-      . '<div class="cmf-search" data-cmf-search="copropiedad"><label class="cqt-field"><span>Buscar copropiedad registrada</span><input type="search" data-cmf-search-input placeholder="Nombre o NIT" autocomplete="off"></label><ul class="cst-results" data-cmf-search-results aria-live="polite"></ul></div>'
-      . '<input type="hidden" name="copropiedad_id" value="' . self::e(self::val($values, 'copropiedad_id')) . '"><input type="hidden" name="indicativo_copropiedad" value="' . self::e(self::val($values, 'indicativo_copropiedad')) . '">'
-      . '<div class="cst-grid">'
+    $coId = self::val($values, 'copropiedad_id');
+    $coName = self::val($values, 'nombre_copropiedad');
+    $coPicked = $coName . (self::val($values, 'nit_copropiedad') !== '' ? ' · NIT ' . self::val($values, 'nit_copropiedad') : '');
+    $coKnown = $coId !== '' || $coName !== '';
+    $html .= self::when('propiedad_horizontal', 'Si', '<h3>Copropiedad</h3><div class="cmf-entity" data-cmf-entity="copropiedad">'
+      . '<input type="hidden" name="copropiedad_id" value="' . self::e($coId) . '" data-cmf-entity-id><input type="hidden" name="indicativo_copropiedad" value="' . self::e(self::val($values, 'indicativo_copropiedad')) . '">'
+      . self::registered(['question' => '¿La copropiedad ya está registrada?', 'yes' => 'Sí, buscarla', 'no' => 'No, es nueva', 'search' => 'Buscar copropiedad', 'placeholder' => 'Nombre o NIT (mínimo 3 letras)', 'type' => 'copropiedad', 'index' => ''], $coId, 'registrada_copropiedad', $coKnown ? $coPicked : '')
+      . '<div class="cst-grid cmf-entity-data" data-cmf-entity-data' . ($coKnown ? '' : ' hidden') . '>'
       . self::select($values, 'responsable_admin', '¿Responsable de la administración?', self::pairs(['No aplica', 'Propietario', 'Inmobiliaria']))
       . self::input($values, 'nombre_copropiedad', 'Nombre de la copropiedad', ['required' => true])
       . self::input($values, 'administrador', 'Administrador/a')
@@ -146,7 +150,7 @@ final class CommercialMandateFormView
       . self::select($values, 'tipo_cuenta_copropiedad', 'Tipo de cuenta', self::pairs(['Ahorros', 'Corriente']), false)
       . self::input($values, 'numero_cuenta_copropiedad', 'Número de cuenta')
       . self::input($values, 'banco_copropiedad', 'Banco', ['list' => 'cmf-bancos'])
-      . '</div>', 'cmf-block');
+      . '</div></div>', 'cmf-block');
     $services = is_array($values['servicios_publicos'] ?? null) ? $values['servicios_publicos'] : [];
     $html .= '<h3>Servicios del inmueble</h3><fieldset class="cst-services"><legend>Servicios disponibles</legend>';
     foreach (MandateFields::SERVICES as $value => $label) {
@@ -258,30 +262,89 @@ final class CommercialMandateFormView
   }
 
   /**
+   * "¿Ya está registrado?" (como formularios/comun/js/propietario_registrado.js): "Sí, buscarlo" muestra el buscador y,
+   * al elegir, carga su ficha; "No, es nuevo" deja los datos en blanco y se registra al guardar (si el documento ya
+   * existe, avisa y ofrece usar ese). Los datos se ven cuando ya se eligió la opción (y, con "Sí", el registro).
+   * @param array{question:string,yes:string,no:string,search:string,placeholder:string,type:string,index:string} $text
+   */
+  private static function registered(array $text, string $id, string $name, string $picked): string
+  {
+    $mode = $id !== '' ? 'si' : ($picked !== '' ? 'no' : '');
+    $radio = static fn(string $value, string $icon, string $title, string $hint): string => '<label class="cmf-option"><input type="radio" name="' . self::e($name) . '" value="' . $value . '" data-cmf-mode' . ($mode === $value ? ' checked' : '') . '>'
+      . self::icon($icon) . '<span><strong>' . self::e($title) . '</strong><small>' . self::e($hint) . '</small></span></label>';
+    return '<fieldset class="cmf-choice"><legend>' . self::e($text['question']) . ' <em aria-hidden="true">*</em></legend><div class="cmf-options">'
+      . $radio('si', 'person_search', $text['yes'], 'Elegirlo de los ya guardados')
+      . $radio('no', 'person_add', $text['no'], 'Escribir sus datos; se registra al guardar')
+      . '</div></fieldset>'
+      . '<div class="cmf-search" data-cmf-search="' . self::e($text['type']) . '"' . ($text['index'] !== '' ? ' data-index="' . self::e($text['index']) . '"' : '') . ($mode === 'si' ? '' : ' hidden') . ' data-cmf-search-box>'
+      . '<label class="cqt-field"><span>' . self::e($text['search']) . '</span><input type="search" data-cmf-search-input placeholder="' . self::e($text['placeholder']) . '" autocomplete="off"></label>'
+      . '<ul class="cst-results" data-cmf-search-results aria-live="polite"></ul>'
+      . '<p class="cmf-picked" data-cmf-picked' . ($id !== '' ? '' : ' hidden') . '>' . self::icon('check_circle') . '<span data-cmf-picked-label>' . self::e($picked) . '</span></p></div>';
+  }
+
+  /**
+   * País (obligatorio) con su indicativo. Coincide sin importar mayúsculas ni tildes ("Estados unidos" = "Estados
+   * Unidos") o, si el nombre no está en la lista, por el indicativo; sin país, Colombia.
+   * @param list<array{pais:string,codigo:string}> $countries
+   */
+  public static function country(array $countries, string $value, string $code = ''): string
+  {
+    $key = static fn(string $text): string => mb_strtolower(trim(strtr($text, ['á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u', 'Á' => 'a', 'É' => 'e', 'Í' => 'i', 'Ó' => 'o', 'Ú' => 'u', 'ñ' => 'n', 'Ñ' => 'n'])), 'UTF-8');
+    if ($value !== '') {
+      foreach ($countries as $item) {
+        if ($key($item['pais']) === $key($value)) {
+          return $item['pais'];
+        }
+      }
+      foreach ($countries as $item) {
+        if ($code !== '' && $item['codigo'] === trim($code)) {
+          return $item['pais'];
+        }
+      }
+    }
+    foreach ($countries as $item) {
+      if ($key($item['pais']) === 'colombia') {
+        return $item['pais'];
+      }
+    }
+    return $value;
+  }
+
+  /**
    * Bloque del propietario N, con "¿Ya está registrado?" (buscador) y su porcentaje de participación.
    * @param array<string,mixed> $values
    * @param array{paises:list<array{pais:string,codigo:string}>,bancos:list<string>,barrios:list<string>} $options
    */
   private static function owner(array $values, int $i, array $options): string
   {
-    $countries = '<label class="cqt-field"><span>País</span><select name="pais_' . $i . '" data-cmf-country="' . $i . '"><option value="">Elige un país</option>';
-    $country = self::val($values, 'pais_' . $i);
+    $o = static fn(string $name): string => $name . '_' . $i;
+    $country = self::country($options['paises'], self::val($values, $o('pais')), self::val($values, $o('indicativo')));
+    $code = self::val($values, $o('indicativo'));
+    $countries = '<label class="cqt-field"><span>País <em aria-hidden="true">*</em></span><select name="' . $o('pais') . '" data-cmf-country="' . $i . '" required><option value="">Elige un país</option>';
     foreach ($options['paises'] as $item) {
       $countries .= '<option value="' . self::e($item['pais']) . '" data-codigo="' . self::e($item['codigo']) . '"' . ($item['pais'] === $country ? ' selected' : '') . '>' . self::e($item['pais'] . ($item['codigo'] !== '' ? ' (' . $item['codigo'] . ')' : '')) . '</option>';
+      if ($item['pais'] === $country && preg_match('/^\+\d+$/', $code) !== 1) {
+        $code = $item['codigo'];
+      }
     }
     $countries .= '</select></label>';
-    $o = static fn(string $name): string => $name . '_' . $i;
-    return '<fieldset class="cmf-owner" data-cmf-owner="' . $i . '"' . ($i > 1 ? ' hidden' : '') . '><legend>Propietario #' . $i . '</legend>'
-      . '<input type="hidden" name="' . $o('id_propietario') . '" value="' . self::e(self::val($values, $o('id_propietario'))) . '">'
-      . '<input type="hidden" name="' . $o('indicativo') . '" value="' . self::e(self::val($values, $o('indicativo'))) . '">'
-      . '<div class="cmf-search" data-cmf-search="propietario" data-index="' . $i . '"><label class="cqt-field"><span>¿Ya está registrado? Búscalo</span><input type="search" data-cmf-search-input placeholder="Nombre o documento" autocomplete="off"></label><ul class="cst-results" data-cmf-search-results aria-live="polite"></ul></div>'
+    $id = self::val($values, $o('id_propietario'));
+    $name = self::val($values, $o('nombre'));
+    $picked = $name . (self::val($values, $o('documento')) !== '' ? ' · ' . self::val($values, $o('documento')) : '');
+    $known = $id !== '' || $name !== '';
+    return '<fieldset class="cmf-owner" data-cmf-owner="' . $i . '" data-cmf-entity="' . $i . '"' . ($i > 1 ? ' hidden' : '') . '><legend>Propietario #' . $i . '</legend>'
+      . '<input type="hidden" name="' . $o('id_propietario') . '" value="' . self::e($id) . '" data-cmf-entity-id>'
+      . '<input type="hidden" name="' . $o('indicativo') . '" value="' . self::e($code) . '">'
+      . self::registered(['question' => '¿El propietario ya está registrado?', 'yes' => 'Sí, buscarlo', 'no' => 'No, es nuevo', 'search' => 'Buscar propietario', 'placeholder' => 'Nombre o documento (mínimo 3 letras)', 'type' => 'propietario', 'index' => (string) $i], $id, 'registrado_' . $i, $known ? $picked : '')
+      . '<div class="cmf-entity-data" data-cmf-entity-data' . ($known ? '' : ' hidden') . '>'
       . '<div class="cst-grid">'
       . self::select($values, $o('calidad'), 'Calidad', self::pairs(['Propietario', 'Poseedor', 'Tenedor', 'Usufructuario']))
       . self::select($values, $o('tipo_persona'), 'Tipo de persona', ['Natural' => 'Natural', 'Juridica' => 'Jurídica'])
       . self::input($values, $o('nombre'), 'Nombre / Empresa', ['required' => true])
       . self::select($values, $o('tipo_documento'), 'Tipo de documento', ['Cédula de Ciudadania' => 'Cédula de ciudadanía', 'Nit' => 'NIT', 'Cédula Extranjería' => 'Cédula de extranjería', 'Pasaporte' => 'Pasaporte'])
-      . self::input($values, $o('documento'), 'Documento / NIT', ['required' => true])
+      . self::input($values, $o('documento'), 'Documento / NIT', ['required' => true, 'attrs' => ' data-cmf-document="' . $i . '"'])
       . self::input($values, $o('porcentaje'), '% de participación', ['attrs' => ' inputmode="decimal" data-cmf-percent'])
+      . '<p class="cmf-duplicate cmf-wide" data-cmf-duplicate hidden></p>'
       . '</div>'
       . self::when($o('tipo_persona'), 'Juridica', self::input($values, $o('nombre_juridico'), 'Representante legal') . self::input($values, $o('documento_juridico'), 'Documento del representante'))
       . '<div class="cst-grid">' . $countries
@@ -298,6 +361,6 @@ final class CommercialMandateFormView
       . self::input($values, $o('numero_cuenta'), 'Número de cuenta')
       . self::input($values, $o('banco'), 'Banco', ['list' => 'cmf-bancos'])
       . self::input($values, $o('correo_cuenta'), 'Correo de facturación', ['type' => 'email'])
-      . '</div></fieldset>';
+      . '</div></div></fieldset>';
   }
 }

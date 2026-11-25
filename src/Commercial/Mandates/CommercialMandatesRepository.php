@@ -56,6 +56,27 @@ final class CommercialMandatesRepository
     return $id > 0 ? $this->db->getRow('SELECT * FROM `' . $this->mandates() . '` WHERE `_ID` = ? LIMIT 1', [$id]) : null;
   }
 
+  /**
+   * Hoja de cierre del mandato: el estado que el panel inmobiliario refleja en el mandato (estado_hoja_cierre e
+   * id_hoja_cierre, ClosingSheetWorkflow) o, si no lo tiene, la última hoja de wp_jet_cct_cierres con id_contrato = mandato.
+   * @param array<string,mixed> $mandate
+   * @return array{id:int,estado:string}
+   */
+  public function closing(array $mandate): array
+  {
+    $state = trim((string) ($mandate['estado_hoja_cierre'] ?? ''));
+    $id = (int) preg_replace('/\D/', '', (string) ($mandate['id_hoja_cierre'] ?? ''));
+    if ($state !== '') {
+      return ['id' => $id, 'estado' => $state];
+    }
+    try {
+      $row = $this->db->getRow('SELECT `_ID`, estado FROM `' . $this->db->table('jet_cct_cierres') . "` WHERE id_contrato = ? AND estado <> 'Desistida' ORDER BY `_ID` DESC LIMIT 1", [(string) ($mandate['_ID'] ?? '')]);
+    } catch (\Throwable $error) {
+      $row = null;
+    }
+    return is_array($row) ? ['id' => (int) $row['_ID'], 'estado' => trim((string) ($row['estado'] ?? ''))] : ['id' => $id, 'estado' => ''];
+  }
+
   /** @return array<string,mixed> */
   public function review(int $id): array
   {

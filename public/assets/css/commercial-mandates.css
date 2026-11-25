@@ -35,3 +35,26 @@
 .cmf .cqt-field input:focus, .cmf .cqt-field select:focus, .cmf .cqt-field textarea:focus { outline:3px solid #f8cf4a; outline-offset:1px; border-color:#1e3c76; }
 .cmf h2:focus { outline:none; }
 .cmf .cqt-check { display:inline-flex; align-items:center; gap:6px; margin-right:16px; font-size:14px; }
+
+/* "¿Ya está registrado?" (propietarios y copropiedad) */
+.cmf-entity { display:flex; flex-direction:column; gap:12px; }
+.cmf-choice { margin:0; padding:0; border:0; min-width:0; }
+.cmf-choice legend { padding:0; margin:0 0 8px; font-size:14px; font-weight:600; color:#061d49; }
+.cmf-choice legend em { color:#b42318; font-style:normal; }
+.cmf-options { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:8px; }
+.cmf-option { position:relative; display:flex; align-items:center; gap:12px; min-height:56px; padding:10px 12px; border:1px solid #dfe3ee; border-radius:14px; background:#fff; cursor:pointer; transition:border-color .15s, background .15s; }
+.cmf-option:hover { border-color:#9fb0d3; }
+.cmf-option input { position:absolute; opacity:0; width:1px; height:1px; }
+.cmf-option .material-symbols-outlined { display:flex; align-items:center; justify-content:center; width:36px; height:36px; flex:none; border-radius:10px; background:#eef1f8; color:#1e3c76; }
+.cmf-option strong { display:block; font-size:14px; color:#061d49; }
+.cmf-option small { display:block; font-size:12px; color:#5b6680; }
+.cmf-option:has(input:checked) { border-color:#1e3c76; background:#f1f4fb; box-shadow:0 0 0 1px #1e3c76; }
+.cmf-option:has(input:checked) .material-symbols-outlined { background:#1e3c76; color:#fff; }
+.cmf-option:has(input:focus-visible) { outline:3px solid #f8cf4a; outline-offset:2px; }
+.cmf-picked { display:flex; align-items:center; gap:8px; margin:8px 0 0; padding:10px 12px; border-radius:12px; background:#e8f6ee; color:#0b5d35; font-size:14px; font-weight:600; }
+.cmf-picked[hidden], .cmf-entity-data[hidden], .cmf-search[hidden], .cmf-duplicate[hidden] { display:none; }
+.cmf-entity-data { display:flex; flex-direction:column; gap:12px; }
+.cmf-entity-data.cst-grid { display:grid; }
+.cmf-duplicate { margin:0; padding:10px 12px; border-radius:12px; background:#fdeccb; color:#7a4a00; font-size:13px; }
+.cmf-link { padding:0; border:0; background:none; color:#7a4a00; font:inherit; font-weight:700; text-decoration:underline; cursor:pointer; }
+.cmf-link:focus-visible { outline:3px solid #f8cf4a; outline-offset:2px; }

@@ -268,13 +268,17 @@ final class PublicMandateView
   private static function internal(array $data, array $page): string
   {
     $internal = $data['interno'];
-    $warning = $data['revision'] !== 'aprobado' && !$data['firmado']
-      ? '<p class="pm-warn">' . ($internal['pendientes'] > 0 ? 'Hay ' . $internal['pendientes'] . ' observación(es) sin resolver.' : 'El propietario todavía no ha aprobado la versión actual.') . ' Envíalo a firma solo cuando el propietario esté de acuerdo.</p>'
+    $blockers = $data['firmado'] ? [] : (array) ($data['bloqueos'] ?? []);
+    $warning = $blockers !== []
+      ? '<div class="pm-warn"><p>Todavía no se puede enviar a firma:</p><ul>' . implode('', array_map(static fn($reason): string => '<li>' . self::e($reason) . '</li>', $blockers)) . '</ul></div>'
       : '';
+    $closing = (array) ($data['hoja'] ?? []);
+    $closingState = (string) ($closing['estado'] ?? '');
     $html = '<section class="ps-card ps-internal"><h2>Datos internos <small>solo los ve el equipo</small></h2><dl class="ps-facts">'
       . '<div><dt>Estado del mandato</dt><dd>' . self::e($data['estado']) . '</dd></div>'
       . '<div><dt>Envíos al propietario</dt><dd>' . (int) $internal['envios'] . ($internal['enviado_por'] !== '' ? ' · último por ' . self::e($internal['enviado_por']) : '') . '</dd></div>'
       . ($internal['visto_at'] !== '' ? '<div><dt>Lo abrió por primera vez</dt><dd>' . self::e($internal['visto_at']) . '</dd></div>' : '')
+      . '<div><dt>Hoja de cierre</dt><dd>' . ($closingState === '' ? 'Sin hoja de cierre' : self::e(((int) ($closing['id'] ?? 0) > 0 ? '#' . (int) $closing['id'] . ' · ' : '') . ($closingState === 'Realizada' ? 'Aprobada' : $closingState))) . '</dd></div>'
       . '</dl>'
       . '<label class="pm-field"><span>Enlace para el propietario</span><span class="pm-link"><input type="text" readonly value="' . self::e($internal['enlace']) . '" data-pm-link><button type="button" class="ps-button ps-button--light" data-pm-copy>Copiar</button></span></label>'
       . '<div class="pm-actions">';

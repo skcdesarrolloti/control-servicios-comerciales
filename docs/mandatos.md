@@ -11,11 +11,22 @@ los de su inmueble) con su revisión y sus acciones:
 
 1. **Nuevo mandato**: el formulario por pasos (contrato y propietarios, inmueble, valores, garantías, condiciones). Trae
    el inmueble de la tarea o del estudio aprobado y su propietario; enlaza el estudio aprobado.
+   - Cada propietario y la copropiedad preguntan **"¿Ya está registrado?"** (como `formularios/comun/js/propietario_registrado.js`):
+     **Sí, buscarlo** muestra el buscador y carga su ficha (si se cambia un dato, también se actualiza en la ficha);
+     **No, es nuevo** deja los datos en blanco y se registra al guardar. Si el documento escrito ya existe, avisa y
+     ofrece **Usar ese propietario** (al guardar nunca se duplica un documento). Los datos se ven después de elegir.
+   - **País** obligatorio: se toma de la ficha sin importar mayúsculas ni tildes ("Estados unidos" = "Estados Unidos")
+     o por su indicativo; sin país, Colombia.
 2. **Revisión del propietario**: se le envía el contrato (correo y WhatsApp); deja observaciones o lo aprueba.
-3. **Editar**: corrige lo que pidió el propietario. Si ya estaba enviado a firma, actualiza el contrato en eSignatures.
-4. **Enviar a firma**: crea el contrato en eSignatures (o modifica el mismo si ya existía). Si el propietario no ha
-   aprobado la versión actual, pide confirmarlo.
-5. Al firmar todos, eSignatures avisa al panel: el mandato queda **Firmado** con su PDF.
+3. **Hoja de cierre**: se hace y se aprueba en el panel inmobiliario (`hoja-cierre.php`), que refleja su estado en el
+   mandato (`estado_hoja_cierre`, `id_hoja_cierre`).
+4. **Editar**: corrige lo que pidió el propietario. Si ya estaba enviado a firma y el propietario aprobó esta versión
+   (y la hoja sigue aprobada), actualiza el contrato en eSignatures; si cambió el contenido, queda pendiente de que el
+   propietario apruebe los cambios y luego se usa **Reenviar a firma**.
+5. **Enviar a firma**: solo cuando **el propietario aprobó la versión actual** y **la hoja de cierre está aprobada**
+   (`Aprobada`, o `Realizada` si ya tiene contrato de arrendamiento). Si falta algo, el botón dice qué y el servidor
+   no lo envía (`CommercialMandatesService::signBlockers`). Crea el contrato en eSignatures o modifica el mismo.
+6. Al firmar todos, eSignatures avisa al panel: el mandato queda **Firmado** con su PDF.
 
 Lo mismo se hace desde **Registros › Mandatos** (y Nuevo mandato sin tarea, escribiendo el código del inmueble).
 
@@ -48,6 +59,8 @@ el crédito de la garantía (`MandateCalculator`) y lo guarda en `wp_jet_cct_cre
     enlace al panel para editarlo o enviarlo a firma.
 - La aprobación guarda una huella del contenido: si el mandato cambia después, queda en **"Cambió después de aprobar"** y
   hay que enviárselo otra vez. No se puede aprobar con observaciones pendientes.
+- Sin la aprobación del propietario (de la versión actual) no se puede enviar a firma desde el panel. Los formularios de
+  WordPress (`formularios/enviar-mandato`) no lo validan: por eso conviene dejar de usarlos.
 
 ## Enlace para el listado de mandatos de WordPress (mientras se migra)
 

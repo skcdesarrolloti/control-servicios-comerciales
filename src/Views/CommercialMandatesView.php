@@ -36,7 +36,7 @@ final class CommercialMandatesView
     $html = '<section class="cqt cqt-page cst" data-cma-page>'
       . '<header class="cqt-head"><div><p class="cqt-eyebrow">Actividades comerciales · Registros</p><h1>' . ($listing['mine'] ? 'Mis mandatos' : 'Contratos de mandato') . '</h1><p>'
       . ($mine ? 'Los contratos de mandato que has creado.' : 'Los contratos de mandato de todo el equipo.')
-      . ' Antes de enviarlo a firma, envía el contrato al propietario: lo revisa, deja observaciones por sección o lo aprueba. Se crean desde la tarea (Gestión operativa › Contrato de mandato) o aquí con Nuevo mandato.</p></div>'
+      . ' Antes de la firma, el propietario revisa el contrato (deja observaciones por sección o lo aprueba) y la hoja de cierre debe estar aprobada. Se crean desde la tarea (Gestión operativa › Contrato de mandato) o aquí con Nuevo mandato.</p></div>'
       . ($listing['can_create'] ? '<button type="button" class="cqt-primary" data-cma-form>' . self::icon('add') . 'Nuevo mandato</button>' : '') . '</header>'
       . '<form class="cqt-filters cqt-list-filters" data-cma-list-filters aria-label="Filtros de mandatos">'
       . ($listing['mine'] ? '<input type="hidden" name="portafolio" value="1">' : '')
@@ -103,7 +103,7 @@ final class CommercialMandatesView
     $html = '<section class="cqt cqt-task cst cma" data-cma-task data-ticket-pk="' . $pk . '">'
       . '<header class="cqt-task-head"><button type="button" class="cqt-back" data-commercial-return-case="' . $pk . '">' . self::icon('arrow_back') . 'Volver a la tarea</button>'
       . '<div><p class="cqt-eyebrow">Tarea #' . $pk . ($data['asunto'] !== '' ? ' · ' . self::e($data['asunto']) : '') . '</p><h1 tabindex="-1">Contrato de mandato</h1>'
-      . '<p>Después del estudio aprobado: crea el mandato, envíaselo al propietario para que lo revise y, cuando lo apruebe, envíalo a firma digital.</p></div>'
+      . '<p>Después del estudio aprobado: crea el mandato y envíaselo al propietario para que lo revise. Se envía a firma digital cuando el propietario lo aprobó y la hoja de cierre está aprobada.</p></div>'
       . '<button type="button" class="cqt-icon" data-commercial-close-case aria-label="Cerrar">' . self::icon('close') . '</button></header>'
       . ($data['flash'] !== '' ? '<p class="cma-flash" role="status">' . self::e($data['flash']) . '</p>' : '')
       . ($data['can_create'] ? '<p><button type="button" class="cqt-primary" data-cma-form data-ticket-pk="' . $pk . '">' . self::icon('add') . 'Nuevo mandato</button></p>' : '');
@@ -125,7 +125,16 @@ final class CommercialMandatesView
   {
     [$label, $tone] = CommercialMandatesService::REVIEW_STATES[$row['revision']] ?? ['', 'wait'];
     return '<span class="cst-state cst-state--' . (self::STATE_TONES[$row['estado']] ?? 'wait') . '">' . self::e($row['estado'] === 'Enviado' ? 'Enviado a firma' : $row['estado']) . '</span>'
-      . ($row['revision'] !== 'firmado' ? '<span class="cst-state cst-state--' . self::e($tone) . '">' . self::e($label) . '</span>' : '');
+      . ($row['revision'] !== 'firmado' ? '<span class="cst-state cst-state--' . self::e($tone) . '">' . self::e($label) . '</span>' . self::closingBadge($row['hoja'] ?? ['id' => 0, 'estado' => '']) : '');
+  }
+
+  /** Estado de la hoja de cierre (debe estar aprobada para enviar a firma). @param array{id:int,estado:string} $closing */
+  private static function closingBadge(array $closing): string
+  {
+    $state = $closing['estado'];
+    $tone = in_array($state, CommercialMandatesService::CLOSING_APPROVED, true) ? 'ok' : ($state === '' ? 'off' : 'warn');
+    $label = $state === '' ? 'Sin hoja de cierre' : 'Hoja de cierre' . ($closing['id'] > 0 ? ' #' . $closing['id'] : '') . ': ' . ($state === 'Realizada' ? 'Aprobada' : $state);
+    return '<span class="cst-state cst-state--' . $tone . '">' . self::e($label) . '</span>';
   }
 
   /** Acciones de un mandato (tarea y pestaña). @param array<string,mixed> $row */
@@ -136,7 +145,7 @@ final class CommercialMandatesView
     $ticketAttr = $ticket > 0 ? ' data-ticket-pk="' . $ticket . '"' : '';
     return '<button type="button" class="' . ($row['revision'] === 'observaciones' ? 'cqt-primary' : 'cqt-secondary') . ' cqt-small" data-cma-view="' . $id . '">' . self::icon('rate_review') . 'Revisión del propietario</button>'
       . ($canEdit && $open ? '<button type="button" class="cqt-secondary cqt-small" data-cma-form data-id="' . $id . '"' . $ticketAttr . '>' . self::icon('edit') . 'Editar</button>' : '')
-      . ($canSign && $open ? '<button type="button" class="cqt-secondary cqt-small" data-cma-sign="' . $id . '" data-approved="' . ($row['revision'] === 'aprobado' ? '1' : '0') . '" data-resend="' . ($row['estado'] === 'Enviado' ? '1' : '0') . '"' . $ticketAttr . '>' . self::icon('draw') . ($row['estado'] === 'Enviado' ? 'Reenviar a firma' : 'Enviar a firma') . '</button>' : '')
+      . ($canSign && $open ? '<button type="button" class="cqt-secondary cqt-small" data-cma-sign="' . $id . '" data-blockers="' . self::e((string) json_encode($row['bloqueos'] ?? [], JSON_UNESCAPED_UNICODE)) . '" data-resend="' . ($row['estado'] === 'Enviado' ? '1' : '0') . '"' . $ticketAttr . '>' . self::icon('draw') . ($row['estado'] === 'Enviado' ? 'Reenviar a firma' : 'Enviar a firma') . '</button>' : '')
       . ($row['pdf'] !== '' ? '<a class="cqt-secondary cqt-small" href="' . self::e($row['pdf']) . '" target="_blank" rel="noopener">' . self::icon('picture_as_pdf') . 'PDF firmado</a>' : '');
   }
 

@@ -139,22 +139,35 @@
       if (box) { box.textContent = error.message; box.hidden = false; box.scrollIntoView({ block: "nearest" }); } else notify("error", error.message);
     }).finally(function () { submit.disabled = false; });
   }
+  // Solo se envía a firma cuando el propietario aprobó la versión actual y la hoja de cierre está aprobada
+  // (data-blockers trae lo que falta; el servidor lo vuelve a validar).
   function sign(button) {
     var id = button.getAttribute("data-cma-sign");
     var ticket = button.getAttribute("data-ticket-pk") || "";
-    var approved = button.getAttribute("data-approved") === "1";
     var resend = button.getAttribute("data-resend") === "1";
-    var text = (resend ? "Se actualizará el contrato que ya está en eSignatures con los datos actuales del mandato #" : "Se enviará el mandato #") + id + " a firma digital: a cada propietario le llega la solicitud por correo y celular."
-      + (approved ? "" : "\n\n⚠️ El propietario todavía no ha aprobado la versión actual en su revisión.");
+    var blockers = [];
+    try { blockers = JSON.parse(button.getAttribute("data-blockers") || "[]"); } catch (_error) {}
+    if (blockers.length) {
+      if (window.Swal) {
+        var list = document.createElement("ul");
+        list.style.textAlign = "left";
+        blockers.forEach(function (reason) { var li = document.createElement("li"); li.textContent = reason; list.appendChild(li); });
+        window.Swal.fire({ title: "Todavía no se puede enviar a firma", html: list, icon: "info", confirmButtonText: "Entendido" });
+      } else {
+        window.alert("Todavía no se puede enviar a firma:\n• " + blockers.join("\n• "));
+      }
+      return;
+    }
+    var text = (resend ? "Se actualizará el contrato que ya está en eSignatures con los datos actuales del mandato #" : "Se enviará el mandato #") + id + " a firma digital: a cada propietario le llega la solicitud por correo y celular.";
     var go = function () {
       button.disabled = true;
-      request("commercial_mandate_sign", { id: id, ticket_pk: ticket, confirmar: "1" }).then(function (result) {
+      request("commercial_mandate_sign", { id: id, ticket_pk: ticket }).then(function (result) {
         notify("success", result.message || "Enviado a firma.");
         if (ticket && result.html) showInCase(result.html); else if (document.querySelector("[data-cma-list]")) refreshList(listPage);
       }).catch(function (error) { notify("error", error.message); }).finally(function () { button.disabled = false; });
     };
     if (window.Swal) {
-      window.Swal.fire({ title: resend ? "¿Reenviar a firma?" : "¿Enviar a firma?", text: text, icon: approved ? "question" : "warning", showCancelButton: true, confirmButtonText: approved ? "Sí, enviar" : "Enviar de todas formas", cancelButtonText: "Cancelar" })
+      window.Swal.fire({ title: resend ? "¿Reenviar a firma?" : "¿Enviar a firma?", text: text, icon: "question", showCancelButton: true, confirmButtonText: "Sí, enviar", cancelButtonText: "Cancelar" })
         .then(function (answer) { if (answer.isConfirmed) go(); });
     } else if (window.confirm(text)) {
       go();

@@ -205,7 +205,7 @@ final class CommercialMandateFormService
    * Crea (sin $id) o edita el mandato con lo enviado en el formulario.
    * @param array<string,mixed> $post
    * @param array{ticket?:int,estudio?:int} $context Tarea y estudio de donde se crea.
-   * @return array{id:int,firma:bool}
+   * @return array{id:int,firma:bool,reenviar:bool}
    */
   public function save(array $post, ?int $id = null, array $context = []): array
   {
@@ -280,17 +280,22 @@ final class CommercialMandateFormService
       $this->syncCredit($id, $credit, (string) $post['id_propietario_1'], $employee);
       $this->updateProperty($property, $post, $mandate === null ? $id : null);
 
-      // Ya enviado a firma: el contrato de eSignatures se actualiza con lo editado. Antes del commit: si falla, no se
-      // guarda nada (como edit-mandato).
+      // Ya enviado a firma: el contrato de eSignatures se actualiza con lo editado (como edit-mandato), pero solo si
+      // sigue cumpliendo lo necesario para la firma (el propietario aprobó esta versión y la hoja de cierre está
+      // aprobada). Si el contenido cambió, el propietario debe aprobar los cambios y luego se usa "Reenviar a firma".
+      // Antes del commit: si falla, no se guarda nada.
       $signed = false;
-      if ($mandate !== null && trim((string) ($mandate['estado'] ?? '')) === 'Enviado' && $this->signature !== null && trim((string) ($mandate['id_esignatures'] ?? '')) !== '') {
+      $resend = false;
+      if ($mandate !== null && trim((string) ($mandate['estado'] ?? '')) === 'Enviado' && $this->signature !== null && trim((string) ($mandate['id_esignatures'] ?? '')) !== '' && $this->signBlockers($id) !== []) {
+        $resend = true;
+      } elseif ($mandate !== null && trim((string) ($mandate['estado'] ?? '')) === 'Enviado' && $this->signature !== null && trim((string) ($mandate['id_esignatures'] ?? '')) !== '') {
         $fresh = $this->repository->find($id) ?? [];
         $contract = $this->signature->send(MandateFields::toForm($fresh) + $this->signerFields($fresh), $id, $credit, trim((string) $mandate['id_esignatures']));
         $this->db->update($this->table(), ['id_esignatures' => $contract], ['_ID' => $id]);
         $signed = true;
       }
       $pdo->commit();
-      return ['id' => $id, 'firma' => $signed];
+      return ['id' => $id, 'firma' => $signed, 'reenviar' => $resend];
     } catch (\Throwable $error) {
       if ($pdo->inTransaction()) {
         $pdo->rollBack();
@@ -319,11 +324,22 @@ final class CommercialMandateFormService
     if (trim((string) ($mandate['estado'] ?? '')) === 'Firmado') {
       throw new \InvalidArgumentException('Este mandato ya está firmado: no se puede volver a enviar.');
     }
+    $blockers = $this->signBlockers($id);
+    if ($blockers !== []) {
+      throw new \InvalidArgumentException('Todavía no se puede enviar a firma: ' . implode(' ', $blockers));
+    }
     $post = MandateFields::toForm($mandate) + $this->signerFields($mandate);
     $credit = $this->calculator->credit($post);
     $contract = $this->signature->send($post, $id, $credit, trim((string) ($mandate['id_esignatures'] ?? '')));
     $this->db->update($this->table(), MandateFields::existing($this->db, $this->table(), ['estado' => 'Enviado', 'id_esignatures' => $contract, 'cct_modified' => date('Y-m-d H:i:s')]), ['_ID' => $id]);
     return ['id' => $id, 'contrato' => $contract];
+  }
+
+  /** Lo que falta para enviar a firma (CommercialMandatesService::signBlockers). @return list<string> */
+  public function signBlockers(int $id): array
+  {
+    $view = (new CommercialMandatesService($this->db, $this->policy, null, $this->repository))->viewData($id);
+    return $view === null ? ['El mandato no existe.'] : $view['bloqueos'];
   }
 
   /** Quien firma como "quien elabora": el funcionario que creó el mandato. @param array<string,mixed> $mandate @return array<string,string> */
@@ -371,6 +387,9 @@ final class CommercialMandateFormService
     for ($i = 1; $i <= $count; $i++) {
       if (trim((string) ($post['nombre_' . $i] ?? '')) === '' || trim((string) ($post['documento_' . $i] ?? '')) === '') {
         throw new \InvalidArgumentException('Falta el nombre o el documento del propietario #' . $i . '.');
+      }
+      if (trim((string) ($post['pais_' . $i] ?? '')) === '') {
+        throw new \InvalidArgumentException('Elige el país del propietario #' . $i . '.');
       }
     }
     if (MandateCalculator::money($post['precio_canon'] ?? '') <= 0) {

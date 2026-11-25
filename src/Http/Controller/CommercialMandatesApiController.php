@@ -208,7 +208,9 @@ final class CommercialMandatesApiController
       $id = (int) ($input['id'] ?? 0);
       $result = $this->form->save($input, $id > 0 ? $id : null, ['ticket' => $pk, 'estudio' => (int) ($input['id_estudio'] ?? 0)]);
       $message = $id > 0
-        ? 'Se guardaron los cambios del mandato #' . $result['id'] . ($result['firma'] ? ' y se actualizó su contrato en eSignatures.' : '.')
+        ? 'Se guardaron los cambios del mandato #' . $result['id'] . ($result['firma'] ? ' y se actualizó su contrato en eSignatures.' : ($result['reenviar']
+          ? '. Ya estaba en firma: el contrato de eSignatures no se actualizó porque falta lo necesario para la firma (que el propietario apruebe esta versión y la hoja de cierre aprobada). Cuando esté listo, usa "Reenviar a firma".'
+          : '.'))
         : 'Se creó el mandato #' . $result['id'] . '. Envíaselo al propietario para que lo revise antes de la firma.';
       return ['message' => $message, 'id' => $result['id']] + ($pk > 0 ? $this->taskPanel($pk, $message) : []);
     });
@@ -221,11 +223,7 @@ final class CommercialMandatesApiController
       $pk = $this->taskPk($input);
       $id = $this->openable((int) ($input['id'] ?? 0));
       $mandate = $this->service->repository()->find($id) ?? [];
-      $view = $this->service->viewData($id) ?? [];
-      // Antes de la firma, el propietario revisa: si no ha aprobado la versión actual, hay que confirmarlo.
-      if (($view['revision'] ?? '') !== 'aprobado' && (string) ($input['confirmar'] ?? '') !== '1') {
-        throw new \InvalidArgumentException('El propietario no ha aprobado la versión actual del mandato. Confirma que quieres enviarlo a firma de todas formas.');
-      }
+      // sendToSign exige que el propietario haya aprobado la versión actual y que la hoja de cierre esté aprobada.
       $result = $this->form->sendToSign($id);
       $message = 'El mandato #' . $id . ' se envió a firma digital' . (trim((string) ($mandate['id_esignatures'] ?? '')) !== '' && $result['contrato'] === trim((string) $mandate['id_esignatures']) ? ' (se actualizó el mismo contrato).' : '.');
       return ['message' => $message] + ($pk > 0 ? $this->taskPanel($pk, $message) : []);

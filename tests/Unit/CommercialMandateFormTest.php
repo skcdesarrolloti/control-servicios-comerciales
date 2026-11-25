@@ -8,6 +8,8 @@ use PHPUnit\Framework\TestCase;
 use SCM\Commercial\CommercialAccessPolicy;
 use SCM\Commercial\Mandates\CommercialMandateFormService;
 use SCM\Commercial\Mandates\CommercialMandatesService;
+use SCM\Commercial\Mandates\CommercialMandatesRepository;
+use SCM\Commercial\Mandates\MandateDocument;
 use SCM\Commercial\Mandates\MandateCalculator;
 use SCM\Commercial\Mandates\MandateFields;
 use SCM\Commercial\Mandates\MandateSignature;
@@ -42,7 +44,7 @@ final class CommercialMandateFormTest extends TestCase
     if (!defined('SCM_APP_SECRET')) define('SCM_APP_SECRET', 'secreto-de-prueba-de-al-menos-32-caracteres');
     if (!defined('SCM_BASE_URL')) define('SCM_BASE_URL', 'https://panel.test/public');
     [$this->db, $this->policy] = CommercialNotificationsFixture::make(true);
-    $mandate = ['estado', 'cct_status', 'cct_author_id', 'cct_created', 'cct_modified', 'fecha', 'sucursal', 'propietarios', 'id_inmueble', 'id_propietario', 'id_empleado', 'creador', 'email_creador', 'celular_creador', 'id_estudio_aseguradora', 'numero_solicitud', 'vigilancia', 'servicios_publicos', 'id_esignatures', 'pdf_firmado', 'fecha_firma', 'iva_precio'];
+    $mandate = ['estado', 'cct_status', 'cct_author_id', 'cct_created', 'cct_modified', 'fecha', 'sucursal', 'propietarios', 'id_inmueble', 'id_propietario', 'id_empleado', 'creador', 'email_creador', 'celular_creador', 'id_estudio_aseguradora', 'numero_solicitud', 'vigilancia', 'servicios_publicos', 'id_esignatures', 'pdf_firmado', 'fecha_firma', 'iva_precio', 'estado_hoja_cierre', 'id_hoja_cierre'];
     for ($i = 1; $i <= 6; $i++) {
       foreach (array_merge(array_values(MandateFields::OWNER), ['porcentaje']) as $column) {
         $mandate[] = $column . '_' . $i;
@@ -118,6 +120,14 @@ final class CommercialMandateFormTest extends TestCase
     });
   }
 
+  /** Deja el mandato listo para la firma: el propietario aprueba la versión actual y la hoja de cierre está aprobada. */
+  private function ready(int $id, string $closing = 'Aprobada'): void
+  {
+    $repository = new CommercialMandatesRepository($this->db);
+    $repository->approve($id, 'Lilia Granados', MandateDocument::fingerprint($repository->find($id) ?? []));
+    $this->db->update('wp_jet_cct_contrato_mandato', ['estado_hoja_cierre' => $closing, 'id_hoja_cierre' => '440'], ['_ID' => $id]);
+  }
+
   private function service(): CommercialMandateFormService
   {
     return new CommercialMandateFormService($this->db, $this->policy, new MandateCalculator($this->db), $this->signature());
@@ -129,9 +139,9 @@ final class CommercialMandateFormTest extends TestCase
     return $changes + [
       'tipo_contrato' => 'Por defecto', 'clasificacion' => '5- Entrega inmediata', 'cantidad_propietarios' => '2', 'id_inmueble' => '28355',
       'calidad_1' => 'Propietario', 'tipo_persona_1' => 'Natural', 'nombre_1' => 'Lilia Granados', 'tipo_documento_1' => 'Cédula de Ciudadania', 'documento_1' => '21235713',
-      'correo_1' => 'lilia@example.test', 'celular_1' => '3006681522', 'indicativo_1' => '+57', 'porcentaje_1' => '60', 'banco_1' => 'Davivienda',
+      'correo_1' => 'lilia@example.test', 'celular_1' => '3006681522', 'indicativo_1' => '+57', 'pais_1' => 'Colombia', 'porcentaje_1' => '60', 'banco_1' => 'Davivienda',
       'calidad_2' => 'Propietario', 'tipo_persona_2' => 'Natural', 'nombre_2' => 'Pedro Nuevo', 'tipo_documento_2' => 'Cédula de Ciudadania', 'documento_2' => '998877',
-      'correo_2' => 'pedro@example.test', 'porcentaje_2' => '40',
+      'correo_2' => 'pedro@example.test', 'pais_2' => 'Colombia', 'porcentaje_2' => '40',
       'existe_simi' => 'No', 'mismo_propietario' => 'Si', 'codigo_inmueble' => '28355', 'escritura' => '891', 'fecha_inmueble' => '1998-03-20', 'circulo_notarial' => '2A',
       'matricula_inmobiliaria' => '060-1', 'referencia_catastral' => '0102', 'barrio' => 'Manga', 'direccion' => 'Cra 20 # 25-40', 'direccion_fisica' => 'Cra 20', 'area_construida' => '120',
       'estrato' => '4', 'propiedad_horizontal' => 'No', 'tiene_parqueadero' => 'No', 'tiene_deposito' => 'No', 'tiene_vigilancia' => 'Si', 'servicios_publicos' => ['Energia', 'Agua'],
@@ -214,7 +224,7 @@ final class CommercialMandateFormTest extends TestCase
 
   public function testInvalidFormsAreRejectedWithoutSavingAnything(): void
   {
-    foreach ([['tipo_contrato' => ''], ['nombre_2' => ''], ['precio_canon' => ''], ['porcentaje_1' => '50'], ['id_inmueble' => '']] as $change) {
+    foreach ([['tipo_contrato' => ''], ['nombre_2' => ''], ['precio_canon' => ''], ['porcentaje_1' => '50'], ['id_inmueble' => ''], ['pais_2' => '']] as $change) {
       try {
         $this->service()->save($this->post($change));
         self::fail('Debía rechazar ' . json_encode($change));
@@ -229,6 +239,7 @@ final class CommercialMandateFormTest extends TestCase
   {
     $service = $this->service();
     $id = $service->save($this->post())['id'];
+    $this->ready($id);
     $result = $service->sendToSign($id);
     self::assertSame(['Enviado', 'c1'], array_values($this->db->getRow('SELECT estado, id_esignatures FROM wp_jet_cct_contrato_mandato WHERE _ID = ?', [$id])));
     $body = $this->calls[0][2];
@@ -246,6 +257,7 @@ final class CommercialMandateFormTest extends TestCase
     // Reenviar con la misma plantilla y propietarios: se modifica el mismo contrato.
     $this->calls = [];
     $this->db->update('wp_jet_cct_contrato_mandato', ['correo_1' => 'otro@example.test'], ['_ID' => $id]);
+    $this->ready($id);
     self::assertSame('c1', $service->sendToSign($id)['contrato']);
     $paths = array_map(static fn(array $call): string => $call[0] . ' ' . $call[1], $this->calls);
     self::assertContains('POST contracts/c1/placeholder_fields', $paths);
@@ -260,6 +272,7 @@ final class CommercialMandateFormTest extends TestCase
   public function testAnOwnerWithoutContactCannotBeSentToSign(): void
   {
     $id = $this->service()->save($this->post(['correo_2' => '', 'celular_2' => '']))['id'];
+    $this->ready($id);
     $this->expectExceptionMessage('necesita correo o celular');
     $this->service()->sendToSign($id);
   }
@@ -268,6 +281,7 @@ final class CommercialMandateFormTest extends TestCase
   {
     $service = $this->service();
     $id = $service->save($this->post())['id'];
+    $this->ready($id);
     $service->sendToSign($id);
     $stored = [];
     $webhook = new MandateSignatureWebhook($this->db, $this->signature(), static function (string $url) use (&$stored): string {
@@ -314,7 +328,76 @@ final class CommercialMandateFormTest extends TestCase
     $rows = $mandates->repository()->forTask(700, [621], '');
     $panel = CommercialMandatesView::taskPanel(['ticket' => 700, 'asunto' => 'Arriendo', 'rows' => array_map([$mandates, 'summary'], $rows), 'can_create' => true, 'can_sign' => true, 'flash' => '']);
     self::assertStringContainsString('Mandato #' . $id, $panel);
-    self::assertStringContainsString('data-cma-sign="' . $id . '" data-approved="0"', $panel);
+    self::assertStringContainsString('data-cma-sign="' . $id . '" data-blockers="[&quot;El propietario no ha revisado', $panel);
+    self::assertStringContainsString('Sin hoja de cierre', $panel);
     self::assertStringContainsString('data-cma-form data-ticket-pk="700"', $panel);
+  }
+
+  public function testSigningNeedsTheOwnersApprovalAndAnApprovedClosingSheet(): void
+  {
+    $service = $this->service();
+    $id = $service->save($this->post())['id'];
+    try {
+      $service->sendToSign($id);
+      self::fail('Sin revisión del propietario no se envía a firma.');
+    } catch (\InvalidArgumentException $error) {
+      self::assertStringContainsString('El propietario no ha revisado', $error->getMessage());
+      self::assertStringContainsString('Falta la hoja de cierre', $error->getMessage());
+    }
+    $this->ready($id, 'Esperando respuesta');
+    self::assertSame(['La hoja de cierre #440 está "Esperando respuesta": debe estar aprobada.'], $service->signBlockers($id));
+    $this->db->update('wp_jet_cct_contrato_mandato', ['estado_hoja_cierre' => 'Realizada'], ['_ID' => $id]);
+    self::assertSame([], $service->signBlockers($id), '"Realizada" es una hoja aprobada que ya tiene contrato.');
+    self::assertSame([], $this->calls, 'Mientras falte algo no se llama a eSignatures.');
+
+    // Si el mandato cambia después de aprobado, hay que volver a pedir la aprobación.
+    $this->db->update('wp_jet_cct_contrato_mandato', ['precio' => '1.900.000'], ['_ID' => $id]);
+    self::assertStringContainsString('cambió después', implode(' ', $service->signBlockers($id)));
+    self::assertSame([], CommercialMandatesService::signBlockers('firmado', ['id' => 0, 'estado' => '']), 'Firmado: no hay nada que pedir.');
+  }
+
+  public function testEditingASentMandateOnlyUpdatesESignaturesWhenItIsStillApproved(): void
+  {
+    $service = $this->service();
+    $id = $service->save($this->post())['id'];
+    $this->ready($id);
+    $service->sendToSign($id);
+    $this->calls = [];
+    $result = $service->save($this->post(['duracion' => '24 Meses']), $id);
+    self::assertSame([false, true], [$result['firma'], $result['reenviar']], 'Cambió el contenido: el propietario debe aprobar antes de actualizar la firma.');
+    self::assertSame([], $this->calls);
+    self::assertSame('24 Meses', $this->db->getVar('SELECT duracion FROM wp_jet_cct_contrato_mandato WHERE _ID = ?', [$id]), 'Lo editado sí se guarda.');
+    $this->ready($id);
+    self::assertTrue($service->save($this->post(['duracion' => '24 Meses']), $id)['firma'], 'Aprobada esta versión, guardar actualiza el contrato de eSignatures.');
+  }
+
+  public function testTheCountryIsMatchedIgnoringCaseOrDefaultsToColombia(): void
+  {
+    $countries = [['pais' => 'Colombia', 'codigo' => '+57'], ['pais' => 'Estados Unidos', 'codigo' => '+1'], ['pais' => 'España', 'codigo' => '+34']];
+    self::assertSame('Estados Unidos', CommercialMandateFormView::country($countries, 'Estados unidos'));
+    self::assertSame('España', CommercialMandateFormView::country($countries, 'espana'));
+    self::assertSame('Colombia', CommercialMandateFormView::country($countries, ''), 'Sin país: Colombia.');
+    self::assertSame('España', CommercialMandateFormView::country($countries, 'Reino de España', '+34'), 'Si el nombre no está, por el indicativo.');
+    $html = CommercialMandateFormView::render(['cantidad_propietarios' => '1', 'pais_1' => 'Estados unidos', 'indicativo_1' => ''], ['paises' => $countries, 'bancos' => [], 'barrios' => []], [], ['id' => 0, 'ticket' => 0, 'estudio' => 0, 'estudios' => [], 'estado' => '', 'volver' => '']);
+    self::assertStringContainsString('<option value="Estados Unidos" data-codigo="+1" selected>', $html);
+    self::assertStringContainsString('name="indicativo_1" value="+1"', $html, 'Sin indicativo, el del país.');
+    self::assertStringContainsString('<select name="pais_1" data-cmf-country="1" required>', $html);
+    self::assertStringContainsString('<option value="Colombia" data-codigo="+57" selected>', $html, 'Los demás propietarios: Colombia.');
+  }
+
+  public function testOwnersAndCoOwnershipAskIfTheyAreAlreadyRegistered(): void
+  {
+    $empty = ['paises' => [['pais' => 'Colombia', 'codigo' => '+57']], 'bancos' => [], 'barrios' => []];
+    $context = ['id' => 0, 'ticket' => 0, 'estudio' => 0, 'estudios' => [], 'estado' => '', 'volver' => ''];
+    $html = CommercialMandateFormView::render(['cantidad_propietarios' => '1'], $empty, [], $context);
+    self::assertSame(6, substr_count($html, '¿El propietario ya está registrado?'));
+    self::assertStringContainsString('¿La copropiedad ya está registrada?', $html);
+    self::assertStringContainsString('name="registrado_1" value="si" data-cmf-mode>', $html, 'Sin propietario: ninguna opción marcada.');
+    self::assertMatchesRegularExpression('/data-cmf-entity-data hidden>/', $html, 'Los datos se ven al elegir la opción.');
+    $known = CommercialMandateFormView::render(['cantidad_propietarios' => '1', 'id_propietario_1' => '10', 'nombre_1' => 'Propietario 10', 'documento_1' => '21235713'], $empty, [], $context);
+    self::assertStringContainsString('name="registrado_1" value="si" data-cmf-mode checked>', $known, 'Con su ficha: "Sí" y el registro elegido.');
+    self::assertStringContainsString('Propietario 10 · 21235713', $known);
+    $typed = CommercialMandateFormView::render(['cantidad_propietarios' => '1', 'nombre_1' => 'Pedro Nuevo'], $empty, [], $context);
+    self::assertStringContainsString('name="registrado_1" value="no" data-cmf-mode checked>', $typed, 'Con datos sin ficha: "No, es nuevo".');
   }
 }
