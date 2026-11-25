@@ -209,7 +209,7 @@ final class CommercialMandatesApiController
       $result = $this->form->save($input, $id > 0 ? $id : null, ['ticket' => $pk, 'estudio' => (int) ($input['id_estudio'] ?? 0)]);
       $message = $id > 0
         ? 'Se guardaron los cambios del mandato #' . $result['id'] . ($result['firma'] ? ' y se actualizó su contrato en eSignatures.' : ($result['reenviar']
-          ? '. Ya estaba en firma: el contrato de eSignatures no se actualizó porque falta lo necesario para la firma (que el propietario apruebe esta versión y la hoja de cierre aprobada). Cuando esté listo, usa "Reenviar a firma".'
+          ? '. Ya estaba en firma: el contrato de eSignatures no se actualizó porque la hoja de cierre no está aprobada. Cuando esté listo, usa "Reenviar a firma".'
           : '.'))
         : 'Se creó el mandato #' . $result['id'] . '. Envíaselo al propietario para que lo revise antes de la firma.';
       return ['message' => $message, 'id' => $result['id']] + ($pk > 0 ? $this->taskPanel($pk, $message) : []);
@@ -223,7 +223,7 @@ final class CommercialMandatesApiController
       $pk = $this->taskPk($input);
       $id = $this->openable((int) ($input['id'] ?? 0));
       $mandate = $this->service->repository()->find($id) ?? [];
-      // sendToSign exige que el propietario haya aprobado la versión actual y que la hoja de cierre esté aprobada.
+      // sendToSign exige que la hoja de cierre esté aprobada (la revisión del propietario es opcional).
       $result = $this->form->sendToSign($id);
       $message = 'El mandato #' . $id . ' se envió a firma digital' . (trim((string) ($mandate['id_esignatures'] ?? '')) !== '' && $result['contrato'] === trim((string) $mandate['id_esignatures']) ? ' (se actualizó el mismo contrato).' : '.');
       return ['message' => $message] + ($pk > 0 ? $this->taskPanel($pk, $message) : []);

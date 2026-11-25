@@ -14,7 +14,8 @@ use SCM\Support\PublicMandateAccess;
  *
  * Flujo: el mandato se crea en el panel (tarea o pestaña Mandatos) → el equipo lo envía al propietario
  * (correo y WhatsApp con el enlace de public/mandato.php) → el propietario deja observaciones por sección o lo aprueba
- * → el equipo corrige, responde y lo envía a firma (eSignatures) desde el panel.
+ * → el equipo corrige, responde y lo envía a firma (eSignatures) desde el panel. La revisión es opcional; para la firma
+ * es obligatorio que la hoja de cierre esté aprobada (signBlockers).
  * La aprobación guarda la huella del contenido: si el mandato cambia después, vuelve a pedir revisión.
  */
 final class CommercialMandatesService
@@ -101,30 +102,31 @@ final class CommercialMandatesService
   }
 
   /**
-   * Por qué todavía no se puede enviar a firma (vacío = se puede): el propietario debe haber aprobado la versión actual
-   * en su revisión y la hoja de cierre del negocio debe estar aprobada.
+   * Por qué todavía no se puede enviar a firma (vacío = se puede): la hoja de cierre del negocio debe estar aprobada.
+   * La revisión del propietario es opcional (reviewNotice solo lo advierte).
    * @param array{id:int,estado:string} $closing CommercialMandatesRepository::closing()
    * @return list<string>
    */
   public static function signBlockers(string $review, array $closing): array
   {
-    $reasons = [];
-    $message = [
-      'sin_enviar' => 'El propietario no ha revisado el contrato: envíaselo con "Revisión del propietario".',
+    if ($review === 'firmado' || in_array($closing['estado'], self::CLOSING_APPROVED, true)) {
+      return [];
+    }
+    return [$closing['estado'] === ''
+      ? 'Falta la hoja de cierre del negocio, y debe estar aprobada.'
+      : 'La hoja de cierre' . ($closing['id'] > 0 ? ' #' . $closing['id'] : '') . ' está "' . $closing['estado'] . '": debe estar aprobada.'];
+  }
+
+  /** Aviso (no obligatorio) de la revisión del propietario antes de enviar a firma; vacío si la aprobó o ya está firmado. */
+  public static function reviewNotice(string $review): string
+  {
+    return [
+      'sin_enviar' => 'El propietario no ha revisado el contrato (es opcional: puedes enviárselo con "Revisión del propietario").',
       'enviado' => 'El propietario todavía no ha aprobado el contrato en su revisión.',
       'visto' => 'El propietario abrió el contrato pero todavía no lo ha aprobado.',
-      'observaciones' => 'Hay observaciones del propietario sin resolver: corrige, respóndelas y pídele que lo apruebe.',
-      'cambio' => 'El mandato cambió después de que el propietario lo aprobó: envíaselo otra vez para que apruebe los cambios.',
-    ][$review] ?? null;
-    if ($message !== null) {
-      $reasons[] = $message;
-    }
-    if ($review !== 'firmado' && !in_array($closing['estado'], self::CLOSING_APPROVED, true)) {
-      $reasons[] = $closing['estado'] === ''
-        ? 'Falta la hoja de cierre del negocio, y debe estar aprobada.'
-        : 'La hoja de cierre' . ($closing['id'] > 0 ? ' #' . $closing['id'] : '') . ' está "' . $closing['estado'] . '": debe estar aprobada.';
-    }
-    return $reasons;
+      'observaciones' => 'Hay observaciones del propietario sin resolver.',
+      'cambio' => 'El mandato cambió después de que el propietario lo aprobó.',
+    ][$review] ?? '';
   }
 
   /**
@@ -176,6 +178,7 @@ final class CommercialMandatesService
       'revision' => $state,
       'hoja' => $closing,
       'bloqueos' => self::signBlockers($state, $closing),
+      'aviso_revision' => self::reviewNotice($state),
       'pendientes' => (int) ($row['rev_pendientes'] ?? 0),
       'envios' => (int) ($row['rev_envios'] ?? 0),
       'pdf' => trim((string) ($row['pdf_firmado'] ?? '')),
@@ -215,6 +218,7 @@ final class CommercialMandatesService
       'revision' => $revision,
       'hoja' => $closing,
       'bloqueos' => self::signBlockers($revision, $closing),
+      'aviso_revision' => self::reviewNotice($revision),
       'aprobado_por' => trim((string) ($review['aprobado_por'] ?? '')),
       'aprobado_at' => self::when((string) ($review['aprobado_at'] ?? '')),
       'enviado_at' => self::when((string) ($review['enviado_at'] ?? '')),

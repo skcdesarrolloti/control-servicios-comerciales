@@ -328,49 +328,49 @@ final class CommercialMandateFormTest extends TestCase
     $rows = $mandates->repository()->forTask(700, [621], '');
     $panel = CommercialMandatesView::taskPanel(['ticket' => 700, 'asunto' => 'Arriendo', 'rows' => array_map([$mandates, 'summary'], $rows), 'can_create' => true, 'can_sign' => true, 'flash' => '']);
     self::assertStringContainsString('Mandato #' . $id, $panel);
-    self::assertStringContainsString('data-cma-sign="' . $id . '" data-blockers="[&quot;El propietario no ha revisado', $panel);
+    self::assertStringContainsString('data-cma-sign="' . $id . '" data-blockers="[&quot;Falta la hoja de cierre', $panel);
     self::assertStringContainsString('Sin hoja de cierre', $panel);
     self::assertStringContainsString('Para enviar a firma falta:', $panel, 'Lo que falta se ve sin pulsar el botón.');
     self::assertStringContainsString('cma-blocked" aria-disabled="true"', $panel);
     self::assertStringContainsString('data-cma-form data-ticket-pk="700"', $panel);
   }
 
-  public function testSigningNeedsTheOwnersApprovalAndAnApprovedClosingSheet(): void
+  public function testSigningNeedsAnApprovedClosingSheetAndTheOwnersReviewIsOptional(): void
   {
     $service = $this->service();
     $id = $service->save($this->post())['id'];
     try {
       $service->sendToSign($id);
-      self::fail('Sin revisión del propietario no se envía a firma.');
+      self::fail('Sin hoja de cierre aprobada no se envía a firma.');
     } catch (\InvalidArgumentException $error) {
-      self::assertStringContainsString('El propietario no ha revisado', $error->getMessage());
       self::assertStringContainsString('Falta la hoja de cierre', $error->getMessage());
+      self::assertStringNotContainsString('propietario', $error->getMessage(), 'La revisión del propietario no es obligatoria.');
     }
-    $this->ready($id, 'Esperando respuesta');
+    self::assertSame([], $this->calls, 'Mientras falte la hoja no se llama a eSignatures.');
+    $this->db->update('wp_jet_cct_contrato_mandato', ['estado_hoja_cierre' => 'Esperando respuesta', 'id_hoja_cierre' => '440'], ['_ID' => $id]);
     self::assertSame(['La hoja de cierre #440 está "Esperando respuesta": debe estar aprobada.'], $service->signBlockers($id));
     $this->db->update('wp_jet_cct_contrato_mandato', ['estado_hoja_cierre' => 'Realizada'], ['_ID' => $id]);
     self::assertSame([], $service->signBlockers($id), '"Realizada" es una hoja aprobada que ya tiene contrato.');
-    self::assertSame([], $this->calls, 'Mientras falte algo no se llama a eSignatures.');
-
-    // Si el mandato cambia después de aprobado, hay que volver a pedir la aprobación.
-    $this->db->update('wp_jet_cct_contrato_mandato', ['precio' => '1.900.000'], ['_ID' => $id]);
-    self::assertStringContainsString('cambió después', implode(' ', $service->signBlockers($id)));
+    self::assertSame('c1', $service->sendToSign($id)['contrato'], 'Sin revisión del propietario también se envía.');
+    self::assertStringContainsString('no ha revisado', CommercialMandatesService::reviewNotice('sin_enviar'), 'Solo se advierte.');
+    self::assertSame('', CommercialMandatesService::reviewNotice('aprobado'));
     self::assertSame([], CommercialMandatesService::signBlockers('firmado', ['id' => 0, 'estado' => '']), 'Firmado: no hay nada que pedir.');
   }
 
-  public function testEditingASentMandateOnlyUpdatesESignaturesWhenItIsStillApproved(): void
+  public function testEditingASentMandateUpdatesESignaturesOnlyWithAnApprovedClosingSheet(): void
   {
     $service = $this->service();
     $id = $service->save($this->post())['id'];
-    $this->ready($id);
+    $this->db->update('wp_jet_cct_contrato_mandato', ['estado_hoja_cierre' => 'Aprobada'], ['_ID' => $id]);
     $service->sendToSign($id);
     $this->calls = [];
-    $result = $service->save($this->post(['duracion' => '24 Meses']), $id);
-    self::assertSame([false, true], [$result['firma'], $result['reenviar']], 'Cambió el contenido: el propietario debe aprobar antes de actualizar la firma.');
+    self::assertTrue($service->save($this->post(['duracion' => '24 Meses']), $id)['firma'], 'Con la hoja aprobada, guardar actualiza el contrato de eSignatures.');
+    $this->db->update('wp_jet_cct_contrato_mandato', ['estado_hoja_cierre' => 'No aprobada'], ['_ID' => $id]);
+    $this->calls = [];
+    $result = $service->save($this->post(['duracion' => '36 Meses']), $id);
+    self::assertSame([false, true], [$result['firma'], $result['reenviar']], 'Hoja no aprobada: queda para "Reenviar a firma".');
     self::assertSame([], $this->calls);
-    self::assertSame('24 Meses', $this->db->getVar('SELECT duracion FROM wp_jet_cct_contrato_mandato WHERE _ID = ?', [$id]), 'Lo editado sí se guarda.');
-    $this->ready($id);
-    self::assertTrue($service->save($this->post(['duracion' => '24 Meses']), $id)['firma'], 'Aprobada esta versión, guardar actualiza el contrato de eSignatures.');
+    self::assertSame('36 Meses', $this->db->getVar('SELECT duracion FROM wp_jet_cct_contrato_mandato WHERE _ID = ?', [$id]), 'Lo editado sí se guarda.');
   }
 
   public function testTheCountryIsMatchedIgnoringCaseOrDefaultsToColombia(): void

@@ -280,10 +280,8 @@ final class CommercialMandateFormService
       $this->syncCredit($id, $credit, (string) $post['id_propietario_1'], $employee);
       $this->updateProperty($property, $post, $mandate === null ? $id : null);
 
-      // Ya enviado a firma: el contrato de eSignatures se actualiza con lo editado (como edit-mandato), pero solo si
-      // sigue cumpliendo lo necesario para la firma (el propietario aprobó esta versión y la hoja de cierre está
-      // aprobada). Si el contenido cambió, el propietario debe aprobar los cambios y luego se usa "Reenviar a firma".
-      // Antes del commit: si falla, no se guarda nada.
+      // Ya enviado a firma: el contrato de eSignatures se actualiza con lo editado (como edit-mandato), si la hoja de
+      // cierre sigue aprobada; si no, queda para "Reenviar a firma". Antes del commit: si falla, no se guarda nada.
       $signed = false;
       $resend = false;
       if ($mandate !== null && trim((string) ($mandate['estado'] ?? '')) === 'Enviado' && $this->signature !== null && trim((string) ($mandate['id_esignatures'] ?? '')) !== '' && $this->signBlockers($id) !== []) {

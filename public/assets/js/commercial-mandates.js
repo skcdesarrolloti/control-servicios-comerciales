@@ -139,8 +139,8 @@
       if (box) { box.textContent = error.message; box.hidden = false; box.scrollIntoView({ block: "nearest" }); } else notify("error", error.message);
     }).finally(function () { submit.disabled = false; });
   }
-  // Solo se envía a firma cuando el propietario aprobó la versión actual y la hoja de cierre está aprobada
-  // (data-blockers trae lo que falta; el servidor lo vuelve a validar).
+  // Solo se envía a firma con la hoja de cierre aprobada; la revisión del propietario es opcional y solo se advierte
+  // (data-blockers trae lo que falta, data-review-notice el aviso; el servidor lo vuelve a validar).
   function sign(button) {
     var id = button.getAttribute("data-cma-sign");
     var ticket = button.getAttribute("data-ticket-pk") || "";
@@ -158,7 +158,9 @@
       }
       return;
     }
-    var text = (resend ? "Se actualizará el contrato que ya está en eSignatures con los datos actuales del mandato #" : "Se enviará el mandato #") + id + " a firma digital: a cada propietario le llega la solicitud por correo y celular.";
+    var notice = button.getAttribute("data-review-notice") || "";
+    var text = (resend ? "Se actualizará el contrato que ya está en eSignatures con los datos actuales del mandato #" : "Se enviará el mandato #") + id + " a firma digital: a cada propietario le llega la solicitud por correo y celular."
+      + (notice ? "\n\nNota: " + notice : "");
     var go = function () {
       button.disabled = true;
       request("commercial_mandate_sign", { id: id, ticket_pk: ticket }).then(function (result) {

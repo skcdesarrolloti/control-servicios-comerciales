@@ -269,9 +269,10 @@ final class PublicMandateView
   {
     $internal = $data['interno'];
     $blockers = $data['firmado'] ? [] : (array) ($data['bloqueos'] ?? []);
-    $warning = $blockers !== []
+    $notice = $data['firmado'] ? '' : (string) ($data['aviso_revision'] ?? '');
+    $warning = ($blockers !== []
       ? '<div class="pm-warn"><p>Todavía no se puede enviar a firma:</p><ul>' . implode('', array_map(static fn($reason): string => '<li>' . self::e($reason) . '</li>', $blockers)) . '</ul></div>'
-      : '';
+      : '') . ($notice !== '' ? '<p class="pm-review-note">' . self::e($notice) . '</p>' : '');
     $closing = (array) ($data['hoja'] ?? []);
     $closingState = (string) ($closing['estado'] ?? '');
     $html = '<section class="ps-card ps-internal"><h2>Datos internos <small>solo los ve el equipo</small></h2><dl class="ps-facts">'

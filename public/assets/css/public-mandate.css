@@ -41,5 +41,6 @@
 .pm-warn { margin:12px 0 0!important; padding:10px 14px; border-radius:12px; background:#fdeccb; color:#7a4a00; font-weight:600; }
 .pm-warn p { margin:0 0 4px; }
 .pm-warn ul { margin:0; padding-left:18px; font-weight:500; }
+.pm-review-note { margin:10px 0 0; font-size:13px; color:#5b6680; }
 .ps-hero--done .ps-badge { background:#d9f2e4; color:#0b5d35; }
 @media (max-width:760px) { .pm-link { flex-direction:column; } }

@@ -69,3 +69,8 @@
 .cma-ready .material-symbols-outlined { font-size:18px; }
 .cqt-table .cma-missing, .cqt-table .cma-ready { max-width:340px; }
 .cma-blocked { opacity:.6; }
+.cma-note { margin:4px 0 0; color:#5b6680; font-size:12px; }
+.cqt-table .cma-note { max-width:340px; }
+/* Separación entre los filtros y las pestañas de estado del listado */
+[data-cma-page] [data-cma-list] { padding-top:16px; }
+[data-cma-page] .cst-pills { margin-bottom:16px; }
