@@ -109,6 +109,8 @@ final class CommercialApiController
       $html = \SCM\Views\CommercialQuotesView::page($input, new \SCM\Commercial\Quotes\CommercialQuotesService(new \SCM\Commercial\Quotes\CommercialQuotesRepository($this->db), $this->settings, $this->policy), $this->policy);
     } elseif ($bucket === 'estudios') {
       $html = \SCM\Views\CommercialStudiesView::page($input, new \SCM\Commercial\Studies\CommercialStudiesService(new \SCM\Commercial\Studies\CommercialStudiesRepository($this->db), $this->settings, $this->policy), $this->policy);
+    } elseif ($bucket === 'cierres') {
+      $html = \SCM\Views\CommercialClosingSheetsView::page($input, new \SCM\Commercial\Mandates\ClosingSheetsListing($this->db, $this->policy));
     } elseif ($bucket === 'mandatos') {
       $html = \SCM\Views\CommercialMandatesView::page($input, new \SCM\Commercial\Mandates\CommercialMandatesService($this->db, $this->policy));
     } elseif ($bucket === 'precaptacion') {

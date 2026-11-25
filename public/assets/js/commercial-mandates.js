@@ -37,6 +37,7 @@
       if (closingSaved) {
         closingSaved = false;
         if (document.querySelector("[data-cma-list]")) refreshList(listPage);
+        if (document.querySelector("[data-ccs-list]")) refreshSheets(sheetsPage);
         if (closingTicket && document.querySelector("[data-cma-task]")) openTask(closingTicket);
         else if (closingTicket && window.SCMCommercialReloadCase) window.SCMCommercialReloadCase(closingTicket);
       }
@@ -72,15 +73,16 @@
   var closingSaved = false;
   var closingTicket = "";
   function openClosing(button) {
-    var id = button.getAttribute("data-cma-closing");
-    if (!/^[1-9][0-9]{0,17}$/.test(id || "")) return;
+    var sheet = button.getAttribute("data-cma-closing-sheet") || "";
+    var id = button.getAttribute("data-cma-closing") || "";
+    if (!/^[1-9][0-9]{0,17}$/.test(sheet || id)) return;
     returnFocus = button;
     closingSaved = false;
     closingTicket = button.getAttribute("data-ticket-pk") || "";
     var old = document.getElementById("cma-viewer");
     if (old) old.remove();
-    var title = button.getAttribute("data-cma-closing-title") || ("Hoja de cierre · Mandato #" + id);
-    var url = "hoja-cierre.php?mandato=" + encodeURIComponent(id);
+    var title = button.getAttribute("data-cma-closing-title") || (sheet ? "Hoja de cierre #" + sheet : "Hoja de cierre · Mandato #" + id);
+    var url = sheet ? "hoja-cierre.php?numero=" + encodeURIComponent(sheet) : "hoja-cierre.php?mandato=" + encodeURIComponent(id);
     var viewer = document.createElement("div");
     viewer.id = "cma-viewer";
     viewer.className = "cqt-viewer cma-closing";
@@ -137,6 +139,31 @@
       var url = new URL(window.location.href);
       LIST_FILTERS.concat("ma_pag").forEach(function (name) {
         if (values[name] && !(name === "ma_pag" && values[name] === "1")) url.searchParams.set(name, values[name]);
+        else url.searchParams.delete(name);
+      });
+      window.history.replaceState(window.history.state, "", url);
+    }).catch(function (error) { notify("error", error.message); }).finally(function () { holder.removeAttribute("aria-busy"); });
+  }
+
+  // ── Hojas de cierre / Mis cierres ──────────────────
+  var SHEET_FILTERS = ["hc_q", "hc_estado", "hc_empleado"];
+  var sheetsPage = 1;
+  function refreshSheets(page) {
+    var holder = document.querySelector("[data-ccs-list]");
+    if (!holder) return;
+    sheetsPage = page || 1;
+    var form = document.querySelector("[data-ccs-list-filters]");
+    var values = { hc_pag: String(sheetsPage) };
+    if (form) {
+      SHEET_FILTERS.forEach(function (name) { if (form.elements[name]) values[name] = form.elements[name].value; });
+      if (form.elements.portafolio) values.portafolio = form.elements.portafolio.value;
+    }
+    holder.setAttribute("aria-busy", "true");
+    request("commercial_closing_sheets_list", values).then(function (result) {
+      holder.innerHTML = result.html || "";
+      var url = new URL(window.location.href);
+      SHEET_FILTERS.concat("hc_pag").forEach(function (name) {
+        if (values[name] && !(name === "hc_pag" && values[name] === "1")) url.searchParams.set(name, values[name]);
         else url.searchParams.delete(name);
       });
       window.history.replaceState(window.history.state, "", url);
@@ -251,7 +278,22 @@
     if (taskButton) { event.preventDefault(); openTask(taskButton.getAttribute("data-ticket-pk")); return; }
     var signButton = target.closest("[data-cma-sign]");
     if (signButton) { event.preventDefault(); sign(signButton); return; }
-    var closingButton = target.closest("[data-cma-closing]");
+    var sheetState = target.closest("[data-ccs-state]");
+    if (sheetState) {
+      var sheetFilters = document.querySelector("[data-ccs-list-filters]");
+      if (sheetFilters && sheetFilters.elements.hc_estado) sheetFilters.elements.hc_estado.value = sheetState.getAttribute("data-ccs-state");
+      refreshSheets(1);
+      return;
+    }
+    var sheetPage = target.closest("[data-ccs-list-page]");
+    if (sheetPage) { refreshSheets(parseInt(sheetPage.getAttribute("data-ccs-list-page"), 10)); return; }
+    if (target.closest("[data-ccs-list-clear]")) {
+      var sheetForm = document.querySelector("[data-ccs-list-filters]");
+      if (sheetForm) SHEET_FILTERS.forEach(function (name) { if (sheetForm.elements[name]) sheetForm.elements[name].value = ""; });
+      refreshSheets(1);
+      return;
+    }
+    var closingButton = target.closest("[data-cma-closing], [data-cma-closing-sheet]");
     if (closingButton) { event.preventDefault(); openClosing(closingButton); return; }
     var view = target.closest("[data-cma-view]");
     if (view) { event.preventDefault(); openViewer(view.getAttribute("data-cma-view"), view); return; }
@@ -276,6 +318,7 @@
   document.addEventListener("submit", function (event) {
     var form = event.target;
     if (form instanceof HTMLFormElement && form.matches("[data-cma-list-filters]")) { event.preventDefault(); refreshList(1); }
+    if (form instanceof HTMLFormElement && form.matches("[data-ccs-list-filters]")) { event.preventDefault(); refreshSheets(1); }
   });
   document.addEventListener("keydown", function (event) {
     if (event.key === "Escape" && document.getElementById("cma-viewer")) { event.stopPropagation(); closeViewer(); }

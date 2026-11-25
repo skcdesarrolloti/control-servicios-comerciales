@@ -27,6 +27,10 @@ los de su inmueble) con su revisión y sus acciones:
    de arrendamiento). Si falta, cada mandato lo dice ("Para enviar a firma falta") y el servidor no lo envía
    (`CommercialMandatesService::signBlockers`). La revisión del propietario no es obligatoria: si no la aprobó, solo se
    advierte (`reviewNotice`). Crea el contrato en eSignatures o modifica el mismo.
+   **Editar** un mandato ya enviado a firma actualiza solo ese mismo contrato en eSignatures (los firmantes conservan su
+   enlace; solo se les reenvía si cambió su correo o celular). Si la hoja de cierre no está aprobada, queda para
+   **Reenviar a firma**. Los mandatos enviados por Make (antes del panel) no tienen `id_esignatures`: editar no los
+   actualiza y el mensaje lo dice; con **Reenviar a firma** se envía uno nuevo y el anterior se anula a mano en eSignatures.
    Al modificar el mismo contrato, los campos de texto se actualizan solos (siguen como `{{campo}}` en el texto), pero las
    tablas (`tabla_propietarios`, `tabla_acuerdos`) quedaron escritas en el texto al crearlo. Por eso se reemplazan ahí
    (`POST contracts/{id}/content`, `MandateSignature::refreshTables`) y se comprueba que quedaron. Si no se puede, se crea
@@ -67,9 +71,15 @@ este panel:
 - la carpeta de documentos, el borrador automático y el estado que se refleja en el mandato (`estado_hoja_cierre`,
   `id_hoja_cierre`), que es lo que exige **Enviar a firma**.
 
+**Listados:** **Registros › Hojas de cierre** (todo el equipo, con filtro por consultor/a) y **Mi portafolio › Mis cierres**
+(las hojas que hizo la persona, por `id_empleado` exacto). Tienen pestañas por estado, búsqueda por hoja, mandato,
+inmueble, dirección, propietario o arrendatario, y el botón **Abrir hoja**. Es la vista `cierres` de Permisos, con alcance
+*solo sus hojas* o *todo el equipo* (`ClosingSheetsListing`, solo lectura de `wp_jet_cct_cierres`).
+
 Cómo funciona (`MandateClosingSheet`, `public/hoja-cierre.php?mandato=ID`):
 
-- revisa que la persona pueda abrir ese mandato (`canOpen`) y tenga la acción `mandato_hoja_cierre`;
+- `?mandato=ID`: revisa que la persona pueda abrir ese mandato (`canOpen`) y tenga la acción `mandato_hoja_cierre`;
+- `?numero=HOJA` (desde los listados): la hoja debe ser de la persona, salvo que vea todo el equipo en `cierres`;
 - sin hoja, o si la última está **Desistida**: `hoja-cierre.php?id_contrato=<mandato>` (lo demás lo toma del mandato);
 - con hoja: `hoja-cierre-ver.php?numero=<hoja>`, desde donde se revisa, aprueba, edita o desiste;
 - al guardar allá, la página avisa (`scm-closing-sheet-saved`) y, al cerrar la ventana, se actualiza el listado o la tarea.

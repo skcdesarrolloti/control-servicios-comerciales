@@ -662,6 +662,8 @@ final class CommercialDashboardView
             echo (string) ($data['studies_html'] ?? '');
           } elseif ($bucket === 'mandatos') {
             echo (string) ($data['mandates_html'] ?? '');
+          } elseif ($bucket === 'cierres') {
+            echo (string) ($data['closings_html'] ?? '');
           } elseif ($bucket === 'precaptacion') {
             echo self::renderPrecaptacion($baseUrl, $_GET);
           } elseif ($bucket === 'anadir_aviso') {
@@ -854,10 +856,10 @@ final class CommercialDashboardView
       <?php endif; ?>
 
       <!-- Actividades comerciales: registrar (precaptación, aviso), gestión de tareas, actualizaciones y avisos en fachada -->
-      <?php $commercialViews = array_merge(['llamadas', 'precaptacion', 'cotizaciones', 'estudios', 'mandatos', 'anadir_aviso', 'actualizaciones', 'avisos'], $taskViews); ?>
+      <?php $commercialViews = array_merge(['llamadas', 'precaptacion', 'cotizaciones', 'estudios', 'mandatos', 'cierres', 'anadir_aviso', 'actualizaciones', 'avisos'], $taskViews); ?>
       <?php if (array_intersect($commercialViews, $views) !== []): ?>
         <div class="relative group/nav" data-commercial-dropdown="comerciales">
-          <button type="button" class="flex items-center gap-space-xs px-2 xl:px-3 py-space-xs font-label-md text-label-md <?php echo ($isTaskActive || in_array($bucket, ['llamadas', 'precaptacion', 'cotizaciones', 'estudios', 'mandatos', 'anadir_aviso', 'actualizaciones', 'avisos'], true)) ? ($activeClasses . ' active') : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-tab="comerciales" data-commercial-dropdown-trigger="comerciales" aria-expanded="false">
+          <button type="button" class="flex items-center gap-space-xs px-2 xl:px-3 py-space-xs font-label-md text-label-md <?php echo ($isTaskActive || in_array($bucket, ['llamadas', 'precaptacion', 'cotizaciones', 'estudios', 'mandatos', 'cierres', 'anadir_aviso', 'actualizaciones', 'avisos'], true)) ? ($activeClasses . ' active') : $inactiveClasses; ?> cursor-pointer select-none" data-commercial-tab="comerciales" data-commercial-dropdown-trigger="comerciales" aria-expanded="false">
             <span class="material-symbols-outlined text-[16px]" aria-hidden="true">business_center</span>
             <span>Actividades comerciales</span>
             <span class="material-symbols-outlined text-[16px] group-hover/nav:rotate-180 transition-transform" aria-hidden="true">expand_more</span>
@@ -886,7 +888,7 @@ final class CommercialDashboardView
               </div>
             </div>
             <?php endif; ?>
-            <?php if (array_intersect(['llamadas', 'precaptacion', 'cotizaciones', 'estudios', 'mandatos', 'anadir_aviso', 'actualizaciones', 'avisos'], $views)): ?>
+            <?php if (array_intersect(['llamadas', 'precaptacion', 'cotizaciones', 'estudios', 'mandatos', 'cierres', 'anadir_aviso', 'actualizaciones', 'avisos'], $views)): ?>
             <div class="min-w-[250px]">
             <?php if (array_intersect(['llamadas', 'precaptacion', 'anadir_aviso'], $views)): ?>
               <div class="flex items-center gap-1.5 px-3 pt-2 pb-1 font-label-sm text-[11px] uppercase font-semibold text-secondary"><span class="material-symbols-outlined text-[15px]" aria-hidden="true">edit_note</span><span>Registrar</span></div>
@@ -906,7 +908,7 @@ final class CommercialDashboardView
               </a>
               <?php endif; ?>
             <?php endif; ?>
-            <?php if (array_intersect(['cotizaciones', 'estudios', 'mandatos'], $views) !== []): ?>
+            <?php if (array_intersect(['cotizaciones', 'estudios', 'mandatos', 'cierres'], $views) !== []): ?>
               <div class="flex items-center gap-1.5 px-3 pt-2 pb-1 font-label-sm text-[11px] uppercase font-semibold text-secondary"><span class="material-symbols-outlined text-[15px]" aria-hidden="true">folder_open</span><span>Registros</span></div>
               <?php if (in_array('cotizaciones', $views, true)): ?>
               <a class="flex items-center gap-2 px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="cotizaciones" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'cotizaciones'])); ?>">
@@ -921,6 +923,11 @@ final class CommercialDashboardView
               <?php if (in_array('mandatos', $views, true)): ?>
               <a class="flex items-center gap-2 px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="mandatos" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'mandatos'])); ?>">
                 <span class="material-symbols-outlined text-[18px] text-secondary" aria-hidden="true">contract_edit</span><span>Mandatos</span>
+              </a>
+              <?php endif; ?>
+              <?php if (in_array('cierres', $views, true)): ?>
+              <a class="flex items-center gap-2 px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="cierres" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'cierres'])); ?>">
+                <span class="material-symbols-outlined text-[18px] text-secondary" aria-hidden="true">handshake</span><span>Hojas de cierre</span>
               </a>
               <?php endif; ?>
             <?php endif; ?>
@@ -1347,6 +1354,7 @@ final class CommercialDashboardView
       ['tab' => 'cotizaciones', 'label' => 'Mis cotizaciones', 'icon' => 'request_quote', 'params' => ['portafolio' => '1']],
       ['tab' => 'estudios', 'label' => 'Mis estudios', 'icon' => 'verified_user', 'params' => ['portafolio' => '1']],
       ['tab' => 'mandatos', 'label' => 'Mis mandatos', 'icon' => 'contract_edit', 'params' => ['portafolio' => '1']],
+      ['tab' => 'cierres', 'label' => 'Mis cierres', 'icon' => 'handshake', 'params' => ['portafolio' => '1']],
       // Ayudas de control: abren solo lo que pide acción. El subtítulo sale sobre la primera que el cargo pueda abrir.
       ['tab' => 'actualizaciones', 'label' => 'Inmuebles por vencer', 'icon' => 'published_with_changes', 'params' => ['portafolio' => '1', 'estado_actualizacion' => 'Pendientes'], 'pending' => true],
       ['tab' => 'avisos', 'label' => 'Avisos pendientes', 'icon' => 'signpost', 'params' => ['portafolio' => '1', 'estado_aviso' => 'Pendientes'], 'pending' => true],

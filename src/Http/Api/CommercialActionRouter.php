@@ -115,6 +115,7 @@ final class CommercialActionRouter
     'commercial_mandate_sign' => 'sign',
     'commercial_mandate_search' => 'search',
     'commercial_mandate_property' => 'property',
+    'commercial_closing_sheets_list' => 'closingList',
   ];
 
   private CommercialApiController $controller;

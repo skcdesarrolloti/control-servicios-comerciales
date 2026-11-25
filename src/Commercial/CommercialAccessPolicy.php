@@ -18,6 +18,7 @@ final class CommercialAccessPolicy
     'cotizaciones' => 'Cotizaciones de inmuebles',
     'estudios' => 'Estudios de aseguradora',
     'mandatos' => 'Contratos de mandato',
+    'cierres' => 'Hojas de cierre',
     'anadir_aviso' => 'Añadir aviso',
     'inmuebles' => 'Inmuebles',
     'abiertos' => 'Tareas abiertas',
@@ -154,7 +155,7 @@ final class CommercialAccessPolicy
   /** Grupos del menú del encabezado, en el mismo orden, para la configuración de accesos. */
   public const VIEW_GROUPS = [
     'General' => ['inicio', 'calendario'],
-    'Actividades comerciales' => ['llamadas', 'precaptacion', 'cotizaciones', 'estudios', 'mandatos', 'anadir_aviso', 'actualizaciones', 'avisos', 'abiertos', 'mis_tickets', 'postergados', 'cerrados', 'reportes_comerciales'],
+    'Actividades comerciales' => ['llamadas', 'precaptacion', 'cotizaciones', 'estudios', 'mandatos', 'cierres', 'anadir_aviso', 'actualizaciones', 'avisos', 'abiertos', 'mis_tickets', 'postergados', 'cerrados', 'reportes_comerciales'],
     'Inventario' => ['inmuebles'],
     'Promoción' => ['promocion'],
     'Comunicación y herramientas' => ['notificaciones', 'herramientas'],
@@ -172,6 +173,7 @@ final class CommercialAccessPolicy
     'cotizaciones' => ['Solo sus cotizaciones', 'Cotizaciones de todo el equipo'],
     'estudios' => ['Solo sus estudios', 'Estudios de todo el equipo'],
     'mandatos' => ['Solo sus mandatos', 'Mandatos de todo el equipo'],
+    'cierres' => ['Solo sus hojas de cierre', 'Hojas de cierre de todo el equipo'],
     'actualizaciones' => ['Solo sus inmuebles', 'Inmuebles de todo el equipo'],
     'avisos' => ['Solo sus avisos', 'Avisos de todo el equipo'],
     'abiertos' => ['Solo sus tareas', 'Tareas de todo el equipo'],

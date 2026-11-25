@@ -269,7 +269,7 @@ final class CommercialMandatesTest extends TestCase
     foreach (['mandato_crear', CommercialMandatesService::ACTION_SEND, CommercialMandatesService::ACTION_ANSWER, 'mandato_enviar_firma'] as $action) {
       self::assertArrayHasKey($action, CommercialAccessPolicy::ACTIONS);
     }
-    self::assertSame(['commercial_mandates_list' => 'list', 'commercial_mandate_view' => 'view', 'commercial_mandate_task' => 'task', 'commercial_mandate_form' => 'form', 'commercial_mandate_save' => 'save', 'commercial_mandate_sign' => 'sign', 'commercial_mandate_search' => 'search', 'commercial_mandate_property' => 'property'], CommercialActionRouter::MANDATE_ACTIONS);
+    self::assertSame(['commercial_mandates_list' => 'list', 'commercial_mandate_view' => 'view', 'commercial_mandate_task' => 'task', 'commercial_mandate_form' => 'form', 'commercial_mandate_save' => 'save', 'commercial_mandate_sign' => 'sign', 'commercial_mandate_search' => 'search', 'commercial_mandate_property' => 'property', 'commercial_closing_sheets_list' => 'closingList'], CommercialActionRouter::MANDATE_ACTIONS);
     $events = array_merge(...array_values(array_map(static fn(array $group): array => array_keys($group['items']), CommercialInternalNotifications::CATALOG)));
     foreach ([CommercialMandatesNotifier::EVENT_SENT, CommercialMandatesNotifier::EVENT_NOTE, CommercialMandatesNotifier::EVENT_APPROVED] as $event) {
       self::assertContains($event, $events);

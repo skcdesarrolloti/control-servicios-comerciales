@@ -57,7 +57,18 @@ final class MandateClosingSheet
       throw new \RuntimeException('Falta INMOBILIARIO_URL en el .env del panel: la dirección del panel inmobiliario.');
     }
     $id = self::current($closing);
-    $query = $id > 0 ? ['numero' => $id] : ['id_contrato' => (int) ($mandate['_ID'] ?? 0)];
-    return $this->servicesUrl . '/' . ($id > 0 ? 'hoja-cierre-ver.php' : 'hoja-cierre.php') . '?' . http_build_query($query + ['embed' => '1'], '', '&', PHP_QUERY_RFC3986);
+    if ($id > 0) {
+      return $this->sheetUrl($id);
+    }
+    return $this->servicesUrl . '/hoja-cierre.php?' . http_build_query(['id_contrato' => (int) ($mandate['_ID'] ?? 0), 'embed' => '1'], '', '&', PHP_QUERY_RFC3986);
+  }
+
+  /** Una hoja por su número (Hojas de cierre y Mis cierres): hoja-cierre-ver.php, aunque esté desistida. */
+  public function sheetUrl(int $id): string
+  {
+    if (!$this->configured()) {
+      throw new \RuntimeException('Falta INMOBILIARIO_URL en el .env del panel: la dirección del panel inmobiliario.');
+    }
+    return $this->servicesUrl . '/hoja-cierre-ver.php?' . http_build_query(['numero' => $id, 'embed' => '1'], '', '&', PHP_QUERY_RFC3986);
   }
 }

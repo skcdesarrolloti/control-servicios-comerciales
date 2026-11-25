@@ -70,7 +70,7 @@ final class CommercialDashboardController
     }
     $navigation = $repository->scopedNavigation($bucket, $filters, $currentEmployeeFilter, $policy);
     $tabCounts = $navigation['tabs'];
-    $result = in_array($bucket, ['actualizaciones', 'avisos', 'calendario', 'inmuebles', 'notificaciones', 'llamadas', 'cotizaciones', 'estudios', 'mandatos', 'precaptacion', 'anadir_aviso', 'herramientas', 'promocion', 'reportes_comerciales'], true) ? ['rows' => [], 'counts' => $repository->statusCounts($filters), 'pagination' => []] : $repository->search($bucket === 'inicio' ? 'abiertos' : $bucket, $filters);
+    $result = in_array($bucket, ['actualizaciones', 'avisos', 'calendario', 'inmuebles', 'notificaciones', 'llamadas', 'cotizaciones', 'estudios', 'mandatos', 'cierres', 'precaptacion', 'anadir_aviso', 'herramientas', 'promocion', 'reportes_comerciales'], true) ? ['rows' => [], 'counts' => $repository->statusCounts($filters), 'pagination' => []] : $repository->search($bucket === 'inicio' ? 'abiertos' : $bucket, $filters);
     $homeDashboard = $repository->homeDashboard($navigation['home'], $policy);
     $canSeeAll = $policy->canSeeAll('inmuebles');
     $propertiesRepository = new CommercialPropertiesRepository($this->db);
@@ -117,6 +117,7 @@ final class CommercialDashboardController
       'tools_service' => $bucket === 'herramientas' ? new \SCM\Commercial\CommercialOwnerPreapprovalService($this->db, $policy) : null,
       'quotes_html' => $bucket === 'cotizaciones' ? \SCM\Views\CommercialQuotesView::page($input, new \SCM\Commercial\Quotes\CommercialQuotesService(new \SCM\Commercial\Quotes\CommercialQuotesRepository($this->db), $this->settings, $policy), $policy) : '',
       'studies_html' => $bucket === 'estudios' ? \SCM\Views\CommercialStudiesView::page($input, new \SCM\Commercial\Studies\CommercialStudiesService(new \SCM\Commercial\Studies\CommercialStudiesRepository($this->db), $this->settings, $policy), $policy) : '',
+      'closings_html' => $bucket === 'cierres' ? \SCM\Views\CommercialClosingSheetsView::page($input, new \SCM\Commercial\Mandates\ClosingSheetsListing($this->db, $policy)) : '',
       'mandates_html' => $bucket === 'mandatos' ? \SCM\Views\CommercialMandatesView::page($input, new \SCM\Commercial\Mandates\CommercialMandatesService($this->db, $policy)) : '',
       'calls_html' => $bucket === 'llamadas' ? \SCM\Views\CommercialCallsView::page($input, new \SCM\Commercial\Calls\CommercialCallsService($this->db, $this->settings, $policy, $this->config), $policy) : '',
       'report_sub' => $bucket === 'reportes_comerciales' ? (string) ($input['reporte_sub'] ?? '') : '',

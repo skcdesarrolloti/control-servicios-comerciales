@@ -205,7 +205,7 @@ final class CommercialMandateFormService
    * Crea (sin $id) o edita el mandato con lo enviado en el formulario.
    * @param array<string,mixed> $post
    * @param array{ticket?:int,estudio?:int} $context Tarea y estudio de donde se crea.
-   * @return array{id:int,firma:bool,reenviar:bool}
+   * @return array{id:int,firma:bool,reenviar:bool,sin_contrato:bool}
    */
   public function save(array $post, ?int $id = null, array $context = []): array
   {
@@ -284,6 +284,8 @@ final class CommercialMandateFormService
       // cierre sigue aprobada; si no, queda para "Reenviar a firma". Antes del commit: si falla, no se guarda nada.
       $signed = false;
       $resend = false;
+      // Enviado por Make (antes del panel): el panel no tiene el id del contrato y no puede actualizarlo.
+      $noContract = $mandate !== null && trim((string) ($mandate['estado'] ?? '')) === 'Enviado' && trim((string) ($mandate['id_esignatures'] ?? '')) === '';
       if ($mandate !== null && trim((string) ($mandate['estado'] ?? '')) === 'Enviado' && $this->signature !== null && trim((string) ($mandate['id_esignatures'] ?? '')) !== '' && $this->signBlockers($id) !== []) {
         $resend = true;
       } elseif ($mandate !== null && trim((string) ($mandate['estado'] ?? '')) === 'Enviado' && $this->signature !== null && trim((string) ($mandate['id_esignatures'] ?? '')) !== '') {
@@ -293,7 +295,7 @@ final class CommercialMandateFormService
         $signed = true;
       }
       $pdo->commit();
-      return ['id' => $id, 'firma' => $signed, 'reenviar' => $resend];
+      return ['id' => $id, 'firma' => $signed, 'reenviar' => $resend, 'sin_contrato' => $noContract];
     } catch (\Throwable $error) {
       if ($pdo->inTransaction()) {
         $pdo->rollBack();

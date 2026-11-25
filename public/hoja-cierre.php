@@ -2,12 +2,13 @@
 
 declare(strict_types=1);
 
-// Hoja de cierre del mandato (?mandato=ID): la abre la ventana de Mandatos, Mis mandatos y el popup de la tarea. Revisa
+// Hoja de cierre del mandato (?mandato=ID) o una hoja por su número (?numero=ID, Hojas de cierre y Mis cierres): la abre la ventana de Mandatos, Mis mandatos y el popup de la tarea. Revisa
 // que la persona pueda abrir ese mandato y la lleva a la página del panel inmobiliario que corresponde (crear o ver la
 // hoja), que es la que guarda, avisa y aplica sus permisos y políticas (MandateClosingSheet).
 require_once dirname(__DIR__) . '/bootstrap/app.php';
 
 use SCM\Commercial\CommercialAccessPolicy;
+use SCM\Commercial\Mandates\ClosingSheetsListing;
 use SCM\Commercial\Mandates\CommercialMandatesService;
 use SCM\Commercial\Mandates\MandateClosingSheet;
 use SCM\Core\Auth;
@@ -16,7 +17,9 @@ header('Cache-Control: no-store, private');
 header('X-Robots-Tag: noindex, nofollow');
 header('Referrer-Policy: same-origin');
 
-$id = preg_match('/^[1-9][0-9]{0,18}$/D', trim((string) ($_GET['mandato'] ?? ''))) === 1 ? (int) $_GET['mandato'] : 0;
+$digits = static fn(string $key): int => preg_match('/^[1-9][0-9]{0,18}$/D', trim((string) ($_GET[$key] ?? ''))) === 1 ? (int) $_GET[$key] : 0;
+$id = $digits('mandato');
+$sheetId = $digits('numero');
 Auth::requireLogin(SCM_BASE_URL . '/login.php');
 
 $stop = static function (int $status, string $message): never {
@@ -31,6 +34,26 @@ $stop = static function (int $status, string $message): never {
 
 $adminCargos = is_array($scmConfig['dashboard_admin_cargos'] ?? null) ? $scmConfig['dashboard_admin_cargos'] : ['11', '12', '13', '14'];
 $policy = new CommercialAccessPolicy($scmSettings, $scmDb, $adminCargos);
+$sheets = new MandateClosingSheet((string) ($scmConfig['services_url'] ?? ''));
+// ?numero=<hoja>: desde Hojas de cierre / Mis cierres (la hoja debe ser de la persona, salvo que vea todo el equipo).
+if ($sheetId > 0) {
+  $listing = new ClosingSheetsListing($scmDb, $policy);
+  $sheet = $listing->find($sheetId);
+  if ($sheet === null) {
+    $stop(404, 'La hoja de cierre no existe.');
+  }
+  if (!$listing->canOpen($sheet)) {
+    $stop(403, 'Tu cargo no tiene permiso para abrir esta hoja de cierre.');
+  }
+  try {
+    $url = $sheets->sheetUrl($sheetId);
+  } catch (\RuntimeException $error) {
+    $stop(503, $error->getMessage());
+  }
+  $_SESSION['scm_last_activity'] = time();
+  header('Location: ' . $url, true, 302);
+  exit;
+}
 $service = new CommercialMandatesService($scmDb, $policy);
 $mandate = $id > 0 ? $service->repository()->find($id) : null;
 if ($mandate === null) {
@@ -40,7 +63,7 @@ if (!$service->canOpen($mandate) || !$policy->canAct(MandateClosingSheet::ACTION
   $stop(403, 'Tu cargo no tiene permiso para abrir la hoja de cierre de este mandato.');
 }
 try {
-  $url = (new MandateClosingSheet((string) ($scmConfig['services_url'] ?? '')))->url($mandate, $service->repository()->closing($mandate));
+  $url = $sheets->url($mandate, $service->repository()->closing($mandate));
 } catch (\RuntimeException $error) {
   $stop(503, $error->getMessage());
 }

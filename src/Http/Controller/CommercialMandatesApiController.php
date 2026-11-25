@@ -6,6 +6,7 @@ namespace SCM\Http\Controller;
 
 use SCM\Commercial\CommercialAccessPolicy;
 use SCM\Commercial\CommercialTicketsRepository;
+use SCM\Commercial\Mandates\ClosingSheetsListing;
 use SCM\Commercial\Mandates\CommercialMandateFormService;
 use SCM\Commercial\Mandates\CommercialMandatesRepository;
 use SCM\Commercial\Mandates\CommercialMandatesService;
@@ -15,6 +16,7 @@ use SCM\Core\Csrf;
 use SCM\Core\Database;
 use SCM\Core\Settings;
 use SCM\Http\Response\JsonResponse;
+use SCM\Views\CommercialClosingSheetsView;
 use SCM\Views\CommercialMandateFormView;
 use SCM\Views\CommercialMandatesView;
 
@@ -73,6 +75,12 @@ final class CommercialMandatesApiController
   public function list(array $input): never
   {
     $this->guarded($input, fn(): array => ['html' => CommercialMandatesView::results($this->service->listing($input))]);
+  }
+
+  /** Hojas de cierre / Mis cierres (filtros, estados y páginas). @param array<string,mixed> $input */
+  public function closingList(array $input): never
+  {
+    $this->guarded($input, fn(): array => ['html' => CommercialClosingSheetsView::results((new ClosingSheetsListing($this->db, $this->policy))->listing($input))]);
   }
 
   /** @param array<string,mixed> $input */
@@ -205,7 +213,9 @@ final class CommercialMandatesApiController
       $message = $id > 0
         ? 'Se guardaron los cambios del mandato #' . $result['id'] . ($result['firma'] ? ' y se actualizó su contrato en eSignatures.' : ($result['reenviar']
           ? '. Ya estaba en firma: el contrato de eSignatures no se actualizó porque la hoja de cierre no está aprobada. Cuando esté listo, usa "Reenviar a firma".'
-          : '.'))
+          : (($result['sin_contrato'] ?? false)
+            ? '. Este mandato se envió a firma antes del panel (por Make) y el panel no tiene su contrato de eSignatures: para que los propietarios firmen con estos datos, usa "Reenviar a firma" y anula el contrato anterior en eSignatures.'
+            : '.')))
         : 'Se creó el mandato #' . $result['id'] . '. Envíaselo al propietario para que lo revise antes de la firma.';
       return ['message' => $message, 'id' => $result['id']] + ($pk > 0 ? $this->taskPanel($pk, $message) : []);
     });
