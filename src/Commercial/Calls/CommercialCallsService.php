@@ -539,10 +539,16 @@ final class CommercialCallsService
         $this->repository->update($id, ['id_empleado' => $assignee]);
         $call['id_empleado'] = $assignee;
       }
-      // Una llamada sin marcar (o marcada que no) a la que se le crea tarea queda como que sí la merecía.
+      // Una llamada sin marcar (o marcada que no) a la que se le crea tarea queda como que sí la merecía y, si es de
+      // arriendo o venta, registra al cliente como al guardarla (ensureClient no lo duplica: lo busca por celular).
       if (trim((string) ($call['merece_ticket'] ?? '')) !== 'Si') {
         $this->repository->update($id, ['merece_ticket' => 'Si']);
         $call['merece_ticket'] = 'Si';
+        $topic = is_scalar($input['tema_ayuda'] ?? null) ? trim((string) $input['tema_ayuda']) : trim((string) ($call['tema_ayuda'] ?? ''));
+        if (isset(self::CLIENT_TOPICS[$topic]) && trim((string) ($call['id_cliente'] ?? '')) === '') {
+          $clientId = $this->ensureClient($id, ['celular' => (string) ($call['celular'] ?? ''), 'cliente' => (string) ($call['cliente'] ?? ''), 'email' => (string) ($call['email'] ?? ''), 'indicativo' => (string) ($call['indicativo'] ?? ''), 'tema_ayuda' => $topic], $me);
+          $this->repository->update($id, ['id_cliente' => (string) $clientId]);
+        }
       }
       $task = $this->taskRow($call, $input, $employee, $me);
       $taskId = $this->repository->insertTask($task);

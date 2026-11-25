@@ -283,6 +283,12 @@ final class CommercialCallsTest extends TestCase
     $task = $this->service()->createTask($this->taskInput($id));
     self::assertGreaterThan(0, $task['id']);
     self::assertSame('Si', $this->row($id)['merece_ticket'], 'Al crearla queda que la merecía.');
+    $clients = (int) $this->db->getVar('SELECT COUNT(*) FROM wp_jet_cct_clientes');
+    self::assertSame(1, $clients, 'Al crearla se registra el cliente de arriendo.');
+    self::assertNotSame('', $this->row($id)['id_cliente']);
+    $again = $this->create(['merece_ticket' => 'No', 'medio' => 'Aviso']);
+    $this->service()->createTask($this->taskInput($again));
+    self::assertSame(1, (int) $this->db->getVar('SELECT COUNT(*) FROM wp_jet_cct_clientes'), 'La misma persona no se duplica como cliente.');
     $this->expectExceptionMessage('ya tiene la tarea');
     $this->service()->createTask($this->taskInput($id));
   }
