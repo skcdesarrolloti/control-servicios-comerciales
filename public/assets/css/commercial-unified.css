@@ -1,0 +1,142 @@
+/*
+ * Estilo único del panel: las vistas de Actividades comerciales (Llamadas `ccl-*`; Cotizaciones, Estudios, Mandatos y
+ * Hojas de cierre `cqt-*`) y sus popups usan el mismo diseño de Inmuebles (CommercialDashboardView::renderPropertiesPage):
+ * encabezado en tarjeta con ícono, filtros en tarjeta con campos suaves, estados como píldoras y tablas en tarjeta.
+ * Se carga después de las hojas de cada módulo; los colores son los tokens del panel (tailwind.config.cjs).
+ */
+:root {
+  --scm-primary: #735c00;
+  --scm-gold: #f8cf4a;
+  --scm-ink: #001944;
+  --scm-muted: #4b5d8c;
+  --scm-line: #e9edff;
+  --scm-soft: #f2f3ff;
+  --scm-soft-hover: #e1e8ff;
+  --scm-active: #0b2e67;
+  --scm-field-line: rgba(208, 198, 174, .4);
+}
+.ccl, .cqt, .cst, .cmd {
+  --ccl-navy: var(--scm-ink); --ccl-blue: var(--scm-active); --ccl-muted: var(--scm-muted); --ccl-line: var(--scm-line);
+  --cqt-navy: var(--scm-ink); --cqt-blue: var(--scm-active); --cqt-muted: var(--scm-muted); --cqt-line: var(--scm-line); --cqt-soft: var(--scm-soft);
+}
+
+/* Encabezado: tarjeta con ícono, título y descripción (como Inmuebles). */
+.ccl-head, .cqt-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  margin: 0 0 24px; padding: 24px; background: #fff; border: 1px solid var(--scm-line); border-radius: 24px;
+}
+.scm-head-icon {
+  display: inline-flex; align-items: center; justify-content: center; flex: 0 0 48px; width: 48px; height: 48px;
+  border-radius: 16px; background: rgba(115, 92, 0, .1); color: var(--scm-primary);
+}
+.scm-head-icon .material-symbols-outlined { font-size: 28px !important; }
+.ccl-head .ccl-eyebrow, .cqt-head .cqt-eyebrow { display: none; }
+.ccl-head > div, .cqt-head > div { flex: 1 1 320px; min-width: 0; }
+.ccl-head h1, .cqt-head h1 { margin: 0; font-size: 24px; line-height: 1.25; font-weight: 700; color: var(--scm-ink); }
+.ccl-head p:last-child, .cqt-head p:last-child { margin: 4px 0 0; max-width: 48rem; font-size: 14px; color: var(--scm-muted); }
+
+/* Botones */
+.ccl-primary, .cqt-primary {
+  min-height: 38px; padding: 0 16px; border: 0; border-radius: 12px; background: var(--scm-primary); color: #fff;
+  font-size: 12px; font-weight: 600; box-shadow: 0 1px 2px rgba(0, 25, 68, .08);
+}
+.ccl-primary:hover, .cqt-primary:hover { background: rgba(115, 92, 0, .9); }
+.ccl-head .ccl-primary, .cqt-head .cqt-primary { background: var(--scm-gold); color: var(--scm-ink); }
+.ccl-head .ccl-primary:hover, .cqt-head .cqt-primary:hover { background: #e5bd3b; }
+.ccl-secondary, .cqt-secondary, .cqt-back {
+  min-height: 38px; padding: 0 14px; border: 1px solid rgba(208, 198, 174, .3); border-radius: 12px;
+  background: var(--scm-soft); color: var(--scm-ink); font-size: 12px; font-weight: 600;
+}
+.ccl-secondary:hover, .cqt-secondary:hover, .cqt-back:hover { background: var(--scm-line); }
+.cqt-small { min-height: 32px; padding: 0 12px; font-size: 12px; }
+.cqt-icon { color: var(--scm-muted); }
+.cqt-icon:hover { background: var(--scm-soft); }
+.cqt-link { color: var(--scm-primary); }
+
+/* Filtros y campos */
+.ccl-filters, .cqt-list-filters {
+  gap: 12px; padding: 20px; background: #fff; border: 1px solid var(--scm-line); border-radius: 16px; margin: 0 0 24px;
+}
+.ccl-field, .cqt-field { gap: 4px; font-size: 11px; font-weight: 600; color: var(--scm-muted); }
+.ccl-field input, .ccl-field select, .ccl-field textarea,
+.cqt-field input, .cqt-field select, .cqt-field textarea {
+  min-height: 38px; padding: 8px 12px; border: 1px solid var(--scm-field-line); border-radius: 12px;
+  background: var(--scm-soft); font-size: 12px; color: var(--scm-ink); transition: background .15s, border-color .15s;
+}
+.ccl-field input:focus, .ccl-field select:focus, .ccl-field textarea:focus,
+.cqt-field input:focus, .cqt-field select:focus, .cqt-field textarea:focus {
+  background: #fff; border-color: var(--scm-primary); outline: none; box-shadow: 0 0 0 1px var(--scm-primary);
+}
+.cqt-check, .ccl-check { font-size: 12px; color: var(--scm-ink); }
+
+/* Estados y conteos: píldoras como "Mis inmuebles por estado". */
+.ccl-chips, .cqt-chips {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 24px; padding: 8px;
+  background: #fff; border-radius: 16px; box-shadow: 0 1px 2px rgba(0, 25, 68, .06);
+}
+.ccl-chip, .cqt-chip {
+  min-height: 38px; padding: 6px 16px; border: 0; border-radius: 12px; background: var(--scm-line);
+  color: var(--scm-ink); font-size: 13px; font-weight: 500; flex-direction: row-reverse;
+}
+.ccl-chip:hover { background: var(--scm-soft-hover); }
+.ccl-chip strong, .cqt-chip strong {
+  min-width: 24px; padding: 2px 8px; border-radius: 999px; background: #fff; color: var(--scm-muted);
+  font-size: 12px; font-weight: 700; text-align: center;
+}
+.ccl-chip.is-active { background: var(--scm-active); color: #fff; box-shadow: 0 1px 2px rgba(0, 25, 68, .12); }
+.ccl-chip.is-active strong { background: var(--scm-gold); color: var(--scm-ink); }
+.ccl-chip.is-static { background: #fff8e1; }
+
+/* Tablas en tarjeta */
+.ccl-table-wrap, .cqt-table-wrap { border: 1px solid var(--scm-line); border-radius: 16px; }
+.ccl-table, .cqt-table { font-size: 13px; color: var(--scm-ink); }
+.ccl-table th, .cqt-table th {
+  padding: 12px 16px; background: var(--scm-soft); color: var(--scm-muted); border-bottom: 0;
+  font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; white-space: nowrap;
+}
+.ccl-table td, .cqt-table td { padding: 12px 16px; border-bottom: 1px solid var(--scm-line); }
+.ccl-table tbody tr:hover, .cqt-table tbody tr:hover { background: rgba(242, 243, 255, .6); }
+.ccl-table strong, .cqt-table strong { color: var(--scm-ink); }
+.ccl-table small, .cqt-table small { color: var(--scm-muted); }
+.ccl-status { background: var(--scm-line); color: var(--scm-ink); font-size: 11px; }
+
+/* Sin resultados: tarjeta con ícono */
+.ccl-empty, .cqt-empty {
+  padding: 48px 24px; background: #fff; border: 1px solid var(--scm-line); border-radius: 24px;
+  color: var(--scm-ink); font-size: 14px; font-weight: 700; text-align: center;
+}
+.ccl-empty::before, .cqt-empty::before {
+  content: "inbox"; display: flex; align-items: center; justify-content: center; width: 64px; height: 64px;
+  margin: 0 auto 12px; border-radius: 16px; background: var(--scm-line); color: var(--scm-muted);
+  font-family: "Material Symbols Outlined"; font-size: 32px; font-weight: 400; line-height: 1;
+  -webkit-font-feature-settings: "liga"; font-feature-settings: "liga";
+}
+.ccl-pager, .cqt-pager { font-size: 12px; color: var(--scm-muted); }
+
+/* Paneles y popups */
+.cqt-panel { border-color: var(--scm-line); border-radius: 16px; }
+.cqt-panel h2 { color: var(--scm-ink); }
+.cqt-task { background: #faf8ff; }
+.cqt-task-head { border-bottom-color: var(--scm-line); }
+.ccl-modal { border-radius: 24px; }
+.ccl-modal-head { border-bottom-color: var(--scm-line); }
+.ccl-modal-head h2 { color: var(--scm-ink); }
+.ccl-modal-head p { color: var(--scm-muted); }
+.ccl-modal-foot { border-top-color: var(--scm-line); background: #faf8ff; }
+.ccl-modal-body h3 { color: var(--scm-ink); }
+
+/* Estados de Estudios y Hojas de cierre (cst-pill): las mismas píldoras de estado. */
+.cst-pills {
+  gap: 8px; margin: 0 0 24px; padding: 8px; background: #fff; border-radius: 16px; box-shadow: 0 1px 2px rgba(0, 25, 68, .06);
+}
+.cst-pill {
+  min-height: 38px; padding: 6px 16px; border: 0; border-radius: 12px; background: var(--scm-line);
+  color: var(--scm-ink); font-size: 13px; font-weight: 500;
+}
+.cst-pill:hover { background: var(--scm-soft-hover); }
+.cst-pill strong {
+  min-width: 24px; padding: 2px 8px; border-radius: 999px; background: #fff; color: var(--scm-muted);
+  font-size: 12px; font-weight: 700; text-align: center;
+}
+.cst-pill[aria-pressed="true"] { background: var(--scm-active); color: #fff; box-shadow: 0 1px 2px rgba(0, 25, 68, .12); }
+.cst-pill[aria-pressed="true"] strong { background: var(--scm-gold); color: var(--scm-ink); }

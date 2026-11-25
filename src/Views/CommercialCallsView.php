@@ -35,7 +35,7 @@ final class CommercialCallsView
       $employees[(string) $employee['id']] = (string) $employee['name'];
     }
     $html = '<section class="ccl" data-ccl-page>'
-      . '<header class="ccl-head"><div><p class="ccl-eyebrow">Actividades comerciales</p><h1>Llamadas</h1><p>' . ($team ? 'Las llamadas de todo el equipo.' : 'Tus llamadas: las asignadas a ti y las que registraste.') . ' Cada llamada es una solicitud con su propio medio.</p></div>'
+      . '<header class="ccl-head"><span class="scm-head-icon" aria-hidden="true"><span class="material-symbols-outlined">call</span></span><div><p class="ccl-eyebrow">Actividades comerciales</p><h1>Llamadas</h1><p>' . ($team ? 'Las llamadas de todo el equipo.' : 'Tus llamadas: las asignadas a ti y las que registraste.') . ' Cada llamada es una solicitud con su propio medio.</p></div>'
       . ($policy->canAct('llamadas_crear') ? '<button type="button" class="ccl-primary" data-ccl-new><span class="material-symbols-outlined" aria-hidden="true">add_call</span>Registrar llamada</button>' : '')
       . '</header>'
       . '<form class="ccl-filters" data-ccl-filters aria-label="Filtros de llamadas">'

@@ -21,8 +21,8 @@ final class CommercialNotificationsView
       'can_edit_actor' => $policy->canAct('editar_actor'),
       'email_document' => $service->emailDocument('__SCM_NAME__', '__SCM_SUBJECT__', '__SCM_MESSAGE__'),
       'sms' => ['prefix' => CommercialSmsMessage::PREFIX, 'max' => CommercialSmsMessage::MAX_CHARACTERS, 'basic' => CommercialSmsMessage::GSM_BASIC, 'extended' => CommercialSmsMessage::GSM_EXTENDED]];
-    $field = 'w-full rounded-xl border border-slate-200 bg-surface-container-lowest px-3 py-2.5 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary-container';
-    $secondary = 'inline-flex items-center justify-center gap-2 min-h-[44px] rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium hover:bg-surface-container-low focus-visible:ring-2 focus-visible:ring-primary-container disabled:opacity-50 disabled:cursor-not-allowed';
+    $field = 'w-full rounded-xl border border-surface-container bg-surface-container-lowest px-3 py-2.5 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary-container';
+    $secondary = 'inline-flex items-center justify-center gap-2 min-h-[44px] rounded-xl border border-surface-container px-4 py-2 text-sm font-medium hover:bg-surface-container-low focus-visible:ring-2 focus-visible:ring-primary-container disabled:opacity-50 disabled:cursor-not-allowed';
     ob_start();
 ?>
 <section class="px-4 md:px-margin py-6 space-y-6 [&_[hidden]]:!hidden" data-commercial-notifications data-notification-config="<?php echo esc_attr(json_encode($config, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_THROW_ON_ERROR)); ?>">
@@ -42,15 +42,15 @@ final class CommercialNotificationsView
   <div id="notif-recipients-panel" role="tabpanel" aria-labelledby="notif-recipients-tab" data-notif-panel="recipients" class="space-y-5">
     <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
       <?php foreach ($types as $key => $type): ?>
-      <button type="button" data-notif-type="<?php echo esc_attr($key); ?>" aria-pressed="false" class="p-4 rounded-2xl bg-white border border-slate-200 text-left hover:shadow-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-container transition-shadow">
+      <button type="button" data-notif-type="<?php echo esc_attr($key); ?>" aria-pressed="false" class="p-4 rounded-2xl bg-white border border-surface-container text-left hover:shadow-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-container transition-shadow">
         <span class="flex min-h-[40px] items-start justify-between gap-2 text-sm font-medium"><span><?php echo esc_html($type['label']); ?></span><span class="material-symbols-outlined shrink-0 text-secondary text-[20px]" aria-hidden="true"><?php echo ['Propietario' => 'home_work', 'Arrendatario' => 'key', 'Copropiedad' => 'apartment', 'Club PPH' => 'loyalty'][$type['role']]; ?></span></span>
         <strong class="block text-2xl mt-2" data-notif-total="<?php echo esc_attr($key); ?>">—</strong><span class="block text-xs text-secondary mt-1" data-notif-contact="<?php echo esc_attr($key); ?>">Abrir para consultar</span>
       </button>
       <?php endforeach; ?>
     </div>
     <p class="text-xs text-secondary">Activos: con contrato Entregado. No activos: con contrato Recibido y sin contratos Entregados.</p>
-    <div class="rounded-2xl bg-white border border-slate-200 shadow-card overflow-hidden">
-        <div class="p-5 border-b border-slate-100 space-y-4">
+    <div class="rounded-2xl bg-white border border-surface-container shadow-card overflow-hidden">
+        <div class="p-5 border-b border-surface-container space-y-4">
           <div class="flex flex-wrap items-center justify-between gap-3">
             <h3 class="font-semibold text-title-md" data-notif-actor-title>Selecciona una categoría</h3>
             <div class="flex flex-wrap gap-2 items-center">
@@ -75,17 +75,17 @@ final class CommercialNotificationsView
             </fieldset>
           </form>
         </div>
-        <div class="px-5 py-3 flex flex-wrap items-center gap-3 border-b border-slate-100 text-xs"><label class="inline-flex items-center gap-2 min-h-[44px]"><input type="checkbox" data-notif-select-page class="accent-[#735c00] w-4 h-4">Seleccionar página</label><button type="button" data-notif-select-all class="underline text-secondary min-h-[44px]">Seleccionar todos los resultados</button><button type="button" data-notif-clear class="underline text-secondary min-h-[44px]">Quitar selección</button></div>
-        <div data-notif-recipients aria-live="polite" aria-busy="false" class="divide-y divide-slate-100"><p class="p-8 text-center text-sm text-secondary">Abre una categoría para consultar sus destinatarios.</p></div>
-        <div class="flex items-center justify-between gap-2 p-4 border-t border-slate-100"><button type="button" data-notif-prev class="<?php echo $secondary; ?>" disabled>Anterior</button><span data-notif-pagination class="text-xs text-secondary">Página 1</span><button type="button" data-notif-next class="<?php echo $secondary; ?>" disabled>Siguiente</button></div>
+        <div class="px-5 py-3 flex flex-wrap items-center gap-3 border-b border-surface-container text-xs"><label class="inline-flex items-center gap-2 min-h-[44px]"><input type="checkbox" data-notif-select-page class="accent-[#735c00] w-4 h-4">Seleccionar página</label><button type="button" data-notif-select-all class="underline text-secondary min-h-[44px]">Seleccionar todos los resultados</button><button type="button" data-notif-clear class="underline text-secondary min-h-[44px]">Quitar selección</button></div>
+        <div data-notif-recipients aria-live="polite" aria-busy="false" class="divide-y divide-surface-container"><p class="p-8 text-center text-sm text-secondary">Abre una categoría para consultar sus destinatarios.</p></div>
+        <div class="flex items-center justify-between gap-2 p-4 border-t border-surface-container"><button type="button" data-notif-prev class="<?php echo $secondary; ?>" disabled>Anterior</button><span data-notif-pagination class="text-xs text-secondary">Página 1</span><button type="button" data-notif-next class="<?php echo $secondary; ?>" disabled>Siguiente</button></div>
     </div>
   </div>
   <dialog data-notif-modal aria-labelledby="notif-modal-title" class="m-auto w-[calc(100%-2rem)] max-w-6xl max-h-[90dvh] p-0 rounded-2xl border-0 bg-background text-on-surface shadow-modal backdrop:bg-slate-900/50">
-    <div class="sticky top-0 z-10 bg-white border-b border-slate-200 px-5 py-4 flex justify-between items-start gap-4"><div><h3 id="notif-modal-title" class="text-title-lg font-semibold">Enviar notificación</h3><p data-notif-modal-target class="text-sm text-secondary mt-1"></p></div><button type="button" data-notif-close class="<?php echo $secondary; ?>" aria-label="Cerrar editor"><span class="material-symbols-outlined" aria-hidden="true">close</span></button></div>
+    <div class="sticky top-0 z-10 bg-white border-b border-surface-container px-5 py-4 flex justify-between items-start gap-4"><div><h3 id="notif-modal-title" class="text-title-lg font-semibold">Enviar notificación</h3><p data-notif-modal-target class="text-sm text-secondary mt-1"></p></div><button type="button" data-notif-close class="<?php echo $secondary; ?>" aria-label="Cerrar editor"><span class="material-symbols-outlined" aria-hidden="true">close</span></button></div>
     <p data-notif-modal-feedback role="status" class="px-5 pt-3 text-sm text-error" hidden></p>
     <div class="p-4 sm:p-5 grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
       <div>
-        <form data-notif-compose class="p-5 rounded-2xl bg-white border border-slate-200 shadow-card space-y-4">
+        <form data-notif-compose class="p-5 rounded-2xl bg-white border border-surface-container shadow-card space-y-4">
           <h3 class="font-semibold text-title-md">Prepara el mensaje</h3>
           <fieldset><legend class="text-xs font-medium mb-2">Canales de envío</legend><div class="flex flex-wrap gap-3 text-sm"><?php foreach (['whatsapp' => 'WhatsApp', 'email' => 'Email', 'sms' => 'SMS'] as $channel => $label): ?><label class="inline-flex gap-2 items-center min-h-[44px]"><input name="channels[]" value="<?php echo $channel; ?>" type="checkbox" <?php echo $channel === 'whatsapp' ? 'checked' : ''; ?> class="w-4 h-4 accent-[#735c00]"><?php echo $label; ?></label><?php endforeach; ?></div><p data-notif-channel-help class="mt-1 text-xs text-secondary"></p></fieldset>
           <div data-notif-whatsapp-fields><label for="notif-template" class="block text-xs font-medium mb-1.5">Plantilla de WhatsApp</label><select name="whatsapp_template" id="notif-template" class="<?php echo $field; ?>"><?php foreach ($templates as $template): ?><option value="<?php echo esc_attr($template['name']); ?>"><?php echo esc_html($template['label']); ?></option><?php endforeach; ?></select><p class="text-xs text-secondary mt-2">Utiliza una plantilla aprobada en Meta y contactos que autorizaron recibir tus mensajes.</p></div>
@@ -97,7 +97,7 @@ final class CommercialNotificationsView
           <?php if (!$policy->canAct('enviar_notificacion')): ?><p class="text-xs text-secondary">Tu cargo puede consultar, pero no tiene permiso para enviar notificaciones.</p><?php endif; ?>
         </form>
       </div>
-      <div class="rounded-2xl border border-slate-200 bg-surface-container-low p-4 space-y-3"><h3 class="text-xs font-semibold text-secondary uppercase tracking-wide">Vista previa del mensaje</h3><div class="flex flex-wrap gap-2" aria-label="Canal de vista previa"><?php foreach (['whatsapp' => 'WhatsApp', 'email' => 'Correo', 'sms' => 'SMS'] as $channel => $label): ?><button type="button" data-notif-preview-channel="<?php echo $channel; ?>" class="<?php echo $secondary; ?> bg-white"><?php echo $label; ?></button><?php endforeach; ?></div><div data-notif-text-preview class="rounded-xl bg-white p-4 shadow-sm"><div data-notif-media-preview class="mb-3" hidden></div><p data-notif-preview class="whitespace-pre-wrap break-words text-sm leading-relaxed"></p></div><iframe data-notif-email-preview title="Vista previa del correo con banner" sandbox="" referrerpolicy="no-referrer" class="w-full h-[560px] rounded-xl border border-slate-200 bg-white" hidden></iframe><p class="text-xs text-secondary">Cada destinatario recibe su mensaje personalizado. SMS utiliza el prefijo de la empresa y el texto escrito, dentro de 160 caracteres.</p></div>
+      <div class="rounded-2xl border border-surface-container bg-surface-container-low p-4 space-y-3"><h3 class="text-xs font-semibold text-secondary uppercase tracking-wide">Vista previa del mensaje</h3><div class="flex flex-wrap gap-2" aria-label="Canal de vista previa"><?php foreach (['whatsapp' => 'WhatsApp', 'email' => 'Correo', 'sms' => 'SMS'] as $channel => $label): ?><button type="button" data-notif-preview-channel="<?php echo $channel; ?>" class="<?php echo $secondary; ?> bg-white"><?php echo $label; ?></button><?php endforeach; ?></div><div data-notif-text-preview class="rounded-xl bg-white p-4 shadow-sm"><div data-notif-media-preview class="mb-3" hidden></div><p data-notif-preview class="whitespace-pre-wrap break-words text-sm leading-relaxed"></p></div><iframe data-notif-email-preview title="Vista previa del correo con banner" sandbox="" referrerpolicy="no-referrer" class="w-full h-[560px] rounded-xl border border-surface-container bg-white" hidden></iframe><p class="text-xs text-secondary">Cada destinatario recibe su mensaje personalizado. SMS utiliza el prefijo de la empresa y el texto escrito, dentro de 160 caracteres.</p></div>
     </div>
   </dialog>
   <dialog data-notif-confirm-modal aria-labelledby="notif-confirm-title" aria-describedby="notif-confirm-description" class="m-auto w-[calc(100%-2rem)] max-w-lg max-h-[90dvh] p-6 sm:p-7 rounded-2xl border-0 bg-white text-on-surface shadow-modal backdrop:bg-slate-900/50">
@@ -123,9 +123,9 @@ final class CommercialNotificationsView
   </dialog>
   <div id="notif-queue-panel" role="tabpanel" aria-labelledby="notif-queue-tab" data-notif-panel="queue" hidden class="space-y-4">
     <div class="grid grid-cols-2 sm:grid-cols-5 gap-3" data-notif-queue-stats></div>
-    <div class="bg-white border border-slate-200 rounded-2xl shadow-card overflow-hidden">
+    <div class="bg-white border border-surface-container rounded-2xl shadow-card overflow-hidden">
       <div class="p-5 flex flex-wrap justify-between gap-3"><div><h3 class="font-semibold text-title-md">Estado de los envíos</h3><p class="text-xs text-secondary mt-1"><?php echo $policy->canSeeAll('notificaciones') ? 'Todos los envíos del módulo comercial.' : 'Historial de tus notificaciones.'; ?></p></div><div class="flex gap-2"><select aria-label="Filtrar por estado" data-notif-queue-status class="<?php echo $field; ?>"><option value="">Todos los estados</option><option value="pending">Pendientes</option><option value="processing">Procesando</option><option value="sent">Enviados</option><option value="failed">Fallidos</option><option value="cancelled">Cancelados</option></select><button type="button" data-notif-queue-refresh class="<?php echo $secondary; ?>" aria-label="Actualizar cola"><span class="material-symbols-outlined text-[20px]" aria-hidden="true">refresh</span></button></div></div>
-      <div class="overflow-x-auto"><table class="w-full text-sm"><thead class="bg-surface-container-low text-left text-xs text-secondary"><tr><th class="px-5 py-3">Destinatario</th><th class="px-5 py-3">Creada por</th><th class="px-5 py-3">Canal</th><th class="px-5 py-3">Estado</th><th class="px-5 py-3">Fecha de creación</th><th class="px-5 py-3">Detalle</th><th class="px-5 py-3">Acciones</th></tr></thead><tbody data-notif-queue-rows class="divide-y divide-slate-100"></tbody></table></div>
+      <div class="overflow-x-auto"><table class="w-full text-sm"><thead class="bg-surface-container-low text-left text-xs text-secondary"><tr><th class="px-5 py-3">Destinatario</th><th class="px-5 py-3">Creada por</th><th class="px-5 py-3">Canal</th><th class="px-5 py-3">Estado</th><th class="px-5 py-3">Fecha de creación</th><th class="px-5 py-3">Detalle</th><th class="px-5 py-3">Acciones</th></tr></thead><tbody data-notif-queue-rows class="divide-y divide-surface-container"></tbody></table></div>
       <div class="p-4 flex items-center justify-between gap-2"><button type="button" data-notif-queue-prev class="<?php echo $secondary; ?>" disabled>Anterior</button><span data-notif-queue-page class="text-xs text-secondary"></span><button type="button" data-notif-queue-next class="<?php echo $secondary; ?>" disabled>Siguiente</button></div>
     </div>
   </div>
@@ -134,8 +134,8 @@ final class CommercialNotificationsView
     <p data-notif-history-loading role="status" class="mt-4 text-sm text-secondary">Cargando mensaje…</p>
     <div data-notif-history-content class="mt-4 space-y-4" hidden>
       <dl data-notif-history-info class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm rounded-xl bg-surface-container-low p-4"></dl>
-      <p data-notif-history-text class="whitespace-pre-wrap break-words rounded-xl border border-slate-200 p-4 text-sm leading-relaxed"></p>
-      <iframe data-notif-history-email title="Correo guardado en la cola" sandbox="" referrerpolicy="no-referrer" class="w-full h-[560px] rounded-xl border border-slate-200 bg-white" hidden></iframe>
+      <p data-notif-history-text class="whitespace-pre-wrap break-words rounded-xl border border-surface-container p-4 text-sm leading-relaxed"></p>
+      <iframe data-notif-history-email title="Correo guardado en la cola" sandbox="" referrerpolicy="no-referrer" class="w-full h-[560px] rounded-xl border border-surface-container bg-white" hidden></iframe>
       <div data-notif-history-media class="space-y-2" hidden></div>
       <p class="text-xs text-secondary">Contenido guardado al crear el mensaje. Enviado indica el resultado registrado por el proveedor; no confirma lectura.</p>
     </div>
@@ -148,7 +148,7 @@ final class CommercialNotificationsView
     <div class="mt-5 flex flex-col-reverse sm:flex-row sm:justify-end gap-2"><button type="button" data-notif-delete-cancel autofocus class="<?php echo $secondary; ?>">Cancelar</button><button type="button" data-notif-delete-confirm class="<?php echo $secondary; ?> text-error">Eliminar notificación</button></div>
   </dialog>
   <div id="notif-report-panel" role="tabpanel" aria-labelledby="notif-report-tab" data-notif-panel="report" hidden class="space-y-4">
-    <div class="bg-white border border-slate-200 rounded-2xl shadow-card overflow-hidden">
+    <div class="bg-white border border-surface-container rounded-2xl shadow-card overflow-hidden">
       <div class="p-5 space-y-4">
         <div><h3 class="font-semibold text-title-md">Informe de notificaciones por funcionario</h3><p class="text-xs text-secondary mt-1"><?php echo $policy->canSeeAll('notificaciones') ? 'Todos los autores del módulo comercial.' : 'Informe de tus notificaciones.'; ?> Una fila por funcionario, con cantidades de WhatsApp, correo y SMS. Incluye eliminados para conservar la trazabilidad.</p></div>
         <form data-notif-report-form class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
@@ -161,7 +161,7 @@ final class CommercialNotificationsView
         <p data-notif-report-summary role="status" class="text-sm text-secondary"></p>
         <p class="text-xs text-secondary">Fechas de creación en hora de Colombia. «Eliminados» es parte del total y puede coincidir con cualquier estado. El autor es quien creó y solicitó el envío; la entrega la realiza el servicio automático.</p>
       </div>
-      <div class="overflow-x-auto"><table class="w-full text-sm"><thead class="bg-surface-container-low text-left text-xs text-secondary"><tr><?php foreach (['Funcionario', 'Cargo', 'WhatsApp', 'Correo', 'SMS', 'Total', 'Pendientes', 'Procesando', 'Enviados', 'Fallidos', 'Cancelados', 'Eliminados', 'Última creación'] as $heading): ?><th class="px-4 py-3 whitespace-nowrap"><?php echo $heading; ?></th><?php endforeach; ?></tr></thead><tbody data-notif-report-rows class="divide-y divide-slate-100"></tbody></table></div>
+      <div class="overflow-x-auto"><table class="w-full text-sm"><thead class="bg-surface-container-low text-left text-xs text-secondary"><tr><?php foreach (['Funcionario', 'Cargo', 'WhatsApp', 'Correo', 'SMS', 'Total', 'Pendientes', 'Procesando', 'Enviados', 'Fallidos', 'Cancelados', 'Eliminados', 'Última creación'] as $heading): ?><th class="px-4 py-3 whitespace-nowrap"><?php echo $heading; ?></th><?php endforeach; ?></tr></thead><tbody data-notif-report-rows class="divide-y divide-surface-container"></tbody></table></div>
     </div>
   </div>
   <?php if ($policy->canAct('editar_actor')): ?>
@@ -178,7 +178,7 @@ final class CommercialNotificationsView
       <h4 data-notif-actor-comparison-title tabindex="-1" class="text-sm font-semibold">Comparación antes de guardar</h4><p class="text-xs text-secondary">Revisa el valor actual y cómo quedará cada campo de los registros seleccionados. Se resaltan los campos que cambiarán. Nada se guarda hasta confirmar.</p>
       <div data-notif-actor-changes class="space-y-3"></div>
     </div>
-    <div data-notif-actor-actions class="sticky bottom-0 bg-white border-t border-slate-200 mt-4 pt-4 pb-2 space-y-3">
+    <div data-notif-actor-actions class="sticky bottom-0 bg-white border-t border-surface-container mt-4 pt-4 pb-2 space-y-3">
       <p data-notif-actor-save-hint role="status" class="text-xs text-secondary">Primero abre la comparación para habilitar el guardado.</p>
       <label data-notif-actor-confirm-wrap class="flex items-start gap-2 text-sm" hidden><input type="checkbox" data-notif-actor-confirm class="mt-1 w-4 h-4 shrink-0 accent-[#735c00]"><span>He revisado los valores actuales y finales y confirmo actualizar los registros seleccionados.</span></label>
       <div class="flex flex-col sm:flex-row sm:justify-end gap-2"><button type="button" data-notif-actor-back class="<?php echo $secondary; ?>" hidden>Volver a editar</button><button type="button" data-notif-actor-review class="<?php echo $secondary; ?> bg-primary-container">Ver cómo quedarán los datos</button><button type="button" data-notif-actor-save hidden disabled class="<?php echo $secondary; ?> bg-primary-container">Guardar cambios</button></div>

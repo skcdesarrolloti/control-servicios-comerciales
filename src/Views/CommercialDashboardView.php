@@ -466,6 +466,8 @@ final class CommercialDashboardView
   <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/commercial-property-entry.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/commercial-property-entry.css')); ?>">
   <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/commercial-editor-studio.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/commercial-editor-studio.css')); ?>">
   <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/commercial-property-video.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/commercial-property-video.css')); ?>">
+  <!-- Estilo único (el de Inmuebles) para Actividades comerciales y sus popups: va después de las hojas de cada módulo. -->
+  <link rel="stylesheet" href="<?php echo esc_url($baseUrl . '/assets/css/commercial-unified.css?v=' . hash_file('sha256', SCM_PUBLIC_PATH . '/assets/css/commercial-unified.css')); ?>">
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11" defer></script>
 </head>
 <body class="bg-background font-body-md text-on-surface antialiased">
@@ -683,8 +685,8 @@ final class CommercialDashboardView
 
     <!-- Modal de Caso / Tarea -->
     <div class="fixed inset-0 z-50 items-center justify-center p-3 sm:p-5 lg:p-7 bg-[#061D49]/50 backdrop-blur-md commercial-modal overflow-y-auto" id="commercial-case-modal" role="dialog" aria-modal="true" aria-labelledby="commercial-case-title" aria-hidden="true">
-      <div class="bg-white w-full max-w-[1400px] max-h-[94vh] rounded-3xl shadow-modal border border-slate-100 flex flex-col overflow-hidden relative" role="document" data-commercial-case-content>
-        <div class="flex items-center justify-center py-28 text-slate-500 gap-3">
+      <div class="bg-white w-full max-w-[1400px] max-h-[94vh] rounded-3xl shadow-modal border border-surface-container flex flex-col overflow-hidden relative" role="document" data-commercial-case-content>
+        <div class="flex items-center justify-center py-28 text-secondary gap-3">
           <span class="w-3 h-3 rounded-full bg-[#1E3C76] animate-ping"></span>
           <p class="font-body-md text-sm font-medium">Cargando información de la tarea…</p>
         </div>
@@ -693,8 +695,8 @@ final class CommercialDashboardView
 
     <!-- Modal Detalle Completo de Inmueble -->
     <div class="fixed inset-0 z-[60] items-center justify-center p-3 sm:p-5 lg:p-7 bg-[#061D49]/60 backdrop-blur-md commercial-modal overflow-y-auto" id="commercial-property-detail-modal" role="dialog" aria-modal="true" aria-labelledby="commercial-property-detail-title" aria-hidden="true">
-      <div class="bg-surface-container-lowest w-full max-w-5xl max-h-[94vh] rounded-3xl shadow-modal border border-slate-200/80 flex flex-col overflow-hidden relative text-on-surface" role="document" data-commercial-property-detail-container>
-        <div class="flex items-center justify-center py-28 text-slate-500 gap-3">
+      <div class="bg-surface-container-lowest w-full max-w-5xl max-h-[94vh] rounded-3xl shadow-modal border border-surface-container/80 flex flex-col overflow-hidden relative text-on-surface" role="document" data-commercial-property-detail-container>
+        <div class="flex items-center justify-center py-28 text-secondary gap-3">
           <span class="w-3 h-3 rounded-full bg-[#1E3C76] animate-ping"></span>
           <p class="font-body-md text-sm font-medium">Cargando información del inmueble…</p>
         </div>
@@ -767,7 +769,7 @@ final class CommercialDashboardView
     ob_start();
 ?>
     <section data-commercial-access-denied class="px-4 md:px-margin py-12 sm:py-16">
-      <div class="mx-auto max-w-xl rounded-2xl border border-slate-200 bg-white p-6 sm:p-10 shadow-card text-center">
+      <div class="mx-auto max-w-xl rounded-2xl border border-surface-container bg-white p-6 sm:p-10 shadow-card text-center">
         <div class="mx-auto w-16 h-16 rounded-2xl bg-primary-container flex items-center justify-center text-on-surface"><span class="material-symbols-outlined text-[32px]" aria-hidden="true">lock</span></div>
         <p class="mt-5 text-xs font-semibold text-secondary uppercase tracking-wide">Acceso restringido · 403</p>
         <h2 class="mt-2 text-headline-md font-semibold text-on-surface focus:outline-none">No tienes permiso para entrar a esta página</h2>
@@ -1107,10 +1109,10 @@ final class CommercialDashboardView
             <?php if (!$policy instanceof CommercialAccessPolicy || $policy->canSubview('inmuebles', 'no_publicos')): ?>
             <a class="flex items-center justify-between px-3 py-2 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-commercial-tab="inmuebles" href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'inmuebles', 'property_subtab' => 'no_publicos'])); ?>">
               <span class="flex items-center gap-2">
-                <span class="material-symbols-outlined text-[18px] text-slate-600">inventory_2</span>
+                <span class="material-symbols-outlined text-[18px] text-secondary">inventory_2</span>
                 <span>Inmuebles no públicos</span>
               </span>
-              <span class="font-label-sm text-[11px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full font-semibold"><?php echo esc_html($propertyBadge('no_publicos', 'Cerrados')); ?></span>
+              <span class="font-label-sm text-[11px] bg-surface-container text-on-surface px-2 py-0.5 rounded-full font-semibold"><?php echo esc_html($propertyBadge('no_publicos', 'Cerrados')); ?></span>
             </a>
             <?php endif; ?>
             <div class="my-1 border-t border-surface-container"></div>
@@ -1294,7 +1296,7 @@ final class CommercialDashboardView
         <span><?php echo esc_html(in_array($bucket, ['actualizaciones', 'avisos'], true) ? self::controlTitle($bucket, $policy, $filters) : (CommercialAccessPolicy::VIEWS[$bucket] ?? 'Navegación')); ?></span>
         <span class="material-symbols-outlined text-[18px]" aria-hidden="true">expand_more</span>
       </button>
-      <nav class="absolute left-0 top-full hidden bg-white border border-slate-200 rounded-2xl shadow-modal p-2 w-72 max-w-[85vw] max-h-[75vh] overflow-y-auto z-50" data-commercial-dropdown-menu="mobile" aria-label="Navegación móvil">
+      <nav class="absolute left-0 top-full hidden bg-white border border-surface-container rounded-2xl shadow-modal p-2 w-72 max-w-[85vw] max-h-[75vh] overflow-y-auto z-50" data-commercial-dropdown-menu="mobile" aria-label="Navegación móvil">
         <?php if ($portfolioLinks !== []): ?>
           <div class="px-3 pt-2 pb-1 text-[11px] uppercase font-semibold text-secondary">Mi portafolio</div>
           <?php foreach ($portfolioLinks as $portfolioLink): ?>
@@ -1747,7 +1749,7 @@ final class CommercialDashboardView
 ?>
     <!-- Modal 1: Tareas Atrasadas -->
     <div class="fixed inset-0 z-50 items-center justify-center p-4 sm:p-6 bg-[#061D49]/50 backdrop-blur-md commercial-modal commercial-advisory-modal" id="commercial-advisory-modal-task_updates" role="dialog" aria-modal="true" aria-labelledby="commercial-advisory-title-task_updates" aria-hidden="true" data-commercial-advisory-modal="task_updates" data-auto-open="<?php echo $taskOverdue > 0 ? '1' : '0'; ?>">
-      <div class="bg-surface-container-lowest w-full max-w-xl rounded-3xl shadow-modal border border-slate-100 overflow-hidden flex flex-col relative" role="document">
+      <div class="bg-surface-container-lowest w-full max-w-xl rounded-3xl shadow-modal border border-surface-container overflow-hidden flex flex-col relative" role="document">
         <div class="p-6 bg-error-container/30 border-b border-error/10 flex items-center justify-between">
           <div class="flex items-center gap-3">
             <span class="w-10 h-10 rounded-2xl bg-error text-on-error flex items-center justify-center shadow-sm">
@@ -1808,7 +1810,7 @@ final class CommercialDashboardView
 
     <!-- Modal 2: Inmuebles Pendientes por Actualizar -->
     <div class="fixed inset-0 z-50 items-center justify-center p-4 sm:p-6 bg-[#061D49]/50 backdrop-blur-md commercial-modal commercial-advisory-modal" id="commercial-advisory-modal-property_updates" role="dialog" aria-modal="true" aria-labelledby="commercial-advisory-title-property_updates" aria-hidden="true" data-commercial-advisory-modal="property_updates" data-auto-open="<?php echo $propertyPending > 0 ? '1' : '0'; ?>">
-      <div class="bg-surface-container-lowest w-full max-w-xl rounded-3xl shadow-modal border border-slate-100 overflow-hidden flex flex-col relative" role="document">
+      <div class="bg-surface-container-lowest w-full max-w-xl rounded-3xl shadow-modal border border-surface-container overflow-hidden flex flex-col relative" role="document">
         <div class="p-6 bg-tertiary-fixed/30 border-b border-tertiary-fixed/40 flex items-center justify-between">
           <div class="flex items-center gap-3">
             <span class="w-10 h-10 rounded-2xl bg-tertiary text-on-tertiary flex items-center justify-center shadow-sm">
@@ -1860,7 +1862,7 @@ final class CommercialDashboardView
 
     <!-- Modal 3: Avisos en Fachada Pendientes -->
     <div class="fixed inset-0 z-50 items-center justify-center p-4 sm:p-6 bg-[#061D49]/50 backdrop-blur-md commercial-modal commercial-advisory-modal" id="commercial-advisory-modal-sign_status" role="dialog" aria-modal="true" aria-labelledby="commercial-advisory-title-sign_status" aria-hidden="true" data-commercial-advisory-modal="sign_status" data-auto-open="<?php echo $signPending > 0 ? '1' : '0'; ?>">
-      <div class="bg-surface-container-lowest w-full max-w-xl rounded-3xl shadow-modal border border-slate-100 overflow-hidden flex flex-col relative" role="document">
+      <div class="bg-surface-container-lowest w-full max-w-xl rounded-3xl shadow-modal border border-surface-container overflow-hidden flex flex-col relative" role="document">
         <div class="p-6 bg-surface-container border-b border-surface-container-high flex items-center justify-between">
           <div class="flex items-center gap-3">
             <span class="w-10 h-10 rounded-2xl bg-secondary text-on-secondary flex items-center justify-center shadow-sm">
@@ -3299,7 +3301,7 @@ final class CommercialDashboardView
 
     ob_start();
 ?>
-    <div class="scm-calendar-panel w-full max-w-[1680px] mx-auto px-4 sm:px-6 pt-5 pb-10 space-y-5 text-slate-800" data-scm-calendar-panel
+    <div class="scm-calendar-panel w-full max-w-[1680px] mx-auto px-4 sm:px-6 pt-5 pb-10 space-y-5 text-on-surface" data-scm-calendar-panel
       data-calendar-mode="<?php echo esc_attr($mode); ?>"
       data-calendar-view="<?php echo esc_attr($view); ?>"
       data-calendar-lock-current="<?php echo $mode === 'personal' ? '1' : '0'; ?>"
@@ -3312,25 +3314,25 @@ final class CommercialDashboardView
       <!-- Encabezado -->
       <header class="flex flex-wrap items-end justify-between gap-4">
         <div class="min-w-0">
-          <p class="text-[13px] font-medium text-slate-500">Calendario comercial</p>
-          <h1 class="text-[26px] font-semibold tracking-tight text-slate-900 leading-tight"><?php echo esc_html($title); ?></h1>
+          <p class="text-[13px] font-medium text-secondary">Calendario comercial</p>
+          <h1 class="text-[26px] font-semibold tracking-tight text-on-surface leading-tight"><?php echo esc_html($title); ?></h1>
         </div>
         <div class="flex flex-wrap items-center gap-2">
           <?php if ($showPendingAction): ?>
-            <button type="button" class="inline-flex items-center gap-2 h-9 px-3 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer" data-scm-calendar-open-pending title="Eventos vencidos sin cerrar">
+            <button type="button" class="inline-flex items-center gap-2 h-9 px-3 rounded-lg border border-surface-container bg-white text-sm font-medium text-on-surface hover:bg-surface-container-low transition-colors cursor-pointer" data-scm-calendar-open-pending title="Eventos vencidos sin cerrar">
               <span>Sin cerrar</span>
               <em class="not-italic min-w-[20px] h-5 px-1.5 rounded-full bg-rose-50 text-rose-600 text-xs font-semibold inline-flex items-center justify-center" data-scm-calendar-pending-action-count>0</em>
             </button>
           <?php endif; ?>
           <?php if ($showReportAction): ?>
-            <button type="button" class="inline-flex items-center h-9 px-3 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer" data-scm-calendar-open-report>Informe del día</button>
+            <button type="button" class="inline-flex items-center h-9 px-3 rounded-lg border border-surface-container bg-white text-sm font-medium text-on-surface hover:bg-surface-container-low transition-colors cursor-pointer" data-scm-calendar-open-report>Informe del día</button>
           <?php endif; ?>
           <?php if ($showCreateActions): ?>
             <?php if ($mode === 'personal'): ?>
-              <button type="button" class="inline-flex items-center h-9 px-3 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer" data-scm-calendar-open-create data-calendar-mode="single" data-calendar-kind="reminder">Recordatorio</button>
+              <button type="button" class="inline-flex items-center h-9 px-3 rounded-lg border border-surface-container bg-white text-sm font-medium text-on-surface hover:bg-surface-container-low transition-colors cursor-pointer" data-scm-calendar-open-create data-calendar-mode="single" data-calendar-kind="reminder">Recordatorio</button>
             <?php endif; ?>
             <?php if ($mode !== 'personal' && !empty($config['calendar_can_assign_others'])): ?>
-              <button type="button" class="inline-flex items-center h-9 px-3 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer" data-scm-calendar-open-create data-calendar-mode="multiple" title="Un mismo evento para varios funcionarios">Para varios</button>
+              <button type="button" class="inline-flex items-center h-9 px-3 rounded-lg border border-surface-container bg-white text-sm font-medium text-on-surface hover:bg-surface-container-low transition-colors cursor-pointer" data-scm-calendar-open-create data-calendar-mode="multiple" title="Un mismo evento para varios funcionarios">Para varios</button>
             <?php endif; ?>
             <button type="button" class="inline-flex items-center gap-1.5 h-9 pl-2.5 pr-3.5 rounded-lg bg-[#1E3C76] hover:bg-[#061D49] text-sm font-medium text-white shadow-sm transition-colors cursor-pointer" data-scm-calendar-open-create data-calendar-mode="single">
               <span class="material-symbols-outlined text-[18px]">add</span>
@@ -3341,44 +3343,44 @@ final class CommercialDashboardView
       </header>
 
       <!-- Vistas -->
-      <nav class="flex items-center gap-6 border-b border-slate-200 overflow-x-auto" aria-label="Vistas del calendario">
+      <nav class="flex items-center gap-6 border-b border-surface-container overflow-x-auto" aria-label="Vistas del calendario">
         <?php foreach (['mine' => 'Mi calendario', 'team' => 'Equipo', 'due' => 'Vencimientos'] as $tabKey => $tabLabel): ?>
           <?php if ($policy instanceof CommercialAccessPolicy && !$policy->canSubview('calendario', $tabKey)) continue; ?>
           <a href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'calendario', 'subtab' => $tabKey])); ?>"
-             class="-mb-px py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors <?php echo $subtab === $tabKey ? 'border-[#1E3C76] text-slate-900' : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'; ?>"
+             class="-mb-px py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors <?php echo $subtab === $tabKey ? 'border-[#1E3C76] text-on-surface' : 'border-transparent text-secondary hover:text-on-surface hover:border-outline-variant/40'; ?>"
              data-commercial-tab="calendario" data-subtab="<?php echo esc_attr($tabKey); ?>"<?php echo $subtab === $tabKey ? ' aria-current="page"' : ''; ?>><?php echo esc_html($tabLabel); ?></a>
         <?php endforeach; ?>
       </nav>
 
       <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-5 items-start">
         <!-- Calendario -->
-        <section class="rounded-xl border border-slate-200 bg-white min-w-0">
-          <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-slate-100">
+        <section class="rounded-xl border border-surface-container bg-white min-w-0">
+          <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-surface-container">
             <div class="flex items-center gap-3 min-w-0">
-              <button type="button" class="h-8 px-3 rounded-lg border border-slate-200 text-sm font-medium text-slate-700 hover:bg-slate-50 cursor-pointer" data-scm-calendar-today-btn>Hoy</button>
+              <button type="button" class="h-8 px-3 rounded-lg border border-surface-container text-sm font-medium text-on-surface hover:bg-surface-container-low cursor-pointer" data-scm-calendar-today-btn>Hoy</button>
               <div class="flex items-center">
-                <button type="button" class="w-8 h-8 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800 flex items-center justify-center cursor-pointer" data-scm-calendar-prev aria-label="Anterior"><span class="material-symbols-outlined text-[20px]">chevron_left</span></button>
-                <button type="button" class="w-8 h-8 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800 flex items-center justify-center cursor-pointer" data-scm-calendar-next aria-label="Siguiente"><span class="material-symbols-outlined text-[20px]">chevron_right</span></button>
+                <button type="button" class="w-8 h-8 rounded-lg text-secondary hover:bg-surface-container hover:text-on-surface flex items-center justify-center cursor-pointer" data-scm-calendar-prev aria-label="Anterior"><span class="material-symbols-outlined text-[20px]">chevron_left</span></button>
+                <button type="button" class="w-8 h-8 rounded-lg text-secondary hover:bg-surface-container hover:text-on-surface flex items-center justify-center cursor-pointer" data-scm-calendar-next aria-label="Siguiente"><span class="material-symbols-outlined text-[20px]">chevron_right</span></button>
               </div>
-              <h2 class="text-lg font-semibold text-slate-900 truncate first-letter:uppercase" data-scm-calendar-title>Calendario</h2>
+              <h2 class="text-lg font-semibold text-on-surface truncate first-letter:uppercase" data-scm-calendar-title>Calendario</h2>
               <span class="sr-only" data-scm-calendar-board-kicker>Vista mensual</span>
-              <span class="w-4 h-4 rounded-full border-2 border-slate-200 border-t-[#1E3C76] animate-spin opacity-0 [&.active]:opacity-100 transition-opacity" data-scm-calendar-spinner aria-hidden="true"></span>
+              <span class="w-4 h-4 rounded-full border-2 border-surface-container border-t-[#1E3C76] animate-spin opacity-0 [&.active]:opacity-100 transition-opacity" data-scm-calendar-spinner aria-hidden="true"></span>
             </div>
             <div class="flex items-center gap-4">
-              <dl class="hidden md:flex items-center gap-4 text-[13px] text-slate-500">
+              <dl class="hidden md:flex items-center gap-4 text-[13px] text-secondary">
                 <?php
                   $stats = $view === 'pending'
                     ? [['total', 'en total'], ['done', 'vencidos'], ['today', 'vencen hoy']]
                     : [['pending', 'pendientes'], ['done', 'realizados'], ['today', 'hoy']];
                 ?>
                 <?php foreach ($stats as [$statKey, $statLabel]): ?>
-                  <div class="flex items-baseline gap-1"><dt class="sr-only"><?php echo esc_html($statLabel); ?></dt><dd class="font-semibold text-slate-900" data-scm-calendar-<?php echo esc_attr($statKey); ?>>0</dd><span><?php echo esc_html($statLabel); ?></span></div>
+                  <div class="flex items-baseline gap-1"><dt class="sr-only"><?php echo esc_html($statLabel); ?></dt><dd class="font-semibold text-on-surface" data-scm-calendar-<?php echo esc_attr($statKey); ?>>0</dd><span><?php echo esc_html($statLabel); ?></span></div>
                 <?php endforeach; ?>
                 <?php if ($view !== 'pending'): ?><span class="hidden" data-scm-calendar-total>0</span><?php else: ?><span class="hidden" data-scm-calendar-pending>0</span><?php endif; ?>
               </dl>
-              <div class="flex items-center p-0.5 rounded-lg bg-slate-100" aria-label="Modo de vista">
+              <div class="flex items-center p-0.5 rounded-lg bg-surface-container" aria-label="Modo de vista">
                 <?php foreach (['month' => 'Mes', 'week' => 'Semana', 'day' => 'Día'] as $modeKey => $modeLabel): ?>
-                  <button type="button" class="h-7 px-3 rounded-md text-[13px] font-medium transition-colors cursor-pointer <?php echo $modeKey === 'month' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'; ?>" data-scm-calendar-view-mode="<?php echo esc_attr($modeKey); ?>" aria-pressed="<?php echo $modeKey === 'month' ? 'true' : 'false'; ?>"><?php echo esc_html($modeLabel); ?></button>
+                  <button type="button" class="h-7 px-3 rounded-md text-[13px] font-medium transition-colors cursor-pointer <?php echo $modeKey === 'month' ? 'bg-white text-on-surface shadow-sm' : 'text-secondary hover:text-on-surface'; ?>" data-scm-calendar-view-mode="<?php echo esc_attr($modeKey); ?>" aria-pressed="<?php echo $modeKey === 'month' ? 'true' : 'false'; ?>"><?php echo esc_html($modeLabel); ?></button>
                 <?php endforeach; ?>
               </div>
             </div>
@@ -3386,9 +3388,9 @@ final class CommercialDashboardView
 
           <?php if ($view !== 'pending'): ?>
             <!-- Los filtros se aplican al cambiar -->
-            <form class="flex flex-wrap items-center gap-2 px-4 py-2.5 border-b border-slate-100" data-scm-calendar-filters autocomplete="off" onsubmit="return false;">
+            <form class="flex flex-wrap items-center gap-2 px-4 py-2.5 border-b border-surface-container" data-scm-calendar-filters autocomplete="off" onsubmit="return false;">
               <?php if ($showEmployeeFilter): ?>
-                <select name="id_empleado" data-scm-calendar-filter-employees aria-label="Funcionario" class="h-8 pl-2.5 pr-8 rounded-lg border border-slate-200 bg-white text-[13px] text-slate-700 outline-none focus:border-[#1E3C76] focus:ring-2 focus:ring-[#1E3C76]/10 max-w-[220px]">
+                <select name="id_empleado" data-scm-calendar-filter-employees aria-label="Funcionario" class="h-8 pl-2.5 pr-8 rounded-lg border border-surface-container bg-white text-[13px] text-on-surface outline-none focus:border-[#1E3C76] focus:ring-2 focus:ring-[#1E3C76]/10 max-w-[220px]">
                   <option value=""><?php echo $mode === 'personal' ? 'Mi calendario' : 'Todo el equipo'; ?></option>
                   <?php foreach ($employees as $emp): ?>
                     <?php
@@ -3402,7 +3404,7 @@ final class CommercialDashboardView
               <?php else: ?>
                 <input type="hidden" name="id_empleado" value="<?php echo esc_attr($currentEmployeeId); ?>">
               <?php endif; ?>
-              <select name="id_categoria" data-scm-calendar-filter-categories aria-label="Categoría" class="h-8 pl-2.5 pr-8 rounded-lg border border-slate-200 bg-white text-[13px] text-slate-700 outline-none focus:border-[#1E3C76] focus:ring-2 focus:ring-[#1E3C76]/10 max-w-[200px]">
+              <select name="id_categoria" data-scm-calendar-filter-categories aria-label="Categoría" class="h-8 pl-2.5 pr-8 rounded-lg border border-surface-container bg-white text-[13px] text-on-surface outline-none focus:border-[#1E3C76] focus:ring-2 focus:ring-[#1E3C76]/10 max-w-[200px]">
                 <option value="">Todas las categorías</option>
               </select>
               <div class="flex flex-wrap items-center gap-1" data-scm-calendar-layer-filters aria-label="Qué mostrar">
@@ -3410,29 +3412,29 @@ final class CommercialDashboardView
                   <?php foreach (['team' => 'Equipo', 'mine' => 'Solo yo'] as $scopeKey => $scopeLabel): ?>
                     <label class="cursor-pointer">
                       <input type="radio" name="calendar_scope" value="<?php echo esc_attr($scopeKey); ?>" class="peer sr-only" <?php echo $scopeKey === 'team' ? 'checked' : ''; ?>>
-                      <span class="inline-flex items-center h-8 px-2.5 rounded-lg text-[13px] text-slate-500 hover:bg-slate-50 peer-checked:bg-slate-100 peer-checked:text-slate-900 peer-checked:font-medium peer-focus-visible:ring-2 peer-focus-visible:ring-[#1E3C76]/30"><?php echo esc_html($scopeLabel); ?></span>
+                      <span class="inline-flex items-center h-8 px-2.5 rounded-lg text-[13px] text-secondary hover:bg-surface-container-low peer-checked:bg-surface-container peer-checked:text-on-surface peer-checked:font-medium peer-focus-visible:ring-2 peer-focus-visible:ring-[#1E3C76]/30"><?php echo esc_html($scopeLabel); ?></span>
                     </label>
                   <?php endforeach; ?>
-                  <span class="w-px h-5 bg-slate-200 mx-1" aria-hidden="true"></span>
+                  <span class="w-px h-5 bg-surface-container-high mx-1" aria-hidden="true"></span>
                 <?php else: ?>
                   <input type="radio" name="calendar_scope" value="mine" checked class="hidden">
                 <?php endif; ?>
                 <?php foreach ([['item_type', 'evento', 'Eventos'], ['item_type', 'recordatorio', 'Recordatorios'], ['item_status', 'pending', 'Pendientes'], ['item_status', 'completed', 'Realizados']] as [$layerName, $layerValue, $layerLabel]): ?>
                   <label class="cursor-pointer">
                     <input type="checkbox" name="<?php echo esc_attr($layerName); ?>" value="<?php echo esc_attr($layerValue); ?>" checked class="peer sr-only">
-                    <span class="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-[13px] text-slate-400 hover:bg-slate-50 peer-checked:text-slate-700 peer-focus-visible:ring-2 peer-focus-visible:ring-[#1E3C76]/30 [&>i]:border-slate-300 peer-checked:[&>i]:bg-[#1E3C76] peer-checked:[&>i]:border-[#1E3C76]">
+                    <span class="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-[13px] text-secondary/70 hover:bg-surface-container-low peer-checked:text-on-surface peer-focus-visible:ring-2 peer-focus-visible:ring-[#1E3C76]/30 [&>i]:border-outline-variant/40 peer-checked:[&>i]:bg-[#1E3C76] peer-checked:[&>i]:border-[#1E3C76]">
                       <i class="w-3.5 h-3.5 rounded border flex items-center justify-center" aria-hidden="true"><span class="material-symbols-outlined text-[12px] text-white">check</span></i><?php echo esc_html($layerLabel); ?>
                     </span>
                   </label>
                 <?php endforeach; ?>
               </div>
-              <button type="button" data-scm-calendar-clear class="ml-auto h-8 px-2.5 rounded-lg text-[13px] text-slate-500 hover:text-slate-800 hover:bg-slate-50 cursor-pointer">Limpiar filtros</button>
+              <button type="button" data-scm-calendar-clear class="ml-auto h-8 px-2.5 rounded-lg text-[13px] text-secondary hover:text-on-surface hover:bg-surface-container-low cursor-pointer">Limpiar filtros</button>
             </form>
           <?php else: ?>
             <!-- Tipos de vencimiento comercial -->
-            <form class="flex flex-wrap items-center gap-1 px-4 py-2.5 border-b border-slate-100" data-scm-calendar-due-type-filter autocomplete="off" aria-label="Tipos de vencimiento">
+            <form class="flex flex-wrap items-center gap-1 px-4 py-2.5 border-b border-surface-container" data-scm-calendar-due-type-filter autocomplete="off" aria-label="Tipos de vencimiento">
               <?php if ($canFilterDueEmployee): ?>
-                <select name="id_empleado" data-scm-calendar-due-employee aria-label="Funcionario" class="h-8 pl-2.5 pr-8 mr-1 rounded-lg border border-slate-200 bg-white text-[13px] text-slate-700 outline-none focus:border-[#1E3C76] focus:ring-2 focus:ring-[#1E3C76]/10 max-w-[220px]">
+                <select name="id_empleado" data-scm-calendar-due-employee aria-label="Funcionario" class="h-8 pl-2.5 pr-8 mr-1 rounded-lg border border-surface-container bg-white text-[13px] text-on-surface outline-none focus:border-[#1E3C76] focus:ring-2 focus:ring-[#1E3C76]/10 max-w-[220px]">
                   <option value="">Todo el equipo</option>
                   <?php foreach ($employees as $emp): ?>
                     <?php
@@ -3447,7 +3449,7 @@ final class CommercialDashboardView
               <?php foreach ($dueTypes as $dueKey => $dueType): ?>
                 <label class="cursor-pointer">
                   <input type="checkbox" name="due_type" value="<?php echo esc_attr((string) $dueKey); ?>" checked class="peer sr-only">
-                  <span class="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-[13px] text-slate-400 line-through decoration-slate-300 hover:bg-slate-50 peer-checked:no-underline peer-checked:text-slate-700 peer-focus-visible:ring-2 peer-focus-visible:ring-[#1E3C76]/30">
+                  <span class="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-[13px] text-secondary/70 line-through decoration-secondary/40 hover:bg-surface-container-low peer-checked:no-underline peer-checked:text-on-surface peer-focus-visible:ring-2 peer-focus-visible:ring-[#1E3C76]/30">
                     <i class="w-2 h-2 rounded-full" style="background:<?php echo esc_attr((string) ($dueType['color'] ?? '#64748b')); ?>" aria-hidden="true"></i>
                     <?php echo esc_html((string) ($dueType['label'] ?? $dueKey)); ?>
                   </span>
@@ -3457,11 +3459,11 @@ final class CommercialDashboardView
           <?php endif; ?>
 
           <div class="p-2 sm:p-3">
-            <div class="grid grid-cols-7 text-[11px] font-medium uppercase tracking-wide text-slate-400 pb-1.5" aria-hidden="true" data-scm-calendar-weekdays-header>
+            <div class="grid grid-cols-7 text-[11px] font-medium uppercase tracking-wide text-secondary/70 pb-1.5" aria-hidden="true" data-scm-calendar-weekdays-header>
               <span class="px-2">Lun</span><span class="px-2">Mar</span><span class="px-2">Mié</span><span class="px-2">Jue</span><span class="px-2">Vie</span><span class="px-2">Sáb</span><span class="px-2">Dom</span>
             </div>
             <div class="scm-calendar-month-grid min-h-[420px]" data-scm-calendar-grid aria-live="polite">
-              <div class="py-24 flex items-center justify-center"><span class="w-5 h-5 rounded-full border-2 border-slate-200 border-t-[#1E3C76] animate-spin"></span></div>
+              <div class="py-24 flex items-center justify-center"><span class="w-5 h-5 rounded-full border-2 border-surface-container border-t-[#1E3C76] animate-spin"></span></div>
             </div>
           </div>
         </section>
@@ -3469,31 +3471,31 @@ final class CommercialDashboardView
         <!-- Panel lateral -->
         <aside class="space-y-5 min-w-0">
           <?php if ($view === 'pending'): ?>
-            <section class="rounded-xl border border-slate-200 bg-white" data-scm-calendar-backlog-wrap hidden>
-              <header class="px-4 pt-3.5 pb-2.5 border-b border-slate-100">
-                <h3 class="text-sm font-semibold text-slate-900">Atrasados de meses anteriores</h3>
-                <p class="text-xs text-slate-500">Vencieron antes de este mes y siguen pendientes.</p>
+            <section class="rounded-xl border border-surface-container bg-white" data-scm-calendar-backlog-wrap hidden>
+              <header class="px-4 pt-3.5 pb-2.5 border-b border-surface-container">
+                <h3 class="text-sm font-semibold text-on-surface">Atrasados de meses anteriores</h3>
+                <p class="text-xs text-secondary">Vencieron antes de este mes y siguen pendientes.</p>
               </header>
-              <div class="divide-y divide-slate-100" data-scm-calendar-backlog></div>
+              <div class="divide-y divide-surface-container" data-scm-calendar-backlog></div>
             </section>
           <?php endif; ?>
 
-          <section class="rounded-xl border border-slate-200 bg-white">
-            <header class="flex items-start justify-between gap-2 px-4 pt-3.5 pb-2.5 border-b border-slate-100">
+          <section class="rounded-xl border border-surface-container bg-white">
+            <header class="flex items-start justify-between gap-2 px-4 pt-3.5 pb-2.5 border-b border-surface-container">
               <div class="min-w-0">
-                <h3 class="text-sm font-semibold text-slate-900" data-scm-calendar-day-title>Selecciona un día</h3>
-                <p class="text-xs text-slate-500" data-scm-calendar-day-subtitle></p>
+                <h3 class="text-sm font-semibold text-on-surface" data-scm-calendar-day-title>Selecciona un día</h3>
+                <p class="text-xs text-secondary" data-scm-calendar-day-subtitle></p>
               </div>
-              <button type="button" class="w-7 h-7 -mr-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center cursor-pointer" data-scm-calendar-refresh title="Actualizar" aria-label="Actualizar">
+              <button type="button" class="w-7 h-7 -mr-1 rounded-md text-secondary/70 hover:text-on-surface hover:bg-surface-container flex items-center justify-center cursor-pointer" data-scm-calendar-refresh title="Actualizar" aria-label="Actualizar">
                 <span class="material-symbols-outlined text-[18px]">refresh</span>
               </button>
             </header>
             <div class="p-2 overflow-y-auto max-h-[520px]" data-scm-calendar-events>
-              <p class="py-10 text-center text-sm text-slate-400">Selecciona un día del calendario.</p>
+              <p class="py-10 text-center text-sm text-secondary/70">Selecciona un día del calendario.</p>
             </div>
             <?php if ($view !== 'pending' && $showCreateActions): ?>
               <div class="px-2 pb-2">
-                <button type="button" class="w-full h-9 rounded-lg text-sm font-medium text-slate-500 hover:text-[#1E3C76] hover:bg-slate-50 transition-colors cursor-pointer flex items-center justify-center gap-1" data-scm-calendar-open-create data-calendar-mode="single">
+                <button type="button" class="w-full h-9 rounded-lg text-sm font-medium text-secondary hover:text-[#1E3C76] hover:bg-surface-container-low transition-colors cursor-pointer flex items-center justify-center gap-1" data-scm-calendar-open-create data-calendar-mode="single">
                   <span class="material-symbols-outlined text-[18px]">add</span>
                   <span>Agregar a este día</span>
                 </button>
@@ -3501,13 +3503,13 @@ final class CommercialDashboardView
             <?php endif; ?>
           </section>
 
-          <section class="rounded-xl border border-slate-200 bg-white">
-            <header class="flex items-center justify-between px-4 pt-3.5 pb-2.5 border-b border-slate-100">
-              <h3 class="text-sm font-semibold text-slate-900"><?php echo $view === 'pending' ? 'Próximos vencimientos' : 'Próximos'; ?></h3>
+          <section class="rounded-xl border border-surface-container bg-white">
+            <header class="flex items-center justify-between px-4 pt-3.5 pb-2.5 border-b border-surface-container">
+              <h3 class="text-sm font-semibold text-on-surface"><?php echo $view === 'pending' ? 'Próximos vencimientos' : 'Próximos'; ?></h3>
               <button type="button" class="text-xs font-medium text-[#1E3C76] hover:underline cursor-pointer" data-scm-calendar-upcoming-all>Ver todos</button>
             </header>
             <div class="p-2 overflow-y-auto max-h-[320px]" data-scm-calendar-upcoming>
-              <p class="py-6 text-center text-xs text-slate-400">Sin próximos eventos.</p>
+              <p class="py-6 text-center text-xs text-secondary/70">Sin próximos eventos.</p>
             </div>
           </section>
         </aside>
@@ -3857,7 +3859,7 @@ final class CommercialDashboardView
             <div class="p-4 rounded-xl border <?php echo esc_attr($color['border']); ?> <?php echo esc_attr($color['bg']); ?> flex flex-col justify-between">
               <div class="flex items-center justify-between">
                 <span class="font-bold text-sm <?php echo esc_attr($color['text']); ?>"><?php echo esc_html($pCfg['label']); ?></span>
-                <span class="px-2 py-0.5 rounded-full text-[11px] font-bold <?php echo $available > 0 ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-700'; ?>">
+                <span class="px-2 py-0.5 rounded-full text-[11px] font-bold <?php echo $available > 0 ? 'bg-emerald-600 text-white' : 'bg-surface-container-high text-on-surface'; ?>">
                   <?php echo esc_html((string) $available); ?> Disp.
                 </span>
               </div>
@@ -4516,7 +4518,7 @@ final class CommercialDashboardView
               <a href="<?php echo esc_url($videoUrl); ?>" target="_blank" rel="noopener noreferrer" class="flex flex-col items-center gap-2 text-white hover:text-primary transition-colors p-6 text-center">
                 <span class="material-symbols-outlined text-[48px]">play_circle</span>
                 <strong class="text-sm font-bold">Ver video del inmueble</strong>
-                <span class="text-xs text-slate-300">Se abrirá en una nueva pestaña</span>
+                <span class="text-xs text-secondary/50">Se abrirá en una nueva pestaña</span>
               </a>
             <?php endif; ?>
           </div>
@@ -4694,24 +4696,24 @@ final class CommercialDashboardView
             <div class="space-y-3">
               <div>
                 <span class="text-[10px] font-bold text-amber-700 uppercase tracking-wider block">UBICACIÓN</span>
-                <span class="text-sm font-bold text-slate-800"><?php echo esc_html($llavesUbi !== '' ? $llavesUbi : 'Sin dato'); ?></span>
+                <span class="text-sm font-bold text-on-surface"><?php echo esc_html($llavesUbi !== '' ? $llavesUbi : 'Sin dato'); ?></span>
               </div>
               <div>
                 <span class="text-[10px] font-bold text-amber-700 uppercase tracking-wider block">CONTACTO</span>
-                <span class="text-sm font-bold text-slate-800"><?php echo esc_html($llavesContacto !== '' ? $llavesContacto : 'Sin dato'); ?></span>
+                <span class="text-sm font-bold text-on-surface"><?php echo esc_html($llavesContacto !== '' ? $llavesContacto : 'Sin dato'); ?></span>
               </div>
               <div>
                 <span class="text-[10px] font-bold text-amber-700 uppercase tracking-wider block">TELÉFONO</span>
                 <?php if ($llavesTel !== ''): ?>
-                  <a href="tel:<?php echo esc_attr($llavesTel); ?>" class="text-sm font-bold text-slate-800 hover:text-amber-800 underline decoration-amber-400 block"><?php echo esc_html($llavesTel); ?></a>
+                  <a href="tel:<?php echo esc_attr($llavesTel); ?>" class="text-sm font-bold text-on-surface hover:text-amber-800 underline decoration-amber-400 block"><?php echo esc_html($llavesTel); ?></a>
                 <?php else: ?>
-                  <span class="text-sm font-bold text-slate-800">Sin dato</span>
+                  <span class="text-sm font-bold text-on-surface">Sin dato</span>
                 <?php endif; ?>
               </div>
             </div>
             <div>
               <span class="text-[10px] font-bold text-amber-700 uppercase tracking-wider block">LUGAR</span>
-              <span class="text-sm font-bold text-slate-800"><?php echo esc_html($llavesDonde !== '' ? $llavesDonde : 'Sin dato'); ?></span>
+              <span class="text-sm font-bold text-on-surface"><?php echo esc_html($llavesDonde !== '' ? $llavesDonde : 'Sin dato'); ?></span>
             </div>
           </div>
         </div>
@@ -4820,7 +4822,7 @@ final class CommercialDashboardView
                       $disabled = $isActiveP || $isPendingP || $hasNoQuota;
                       $suffix = $isActiveP ? ' (Activo)' : ($isPendingP ? ' (Pendiente)' : ($hasNoQuota ? ' (Sin cupo)' : " ({$quota} libres)"));
                     ?>
-                    <option value="<?php echo esc_attr($pKey); ?>" <?php echo $disabled ? 'disabled' : ''; ?> class="<?php echo $disabled ? 'text-slate-400 bg-slate-50' : 'text-on-surface'; ?>">
+                    <option value="<?php echo esc_attr($pKey); ?>" <?php echo $disabled ? 'disabled' : ''; ?> class="<?php echo $disabled ? 'text-secondary/70 bg-surface-container-low' : 'text-on-surface'; ?>">
                       <?php echo esc_html($pCfg['label'] . $suffix); ?>
                     </option>
                   <?php endforeach; ?>

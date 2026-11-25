@@ -64,25 +64,25 @@
   });
 
   function numberField(name, value, min, max, step) {
-    return '<input class="w-24 px-2 py-1.5 rounded-lg border border-slate-300 text-sm text-right" type="number" name="' + esc(name) + '" value="' + esc(value == null ? "" : String(value)) + '" min="' + esc(String(min)) + '" max="' + esc(String(max)) + '" step="' + esc(String(step || 1)) + '" required>';
+    return '<input class="w-24 px-2 py-1.5 rounded-lg border border-outline-variant/40 text-sm text-right" type="number" name="' + esc(name) + '" value="' + esc(value == null ? "" : String(value)) + '" min="' + esc(String(min)) + '" max="' + esc(String(max)) + '" step="' + esc(String(step || 1)) + '" required>';
   }
 
   function tableHtml(headers, rows) {
-    return '<div class="overflow-x-auto"><table class="w-full text-sm text-left"><thead><tr class="text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-200">' +
+    return '<div class="overflow-x-auto"><table class="w-full text-sm text-left"><thead><tr class="text-[11px] uppercase tracking-wider text-secondary border-b border-surface-container">' +
       headers.map(function (header, index) { return '<th class="py-2 px-2' + (index ? " text-right" : "") + '">' + esc(header) + "</th>"; }).join("") +
-      '</tr></thead><tbody class="divide-y divide-slate-100">' + rows.join("") + "</tbody></table></div>";
+      '</tr></thead><tbody class="divide-y divide-surface-container">' + rows.join("") + "</tbody></table></div>";
   }
 
   function intro(text) {
-    return '<p class="text-sm text-slate-600 mb-3 text-left">' + text + "</p>";
+    return '<p class="text-sm text-secondary mb-3 text-left">' + text + "</p>";
   }
 
   function checkboxGrid(name, items, checked) {
     return '<div class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[34vh] overflow-y-auto">' + items.map(function (item) {
-      return '<label class="flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white cursor-pointer hover:bg-slate-50 text-left">' +
+      return '<label class="flex items-center gap-2 px-3 py-2 rounded-xl border border-surface-container bg-white cursor-pointer hover:bg-surface-container-low text-left">' +
         '<input type="checkbox" name="' + esc(name) + '" value="' + esc(item.id) + '"' + (checked(item.id) ? " checked" : "") + ">" +
         (item.color ? '<i class="inline-block w-3 h-3 rounded-full shrink-0" style="background:' + esc(item.color) + '"></i>' : "") +
-        '<span class="text-sm text-slate-800">' + esc(item.label) + (item.hint ? ' <small class="text-slate-500">' + esc(item.hint) + "</small>" : "") + "</span></label>";
+        '<span class="text-sm text-on-surface">' + esc(item.label) + (item.hint ? ' <small class="text-secondary">' + esc(item.hint) + "</small>" : "") + "</span></label>";
     }).join("") + "</div>";
   }
 
@@ -91,9 +91,9 @@
     var events = Number(row.eventos || 0);
     return '<tr data-category-row data-id="' + esc(id) + '">' +
       '<td class="py-1.5 px-2 text-center"><input type="checkbox" name="category_ids" value="' + esc(id) + '"' + (enabled ? " checked" : "") + ' aria-label="Usar en comercial"></td>' +
-      '<td class="py-1.5 px-2"><input type="color" data-field="color" value="' + esc(/^#[0-9a-fA-F]{6}$/.test(String(row.color || "")) ? row.color : "#1e3c76") + '" class="w-8 h-8 rounded border border-slate-300 cursor-pointer" aria-label="Color"></td>' +
-      '<td class="py-1.5 px-2"><input data-field="nombre" value="' + esc(row.nombre || "") + '" maxlength="100" required class="w-full px-2 py-1.5 rounded-lg border border-slate-300 text-sm" aria-label="Nombre"></td>' +
-      '<td class="py-1.5 px-2 text-right text-xs text-slate-500 whitespace-nowrap">' + events + "</td>" +
+      '<td class="py-1.5 px-2"><input type="color" data-field="color" value="' + esc(/^#[0-9a-fA-F]{6}$/.test(String(row.color || "")) ? row.color : "#1e3c76") + '" class="w-8 h-8 rounded border border-outline-variant/40 cursor-pointer" aria-label="Color"></td>' +
+      '<td class="py-1.5 px-2"><input data-field="nombre" value="' + esc(row.nombre || "") + '" maxlength="100" required class="w-full px-2 py-1.5 rounded-lg border border-outline-variant/40 text-sm" aria-label="Nombre"></td>' +
+      '<td class="py-1.5 px-2 text-right text-xs text-secondary whitespace-nowrap">' + events + "</td>" +
       '<td class="py-1.5 px-2 text-right">' + (events > 0 ? "" : '<button type="button" data-category-remove class="px-2 py-1 rounded-lg text-xs font-semibold text-rose-700 hover:bg-rose-50">Eliminar</button>') + "</td></tr>";
   }
   var sections = {
@@ -110,23 +110,23 @@
         });
         var selectedCargos = (data.settings.cargo_ids || []).map(String);
         return '<form data-config-form class="text-left space-y-4">' +
-          "<section>" + '<h4 class="text-sm font-bold text-slate-800 mb-1">Categorías del calendario</h4>' +
+          "<section>" + '<h4 class="text-sm font-bold text-on-surface mb-1">Categorías del calendario</h4>' +
           intro("Marca las que se usan en comercial: solo esas salen al crear y agendar. Los nombres y colores son compartidos con el panel administrativo. Una categoría con eventos no se puede eliminar.") +
           (categories.length
-            ? '<div class="flex gap-2 mb-2"><button type="button" class="px-3 py-1 rounded-lg bg-slate-100 text-xs font-semibold" data-toggle-all="category_ids" data-value="1">Marcar todas</button><button type="button" class="px-3 py-1 rounded-lg bg-slate-100 text-xs font-semibold" data-toggle-all="category_ids" data-value="0">Quitar todas</button></div>'
+            ? '<div class="flex gap-2 mb-2"><button type="button" class="px-3 py-1 rounded-lg bg-surface-container text-xs font-semibold" data-toggle-all="category_ids" data-value="1">Marcar todas</button><button type="button" class="px-3 py-1 rounded-lg bg-surface-container text-xs font-semibold" data-toggle-all="category_ids" data-value="0">Quitar todas</button></div>'
             : '<p class="text-sm text-rose-700 mb-2">No se pudieron consultar las categorías del calendario.</p>') +
-          '<div class="max-h-[34vh] overflow-y-auto border border-slate-200 rounded-xl"><table class="w-full text-sm text-left"><thead><tr class="text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-200"><th class="py-2 px-2 text-center">Comercial</th><th class="py-2 px-2">Color</th><th class="py-2 px-2">Nombre</th><th class="py-2 px-2 text-right">Eventos</th><th></th></tr></thead><tbody data-category-rows class="divide-y divide-slate-100">' +
+          '<div class="max-h-[34vh] overflow-y-auto border border-surface-container rounded-xl"><table class="w-full text-sm text-left"><thead><tr class="text-[11px] uppercase tracking-wider text-secondary border-b border-surface-container"><th class="py-2 px-2 text-center">Comercial</th><th class="py-2 px-2">Color</th><th class="py-2 px-2">Nombre</th><th class="py-2 px-2 text-right">Eventos</th><th></th></tr></thead><tbody data-category-rows class="divide-y divide-surface-container">' +
           categories.map(function (row) { return categoryRowHtml(row, !current.length || current.indexOf(String(row.id)) !== -1); }).join("") +
           "</tbody></table></div>" +
           '<button type="button" data-category-add class="mt-2 px-3 py-1.5 rounded-lg bg-[#1E3C76] text-white text-xs font-semibold">Agregar categoría</button>' +
-          "</section><section>" + '<h4 class="text-sm font-bold text-slate-800 mb-1">Cita con cliente</h4>' +
-          '<label class="block text-sm text-slate-700">Categoría que se elige sola al agendar una cita<select name="cita_category_id" class="mt-1 w-full px-2 py-1.5 rounded-lg border border-slate-300 text-sm"><option value="0">Buscar la llamada "Cita con cliente"</option>' +
+          "</section><section>" + '<h4 class="text-sm font-bold text-on-surface mb-1">Cita con cliente</h4>' +
+          '<label class="block text-sm text-on-surface">Categoría que se elige sola al agendar una cita<select name="cita_category_id" class="mt-1 w-full px-2 py-1.5 rounded-lg border border-outline-variant/40 text-sm"><option value="0">Buscar la llamada "Cita con cliente"</option>' +
           categories.map(function (row) { return '<option value="' + esc(row.id) + '"' + (String(row.id) === citaCategory ? " selected" : "") + ">" + esc(row.nombre) + "</option>"; }).join("") +
           "</select></label>" +
-          "</section><section>" + '<h4 class="text-sm font-bold text-slate-800 mb-1">Cargos que llenan reporte comercial al cerrar</h4>' +
+          "</section><section>" + '<h4 class="text-sm font-bold text-on-surface mb-1">Cargos que llenan reporte comercial al cerrar</h4>' +
           intro("Se pide al cerrar visitas, captaciones y demás eventos comerciales de funcionarios con estos cargos.") +
           checkboxGrid("report_cargo_ids", (settings.cargo_options || []).map(function (row) { return { id: String(row.id), label: row.name, hint: "(" + row.total + ")" }; }), function (id) { return reportCargos.indexOf(id) !== -1; }) +
-          "</section><section>" + '<h4 class="text-sm font-bold text-slate-800 mb-1">Cargos de los funcionarios del calendario</h4>' +
+          "</section><section>" + '<h4 class="text-sm font-bold text-on-surface mb-1">Cargos de los funcionarios del calendario</h4>' +
           intro("Los funcionarios activos de estos cargos aparecen en Mi calendario, Calendario equipo y al agendar desde una tarea.") +
           checkboxGrid("cargo_ids", cargos, function (id) { return selectedCargos.indexOf(id) !== -1; }) +
           "</section></form>";
@@ -280,7 +280,7 @@
         return '<form data-config-form class="text-left">' +
           intro("Días hábiles (lunes a sábado, sin festivos) desde la última gestión de la tarea. Desde <strong>Alerta</strong> la tarea aparece por vencer y después de <strong>Vencimiento</strong> queda atrasada. Estos tiempos también los usan los informes de tareas.") +
           tableHtml(["Tema", "Alerta (días)", "Vencimiento (días)"], (settings.topics || []).map(function (row) {
-            return '<tr><td class="py-2 px-2 font-medium text-slate-800">' + esc(row.topic) + '</td><td class="py-2 px-2 text-right">' + numberField("warning_from:" + row.topic, row.warning_from, 0, 120) + '</td><td class="py-2 px-2 text-right">' + numberField("overdue_after:" + row.topic, row.overdue_after, 1, 120) + "</td></tr>";
+            return '<tr><td class="py-2 px-2 font-medium text-on-surface">' + esc(row.topic) + '</td><td class="py-2 px-2 text-right">' + numberField("warning_from:" + row.topic, row.warning_from, 0, 120) + '</td><td class="py-2 px-2 text-right">' + numberField("overdue_after:" + row.topic, row.overdue_after, 1, 120) + "</td></tr>";
           })) + "</form>";
       },
       collect: function (form) {
@@ -302,7 +302,7 @@
         return '<form data-config-form class="text-left">' +
           intro("Plazos para retocar e instalar avisos y valores usados al registrar avisos. Se comparten con las demás aplicaciones de SKC SuCasa Inmobiliaria.") +
           tableHtml(["Concepto", "Valor"], (settings.values || []).map(function (row) {
-            return '<tr><td class="py-2 px-2 font-medium text-slate-800">' + esc(row.label) + '</td><td class="py-2 px-2 text-right">' + numberField(row.key, row.value, row.min, row.max, row.key === "factor_prestacional" ? "0.0001" : 1) + "</td></tr>";
+            return '<tr><td class="py-2 px-2 font-medium text-on-surface">' + esc(row.label) + '</td><td class="py-2 px-2 text-right">' + numberField(row.key, row.value, row.min, row.max, row.key === "factor_prestacional" ? "0.0001" : 1) + "</td></tr>";
           })) + "</form>";
       },
       collect: function (form) {
@@ -456,7 +456,7 @@
           intro("Días calendario desde la última actualización del inmueble publicado. Desde <strong>Alerta</strong> se marca en alerta y desde <strong>Vencido</strong> como vencido.") +
           tableHtml(["Tipo de negocio", "Alerta (días)", "Vencido (días)"], Object.keys(labels).map(function (type) {
             var row = limits[type] || {};
-            return '<tr><td class="py-2 px-2 font-medium text-slate-800">' + esc(labels[type]) + '</td><td class="py-2 px-2 text-right">' + numberField("alerta:" + type, row.alerta, 0, 730) + '</td><td class="py-2 px-2 text-right">' + numberField("vencido:" + type, row.vencido, 1, 730) + "</td></tr>";
+            return '<tr><td class="py-2 px-2 font-medium text-on-surface">' + esc(labels[type]) + '</td><td class="py-2 px-2 text-right">' + numberField("alerta:" + type, row.alerta, 0, 730) + '</td><td class="py-2 px-2 text-right">' + numberField("vencido:" + type, row.vencido, 1, 730) + "</td></tr>";
           })) + "</form>";
       },
       collect: function (form) {
@@ -475,7 +475,7 @@
         return '<form data-config-form class="text-left">' +
           intro("Máximo de inmuebles destacados al mismo tiempo en cada portal.") +
           tableHtml(["Portal", "Cupos"], (settings.portals || []).map(function (row) {
-            return '<tr><td class="py-2 px-2 font-medium text-slate-800">' + esc(row.label) + '</td><td class="py-2 px-2 text-right">' + numberField(row.key, row.value, 0, 10000) + "</td></tr>";
+            return '<tr><td class="py-2 px-2 font-medium text-on-surface">' + esc(row.label) + '</td><td class="py-2 px-2 text-right">' + numberField(row.key, row.value, 0, 10000) + "</td></tr>";
           })) + "</form>";
       },
       collect: function (form) {
@@ -493,27 +493,27 @@
           valor_pasaje_trans: "El auxilio del trabajador es el 50 % de dos pasajes.",
         };
         var globals = (settings.globals || []).map(function (row) {
-          return '<label class="block text-left"><span class="block text-xs font-semibold text-slate-700 mb-1">' + esc(row.label) + (row.percent ? " (%)" : "") + "</span>" +
-            '<input class="w-full px-2 py-1.5 rounded-lg border border-slate-300 text-sm" type="text" inputmode="decimal" name="' + esc(row.key) + '" value="' + esc(String(row.value).replace(".", ",")) + '" data-cleaning-global required>' +
-            (hints[row.key] || row.percent ? '<span class="block text-[11px] text-slate-500 mt-1">' + esc(hints[row.key] || "En porcentaje (19 = 19 %).") + "</span>" : "") + "</label>";
+          return '<label class="block text-left"><span class="block text-xs font-semibold text-on-surface mb-1">' + esc(row.label) + (row.percent ? " (%)" : "") + "</span>" +
+            '<input class="w-full px-2 py-1.5 rounded-lg border border-outline-variant/40 text-sm" type="text" inputmode="decimal" name="' + esc(row.key) + '" value="' + esc(String(row.value).replace(".", ",")) + '" data-cleaning-global required>' +
+            (hints[row.key] || row.percent ? '<span class="block text-[11px] text-secondary mt-1">' + esc(hints[row.key] || "En porcentaje (19 = 19 %).") + "</span>" : "") + "</label>";
         }).join("");
         function table(key, title, note, columns) {
           function line(row) {
             return "<tr data-cleaning-row>" + columns.map(function (column) {
               var value = row[column[1]] == null ? "" : String(row[column[1]]);
-              return '<td class="py-1 px-1"><input class="w-full px-2 py-1 rounded-lg border border-slate-300 text-sm" type="text"' + (column[2] ? ' inputmode="decimal"' : "") + ' data-field="' + column[1] + '" value="' + esc(column[2] ? value.replace(".", ",") : value) + '"></td>';
+              return '<td class="py-1 px-1"><input class="w-full px-2 py-1 rounded-lg border border-outline-variant/40 text-sm" type="text"' + (column[2] ? ' inputmode="decimal"' : "") + ' data-field="' + column[1] + '" value="' + esc(column[2] ? value.replace(".", ",") : value) + '"></td>';
             }).join("") + '<td class="py-1 px-1 text-right"><button type="button" class="px-2 py-1 rounded-lg text-rose-700 hover:bg-rose-50 text-xs font-semibold" data-cleaning-remove-row aria-label="Quitar fila">Quitar</button></td></tr>';
           }
           var empty = {};
-          return '<section class="text-left" data-cleaning-table="' + key + '"><div class="flex flex-wrap items-center justify-between gap-2 mb-1"><div><h4 class="text-sm font-bold text-slate-800">' + esc(title) + '</h4><p class="text-[11px] text-slate-500">' + esc(note) + "</p></div>" +
-            '<button type="button" class="px-3 py-1 rounded-lg bg-slate-100 text-xs font-semibold" data-cleaning-add-row>Agregar fila</button></div>' +
-            '<div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-200">' +
+          return '<section class="text-left" data-cleaning-table="' + key + '"><div class="flex flex-wrap items-center justify-between gap-2 mb-1"><div><h4 class="text-sm font-bold text-on-surface">' + esc(title) + '</h4><p class="text-[11px] text-secondary">' + esc(note) + "</p></div>" +
+            '<button type="button" class="px-3 py-1 rounded-lg bg-surface-container text-xs font-semibold" data-cleaning-add-row>Agregar fila</button></div>' +
+            '<div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="text-[11px] uppercase tracking-wider text-secondary border-b border-surface-container">' +
             columns.map(function (column) { return '<th class="py-2 px-1 text-left">' + esc(column[0]) + "</th>"; }).join("") + "<th></th></tr></thead><tbody>" +
             (settings[key] || []).map(line).join("") + "</tbody></table></div><template data-cleaning-row-template>" + line(empty) + "</template></section>";
         }
         return '<form data-config-form class="text-left space-y-5">' +
           intro("Tarifas y márgenes de la calculadora de aseo. Se guardan en la misma configuración que usan el panel inmobiliario y el plugin de WordPress.") +
-          '<section><h4 class="text-sm font-bold text-slate-800 mb-2">Variables globales</h4><div class="grid grid-cols-1 sm:grid-cols-2 gap-3">' + globals + "</div></section>" +
+          '<section><h4 class="text-sm font-bold text-on-surface mb-2">Variables globales</h4><div class="grid grid-cols-1 sm:grid-cols-2 gap-3">' + globals + "</div></section>" +
           table("insumos", "Insumos", "Costo por unidad y consumo por m².", [["Nombre", "nombre", false], ["Unidad", "unidad", false], ["Costo", "costo", true], ["Consumo / m²", "consumo", true]]) +
           table("transporte", "Tarifas de transporte", "Valor por trayecto: con funcionario se cobra ida y regreso (×2).", [["Rango (km)", "rango", false], ["Valor por trayecto", "valor", true]]) +
           table("tramos", "Tramos de m² y horas", 'Cada área usa el primer tramo cuyo "hasta" la cubre; por encima del último se suma 1 hora cada 50 m².', [["Desde (m²)", "desde", true], ["Hasta (m²)", "hasta", true], ["Horas", "horas", true]]) +
@@ -555,16 +555,16 @@
       ],
       html: function (settings) {
         function line(row) {
-          return '<tr data-utm-row><td class="py-1 px-1"><input class="w-full px-2 py-1 rounded-lg border border-slate-300 text-sm" type="text" maxlength="60" data-field="label" value="' + esc(row.label || "") + '" placeholder="Nombre visible"></td>' +
-            '<td class="py-1 px-1"><input class="w-full px-2 py-1 rounded-lg border border-slate-300 text-sm font-mono" type="text" maxlength="100" data-field="value" value="' + esc(row.value || "") + '" placeholder="Se toma del nombre"></td>' +
+          return '<tr data-utm-row><td class="py-1 px-1"><input class="w-full px-2 py-1 rounded-lg border border-outline-variant/40 text-sm" type="text" maxlength="60" data-field="label" value="' + esc(row.label || "") + '" placeholder="Nombre visible"></td>' +
+            '<td class="py-1 px-1"><input class="w-full px-2 py-1 rounded-lg border border-outline-variant/40 text-sm font-mono" type="text" maxlength="100" data-field="value" value="' + esc(row.value || "") + '" placeholder="Se toma del nombre"></td>' +
             '<td class="py-1 px-1 text-right"><button type="button" class="px-2 py-1 rounded-lg text-rose-700 hover:bg-rose-50 text-xs font-semibold" data-utm-remove-row aria-label="Quitar fila">Quitar</button></td></tr>';
         }
         return '<form data-config-form class="text-left space-y-5">' +
           intro("Campañas que ofrece Herramientas › Generador UTM a todo el equipo. Los valores se guardan en minúsculas, sin tildes ni espacios; los repetidos se descartan. El medio del enlace sale de la lista única de <strong>Configuración › Medios</strong>.") +
           this.lists.map(function (list) {
-            return '<section class="text-left" data-utm-list="' + list[0] + '" data-required="' + (list[3] ? "1" : "0") + '"><div class="flex flex-wrap items-center justify-between gap-2 mb-1"><div><h4 class="text-sm font-bold text-slate-800">' + esc(list[1]) + '</h4><p class="text-[11px] text-slate-500">' + esc(list[2]) + "</p></div>" +
-              '<button type="button" class="px-3 py-1 rounded-lg bg-slate-100 text-xs font-semibold" data-utm-add-row>Agregar fila</button></div>' +
-              '<div class="overflow-x-auto max-h-[30vh] overflow-y-auto"><table class="w-full text-sm"><thead><tr class="text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-200"><th class="py-2 px-1 text-left">Nombre visible</th><th class="py-2 px-1 text-left">Valor en la URL</th><th></th></tr></thead><tbody>' +
+            return '<section class="text-left" data-utm-list="' + list[0] + '" data-required="' + (list[3] ? "1" : "0") + '"><div class="flex flex-wrap items-center justify-between gap-2 mb-1"><div><h4 class="text-sm font-bold text-on-surface">' + esc(list[1]) + '</h4><p class="text-[11px] text-secondary">' + esc(list[2]) + "</p></div>" +
+              '<button type="button" class="px-3 py-1 rounded-lg bg-surface-container text-xs font-semibold" data-utm-add-row>Agregar fila</button></div>' +
+              '<div class="overflow-x-auto max-h-[30vh] overflow-y-auto"><table class="w-full text-sm"><thead><tr class="text-[11px] uppercase tracking-wider text-secondary border-b border-surface-container"><th class="py-2 px-1 text-left">Nombre visible</th><th class="py-2 px-1 text-left">Valor en la URL</th><th></th></tr></thead><tbody>' +
               (settings[list[0]] || []).map(line).join("") + "</tbody></table></div><template data-utm-row-template>" + line({}) + "</template></section>";
           }).join("") + "</form>";
       },
@@ -600,14 +600,14 @@
     plan: {
       title: "Plan estratégico",
       html: function (settings) {
-        var input = 'class="w-full px-2 py-1 rounded-lg border border-slate-300 text-sm" type="text"';
+        var input = 'class="w-full px-2 py-1 rounded-lg border border-outline-variant/40 text-sm" type="text"';
         function line(fields, row) {
           var used = Number(row.uso || 0);
           return '<tr data-plan-row data-id="' + esc(row.id || "") + '"><td class="py-1 px-1"><input ' + input + ' maxlength="200" data-field="nombre" value="' + esc(row.nombre || "") + '" placeholder="Nombre"></td>' +
             Object.keys(fields).map(function (field) {
               return '<td class="py-1 px-1"><input ' + input + ' maxlength="2000" data-field="' + esc(field) + '" value="' + esc(row[field] || "") + '" placeholder="' + esc(fields[field]) + '"></td>';
             }).join("") +
-            '<td class="py-1 px-1 text-right text-[11px] text-slate-500">' + (used ? "En uso: " + used : "") + "</td>" +
+            '<td class="py-1 px-1 text-right text-[11px] text-secondary">' + (used ? "En uso: " + used : "") + "</td>" +
             '<td class="py-1 px-1 text-right">' + (used ? "" : '<button type="button" class="px-2 py-1 rounded-lg text-rose-700 hover:bg-rose-50 text-xs font-semibold" data-plan-remove>Quitar</button>') + "</td></tr>";
         }
         return '<form data-config-form class="text-left space-y-3">' +
@@ -615,9 +615,9 @@
           Object.keys(settings || {}).map(function (key) {
             var catalog = settings[key] || {};
             var fields = catalog.fields || {};
-            return '<details class="text-left rounded-xl border border-slate-200 p-3" data-plan-catalog="' + esc(key) + '"><summary class="cursor-pointer text-sm font-bold text-slate-800">' + esc(catalog.label) + ' <span class="text-[11px] font-normal text-slate-500">(' + (catalog.rows || []).length + ")</span></summary>" +
-              '<div class="flex flex-wrap items-center justify-between gap-2 my-2"><p class="text-[11px] text-slate-500">' + esc(catalog.hint || "") + '</p><button type="button" class="px-3 py-1 rounded-lg bg-slate-100 text-xs font-semibold" data-plan-add-row>Agregar fila</button></div>' +
-              '<div class="overflow-x-auto max-h-[40vh] overflow-y-auto"><table class="w-full text-sm"><thead><tr class="text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-200"><th class="py-2 px-1 text-left">Nombre</th>' +
+            return '<details class="text-left rounded-xl border border-surface-container p-3" data-plan-catalog="' + esc(key) + '"><summary class="cursor-pointer text-sm font-bold text-on-surface">' + esc(catalog.label) + ' <span class="text-[11px] font-normal text-secondary">(' + (catalog.rows || []).length + ")</span></summary>" +
+              '<div class="flex flex-wrap items-center justify-between gap-2 my-2"><p class="text-[11px] text-secondary">' + esc(catalog.hint || "") + '</p><button type="button" class="px-3 py-1 rounded-lg bg-surface-container text-xs font-semibold" data-plan-add-row>Agregar fila</button></div>' +
+              '<div class="overflow-x-auto max-h-[40vh] overflow-y-auto"><table class="w-full text-sm"><thead><tr class="text-[11px] uppercase tracking-wider text-secondary border-b border-surface-container"><th class="py-2 px-1 text-left">Nombre</th>' +
               Object.keys(fields).map(function (field) { return '<th class="py-2 px-1 text-left">' + esc(fields[field]) + "</th>"; }).join("") +
               "<th></th><th></th></tr></thead><tbody>" + (catalog.rows || []).map(function (row) { return line(fields, row); }).join("") + "</tbody></table></div>" +
               "<template data-plan-row-template>" + line(fields, {}) + "</template></details>";
@@ -704,9 +704,9 @@
           return match ? match[3] + "/" + match[2] + "/" + match[1] + (match[4] ? " " + match[4] + ":" + match[5] : "") : String(value || "");
         };
         var area = function (name, label, hint, values, placeholder) {
-          return '<label class="block text-left"><span class="block text-xs font-semibold text-slate-700 mb-1">' + esc(label) + "</span>" +
-            '<textarea class="w-full px-2 py-1.5 rounded-lg border border-slate-300 text-sm font-mono" rows="4" name="' + name + '" placeholder="' + esc(placeholder) + '">' + esc((values || []).join("\n")) + "</textarea>" +
-            '<span class="block text-[11px] text-slate-500 mt-1">' + esc(hint) + "</span></label>";
+          return '<label class="block text-left"><span class="block text-xs font-semibold text-on-surface mb-1">' + esc(label) + "</span>" +
+            '<textarea class="w-full px-2 py-1.5 rounded-lg border border-outline-variant/40 text-sm font-mono" rows="4" name="' + name + '" placeholder="' + esc(placeholder) + '">' + esc((values || []).join("\n")) + "</textarea>" +
+            '<span class="block text-[11px] text-secondary mt-1">' + esc(hint) + "</span></label>";
         };
         var rows = [
           ["Última visita resumida", status.last_fecha ? stamp(status.last_fecha) : "Todavía no se ha resumido nada"],
@@ -720,16 +720,16 @@
           intro("Cómo se cuentan las visitas en Promoción › Analítica web. Los cambios de IPs internas y de dominios propios se aplican a las visitas nuevas; para recalcular meses anteriores, pide a sistemas que recalculen desde una fecha.") +
           '<section class="space-y-3">' + area("internal_ips", "IPs internas (oficina y equipo)", "Una por línea: IP exacta (IPv4 o IPv6), rango CIDR (190.0.0.0/24) o prefijo IPv4 (190.0.0.).", settings.internal_ips, "190.0.0.10\n10.0.0.0/8") +
           area("own_domains", "Dominios propios", "Una por línea. Las visitas que llegan desde ellos cuentan como navegación interna, no como sitio de referencia.", settings.own_domains, "sucasainmobiliaria.com.co") +
-          '<label class="block text-left"><span class="block text-xs font-semibold text-slate-700 mb-1">Conservar visitas crudas (días)</span>' +
+          '<label class="block text-left"><span class="block text-xs font-semibold text-on-surface mb-1">Conservar visitas crudas (días)</span>' +
           numberField("raw_retention_days", retention, 0, settings.max_retention_days || 3650) +
-          '<span class="block text-[11px] text-slate-500 mt-1">0 = no borrar nunca. Con un número (mínimo 30), la tarea programada de sistemas borra las visitas ya resumidas más antiguas que eso y deja constancia. Las cifras de esta pantalla no cambian, pero el panel de marketing anterior pierde esas visitas en su propia analítica.</span></label>' +
+          '<span class="block text-[11px] text-secondary mt-1">0 = no borrar nunca. Con un número (mínimo 30), la tarea programada de sistemas borra las visitas ya resumidas más antiguas que eso y deja constancia. Las cifras de esta pantalla no cambian, pero el panel de marketing anterior pierde esas visitas en su propia analítica.</span></label>' +
           '<label class="hidden items-start gap-2 px-3 py-2 rounded-xl border border-red-200 bg-red-50 text-left cursor-pointer" data-retention-confirm><input type="checkbox" class="mt-1" name="confirm_retention"><span class="text-sm text-red-900" data-retention-confirm-text></span></label>' +
           "</section>" +
-          '<section><h4 class="text-sm font-bold text-slate-800 mb-1">Estado de los resúmenes</h4>' +
+          '<section><h4 class="text-sm font-bold text-on-surface mb-1">Estado de los resúmenes</h4>' +
           tableHtml(["Dato", "Valor"], rows.map(function (row) {
-            return '<tr><td class="py-2 px-2 font-medium text-slate-800">' + esc(row[0]) + '</td><td class="py-2 px-2 text-right" data-analytics-status>' + esc(row[1]) + "</td></tr>";
+            return '<tr><td class="py-2 px-2 font-medium text-on-surface">' + esc(row[0]) + '</td><td class="py-2 px-2 text-right" data-analytics-status>' + esc(row[1]) + "</td></tr>";
           })) +
-          '<details class="mt-2 text-[11px] text-slate-500"><summary class="cursor-pointer">Nota para sistemas</summary>Recalcular: <code>php bin/tracker-rollup.php --rebuild-from=AAAA-MM-DD</code>. Borrar visitas crudas según los días de arriba: <code>php bin/tracker-rollup.php --purge</code>.</details>' +
+          '<details class="mt-2 text-[11px] text-secondary"><summary class="cursor-pointer">Nota para sistemas</summary>Recalcular: <code>php bin/tracker-rollup.php --rebuild-from=AAAA-MM-DD</code>. Borrar visitas crudas según los días de arriba: <code>php bin/tracker-rollup.php --purge</code>.</details>' +
           "</section></form>";
       },
       bind: function (popup, settings) {
@@ -766,15 +766,15 @@
         var listed = usage.filter(function (row) { return row.listed; }).map(function (row) { return row.name; });
         var unlisted = usage.filter(function (row) { return !row.listed && row.products > 0; });
         return '<form data-config-form class="text-left space-y-4">' +
-          '<section><h4 class="text-sm font-bold text-slate-800 mb-1">Categorías de productos</h4>' +
+          '<section><h4 class="text-sm font-bold text-on-surface mb-1">Categorías de productos</h4>' +
           intro("Una por línea. Son las que se ofrecen al crear o editar un producto en Promoción › Material POP.") +
-          '<textarea class="w-full px-2 py-1.5 rounded-lg border border-slate-300 text-sm" rows="5" name="categories" required>' + esc(listed.join("\n")) + "</textarea>" +
+          '<textarea class="w-full px-2 py-1.5 rounded-lg border border-outline-variant/40 text-sm" rows="5" name="categories" required>' + esc(listed.join("\n")) + "</textarea>" +
           (usage.length ? tableHtml(["Categoría", "Productos"], usage.map(function (row) {
-            return '<tr><td class="py-2 px-2 font-medium text-slate-800">' + esc(row.name) + (row.listed ? "" : ' <small class="text-slate-500">(fuera de la lista)</small>') + '</td><td class="py-2 px-2 text-right">' + esc(number(row.products)) + "</td></tr>";
+            return '<tr><td class="py-2 px-2 font-medium text-on-surface">' + esc(row.name) + (row.listed ? "" : ' <small class="text-secondary">(fuera de la lista)</small>') + '</td><td class="py-2 px-2 text-right">' + esc(number(row.products)) + "</td></tr>";
           })) : "") +
-          (unlisted.length ? '<p class="text-[11px] text-slate-500 mt-1">Las categorías fuera de la lista siguen en sus productos, pero no se ofrecen para productos nuevos.</p>' : "") +
+          (unlisted.length ? '<p class="text-[11px] text-secondary mt-1">Las categorías fuera de la lista siguen en sus productos, pero no se ofrecen para productos nuevos.</p>' : "") +
           "</section>" +
-          '<p class="text-[11px] text-slate-500">Quién recibe la alerta de stock bajo se elige en Configuración › Notificaciones internas.</p>' +
+          '<p class="text-[11px] text-secondary">Quién recibe la alerta de stock bajo se elige en Configuración › Notificaciones internas.</p>' +
           popApiHtml(settings) + "</form>";
       },
       bind: function (popup, settings) { bindPopApi(popup, settings); },
@@ -790,14 +790,14 @@
     banner_revista: {
       title: "Banner y revista",
       html: function (settings) {
-        return '<form data-config-form class="text-left space-y-4"><section><h4 class="text-sm font-bold text-slate-800 mb-1">Imagen del banner</h4>' +
+        return '<form data-config-form class="text-left space-y-4"><section><h4 class="text-sm font-bold text-on-surface mb-1">Imagen del banner</h4>' +
           intro("Es la imagen superior de los correos. Si subes una imagen nueva, se guarda de una vez y se reduce para que el correo no pese.") +
-          '<img class="w-full max-h-40 object-contain rounded-xl border border-slate-200 mb-2' + (settings.banner ? "" : " hidden") + '" src="' + esc(settings.banner) + '" alt="Banner actual" data-banner-preview>' +
+          '<img class="w-full max-h-40 object-contain rounded-xl border border-surface-container mb-2' + (settings.banner ? "" : " hidden") + '" src="' + esc(settings.banner) + '" alt="Banner actual" data-banner-preview>' +
           '<input class="w-full text-sm mb-1" type="file" accept="image/jpeg,image/png,image/webp" data-banner-file>' +
           '<p class="hidden text-sm mb-2" data-banner-status></p>' +
-          '<label class="block"><span class="block text-xs font-semibold text-slate-700 mb-1">Dirección de la imagen</span><input class="w-full px-2 py-1.5 rounded-lg border border-slate-300 text-sm" name="banner_url" value="' + esc(settings.banner) + '" placeholder="https://..."></label></section>' +
-          '<section><h4 class="text-sm font-bold text-slate-800 mb-1">Link de la revista</h4>' + intro("Edición de la revista que se enlaza desde los correos.") +
-          '<input class="w-full px-2 py-1.5 rounded-lg border border-slate-300 text-sm" name="link_revista" value="' + esc(settings.link_revista) + '" placeholder="https://..."></section></form>';
+          '<label class="block"><span class="block text-xs font-semibold text-on-surface mb-1">Dirección de la imagen</span><input class="w-full px-2 py-1.5 rounded-lg border border-outline-variant/40 text-sm" name="banner_url" value="' + esc(settings.banner) + '" placeholder="https://..."></label></section>' +
+          '<section><h4 class="text-sm font-bold text-on-surface mb-1">Link de la revista</h4>' + intro("Edición de la revista que se enlaza desde los correos.") +
+          '<input class="w-full px-2 py-1.5 rounded-lg border border-outline-variant/40 text-sm" name="link_revista" value="' + esc(settings.link_revista) + '" placeholder="https://..."></section></form>';
       },
       bind: function (popup) {
         var input = popup.querySelector("[data-banner-file]");
@@ -805,7 +805,7 @@
         input.addEventListener("change", function () {
           if (!input.files.length) return;
           status.textContent = "Subiendo imagen…";
-          status.className = "text-sm mb-2 text-slate-600";
+          status.className = "text-sm mb-2 text-secondary";
           input.disabled = true;
           request("commercial_settings_banner", { banner_image: input.files[0] }).then(function (data) {
             popup.querySelector('[name="banner_url"]').value = data.url;
@@ -832,15 +832,15 @@
     var form = popup.querySelector("[data-config-form]");
     var campaigns = settings.campaigns || [];
     if (!form || !campaigns.length) return;
-    form.insertAdjacentHTML("beforeend", '<section class="text-left mt-4" data-merge-campaign><h4 class="text-sm font-bold text-slate-800 mb-1">Unificar campañas</h4>' +
+    form.insertAdjacentHTML("beforeend", '<section class="text-left mt-4" data-merge-campaign><h4 class="text-sm font-bold text-on-surface mb-1">Unificar campañas</h4>' +
       intro("Corrige nombres mal escritos: las visitas de la campaña de origen pasan a la de destino, también en los resúmenes. No se puede deshacer desde aquí.") +
-      '<div class="grid grid-cols-1 sm:grid-cols-2 gap-2"><label class="block"><span class="block text-xs font-semibold text-slate-700 mb-1">Campaña con el nombre mal escrito</span><select class="w-full px-2 py-1.5 rounded-lg border border-slate-300 text-sm" data-merge-from><option value="">Selecciona una campaña</option>' +
+      '<div class="grid grid-cols-1 sm:grid-cols-2 gap-2"><label class="block"><span class="block text-xs font-semibold text-on-surface mb-1">Campaña con el nombre mal escrito</span><select class="w-full px-2 py-1.5 rounded-lg border border-outline-variant/40 text-sm" data-merge-from><option value="">Selecciona una campaña</option>' +
       campaigns.map(function (row) { return '<option value="' + esc(row.slug) + '">' + esc(row.slug) + " (" + Number(row.hits).toLocaleString("es-CO") + " visitas)</option>"; }).join("") + "</select></label>" +
-      '<label class="block"><span class="block text-xs font-semibold text-slate-700 mb-1">Nombre correcto</span><input class="w-full px-2 py-1.5 rounded-lg border border-slate-300 text-sm" maxlength="120" list="scm-merge-campaigns" data-merge-to placeholder="Una campaña existente o un nombre nuevo"><datalist id="scm-merge-campaigns">' +
+      '<label class="block"><span class="block text-xs font-semibold text-on-surface mb-1">Nombre correcto</span><input class="w-full px-2 py-1.5 rounded-lg border border-outline-variant/40 text-sm" maxlength="120" list="scm-merge-campaigns" data-merge-to placeholder="Una campaña existente o un nombre nuevo"><datalist id="scm-merge-campaigns">' +
       campaigns.map(function (row) { return '<option value="' + esc(row.slug) + '"></option>'; }).join("") + "</datalist></label></div>" +
       '<p class="hidden mt-2 px-3 py-2 rounded-xl border border-red-200 bg-red-50 text-sm text-red-900" data-merge-warning></p>' +
       '<p class="hidden mt-2 text-sm" data-merge-result></p>' +
-      '<button type="button" class="mt-2 px-3 py-1 rounded-lg bg-slate-100 text-xs font-semibold" data-merge-run>Unificar</button></section>');
+      '<button type="button" class="mt-2 px-3 py-1 rounded-lg bg-surface-container text-xs font-semibold" data-merge-run>Unificar</button></section>');
     var box = popup.querySelector("[data-merge-campaign]");
     var from = box.querySelector("[data-merge-from]");
     var to = box.querySelector("[data-merge-to]");
@@ -897,24 +897,24 @@
       : "Todavía no hay token.";
     var example = 'curl -X POST "' + url + '/deliveries" \\\n  -H "Authorization: Bearer TU_TOKEN" -H "Content-Type: application/json" \\\n' +
       "  -d '{\"external_id\":\"form-0001\",\"nombre\":\"Laura Gómez\",\"documento\":\"1001\",\"producto\":\"LLA-1\",\"cantidad\":2}'";
-    return '<section data-pop-api><h4 class="text-sm font-bold text-slate-800 mb-1">API para formularios y sistemas externos</h4>' +
+    return '<section data-pop-api><h4 class="text-sm font-bold text-on-surface mb-1">API para formularios y sistemas externos</h4>' +
       intro("Permite que un formulario (por ejemplo, un webhook de JetFormBuilder) registre entregas y consulte existencias. Las entregas quedan con origen Integración y avisan de stock bajo igual que las del panel.") +
-      '<label class="flex items-start gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white cursor-pointer text-left mb-2"><input type="checkbox" class="mt-1" name="api_enabled"' + (settings.api_enabled ? " checked" : "") + '><span class="text-sm text-slate-800">Activar la API</span></label>' +
-      '<div class="flex flex-wrap items-center gap-2 mb-2"><span class="text-sm text-slate-700" data-pop-token-status>' + status + "</span>" +
-      '<button type="button" class="px-3 py-1 rounded-lg bg-slate-100 text-xs font-semibold" data-pop-token-generate>' + (settings.api_token_set ? "Generar otro token" : "Generar token") + "</button></div>" +
+      '<label class="flex items-start gap-2 px-3 py-2 rounded-xl border border-surface-container bg-white cursor-pointer text-left mb-2"><input type="checkbox" class="mt-1" name="api_enabled"' + (settings.api_enabled ? " checked" : "") + '><span class="text-sm text-on-surface">Activar la API</span></label>' +
+      '<div class="flex flex-wrap items-center gap-2 mb-2"><span class="text-sm text-on-surface" data-pop-token-status>' + status + "</span>" +
+      '<button type="button" class="px-3 py-1 rounded-lg bg-surface-container text-xs font-semibold" data-pop-token-generate>' + (settings.api_token_set ? "Generar otro token" : "Generar token") + "</button></div>" +
       '<div class="hidden mb-2 px-3 py-2 rounded-xl border border-red-200 bg-red-50 text-sm text-red-900" data-pop-token-warning>Los formularios que usan el token actual dejarán de funcionar hasta que les pongas el nuevo. Vuelve a pulsar el botón para confirmar.</div>' +
-      '<div class="hidden mb-2" data-pop-token-box><span class="block text-xs font-semibold text-slate-700 mb-1">Token nuevo (cópialo ahora, no se vuelve a mostrar)</span>' +
-      '<input class="w-full px-2 py-1.5 rounded-lg border border-slate-300 text-sm font-mono" readonly data-pop-token-value></div>' +
+      '<div class="hidden mb-2" data-pop-token-box><span class="block text-xs font-semibold text-on-surface mb-1">Token nuevo (cópialo ahora, no se vuelve a mostrar)</span>' +
+      '<input class="w-full px-2 py-1.5 rounded-lg border border-outline-variant/40 text-sm font-mono" readonly data-pop-token-value></div>' +
       tableHtml(["Uso", "Dirección"], [
         ["Consultar productos (GET)", url + "/products"],
         ["Registrar entrega (POST)", url + "/deliveries"],
       ].map(function (row) {
-        return '<tr><td class="py-2 px-2 font-medium text-slate-800">' + esc(row[0]) + '</td><td class="py-2 px-2 text-right font-mono text-[11px] break-all">' + esc(row[1]) + "</td></tr>";
+        return '<tr><td class="py-2 px-2 font-medium text-on-surface">' + esc(row[0]) + '</td><td class="py-2 px-2 text-right font-mono text-[11px] break-all">' + esc(row[1]) + "</td></tr>";
       })) +
-      '<details class="mt-2 text-[11px] text-slate-600"><summary class="cursor-pointer font-semibold">Campos y ejemplo</summary>' +
+      '<details class="mt-2 text-[11px] text-secondary"><summary class="cursor-pointer font-semibold">Campos y ejemplo</summary>' +
       '<p class="mt-1">El token va en el encabezado <code>Authorization: Bearer …</code> o <code>X-Inventory-Token</code>; si el formulario no deja poner encabezados, en un campo <code>token</code> del envío (nunca en la dirección). Acepta JSON o campos de formulario.</p>' +
       '<p class="mt-1"><b>Quién recibe:</b> <code>nombre</code> (obligatorio), <code>documento</code>, <code>tipo</code>, <code>observaciones</code>. <b>Producto:</b> <code>producto</code> (id o SKU) y <code>cantidad</code>, o varios en <code>productos</code>: <code>[{"producto":"LLA-1","cantidad":2}]</code>. <b>Sin duplicados:</b> manda un <code>id_envio</code> o <code>external_id</code> único por envío; si se repite, no se descuenta otra vez. Opcionales: <code>fecha</code> (si falta, el momento del envío) y <code>evidencias</code> (enlaces HTTPS).</p>' +
-      '<pre class="mt-1 p-2 rounded-lg bg-slate-100 whitespace-pre-wrap break-all font-mono">' + esc(example) + "</pre></details></section>";
+      '<pre class="mt-1 p-2 rounded-lg bg-surface-container whitespace-pre-wrap break-all font-mono">' + esc(example) + "</pre></details></section>";
   }
 
   function bindPopApi(popup, settings) {
@@ -995,7 +995,7 @@
     var unresolved = settings.unresolved || { records: [], variants: [], visits: [] };
     var labels = settings.tables || {};
     var button = function (attrs, text, tone) {
-      return '<button type="button" class="px-2 py-1 rounded-lg text-xs font-semibold ' + (tone || "bg-slate-100 text-slate-700 hover:bg-slate-200") + '" ' + attrs + ">" + esc(text) + "</button>";
+      return '<button type="button" class="px-2 py-1 rounded-lg text-xs font-semibold ' + (tone || "bg-surface-container text-on-surface hover:bg-surface-container-high") + '" ' + attrs + ">" + esc(text) + "</button>";
     };
     var html = '<p class="hidden" data-medios-status role="status" aria-live="polite"></p>' + intro("Una sola lista de medios (cómo llegó el cliente o la visita) para las columnas <strong>medio</strong> de llamadas, tareas, cierres, contratos, estudios y solicitudes, el glosario <strong>Medio de llamada</strong> de los formularios, el Generador UTM y la analítica web. Renombrar o unir cambia los registros con ese nombre exacto y deja el nombre anterior como alias.");
     if (!ready) {
@@ -1006,40 +1006,40 @@
       html += '<p class="text-xs rounded-xl border border-sky-200 bg-sky-50 text-sky-900 px-3 py-2" data-medios-analytics-pending>La analítica web aplica los últimos cambios de la lista en la siguiente corrida de la tarea programada (cada pocos minutos).</p>';
     }
     if (ready) {
-      html += '<div class="flex flex-wrap items-end gap-2"><label class="flex-1 min-w-[12rem] text-left"><span class="block text-xs font-semibold text-slate-700 mb-1">Nuevo medio</span>' +
-        '<input class="w-full px-2 py-1.5 rounded-lg border border-slate-300 text-sm" type="text" maxlength="60" data-medios-new placeholder="Ej.: Volante"></label>' +
-        button("data-medios-add", "Agregar", "bg-slate-800 text-white hover:bg-slate-700") + "</div>";
+      html += '<div class="flex flex-wrap items-end gap-2"><label class="flex-1 min-w-[12rem] text-left"><span class="block text-xs font-semibold text-on-surface mb-1">Nuevo medio</span>' +
+        '<input class="w-full px-2 py-1.5 rounded-lg border border-outline-variant/40 text-sm" type="text" maxlength="60" data-medios-new placeholder="Ej.: Volante"></label>' +
+        button("data-medios-add", "Agregar", "bg-inverse-surface text-white hover:bg-inverse-surface/90") + "</div>";
     }
-    html += '<section><h4 class="text-sm font-bold text-slate-800 mb-1">Lista (' + medios.length + ")</h4>" +
-      '<div class="overflow-x-auto max-h-[38vh] overflow-y-auto border border-slate-200 rounded-xl"><table class="w-full text-sm text-left"><thead><tr class="text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-200 bg-slate-50">' +
-      '<th class="py-2 px-2">Medio</th><th class="py-2 px-2">Valor UTM</th><th class="py-2 px-2">Alias</th><th class="py-2 px-2 text-right">Registros</th><th class="py-2 px-2"></th></tr></thead><tbody class="divide-y divide-slate-100">' +
+    html += '<section><h4 class="text-sm font-bold text-on-surface mb-1">Lista (' + medios.length + ")</h4>" +
+      '<div class="overflow-x-auto max-h-[38vh] overflow-y-auto border border-surface-container rounded-xl"><table class="w-full text-sm text-left"><thead><tr class="text-[11px] uppercase tracking-wider text-secondary border-b border-surface-container bg-surface-container-low">' +
+      '<th class="py-2 px-2">Medio</th><th class="py-2 px-2">Valor UTM</th><th class="py-2 px-2">Alias</th><th class="py-2 px-2 text-right">Registros</th><th class="py-2 px-2"></th></tr></thead><tbody class="divide-y divide-surface-container">' +
       medios.map(function (row) {
         var actions = ready ? Object.keys(MEDIOS_ACTIONS).map(function (action) {
           var text = action === "toggle" ? (row.activo ? "Desactivar" : "Activar") : MEDIOS_ACTIONS[action];
           var tone = action === "toggle" && row.activo ? "bg-rose-50 text-rose-700 hover:bg-rose-100" : "";
           return button('data-medios-action="' + action + '" data-id="' + esc(String(row.id)) + '"', text, tone);
         }).join(" ") : "";
-        return '<tr data-medio-row="' + esc(row.nombre) + '"' + (row.activo ? "" : ' class="opacity-60"') + '><td class="py-2 px-2 font-medium text-slate-800">' + esc(row.nombre) +
-          (row.activo ? "" : ' <span class="text-[10px] font-bold uppercase text-slate-500">inactivo</span>') + "</td>" +
+        return '<tr data-medio-row="' + esc(row.nombre) + '"' + (row.activo ? "" : ' class="opacity-60"') + '><td class="py-2 px-2 font-medium text-on-surface">' + esc(row.nombre) +
+          (row.activo ? "" : ' <span class="text-[10px] font-bold uppercase text-secondary">inactivo</span>') + "</td>" +
           '<td class="py-2 px-2"><code class="text-xs">' + esc(row.slug) + "</code></td>" +
-          '<td class="py-2 px-2 text-xs text-slate-600">' + esc((row.aliases || []).join(", ")) + "</td>" +
+          '<td class="py-2 px-2 text-xs text-secondary">' + esc((row.aliases || []).join(", ")) + "</td>" +
           '<td class="py-2 px-2 text-right">' + number(usage[row.nombre]) + "</td>" +
           '<td class="py-2 px-2 text-right whitespace-nowrap">' + actions + "</td></tr>";
       }).join("") + "</tbody></table></div>" +
-      '<p class="text-[11px] text-slate-500 mt-1">Un medio inactivo no se ofrece en los formularios ni en el Generador UTM, pero sus registros y visitas se siguen reconociendo. Las visitas sin enlace UTM cuentan como «' + esc(settings.direct || "Sin medio (directo)") + "».</p></section>";
+      '<p class="text-[11px] text-secondary mt-1">Un medio inactivo no se ofrece en los formularios ni en el Generador UTM, pero sus registros y visitas se siguen reconociendo. Las visitas sin enlace UTM cuentan como «' + esc(settings.direct || "Sin medio (directo)") + "».</p></section>";
 
     var rawRows = function (items, kind) {
       return items.map(function (item) {
         var where = kind === "visits" ? esc((item.pairs || []).slice(0, 3).join(" | ")) : tableCounts(item.tables, labels);
         var controls = "";
         if (ready) {
-          controls = '<select class="px-2 py-1 rounded-lg border border-slate-300 text-xs max-w-[11rem]" data-medios-raw-target>' + medioOptions(medios, null) + "</select> " +
+          controls = '<select class="px-2 py-1 rounded-lg border border-outline-variant/40 text-xs max-w-[11rem]" data-medios-raw-target>' + medioOptions(medios, null) + "</select> " +
             (kind !== "variants" ? button('data-medios-raw="alias"', "Agregar como alias") + " " : "") +
             (kind !== "visits" ? button('data-medios-raw="rewrite"', "Reescribir registros", "bg-amber-100 text-amber-900 hover:bg-amber-200") : "");
         }
-        return '<tr data-medios-raw-row="' + esc(item.value) + '" data-kind="' + kind + '"><td class="py-2 px-2 font-medium text-slate-800">' + esc(item.value) +
-          (item.medio ? ' <span class="text-[11px] text-slate-500">→ ' + esc(item.medio) + "</span>" : "") + "</td>" +
-          '<td class="py-2 px-2 text-right">' + number(item.total) + '</td><td class="py-2 px-2 text-xs text-slate-600">' + where + "</td>" +
+        return '<tr data-medios-raw-row="' + esc(item.value) + '" data-kind="' + kind + '"><td class="py-2 px-2 font-medium text-on-surface">' + esc(item.value) +
+          (item.medio ? ' <span class="text-[11px] text-secondary">→ ' + esc(item.medio) + "</span>" : "") + "</td>" +
+          '<td class="py-2 px-2 text-right">' + number(item.total) + '</td><td class="py-2 px-2 text-xs text-secondary">' + where + "</td>" +
           '<td class="py-2 px-2 text-right whitespace-nowrap">' + controls + "</td></tr>";
       }).join("");
     };
@@ -1049,23 +1049,23 @@
       ["visits", "En las visitas web", "utm_source / utm_medium que no se reconocen (se muestran con su texto en la analítica). Solo se pueden agregar como alias."],
     ];
     var total = groups.reduce(function (sum, group) { return sum + (unresolved[group[0]] || []).length; }, 0);
-    html += '<section data-medios-unresolved><h4 class="text-sm font-bold text-slate-800 mb-1">Valores sin reconocer (' + total + ")</h4>" +
-      (total === 0 ? '<p class="text-sm text-slate-600">Todos los valores de los registros y de las visitas corresponden a un medio de la lista.</p>' : groups.map(function (group) {
+    html += '<section data-medios-unresolved><h4 class="text-sm font-bold text-on-surface mb-1">Valores sin reconocer (' + total + ")</h4>" +
+      (total === 0 ? '<p class="text-sm text-secondary">Todos los valores de los registros y de las visitas corresponden a un medio de la lista.</p>' : groups.map(function (group) {
         var items = unresolved[group[0]] || [];
         if (!items.length) return "";
-        return '<div class="mb-3"><p class="text-xs font-semibold text-slate-700">' + esc(group[1]) + '</p><p class="text-[11px] text-slate-500 mb-1">' + esc(group[2]) + "</p>" +
-          '<div class="overflow-x-auto"><table class="w-full text-sm text-left"><thead><tr class="text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-200"><th class="py-2 px-2">Valor</th><th class="py-2 px-2 text-right">Cantidad</th><th class="py-2 px-2">Dónde</th><th class="py-2 px-2"></th></tr></thead><tbody class="divide-y divide-slate-100">' +
+        return '<div class="mb-3"><p class="text-xs font-semibold text-on-surface">' + esc(group[1]) + '</p><p class="text-[11px] text-secondary mb-1">' + esc(group[2]) + "</p>" +
+          '<div class="overflow-x-auto"><table class="w-full text-sm text-left"><thead><tr class="text-[11px] uppercase tracking-wider text-secondary border-b border-surface-container"><th class="py-2 px-2">Valor</th><th class="py-2 px-2 text-right">Cantidad</th><th class="py-2 px-2">Dónde</th><th class="py-2 px-2"></th></tr></thead><tbody class="divide-y divide-surface-container">' +
           rawRows(items, group[0]) + "</tbody></table></div></div>";
       }).join("")) + "</section>";
 
     var history = settings.history || [];
     if (history.length) {
       var actionLabels = { seed: "Lista creada", add: "Agregado", rename: "Renombrado", merge: "Unido", activate: "Activado", deactivate: "Desactivado", aliases: "Alias", alias: "Alias", rewrite: "Registros reescritos", normalize: "Normalización", revert: "Revertido", "import": "Importado del glosario" };
-      html += '<details class="text-left"><summary class="cursor-pointer text-sm font-bold text-slate-800">Historial de cambios</summary><ul class="mt-2 space-y-1 text-xs text-slate-600" data-medios-history>' +
+      html += '<details class="text-left"><summary class="cursor-pointer text-sm font-bold text-on-surface">Historial de cambios</summary><ul class="mt-2 space-y-1 text-xs text-secondary" data-medios-history>' +
         history.map(function (row) {
           var records = row.detail && row.detail.records ? Object.keys(row.detail.records).reduce(function (sum, key) { return sum + Number(row.detail.records[key] || 0); }, 0) : null;
           return "<li><strong>" + esc(actionLabels[row.action] || row.action) + "</strong> " + esc([row.from, row.to].filter(Boolean).join(" → ")) +
-            (records !== null ? " · " + number(records) + " registros" : "") + ' <span class="text-slate-400">' + esc(row.at) + (row.id_empleado ? " · funcionario " + esc(row.id_empleado) : "") + " · #" + esc(String(row.id)) + "</span></li>";
+            (records !== null ? " · " + number(records) + " registros" : "") + ' <span class="text-secondary/70">' + esc(row.at) + (row.id_empleado ? " · funcionario " + esc(row.id_empleado) : "") + " · #" + esc(String(row.id)) + "</span></li>";
         }).join("") + "</ul></details>";
     }
     // Panel interno de confirmación (renombrar, alias, unir, desactivar, reescribir): no abre otro popup.
@@ -1109,10 +1109,10 @@
     // Abre el panel con un cuerpo y un botón de confirmar; onConfirm devuelve la operación a enviar.
     function openPanel(title, body, confirmText, onConfirm, danger) {
       var box = panel();
-      box.querySelector("[data-medios-panel-box]").innerHTML = '<h4 class="text-base font-bold text-slate-800">' + esc(title) + "</h4>" + body +
+      box.querySelector("[data-medios-panel-box]").innerHTML = '<h4 class="text-base font-bold text-on-surface">' + esc(title) + "</h4>" + body +
         '<p class="text-sm text-rose-700 hidden" data-medios-panel-error></p><div class="flex justify-end gap-2">' +
-        '<button type="button" class="px-3 py-1.5 rounded-lg bg-slate-100 text-sm font-semibold" data-medios-panel-cancel>Cancelar</button>' +
-        '<button type="button" class="px-3 py-1.5 rounded-lg text-sm font-semibold text-white ' + (danger ? "bg-rose-600 hover:bg-rose-700" : "bg-slate-800 hover:bg-slate-700") + '" data-medios-panel-confirm>' + esc(confirmText) + "</button></div>";
+        '<button type="button" class="px-3 py-1.5 rounded-lg bg-surface-container text-sm font-semibold" data-medios-panel-cancel>Cancelar</button>' +
+        '<button type="button" class="px-3 py-1.5 rounded-lg text-sm font-semibold text-white ' + (danger ? "bg-rose-600 hover:bg-rose-700" : "bg-inverse-surface hover:bg-inverse-surface/90") + '" data-medios-panel-confirm>' + esc(confirmText) + "</button></div>";
       box.classList.remove("hidden");
       box.classList.add("flex");
       var first = box.querySelector("input, textarea, select");
@@ -1146,7 +1146,7 @@
     function previewHtml(value, verb) {
       return op({ op: "preview", value: value }).then(function (data) {
         var result = data.result || {};
-        return '<p class="text-sm text-slate-700" data-medios-preview data-total="' + esc(String(result.total || 0)) + '">' + esc(verb) + " <strong>" + number(result.total) + " registros</strong>" +
+        return '<p class="text-sm text-on-surface" data-medios-preview data-total="' + esc(String(result.total || 0)) + '">' + esc(verb) + " <strong>" + number(result.total) + " registros</strong>" +
           (result.total ? " (" + tableCounts(result.preview, state.settings.tables) + ")" : "") + ".</p>";
       });
     }
@@ -1172,8 +1172,8 @@
         if (!medio) return;
         var kind = action.getAttribute("data-medios-action");
         if (kind === "aliases") {
-          openPanel("Alias de «" + medio.nombre + "»", '<p class="text-sm text-slate-600">Otras formas en que llega este medio (en los registros o en utm_source / utm_medium), una por línea. Se comparan sin mayúsculas, tildes ni signos.</p>' +
-            '<textarea class="w-full px-2 py-1.5 rounded-lg border border-slate-300 text-sm font-mono" rows="6" data-medios-aliases>' + esc((medio.aliases || []).join("\n")) + "</textarea>", "Guardar alias", function (box) {
+          openPanel("Alias de «" + medio.nombre + "»", '<p class="text-sm text-secondary">Otras formas en que llega este medio (en los registros o en utm_source / utm_medium), una por línea. Se comparan sin mayúsculas, tildes ni signos.</p>' +
+            '<textarea class="w-full px-2 py-1.5 rounded-lg border border-outline-variant/40 text-sm font-mono" rows="6" data-medios-aliases>' + esc((medio.aliases || []).join("\n")) + "</textarea>", "Guardar alias", function (box) {
             return { op: "aliases", id: medio.id, aliases: box.querySelector("[data-medios-aliases]").value.split(/\r?\n/) };
           });
           return;
@@ -1187,19 +1187,19 @@
         }
         previewHtml(medio.nombre, kind === "toggle" ? "Lo usan" : "Cambiarán").then(function (preview) {
           if (kind === "toggle") {
-            openPanel("Desactivar «" + medio.nombre + "»", preview + '<p class="text-sm text-slate-600">Deja de ofrecerse en el glosario de los formularios y en el Generador UTM. Los registros no cambian y se sigue reconociendo en la analítica.</p>', "Desactivar", function () {
+            openPanel("Desactivar «" + medio.nombre + "»", preview + '<p class="text-sm text-secondary">Deja de ofrecerse en el glosario de los formularios y en el Generador UTM. Los registros no cambian y se sigue reconociendo en la analítica.</p>', "Desactivar", function () {
               return { op: "toggle", id: medio.id, active: 0 };
             }, true);
           } else if (kind === "rename") {
-            openPanel("Renombrar «" + medio.nombre + "»", '<label class="block"><span class="block text-xs font-semibold text-slate-700 mb-1">Nombre nuevo</span><input class="w-full px-2 py-1.5 rounded-lg border border-slate-300 text-sm" type="text" maxlength="60" data-medios-rename value="' + esc(medio.nombre) + '"></label>' +
-              preview + '<p class="text-sm text-slate-600">Los registros con el nombre exacto «' + esc(medio.nombre) + "» pasan al nombre nuevo, y «" + esc(medio.nombre) + "» queda como alias (los enlaces UTM ya publicados siguen contando).</p>", "Renombrar", function (box) {
+            openPanel("Renombrar «" + medio.nombre + "»", '<label class="block"><span class="block text-xs font-semibold text-on-surface mb-1">Nombre nuevo</span><input class="w-full px-2 py-1.5 rounded-lg border border-outline-variant/40 text-sm" type="text" maxlength="60" data-medios-rename value="' + esc(medio.nombre) + '"></label>' +
+              preview + '<p class="text-sm text-secondary">Los registros con el nombre exacto «' + esc(medio.nombre) + "» pasan al nombre nuevo, y «" + esc(medio.nombre) + "» queda como alias (los enlaces UTM ya publicados siguen contando).</p>", "Renombrar", function (box) {
               var name = box.querySelector("[data-medios-rename]").value.trim();
               if (!name) throw new Error("Escribe el nombre nuevo.");
               return { op: "rename", id: medio.id, nombre: name };
             }, true);
           } else if (kind === "merge") {
-            openPanel("Unir «" + medio.nombre + "» con otro medio", '<label class="block"><span class="block text-xs font-semibold text-slate-700 mb-1">Medio que se conserva</span><select class="w-full px-2 py-1.5 rounded-lg border border-slate-300 text-sm" data-medios-merge-target>' + medioOptions(state.settings.medios, medio.id) + "</select></label>" +
-              preview + '<p class="text-sm text-slate-600">«' + esc(medio.nombre) + "» sale de la lista: sus registros pasan al medio elegido y su nombre, valor UTM y alias quedan como alias de ese medio. Queda en el historial.</p>", "Unir", function (box) {
+            openPanel("Unir «" + medio.nombre + "» con otro medio", '<label class="block"><span class="block text-xs font-semibold text-on-surface mb-1">Medio que se conserva</span><select class="w-full px-2 py-1.5 rounded-lg border border-outline-variant/40 text-sm" data-medios-merge-target>' + medioOptions(state.settings.medios, medio.id) + "</select></label>" +
+              preview + '<p class="text-sm text-secondary">«' + esc(medio.nombre) + "» sale de la lista: sus registros pasan al medio elegido y su nombre, valor UTM y alias quedan como alias de ese medio. Queda en el historial.</p>", "Unir", function (box) {
               var target = box.querySelector("[data-medios-merge-target]").value;
               if (!target) throw new Error("Elige el medio que se conserva.");
               return { op: "merge", id: medio.id, target: Number(target) };
@@ -1223,7 +1223,7 @@
           return;
         }
         previewHtml(value, "Cambiarán").then(function (preview) {
-          openPanel("Reescribir «" + value + "»", preview + '<p class="text-sm text-slate-600">Los registros con el valor exacto «' + esc(value) + "» quedan con «" + esc(target.nombre) + "». El valor anterior de cada registro queda guardado en el historial.</p>", "Reescribir registros", function () {
+          openPanel("Reescribir «" + value + "»", preview + '<p class="text-sm text-secondary">Los registros con el valor exacto «' + esc(value) + "» quedan con «" + esc(target.nombre) + "». El valor anterior de cada registro queda guardado en el historial.</p>", "Reescribir registros", function () {
             return { op: "rewrite_raw", value: value, target: target.id };
           }, true);
         }).catch(function (problem) { status("error", problem.message); });
@@ -1330,7 +1330,7 @@
             current = null;
             window.Swal.resetValidationMessage();
             popup.querySelector("[data-config-tabs]").innerHTML = tabsHtml(group, key);
-            body.innerHTML = '<p class="text-sm text-slate-500 py-8 text-center">Cargando configuración...</p>';
+            body.innerHTML = '<p class="text-sm text-secondary py-8 text-center">Cargando configuración...</p>';
             loadSection(key).then(function (data) {
               if (loading === key) render(popup, key, data);
             }).catch(function (error) {

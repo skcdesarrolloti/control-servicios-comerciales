@@ -67,12 +67,12 @@ final class CommercialTicketModalView
     ob_start();
 ?>
   <!-- BEGIN: ModalHeader -->
-  <header class="bg-white border-b border-slate-100 px-6 sm:px-8 pt-6 pb-5 flex-shrink-0">
+  <header class="bg-white border-b border-surface-container px-6 sm:px-8 pt-6 pb-5 flex-shrink-0">
     <!-- Top Status Bar & Close Button -->
     <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
       <!-- Breadcrumb navigation & Primary Status Badges -->
       <div class="flex flex-wrap items-center gap-2 text-xs">
-        <nav class="flex items-center gap-1.5 text-slate-400 font-medium mr-2">
+        <nav class="flex items-center gap-1.5 text-secondary/70 font-medium mr-2">
           <span>Tareas</span>
           <span>/</span>
           <span><?php echo esc_html($theme !== '' ? $theme : 'Comercial'); ?></span>
@@ -80,7 +80,7 @@ final class CommercialTicketModalView
           <span class="text-[#1E3C76] font-semibold">Tarea #<?php echo esc_html($logicalId); ?></span>
         </nav>
         <!-- Pill Badges -->
-        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-[#061D49] border border-slate-200">
+        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-surface-container text-[#061D49] border border-surface-container">
           #<?php echo esc_html($logicalId); ?>
         </span>
         <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-[#FEF3C7] text-[#92400E] border border-[#FDE68A]">
@@ -101,7 +101,7 @@ final class CommercialTicketModalView
       </div>
       <!-- Top-right Action Buttons and Close Modal Button -->
       <div class="flex items-center gap-2">
-        <button aria-label="Cerrar modal" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-all ml-1 cursor-pointer" type="button" data-commercial-close-case>
+        <button aria-label="Cerrar modal" class="w-8 h-8 rounded-full bg-surface-container hover:bg-surface-container-high text-secondary hover:text-on-surface flex items-center justify-center transition-all ml-1 cursor-pointer" type="button" data-commercial-close-case>
           <span class="material-symbols-outlined text-[18px]">close</span>
         </button>
       </div>
@@ -113,17 +113,17 @@ final class CommercialTicketModalView
         <h1 class="text-xl sm:text-2xl font-bold text-[#061D49] tracking-tight" id="commercial-case-title">
           <?php echo esc_html($subject); ?>
         </h1>
-        <p class="text-xs sm:text-sm text-slate-500 mt-1">
+        <p class="text-xs sm:text-sm text-secondary mt-1">
           <?php echo esc_html($description !== '' ? $description : 'Solicitud comercial registrada en plataforma.'); ?>
           <?php if ($propertyCode !== ''): ?>
-            · <span class="font-medium text-slate-700">Código Inmueble: #<?php echo esc_html($propertyCode); ?></span>
+            · <span class="font-medium text-on-surface">Código Inmueble: #<?php echo esc_html($propertyCode); ?></span>
           <?php endif; ?>
         </p>
       </div>
       <!-- Quick Action Buttons -->
       <div class="flex flex-wrap items-center gap-2 self-start md:self-auto">
         <?php if ($propertyCode !== ''): ?>
-          <button type="button" data-commercial-property-detail="<?php echo esc_attr($propertyCode); ?>" data-ticket-pk="<?php echo esc_attr((string) $pk); ?>" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-[#EBF1FB] text-[#061D49] border border-slate-200 hover:border-[#1E3C76] text-xs font-medium transition-all shadow-sm cursor-pointer">
+          <button type="button" data-commercial-property-detail="<?php echo esc_attr($propertyCode); ?>" data-ticket-pk="<?php echo esc_attr((string) $pk); ?>" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-[#EBF1FB] text-[#061D49] border border-surface-container hover:border-[#1E3C76] text-xs font-medium transition-all shadow-sm cursor-pointer">
             <span class="material-symbols-outlined text-[16px] text-[#1E3C76]">apartment</span>
             <span>Ficha del inmueble</span>
           </button>
@@ -132,14 +132,14 @@ final class CommercialTicketModalView
     </div>
 
     <!-- Meta info pill row -->
-    <div class="mt-4 pt-3 border-t border-slate-100 flex flex-wrap items-center gap-y-2 gap-x-5 text-xs text-slate-500">
+    <div class="mt-4 pt-3 border-t border-surface-container flex flex-wrap items-center gap-y-2 gap-x-5 text-xs text-secondary">
       <div class="flex items-center gap-1.5">
-        <span class="material-symbols-outlined text-[15px] text-slate-400">calendar_today</span>
-        <span>Creación: <strong class="font-medium text-slate-700"><?php echo esc_html(self::formatDate($createdTs)); ?></strong></span>
+        <span class="material-symbols-outlined text-[15px] text-secondary/70">calendar_today</span>
+        <span>Creación: <strong class="font-medium text-on-surface"><?php echo esc_html(self::formatDate($createdTs)); ?></strong></span>
       </div>
       <div class="flex items-center gap-1.5">
-        <span class="material-symbols-outlined text-[15px] text-slate-400">update</span>
-        <span>Última actividad: <strong class="font-medium text-slate-700"><?php echo esc_html(self::formatDate($updatedTs)); ?></strong></span>
+        <span class="material-symbols-outlined text-[15px] text-secondary/70">update</span>
+        <span>Última actividad: <strong class="font-medium text-on-surface"><?php echo esc_html(self::formatDate($updatedTs)); ?></strong></span>
       </div>
       <div class="flex items-center gap-1.5 text-indigo-700 font-medium bg-indigo-50 px-2.5 py-0.5 rounded-md border border-indigo-100">
         <span class="material-symbols-outlined text-[15px]">schedule</span>
@@ -156,7 +156,7 @@ final class CommercialTicketModalView
   <!-- END: ModalHeader -->
 
   <!-- BEGIN: ModalBodyContent (Split View Layout: Left Panel 42% + Right Panel 58%) -->
-  <main class="flex-1 overflow-y-auto bg-slate-50/70 p-5 sm:p-7 grid grid-cols-1 lg:grid-cols-12 gap-6">
+  <main class="flex-1 overflow-y-auto bg-surface-container-low/70 p-5 sm:p-7 grid grid-cols-1 lg:grid-cols-12 gap-6">
     <!-- BEGIN: LeftColumnManagement -->
     <section class="lg:col-span-5 flex flex-col gap-5">
       <!-- AI Insight Banner & Action Card -->
@@ -168,12 +168,12 @@ final class CommercialTicketModalView
             </span>
             <div>
               <h4 class="text-xs font-bold text-[#061D49] uppercase tracking-wider">Asistente Inteligente SuCasa</h4>
-              <p class="text-[11px] text-slate-500"><?php echo !empty($analyses) ? 'Diagnóstico ejecutivo listo' : 'Listo para procesar tarea'; ?></p>
+              <p class="text-[11px] text-secondary"><?php echo !empty($analyses) ? 'Diagnóstico ejecutivo listo' : 'Listo para procesar tarea'; ?></p>
             </div>
           </div>
           <span class="text-[11px] font-semibold text-amber-700 bg-amber-100/80 px-2 py-0.5 rounded-full">IA Activa</span>
         </div>
-        <p class="text-xs text-slate-600 leading-relaxed mb-3">
+        <p class="text-xs text-secondary leading-relaxed mb-3">
           <?php
             if (!empty($analyses[0]['resumen'])) {
               echo esc_html(mb_strimwidth((string) $analyses[0]['resumen'], 0, 180, '…', 'UTF-8'));
@@ -189,70 +189,70 @@ final class CommercialTicketModalView
       </div>
 
       <!-- Quick Action Buttons Grid -->
-      <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-card" data-purpose="case-action-grid">
-        <div class="flex items-center justify-between mb-3.5 pb-2 border-b border-slate-100">
-          <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Gestión Operativa</span>
+      <div class="bg-white rounded-2xl p-5 border border-surface-container/80 shadow-card" data-purpose="case-action-grid">
+        <div class="flex items-center justify-between mb-3.5 pb-2 border-b border-surface-container">
+          <span class="text-xs font-bold uppercase tracking-wider text-secondary/70">Gestión Operativa</span>
           <span class="text-[11px] text-[#1E3C76] font-medium"><?php echo count($timeline); ?> eventos registrados</span>
         </div>
         <div class="grid grid-cols-2 gap-2.5">
           <?php /* Las herramientas de inmueble y cotización solo salen en los temas donde se usan (CommercialTaskTools). */ ?>
           <?php if ($policy->canView('anadir_aviso') && $policy->canAct('registrar_aviso') && CommercialTaskTools::allowsTask(CommercialTaskTools::SIGN, $ticket)): ?>
-            <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-[#EBF1FB] text-slate-700 border border-slate-200 text-xs font-semibold transition-all cursor-pointer" data-commercial-task-form="sign" data-ticket-pk="<?php echo esc_attr((string) $pk); ?>"><span class="material-symbols-outlined text-[16px]">add_photo_alternate</span><span>Aviso nuevo</span></button>
+            <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-surface-container-low hover:bg-[#EBF1FB] text-on-surface border border-surface-container text-xs font-semibold transition-all cursor-pointer" data-commercial-task-form="sign" data-ticket-pk="<?php echo esc_attr((string) $pk); ?>"><span class="material-symbols-outlined text-[16px]">add_photo_alternate</span><span>Aviso nuevo</span></button>
           <?php endif; ?>
           <?php if ($policy->canAct('ingresar_inmueble') && CommercialTaskTools::allowsTask(CommercialTaskTools::PROPERTY, $ticket)): ?>
-            <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-[#EBF1FB] text-slate-700 border border-slate-200 text-xs font-semibold transition-all cursor-pointer" data-commercial-task-form="property" data-ticket-pk="<?php echo esc_attr((string) $pk); ?>"><span class="material-symbols-outlined text-[16px]">add_home_work</span><span>Ingresar inmueble</span></button>
+            <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-surface-container-low hover:bg-[#EBF1FB] text-on-surface border border-surface-container text-xs font-semibold transition-all cursor-pointer" data-commercial-task-form="property" data-ticket-pk="<?php echo esc_attr((string) $pk); ?>"><span class="material-symbols-outlined text-[16px]">add_home_work</span><span>Ingresar inmueble</span></button>
           <?php endif; ?>
           <?php if ($policy->canAct('ingresar_inmueble') && CommercialTaskTools::allowsTask(CommercialTaskTools::MEDIA, $ticket) && ($propertyCode !== '' || (int) ($ticket['id_inmueble_data'] ?? 0) > 0)): ?>
             <button type="button" class="csg-secondary" data-commercial-task-form="media" data-ticket-pk="<?php echo esc_attr((string) $pk); ?>"><span class="material-symbols-outlined text-[16px]">photo_library</span><span>Multimedia del inmueble</span></button>
           <?php endif; ?>
           <?php if ($policy->canAct('cotizacion_crear') && CommercialTaskTools::allowsTask(CommercialTaskTools::QUOTE, $ticket)): ?>
-            <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-[#EBF1FB] text-slate-700 border border-slate-200 text-xs font-semibold transition-all cursor-pointer" data-commercial-task-form="quote" data-ticket-pk="<?php echo esc_attr((string) $pk); ?>"><span class="material-symbols-outlined text-[16px]">request_quote</span><span>Cotizar inmuebles</span></button>
+            <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-surface-container-low hover:bg-[#EBF1FB] text-on-surface border border-surface-container text-xs font-semibold transition-all cursor-pointer" data-commercial-task-form="quote" data-ticket-pk="<?php echo esc_attr((string) $pk); ?>"><span class="material-symbols-outlined text-[16px]">request_quote</span><span>Cotizar inmuebles</span></button>
           <?php endif; ?>
           <?php $studiesCount = (int) ($detail['studies_count'] ?? 0); ?>
           <?php if (($policy->canAct('estudio_crear') || $policy->canAct('estudio_responder') || $policy->canAct('estudio_desistir')) && (CommercialTaskTools::allowsTask(CommercialTaskTools::STUDY, $ticket) || $studiesCount > 0)): ?>
-            <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-[#EBF1FB] text-slate-700 border border-slate-200 text-xs font-semibold transition-all cursor-pointer" data-commercial-task-form="study" data-ticket-pk="<?php echo esc_attr((string) $pk); ?>"><span class="material-symbols-outlined text-[16px]">verified_user</span><span>Estudio de aseguradora</span><?php if ($studiesCount > 0): ?><span class="ml-auto min-w-[20px] h-5 px-1.5 rounded-full bg-[#F8CF4A] text-[#061D49] text-[11px] font-bold inline-flex items-center justify-center" aria-label="<?php echo esc_attr($studiesCount . ($studiesCount === 1 ? ' estudio' : ' estudios')); ?>"><?php echo esc_html((string) $studiesCount); ?></span><?php endif; ?></button>
+            <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-surface-container-low hover:bg-[#EBF1FB] text-on-surface border border-surface-container text-xs font-semibold transition-all cursor-pointer" data-commercial-task-form="study" data-ticket-pk="<?php echo esc_attr((string) $pk); ?>"><span class="material-symbols-outlined text-[16px]">verified_user</span><span>Estudio de aseguradora</span><?php if ($studiesCount > 0): ?><span class="ml-auto min-w-[20px] h-5 px-1.5 rounded-full bg-[#F8CF4A] text-[#061D49] text-[11px] font-bold inline-flex items-center justify-center" aria-label="<?php echo esc_attr($studiesCount . ($studiesCount === 1 ? ' estudio' : ' estudios')); ?>"><?php echo esc_html((string) $studiesCount); ?></span><?php endif; ?></button>
           <?php endif; ?>
           <?php /* Contrato de mandato: después del estudio aprobado, en los mismos temas (o si la tarea ya tiene estudios). */ ?>
           <?php if ($policy->canView('mandatos') && (CommercialTaskTools::allowsTask(CommercialTaskTools::STUDY, $ticket) || $studiesCount > 0)): ?>
-            <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-[#EBF1FB] text-slate-700 border border-slate-200 text-xs font-semibold transition-all cursor-pointer" data-commercial-task-form="mandate" data-ticket-pk="<?php echo esc_attr((string) $pk); ?>"><span class="material-symbols-outlined text-[16px]">contract_edit</span><span>Contrato de mandato</span></button>
+            <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-surface-container-low hover:bg-[#EBF1FB] text-on-surface border border-surface-container text-xs font-semibold transition-all cursor-pointer" data-commercial-task-form="mandate" data-ticket-pk="<?php echo esc_attr((string) $pk); ?>"><span class="material-symbols-outlined text-[16px]">contract_edit</span><span>Contrato de mandato</span></button>
           <?php endif; ?>
           <?php /* Hoja de cierre: solo si la tarea ya tiene contrato de mandato; se hace en las páginas del panel inmobiliario. */ ?>
           <?php $closingMandate = $detail['closing_mandate'] ?? null; ?>
           <?php if (is_array($closingMandate)): ?>
             <?php $closingId = \SCM\Commercial\Mandates\MandateClosingSheet::current($closingMandate['hoja']); ?>
-            <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-[#EBF1FB] text-slate-700 border border-slate-200 text-xs font-semibold transition-all cursor-pointer" data-cma-closing="<?php echo esc_attr((string) $closingMandate['id']); ?>" data-ticket-pk="<?php echo esc_attr((string) $pk); ?>" data-cma-closing-title="<?php echo esc_attr(\SCM\Commercial\Mandates\MandateClosingSheet::label($closingMandate['hoja']) . ' · Mandato #' . $closingMandate['id']); ?>"><span class="material-symbols-outlined text-[16px]">handshake</span><span><?php echo esc_html($closingId > 0 ? 'Hoja de cierre #' . $closingId : 'Hoja de cierre'); ?></span><?php if ($closingMandate['hoja']['estado'] !== ''): ?><span class="ml-auto text-[11px] font-semibold text-slate-500"><?php echo esc_html($closingMandate['hoja']['estado']); ?></span><?php endif; ?></button>
+            <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-surface-container-low hover:bg-[#EBF1FB] text-on-surface border border-surface-container text-xs font-semibold transition-all cursor-pointer" data-cma-closing="<?php echo esc_attr((string) $closingMandate['id']); ?>" data-ticket-pk="<?php echo esc_attr((string) $pk); ?>" data-cma-closing-title="<?php echo esc_attr(\SCM\Commercial\Mandates\MandateClosingSheet::label($closingMandate['hoja']) . ' · Mandato #' . $closingMandate['id']); ?>"><span class="material-symbols-outlined text-[16px]">handshake</span><span><?php echo esc_html($closingId > 0 ? 'Hoja de cierre #' . $closingId : 'Hoja de cierre'); ?></span><?php if ($closingMandate['hoja']['estado'] !== ''): ?><span class="ml-auto text-[11px] font-semibold text-secondary"><?php echo esc_html($closingMandate['hoja']['estado']); ?></span><?php endif; ?></button>
           <?php endif; ?>
           <?php if ($policy->canAct('responder')): ?>
-            <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-[#EBF1FB] hover:text-[#1E3C76] text-slate-700 border border-slate-200 text-xs font-semibold transition-all group cursor-pointer" data-commercial-open-workflow="reply">
-              <span class="material-symbols-outlined text-[16px] text-slate-500 group-hover:text-[#1E3C76]">reply</span>
+            <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-surface-container-low hover:bg-[#EBF1FB] hover:text-[#1E3C76] text-on-surface border border-surface-container text-xs font-semibold transition-all group cursor-pointer" data-commercial-open-workflow="reply">
+              <span class="material-symbols-outlined text-[16px] text-secondary group-hover:text-[#1E3C76]">reply</span>
               <span>Responder</span>
             </button>
           <?php endif; ?>
-          <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-[#EBF1FB] hover:text-[#1E3C76] text-slate-700 border border-slate-200 text-xs font-semibold transition-all group cursor-pointer" data-commercial-open-guides>
-            <span class="material-symbols-outlined text-[16px] text-slate-500 group-hover:text-[#1E3C76]">menu_book</span>
+          <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-surface-container-low hover:bg-[#EBF1FB] hover:text-[#1E3C76] text-on-surface border border-surface-container text-xs font-semibold transition-all group cursor-pointer" data-commercial-open-guides>
+            <span class="material-symbols-outlined text-[16px] text-secondary group-hover:text-[#1E3C76]">menu_book</span>
             <span>Guías</span>
           </button>
           <?php if ($policy->canAct('agregar_nota')): ?>
-            <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold transition-all group cursor-pointer" data-commercial-open-workflow="note">
-              <span class="material-symbols-outlined text-[16px] text-slate-500 group-hover:text-[#061D49]">lock</span>
+            <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-surface-container-low hover:bg-surface-container text-on-surface border border-surface-container text-xs font-semibold transition-all group cursor-pointer" data-commercial-open-workflow="note">
+              <span class="material-symbols-outlined text-[16px] text-secondary group-hover:text-[#061D49]">lock</span>
               <span>Nota interna</span>
             </button>
           <?php endif; ?>
           <?php if ($policy->canAct('seguimiento')): ?>
-            <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold transition-all group cursor-pointer" data-commercial-open-workflow="follow_up">
-              <span class="material-symbols-outlined text-[16px] text-slate-500 group-hover:text-[#061D49]">checklist</span>
+            <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-surface-container-low hover:bg-surface-container text-on-surface border border-surface-container text-xs font-semibold transition-all group cursor-pointer" data-commercial-open-workflow="follow_up">
+              <span class="material-symbols-outlined text-[16px] text-secondary group-hover:text-[#061D49]">checklist</span>
               <span>Seguimiento</span>
             </button>
           <?php endif; ?>
           <?php if ($policy->canAct('postergar')): ?>
-            <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold transition-all group cursor-pointer" data-commercial-open-workflow="postpone">
-              <span class="material-symbols-outlined text-[16px] text-slate-500 group-hover:text-[#061D49]">schedule</span>
+            <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-surface-container-low hover:bg-surface-container text-on-surface border border-surface-container text-xs font-semibold transition-all group cursor-pointer" data-commercial-open-workflow="postpone">
+              <span class="material-symbols-outlined text-[16px] text-secondary group-hover:text-[#061D49]">schedule</span>
               <span>Postergar</span>
             </button>
           <?php endif; ?>
           <?php if ($policy->canAct('reasignar')): ?>
-            <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold transition-all group cursor-pointer" data-commercial-open-workflow="reassign">
-              <span class="material-symbols-outlined text-[16px] text-slate-500 group-hover:text-[#061D49]">manage_accounts</span>
+            <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-surface-container-low hover:bg-surface-container text-on-surface border border-surface-container text-xs font-semibold transition-all group cursor-pointer" data-commercial-open-workflow="reassign">
+              <span class="material-symbols-outlined text-[16px] text-secondary group-hover:text-[#061D49]">manage_accounts</span>
               <span>Reasignar</span>
             </button>
           <?php endif; ?>
@@ -273,7 +273,7 @@ final class CommercialTicketModalView
 
       <?php if ($policy->canView('calendario')): ?>
         <!-- Agenda comercial: agendar citas de la tarea en el calendario y consultar la agenda del responsable -->
-        <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-card" data-purpose="case-calendar"
+        <div class="bg-white rounded-2xl p-5 border border-surface-container/80 shadow-card" data-purpose="case-calendar"
           data-commercial-calendar-task
           data-ticket-pk="<?php echo esc_attr((string) $pk); ?>"
           data-ticket="<?php echo esc_attr($logicalId); ?>"
@@ -286,8 +286,8 @@ final class CommercialTicketModalView
           data-empleado="<?php echo esc_attr($assignee); ?>"
           data-estado-comercial="<?php echo esc_attr(trim((string) ($ticket['estado_comercial'] ?? ''))); ?>"
           data-estado-administrativo="<?php echo esc_attr(trim((string) ($ticket['estado_administrativo'] ?? ''))); ?>">
-          <div class="flex items-center justify-between mb-3.5 pb-2 border-b border-slate-100">
-            <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Agenda comercial</span>
+          <div class="flex items-center justify-between mb-3.5 pb-2 border-b border-surface-container">
+            <span class="text-xs font-bold uppercase tracking-wider text-secondary/70">Agenda comercial</span>
             <span class="text-[11px] text-[#1E3C76] font-medium" data-commercial-calendar-task-status>Calendario de <?php echo esc_html($assignee); ?></span>
           </div>
           <div class="grid grid-cols-2 gap-2.5">
@@ -295,11 +295,11 @@ final class CommercialTicketModalView
               <span class="material-symbols-outlined text-[16px]">event_available</span>
               <span>Agendar cita de la tarea</span>
             </button>
-            <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-[#EBF1FB] text-slate-700 border border-slate-200 text-xs font-semibold transition-all cursor-pointer" data-commercial-calendar-agenda>
+            <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-surface-container-low hover:bg-[#EBF1FB] text-on-surface border border-surface-container text-xs font-semibold transition-all cursor-pointer" data-commercial-calendar-agenda>
               <span class="material-symbols-outlined text-[16px]">calendar_month</span>
               <span>Ver agenda</span>
             </button>
-            <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold transition-all cursor-pointer" data-commercial-calendar-pending>
+            <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-surface-container-low hover:bg-surface-container text-on-surface border border-surface-container text-xs font-semibold transition-all cursor-pointer" data-commercial-calendar-pending>
               <span class="material-symbols-outlined text-[16px] text-rose-600">warning</span>
               <span>Pendientes</span>
               <em class="not-italic ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-700" data-commercial-calendar-pending-count hidden>0</em>
@@ -310,44 +310,44 @@ final class CommercialTicketModalView
       <?php endif; ?>
 
       <!-- Customer and Property Details Card -->
-      <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-card flex flex-col gap-4" data-purpose="customer-property-summary">
-        <div class="border-b border-slate-100 pb-3">
-          <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Detalles &amp; Contacto</span>
+      <div class="bg-white rounded-2xl p-5 border border-surface-container/80 shadow-card flex flex-col gap-4" data-purpose="customer-property-summary">
+        <div class="border-b border-surface-container pb-3">
+          <span class="text-xs font-bold uppercase tracking-wider text-secondary/70">Detalles &amp; Contacto</span>
         </div>
 
         <!-- Solicitante Profile Block -->
-        <div class="flex items-start gap-3 bg-slate-50/70 p-3 rounded-xl border border-slate-100">
+        <div class="flex items-start gap-3 bg-surface-container-low/70 p-3 rounded-xl border border-surface-container">
           <div class="w-10 h-10 rounded-full bg-[#EBF1FB] text-[#061D49] font-bold flex items-center justify-center text-sm border border-[#1E3C76]/20 flex-shrink-0">
             <?php echo esc_html($requesterInitials); ?>
           </div>
           <div class="flex-1 min-w-0">
             <div class="flex items-center justify-between">
-              <span class="text-[11px] font-semibold text-slate-400 uppercase">Solicitante</span>
+              <span class="text-[11px] font-semibold text-secondary/70 uppercase">Solicitante</span>
               <?php if ($channel !== ''): ?>
-                <span class="text-[11px] text-slate-400">Canal: <?php echo esc_html($channel); ?></span>
+                <span class="text-[11px] text-secondary/70">Canal: <?php echo esc_html($channel); ?></span>
               <?php endif; ?>
             </div>
-            <h3 class="text-xs font-bold text-slate-900 truncate"><?php echo esc_html($requester); ?></h3>
+            <h3 class="text-xs font-bold text-on-surface truncate"><?php echo esc_html($requester); ?></h3>
             <div class="mt-2 space-y-1">
               <?php if ($email !== ''): ?>
                 <!-- Email with copy action -->
-                <div class="flex items-center justify-between text-xs text-slate-600 bg-white px-2 py-1 rounded border border-slate-200">
+                <div class="flex items-center justify-between text-xs text-secondary bg-white px-2 py-1 rounded border border-surface-container">
                   <div class="flex items-center gap-1.5 truncate">
-                    <span class="material-symbols-outlined text-[15px] text-slate-400 flex-shrink-0">mail</span>
+                    <span class="material-symbols-outlined text-[15px] text-secondary/70 flex-shrink-0">mail</span>
                     <span class="truncate"><?php echo esc_html($email); ?></span>
                   </div>
-                  <button type="button" class="text-slate-400 hover:text-[#1E3C76] ml-1 cursor-pointer" title="Copiar correo" data-commercial-copy="<?php echo esc_attr($email); ?>">
+                  <button type="button" class="text-secondary/70 hover:text-[#1E3C76] ml-1 cursor-pointer" title="Copiar correo" data-commercial-copy="<?php echo esc_attr($email); ?>">
                     <span class="material-symbols-outlined text-[14px]">content_copy</span>
                   </button>
                 </div>
               <?php endif; ?>
               <?php if ($phone !== ''): ?>
                 <!-- Phone with WhatsApp action -->
-                <div class="flex items-center justify-between gap-2 text-xs text-slate-600 bg-white pl-2 pr-1 py-1 rounded border border-slate-200">
+                <div class="flex items-center justify-between gap-2 text-xs text-secondary bg-white pl-2 pr-1 py-1 rounded border border-surface-container">
                   <div class="flex items-center gap-1.5 min-w-0">
-                    <span class="material-symbols-outlined text-[15px] text-slate-400 flex-shrink-0">phone</span>
+                    <span class="material-symbols-outlined text-[15px] text-secondary/70 flex-shrink-0">phone</span>
                     <span class="truncate"><?php echo esc_html($phone); ?></span>
-                    <button type="button" class="text-slate-400 hover:text-[#1E3C76] cursor-pointer flex-shrink-0" title="Copiar celular" data-commercial-copy="<?php echo esc_attr($phone); ?>">
+                    <button type="button" class="text-secondary/70 hover:text-[#1E3C76] cursor-pointer flex-shrink-0" title="Copiar celular" data-commercial-copy="<?php echo esc_attr($phone); ?>">
                       <span class="material-symbols-outlined text-[14px]">content_copy</span>
                     </button>
                   </div>
@@ -365,7 +365,7 @@ final class CommercialTicketModalView
 
         <!-- Inmueble Snapshot Block -->
         <?php if ($propertyCode !== '' || $address !== '' || $neighborhood !== ''): ?>
-          <div class="bg-slate-50/70 p-3.5 rounded-xl border border-slate-100 flex flex-col gap-2">
+          <div class="bg-surface-container-low/70 p-3.5 rounded-xl border border-surface-container flex flex-col gap-2">
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-1.5 text-[#061D49] font-bold text-xs">
                 <span class="material-symbols-outlined text-[16px] text-[#1E3C76]">apartment</span>
@@ -376,12 +376,12 @@ final class CommercialTicketModalView
               <?php endif; ?>
             </div>
             <?php if ($propertyType !== '' || $neighborhood !== ''): ?>
-              <p class="text-xs text-slate-600 font-medium">
+              <p class="text-xs text-secondary font-medium">
                 <?php echo esc_html(implode(' · ', array_filter([$propertyType, $neighborhood, $city]))); ?>
               </p>
             <?php endif; ?>
             <?php if ($address !== ''): ?>
-              <p class="text-[11px] text-slate-500">
+              <p class="text-[11px] text-secondary">
                 Dirección: <?php echo esc_html($address); ?>
               </p>
             <?php endif; ?>
@@ -399,16 +399,16 @@ final class CommercialTicketModalView
         <!-- Consultor/a asignado -->
         <div class="flex items-center justify-between pt-1 text-xs">
           <div class="flex items-center gap-2">
-            <div class="w-7 h-7 rounded-full bg-slate-200 flex items-center justify-center font-bold text-slate-700 text-xs">
+            <div class="w-7 h-7 rounded-full bg-surface-container-high flex items-center justify-center font-bold text-on-surface text-xs">
               <?php echo esc_html($assigneeInitials); ?>
             </div>
             <div>
-              <span class="text-[10px] text-slate-400 block leading-tight">Responsable asignado</span>
-              <span class="font-semibold text-slate-800"><?php echo esc_html($assignee); ?></span>
+              <span class="text-[10px] text-secondary/70 block leading-tight">Responsable asignado</span>
+              <span class="font-semibold text-on-surface"><?php echo esc_html($assignee); ?></span>
             </div>
           </div>
           <?php if ($assigneeId !== ''): ?>
-            <span class="text-[11px] text-slate-500 font-mono">ID: <?php echo esc_html($assigneeId); ?></span>
+            <span class="text-[11px] text-secondary font-mono">ID: <?php echo esc_html($assigneeId); ?></span>
           <?php endif; ?>
         </div>
 
@@ -448,15 +448,15 @@ final class CommercialTicketModalView
       </div>
 
       <!-- Traceability Feed Header with Counter Pills & Feed -->
-      <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-card flex flex-col flex-1">
-        <div class="flex flex-wrap items-center justify-between gap-2 mb-4 pb-3 border-b border-slate-100">
+      <div class="bg-white rounded-2xl p-5 border border-surface-container/80 shadow-card flex flex-col flex-1">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-4 pb-3 border-b border-surface-container">
           <div>
             <span class="text-xs font-bold uppercase tracking-wider text-[#061D49] block">Trazabilidad y Cronología</span>
-            <span class="text-xs text-slate-400">Historial completo ordenado cronológicamente</span>
+            <span class="text-xs text-secondary/70">Historial completo ordenado cronológicamente</span>
           </div>
           <!-- Metrics Badges -->
           <div class="flex items-center gap-1.5 flex-wrap">
-            <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-700">
+            <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-surface-container text-on-surface">
               <?php echo esc_html((string) count($timeline)); ?> registros
             </span>
             <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-100/70 text-amber-800">
@@ -465,7 +465,7 @@ final class CommercialTicketModalView
             <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-100/70 text-[#1E3C76]">
               <?php echo esc_html((string) $timelineCounts['seguimiento']); ?> seguimientos
             </span>
-            <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-400">
+            <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-surface-container text-secondary/70">
               <?php echo esc_html((string) $timelineCounts['nota']); ?> notas
             </span>
           </div>
@@ -480,9 +480,9 @@ final class CommercialTicketModalView
         ?>
         <div class="space-y-4 overflow-y-auto max-h-[520px] pr-1" data-purpose="timeline-feed" data-ticket-pk="<?php echo esc_attr((string) $pk); ?>">
           <?php if ($timeline === []): ?>
-            <div class="py-16 text-center text-slate-400">
+            <div class="py-16 text-center text-secondary/70">
               <span class="material-symbols-outlined text-[36px] opacity-40 block mb-1">chat</span>
-              <p class="text-xs text-slate-500">Aún no hay respuestas, seguimientos o notas registradas para esta tarea.</p>
+              <p class="text-xs text-secondary">Aún no hay respuestas, seguimientos o notas registradas para esta tarea.</p>
             </div>
           <?php else: ?>
             <?php foreach ($timeline as $index => $item):
@@ -505,11 +505,11 @@ final class CommercialTicketModalView
 
               $icon = '↩';
               $badgeBg = 'bg-amber-100 text-amber-900';
-              $cardBg = $index === 0 ? 'bg-gradient-to-r from-amber-50/60 to-white border-amber-200/80 shadow-sm' : 'bg-white border-slate-200/90 shadow-sm hover:border-slate-300';
+              $cardBg = $index === 0 ? 'bg-gradient-to-r from-amber-50/60 to-white border-amber-200/80 shadow-sm' : 'bg-white border-surface-container/90 shadow-sm hover:border-outline-variant/40';
               if ($type === 'nota') {
                 $icon = '🔒';
-                $badgeBg = 'bg-slate-100 text-slate-700';
-                $cardBg = 'bg-slate-50/80 border-slate-200';
+                $badgeBg = 'bg-surface-container text-on-surface';
+                $cardBg = 'bg-surface-container-low/80 border-surface-container';
               } elseif ($type === 'seguimiento') {
                 $icon = '📅';
                 $badgeBg = 'bg-blue-100 text-[#1E3C76]';
@@ -522,39 +522,39 @@ final class CommercialTicketModalView
                       <?php echo $icon; ?>
                     </span>
                     <div>
-                      <span class="text-xs font-bold text-slate-900"><?php echo esc_html($fromClient ? 'Mensaje del cliente' : ($labels[$type] ?? 'Actividad')); ?></span>
-                      <span class="text-xs text-slate-500">· <?php echo esc_html($author); ?></span>
+                      <span class="text-xs font-bold text-on-surface"><?php echo esc_html($fromClient ? 'Mensaje del cliente' : ($labels[$type] ?? 'Actividad')); ?></span>
+                      <span class="text-xs text-secondary">· <?php echo esc_html($author); ?></span>
                       <?php if ($can['edits'] > 0): ?>
-                        <span class="ml-1 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-500 text-[10px] font-semibold" title="<?php echo esc_attr('Editada ' . $can['edits'] . ($can['edits'] === 1 ? ' vez' : ' veces') . ($editedTs > 0 ? ', la última el ' . self::formatDate($editedTs) : '')); ?>" data-commercial-timeline-edited>
+                        <span class="ml-1 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-surface-container text-secondary text-[10px] font-semibold" title="<?php echo esc_attr('Editada ' . $can['edits'] . ($can['edits'] === 1 ? ' vez' : ' veces') . ($editedTs > 0 ? ', la última el ' . self::formatDate($editedTs) : '')); ?>" data-commercial-timeline-edited>
                           <span class="material-symbols-outlined text-[12px]">edit</span>Editada
                         </span>
                       <?php endif; ?>
                     </div>
                   </div>
                   <div class="flex items-center gap-1.5 shrink-0">
-                    <span class="text-xs font-semibold text-slate-700"><?php echo esc_html($time); ?></span>
+                    <span class="text-xs font-semibold text-on-surface"><?php echo esc_html($time); ?></span>
                     <?php if ($can['edit']): ?>
-                      <button type="button" class="w-7 h-7 rounded-lg text-slate-400 hover:text-[#1E3C76] hover:bg-[#EBF1FB] flex items-center justify-center cursor-pointer transition-colors" data-commercial-timeline-edit title="<?php echo esc_attr('Editar (' . ($editsLeft === 1 ? 'queda 1 edición' : 'quedan ' . $editsLeft . ' ediciones') . ')'); ?>" aria-label="Editar entrada">
+                      <button type="button" class="w-7 h-7 rounded-lg text-secondary/70 hover:text-[#1E3C76] hover:bg-[#EBF1FB] flex items-center justify-center cursor-pointer transition-colors" data-commercial-timeline-edit title="<?php echo esc_attr('Editar (' . ($editsLeft === 1 ? 'queda 1 edición' : 'quedan ' . $editsLeft . ' ediciones') . ')'); ?>" aria-label="Editar entrada">
                         <span class="material-symbols-outlined text-[16px]">edit</span>
                       </button>
                     <?php endif; ?>
                     <?php if ($can['delete']): ?>
-                      <button type="button" class="w-7 h-7 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center cursor-pointer transition-colors" data-commercial-timeline-delete title="Eliminar (queda una nota interna de constancia)" aria-label="Eliminar entrada">
+                      <button type="button" class="w-7 h-7 rounded-lg text-secondary/70 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center cursor-pointer transition-colors" data-commercial-timeline-delete title="Eliminar (queda una nota interna de constancia)" aria-label="Eliminar entrada">
                         <span class="material-symbols-outlined text-[16px]">delete</span>
                       </button>
                     <?php endif; ?>
                   </div>
                 </div>
-                <div class="text-xs sm:text-[13px] text-slate-700 leading-relaxed font-normal pl-8" data-commercial-timeline-text>
+                <div class="text-xs sm:text-[13px] text-on-surface leading-relaxed font-normal pl-8" data-commercial-timeline-text>
                   <?php echo self::renderFormattedMessage($msg, $pk); ?>
                 </div>
                 <?php if ($can['edit']): ?>
                   <form class="pl-8 mt-1 space-y-2" data-commercial-timeline-editor hidden>
-                    <textarea name="texto" rows="5" required maxlength="<?php echo esc_attr((string) CommercialTimelineEditor::MAX_TEXT); ?>" class="w-full text-xs sm:text-[13px] rounded-xl border border-slate-200 focus:border-[#1E3C76] focus:ring focus:ring-[#1E3C76]/20 p-3 outline-none transition bg-white"><?php echo esc_html($msg); ?></textarea>
+                    <textarea name="texto" rows="5" required maxlength="<?php echo esc_attr((string) CommercialTimelineEditor::MAX_TEXT); ?>" class="w-full text-xs sm:text-[13px] rounded-xl border border-surface-container focus:border-[#1E3C76] focus:ring focus:ring-[#1E3C76]/20 p-3 outline-none transition bg-white"><?php echo esc_html($msg); ?></textarea>
                     <div class="flex items-center justify-end gap-2 flex-wrap">
-                      <span class="text-[11px] text-slate-500 mr-auto"><?php echo esc_html(($editsLeft === 1 ? 'Es la última edición' : 'Puedes editarla ' . $editsLeft . ' veces') . ($type !== 'nota' ? '. No se le reenvía al cliente.' : '.')); ?></span>
+                      <span class="text-[11px] text-secondary mr-auto"><?php echo esc_html(($editsLeft === 1 ? 'Es la última edición' : 'Puedes editarla ' . $editsLeft . ' veces') . ($type !== 'nota' ? '. No se le reenvía al cliente.' : '.')); ?></span>
                       <span class="text-xs font-medium text-rose-600 w-full text-right" data-commercial-timeline-message aria-live="polite"></span>
-                      <button type="button" class="px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors cursor-pointer" data-commercial-timeline-cancel>Cancelar</button>
+                      <button type="button" class="px-3.5 py-1.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface text-xs font-semibold transition-colors cursor-pointer" data-commercial-timeline-cancel>Cancelar</button>
                       <button type="submit" class="px-4 py-1.5 rounded-xl bg-[#061D49] hover:bg-[#1E3C76] text-white text-xs font-semibold shadow-sm flex items-center gap-1.5 transition-colors cursor-pointer">
                         <span class="material-symbols-outlined text-[15px]">save</span><span>Guardar cambios</span>
                       </button>
@@ -562,7 +562,7 @@ final class CommercialTicketModalView
                   </form>
                 <?php endif; ?>
                 <?php echo self::timelineAttachments($item); ?>
-                <div class="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400 pl-8">
+                <div class="mt-2.5 pt-2 border-t border-surface-container flex items-center justify-between text-[11px] text-secondary/70 pl-8">
                   <span><?php echo esc_html(self::actorMeta($actorId, $actorEmail)); ?></span>
                   <span class="text-amber-700 font-medium">Estado: <?php echo esc_html($status); ?></span>
                 </div>
@@ -577,12 +577,12 @@ final class CommercialTicketModalView
   <!-- END: ModalBodyContent -->
 
   <!-- BEGIN: ModalFooter -->
-  <footer class="bg-white border-t border-slate-100 px-6 sm:px-8 py-3.5 flex flex-wrap items-center justify-between gap-3 flex-shrink-0">
-    <div class="flex items-center gap-2 text-xs text-slate-500">
-      <span class="material-symbols-outlined text-[15px] text-slate-400">info</span>
+  <footer class="bg-white border-t border-surface-container px-6 sm:px-8 py-3.5 flex flex-wrap items-center justify-between gap-3 flex-shrink-0">
+    <div class="flex items-center gap-2 text-xs text-secondary">
+      <span class="material-symbols-outlined text-[15px] text-secondary/70">info</span>
       <span>Tarea #<?php echo esc_html($logicalId); ?> · Responder, postergar, cerrar y las demás acciones están en Gestión Operativa.</span>
     </div>
-    <button class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 transition-colors cursor-pointer" type="button" data-commercial-close-case>
+    <button class="px-4 py-2 rounded-xl text-xs font-semibold text-secondary hover:text-on-surface bg-surface-container hover:bg-surface-container-high transition-colors cursor-pointer" type="button" data-commercial-close-case>
       Cerrar ventana
     </button>
   </footer>
@@ -592,7 +592,7 @@ final class CommercialTicketModalView
 
   <!-- Modal Interno de Análisis IA -->
   <div class="fixed inset-0 z-[60] items-center justify-center p-3 sm:p-5 bg-[#061D49]/60 backdrop-blur-md commercial-analysis-modal overflow-y-auto" data-commercial-analysis-modal role="dialog" aria-modal="true" aria-labelledby="commercial-analysis-title" hidden>
-    <div class="bg-white rounded-3xl shadow-modal w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col relative border border-slate-100" role="document" data-commercial-analysis-modal-content></div>
+    <div class="bg-white rounded-3xl shadow-modal w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col relative border border-surface-container" role="document" data-commercial-analysis-modal-content></div>
   </div>
 <?php
     return (string) ob_get_clean();
@@ -603,13 +603,13 @@ final class CommercialTicketModalView
   {
     ob_start();
 ?>
-    <section class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-card space-y-3" data-commercial-saved-analyses data-ticket-pk="<?php echo esc_attr((string) $pk); ?>">
-      <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+    <section class="bg-white rounded-2xl p-5 border border-surface-container/80 shadow-card space-y-3" data-commercial-saved-analyses data-ticket-pk="<?php echo esc_attr((string) $pk); ?>">
+      <div class="flex items-center justify-between pb-2 border-b border-surface-container">
         <div class="flex items-center gap-2">
           <span class="material-symbols-outlined text-[16px] text-amber-500">auto_awesome</span>
-          <h3 class="text-xs font-bold uppercase tracking-wider text-slate-700">Análisis Guardados</h3>
+          <h3 class="text-xs font-bold uppercase tracking-wider text-on-surface">Análisis Guardados</h3>
         </div>
-        <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600" data-commercial-analysis-count><?php echo esc_html((string) count($analyses)); ?>/3</span>
+        <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-surface-container text-secondary" data-commercial-analysis-count><?php echo esc_html((string) count($analyses)); ?>/3</span>
       </div>
       <div class="space-y-2" data-commercial-analysis-list>
         <?php echo self::analysisListItems($pk, $analyses); ?>
@@ -623,7 +623,7 @@ final class CommercialTicketModalView
   private static function analysisListItems(int $pk, array $analyses): string
   {
     if ($analyses === []) {
-      return '<div class="py-4 text-center text-slate-400 text-xs"><p>Aún no hay análisis guardados con IA.</p></div>';
+      return '<div class="py-4 text-center text-secondary/70 text-xs"><p>Aún no hay análisis guardados con IA.</p></div>';
     }
 
     $html = '';
@@ -634,13 +634,13 @@ final class CommercialTicketModalView
       $author = trim((string) ($analysis['created_by'] ?? 'Sistema'));
       $json = json_encode($analysis, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE | JSON_PARTIAL_OUTPUT_ON_ERROR);
 
-      $html .= '<div class="flex items-center justify-between p-3 bg-slate-50/80 hover:bg-[#EBF1FB]/60 rounded-xl border border-slate-200 transition-colors text-xs">'
+      $html .= '<div class="flex items-center justify-between p-3 bg-surface-container-low/80 hover:bg-[#EBF1FB]/60 rounded-xl border border-surface-container transition-colors text-xs">'
         . '<button type="button" class="flex-1 text-left cursor-pointer" data-commercial-open-analysis data-analysis-json="' . esc_attr(is_string($json) ? $json : '{}') . '">'
         . '<strong class="block font-semibold text-[#061D49]">' . esc_html($label) . '</strong>'
-        . '<span class="block text-slate-500 text-[11px] line-clamp-1 mt-0.5">' . esc_html(mb_strimwidth($summary, 0, 70, '…', 'UTF-8')) . '</span>'
-        . '<small class="text-[10px] text-slate-400 mt-0.5 block">' . esc_html($author) . '</small>'
+        . '<span class="block text-secondary text-[11px] line-clamp-1 mt-0.5">' . esc_html(mb_strimwidth($summary, 0, 70, '…', 'UTF-8')) . '</span>'
+        . '<small class="text-[10px] text-secondary/70 mt-0.5 block">' . esc_html($author) . '</small>'
         . '</button>'
-        . '<button type="button" class="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg transition-colors cursor-pointer" data-commercial-delete-analysis data-ticket-pk="' . esc_attr((string) $pk) . '" data-analysis-id="' . esc_attr((string) $id) . '" title="Eliminar análisis"><span class="material-symbols-outlined text-[16px]">delete</span></button>'
+        . '<button type="button" class="p-1.5 text-secondary/70 hover:text-rose-600 rounded-lg transition-colors cursor-pointer" data-commercial-delete-analysis data-ticket-pk="' . esc_attr((string) $pk) . '" data-analysis-id="' . esc_attr((string) $id) . '" title="Eliminar análisis"><span class="material-symbols-outlined text-[16px]">delete</span></button>'
         . '</div>';
     }
     return $html;
@@ -679,7 +679,7 @@ final class CommercialTicketModalView
     if ($status === 'cerrado' || $status === 'postergado') {
       $label = $status === 'cerrado' ? 'Cerrada' : 'Postergada';
       $detail = $status === 'cerrado' ? 'La tarea ya no cuenta plazo.' : 'El plazo no corre mientras esté postergada.';
-      $tone = ['text-slate-600', 'bg-slate-300'];
+      $tone = ['text-secondary', 'bg-surface-container-highest'];
       $width = $status === 'cerrado' ? 100 : 0;
     } else {
       $label = $overdue ? 'Atrasada' : ($warning > 0 && $days >= $warning ? 'Por vencer' : 'Al día');
@@ -689,13 +689,13 @@ final class CommercialTicketModalView
       $tone = $overdue ? ['text-rose-700', 'bg-rose-500'] : ($label === 'Por vencer' ? ['text-amber-700', 'bg-[#F8CF4A]'] : ['text-emerald-700', 'bg-emerald-500']);
       $width = min(100, max(4, (int) ($ticket['scm_sla_percent'] ?? 0)));
     }
-    return '<div class="pt-2 border-t border-slate-100" data-commercial-sla="' . esc_attr($status) . '">'
+    return '<div class="pt-2 border-t border-surface-container" data-commercial-sla="' . esc_attr($status) . '">'
       . '<div class="flex justify-between gap-2 text-xs mb-1">'
-      . '<span class="text-slate-500 font-medium">Tiempo de atención (SLA)</span>'
+      . '<span class="text-secondary font-medium">Tiempo de atención (SLA)</span>'
       . '<span class="font-bold ' . $tone[0] . '">' . esc_html($label) . '</span>'
       . '</div>'
-      . '<div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden"><div class="h-2 rounded-full ' . $tone[1] . '" style="width:' . $width . '%"></div></div>'
-      . '<p class="text-[11px] text-slate-500 mt-1">' . esc_html($detail) . '</p>'
+      . '<div class="w-full bg-surface-container rounded-full h-2 overflow-hidden"><div class="h-2 rounded-full ' . $tone[1] . '" style="width:' . $width . '%"></div></div>'
+      . '<p class="text-[11px] text-secondary mt-1">' . esc_html($detail) . '</p>'
       . '</div>';
   }
 
@@ -716,32 +716,32 @@ final class CommercialTicketModalView
   {
     ob_start();
 ?>
-    <form class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-card space-y-4 commercial-workflow-form" data-commercial-workflow-form="reply" hidden>
-      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+    <form class="bg-white rounded-2xl p-5 border border-surface-container/80 shadow-card space-y-4 commercial-workflow-form" data-commercial-workflow-form="reply" hidden>
+      <div class="flex items-center justify-between pb-3 border-b border-surface-container">
         <div>
           <h3 class="text-sm font-bold text-[#061D49] flex items-center gap-2">
             <span class="material-symbols-outlined text-[18px] text-[#1E3C76]">reply</span>
             <span>Responder al solicitante</span>
           </h3>
-          <p class="text-xs text-slate-500 mt-0.5">Escribe la respuesta oficial para <?php echo esc_html($requester); ?>. Le llega por correo y WhatsApp. Puedes actualizar el estado comercial y adjuntar enlaces o archivos.</p>
+          <p class="text-xs text-secondary mt-0.5">Escribe la respuesta oficial para <?php echo esc_html($requester); ?>. Le llega por correo y WhatsApp. Puedes actualizar el estado comercial y adjuntar enlaces o archivos.</p>
         </div>
-        <button type="button" class="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center cursor-pointer transition-colors" data-commercial-close-workflow aria-label="Cerrar formulario">
+        <button type="button" class="w-7 h-7 rounded-full bg-surface-container hover:bg-surface-container-high text-secondary hover:text-on-surface flex items-center justify-center cursor-pointer transition-colors" data-commercial-close-workflow aria-label="Cerrar formulario">
           <span class="material-symbols-outlined text-[16px]">close</span>
         </button>
       </div>
       <input type="hidden" name="ticket_pk" value="<?php echo esc_attr((string) $pk); ?>">
 
       <!-- Selector de Nuevo Estado Comercial -->
-      <div class="space-y-1.5 bg-slate-50/70 p-3 rounded-xl border border-slate-200/80">
+      <div class="space-y-1.5 bg-surface-container-low/70 p-3 rounded-xl border border-surface-container/80">
         <div class="flex items-center justify-between">
-          <label class="block text-xs font-bold text-slate-700 flex items-center gap-1.5">
+          <label class="block text-xs font-bold text-on-surface flex items-center gap-1.5">
             <span class="material-symbols-outlined text-[15px] text-[#1E3C76]">sync_alt</span>
             <span>Estado comercial tras la respuesta:</span>
           </label>
-          <span class="text-[11px] font-normal text-slate-500">Actual: <strong class="text-[#061D49]"><?php echo esc_html($currentStatus); ?></strong></span>
+          <span class="text-[11px] font-normal text-secondary">Actual: <strong class="text-[#061D49]"><?php echo esc_html($currentStatus); ?></strong></span>
         </div>
         <?php $descriptions = CommercialStatusCatalog::descriptions(); ?>
-        <select name="estado" data-commercial-status-select class="w-full text-xs sm:text-sm rounded-xl border border-slate-200 focus:border-[#1E3C76] focus:ring focus:ring-[#1E3C76]/20 p-2.5 outline-none bg-white font-medium text-slate-800 transition">
+        <select name="estado" data-commercial-status-select class="w-full text-xs sm:text-sm rounded-xl border border-surface-container focus:border-[#1E3C76] focus:ring focus:ring-[#1E3C76]/20 p-2.5 outline-none bg-white font-medium text-on-surface transition">
           <option value="__keep__" selected data-label="<?php echo esc_attr($currentStatus); ?>" data-help="<?php echo esc_attr($descriptions[$currentStatus] ?? ''); ?>">Mantener estado actual (<?php echo esc_html($currentStatus); ?>)</option>
           <optgroup label="Gestión activa">
             <?php foreach (CommercialStatusCatalog::OPEN as $st): ?>
@@ -752,7 +752,7 @@ final class CommercialTicketModalView
           </optgroup>
         </select>
         <?php echo self::statusGuide($currentStatus, $descriptions[$currentStatus] ?? ''); ?>
-        <p class="text-[11px] text-slate-500">Para postergar o cerrar la tarea usa su botón: piden la fecha o el resultado y le avisan al cliente.</p>
+        <p class="text-[11px] text-secondary">Para postergar o cerrar la tarea usa su botón: piden la fecha o el resultado y le avisan al cliente.</p>
       </div>
 
       <?php echo self::guidesLauncher($guides); ?>
@@ -760,7 +760,7 @@ final class CommercialTicketModalView
       <!-- Barra de herramientas de enlaces y contenido enriquecido -->
       <div class="space-y-1.5">
         <div class="flex items-center justify-between flex-wrap gap-2">
-          <label class="block text-xs font-semibold text-slate-700">
+          <label class="block text-xs font-semibold text-on-surface">
             Mensaje de respuesta <em class="text-rose-600">*</em>
           </label>
           <!-- Botones de inserción rápida de links -->
@@ -771,28 +771,28 @@ final class CommercialTicketModalView
                 <span>Inmueble #<?php echo esc_html($propertyCode); ?></span>
               </button>
             <?php endif; ?>
-            <button type="button" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-[11px] font-medium transition-all cursor-pointer active:scale-95" data-commercial-insert-custom-property title="Pide el código de otro inmueble y agrega a la respuesta el enlace de su ficha en la página web">
-              <span class="material-symbols-outlined text-[14px] text-slate-500">add_home_work</span>
+            <button type="button" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface border border-surface-container text-[11px] font-medium transition-all cursor-pointer active:scale-95" data-commercial-insert-custom-property title="Pide el código de otro inmueble y agrega a la respuesta el enlace de su ficha en la página web">
+              <span class="material-symbols-outlined text-[14px] text-secondary">add_home_work</span>
               <span>Otro inmueble</span>
             </button>
-            <button type="button" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-[11px] font-medium transition-all cursor-pointer active:scale-95" data-commercial-insert-link title="Pide una dirección web y la agrega a la respuesta">
-              <span class="material-symbols-outlined text-[14px] text-slate-500">link</span>
+            <button type="button" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface border border-surface-container text-[11px] font-medium transition-all cursor-pointer active:scale-95" data-commercial-insert-link title="Pide una dirección web y la agrega a la respuesta">
+              <span class="material-symbols-outlined text-[14px] text-secondary">link</span>
               <span>Enlace web</span>
             </button>
           </div>
         </div>
-        <textarea name="respuesta" rows="5" required placeholder="Escribe aquí la respuesta oficial para <?php echo esc_attr($requester); ?>… (puedes usar los botones de arriba para adjuntar links de inmuebles o páginas web)" class="w-full text-xs sm:text-sm rounded-xl border border-slate-200 focus:border-[#1E3C76] focus:ring focus:ring-[#1E3C76]/20 p-3 placeholder-slate-400 outline-none transition font-sans"></textarea>
-        <p class="text-[11px] text-slate-400 flex items-center gap-1">
-          <span class="material-symbols-outlined text-[13px] text-slate-400">info</span>
+        <textarea name="respuesta" rows="5" required placeholder="Escribe aquí la respuesta oficial para <?php echo esc_attr($requester); ?>… (puedes usar los botones de arriba para adjuntar links de inmuebles o páginas web)" class="w-full text-xs sm:text-sm rounded-xl border border-surface-container focus:border-[#1E3C76] focus:ring focus:ring-[#1E3C76]/20 p-3 placeholder-secondary/60 outline-none transition font-sans"></textarea>
+        <p class="text-[11px] text-secondary/70 flex items-center gap-1">
+          <span class="material-symbols-outlined text-[13px] text-secondary/70">info</span>
           <span>Los links de inmuebles y URLs se convertirán automáticamente en accesos directos interactivos en la cronología.</span>
         </p>
       </div>
 
       <?php echo self::attachmentFields(); ?>
 
-      <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+      <div class="flex items-center justify-end gap-2 pt-3 border-t border-surface-container">
         <span class="text-xs text-rose-600 mr-auto font-medium" data-commercial-form-message aria-live="polite"></span>
-        <button type="button" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-colors cursor-pointer" data-commercial-close-workflow>Cancelar</button>
+        <button type="button" class="px-4 py-2 bg-surface-container hover:bg-surface-container-high text-on-surface rounded-xl text-xs font-semibold transition-colors cursor-pointer" data-commercial-close-workflow>Cancelar</button>
         <button type="submit" class="px-5 py-2 bg-[#061D49] hover:bg-[#1E3C76] text-white rounded-xl text-xs font-semibold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer">
           <span class="material-symbols-outlined text-[15px]">send</span>
           <span>Enviar respuesta</span>
@@ -817,29 +817,29 @@ final class CommercialTicketModalView
   ): string {
     ob_start();
 ?>
-    <form class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-card space-y-3.5 commercial-workflow-form" data-commercial-workflow-form="<?php echo esc_attr($action); ?>" hidden>
-      <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+    <form class="bg-white rounded-2xl p-5 border border-surface-container/80 shadow-card space-y-3.5 commercial-workflow-form" data-commercial-workflow-form="<?php echo esc_attr($action); ?>" hidden>
+      <div class="flex items-center justify-between pb-2 border-b border-surface-container">
         <div>
           <h3 class="text-sm font-bold text-[#061D49]"><?php echo esc_html($title); ?></h3>
-          <p class="text-xs text-slate-500"><?php echo esc_html($help); ?></p>
+          <p class="text-xs text-secondary"><?php echo esc_html($help); ?></p>
         </div>
-        <button type="button" class="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center cursor-pointer transition-colors" data-commercial-close-workflow aria-label="Cerrar formulario">
+        <button type="button" class="w-7 h-7 rounded-full bg-surface-container hover:bg-surface-container-high text-secondary hover:text-on-surface flex items-center justify-center cursor-pointer transition-colors" data-commercial-close-workflow aria-label="Cerrar formulario">
           <span class="material-symbols-outlined text-[16px]">close</span>
         </button>
       </div>
       <input type="hidden" name="ticket_pk" value="<?php echo esc_attr((string) $pk); ?>">
       <?php echo $extra; ?>
       <div class="space-y-1">
-        <label class="block text-xs font-semibold text-slate-700">Mensaje <em class="text-rose-600">*</em></label>
-        <textarea name="<?php echo esc_attr($field); ?>" rows="4" required placeholder="<?php echo esc_attr($placeholder); ?>" class="w-full text-xs sm:text-sm rounded-xl border border-slate-200 focus:border-[#1E3C76] focus:ring focus:ring-[#1E3C76]/20 p-3 placeholder-slate-400 outline-none transition"></textarea>
+        <label class="block text-xs font-semibold text-on-surface">Mensaje <em class="text-rose-600">*</em></label>
+        <textarea name="<?php echo esc_attr($field); ?>" rows="4" required placeholder="<?php echo esc_attr($placeholder); ?>" class="w-full text-xs sm:text-sm rounded-xl border border-surface-container focus:border-[#1E3C76] focus:ring focus:ring-[#1E3C76]/20 p-3 placeholder-secondary/60 outline-none transition"></textarea>
       </div>
       <?php if ($attachments): ?>
         <?php echo self::attachmentFields(); ?>
       <?php endif; ?>
 
-      <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+      <div class="flex items-center justify-end gap-2 pt-2 border-t border-surface-container">
         <span class="text-xs text-rose-600 mr-auto font-medium" data-commercial-form-message aria-live="polite"></span>
-        <button type="button" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-colors cursor-pointer" data-commercial-close-workflow>Cancelar</button>
+        <button type="button" class="px-4 py-2 bg-surface-container hover:bg-surface-container-high text-on-surface rounded-xl text-xs font-semibold transition-colors cursor-pointer" data-commercial-close-workflow>Cancelar</button>
         <button type="submit" class="px-5 py-2 <?php echo $danger ? 'bg-rose-600 hover:bg-rose-700 text-white' : 'bg-[#061D49] hover:bg-[#1E3C76] text-white'; ?> rounded-xl text-xs font-semibold transition-all shadow-sm cursor-pointer"><?php echo esc_html($submit); ?></button>
       </div>
     </form>
@@ -862,21 +862,21 @@ final class CommercialTicketModalView
   ): string {
     ob_start();
 ?>
-    <form class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-card space-y-3.5 commercial-workflow-form" data-commercial-workflow-form="<?php echo esc_attr($action); ?>" hidden>
-      <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+    <form class="bg-white rounded-2xl p-5 border border-surface-container/80 shadow-card space-y-3.5 commercial-workflow-form" data-commercial-workflow-form="<?php echo esc_attr($action); ?>" hidden>
+      <div class="flex items-center justify-between pb-2 border-b border-surface-container">
         <div>
           <h3 class="text-sm font-bold text-[#061D49]"><?php echo esc_html($title); ?></h3>
-          <p class="text-xs text-slate-500"><?php echo esc_html($help); ?></p>
+          <p class="text-xs text-secondary"><?php echo esc_html($help); ?></p>
         </div>
-        <button type="button" class="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center cursor-pointer transition-colors" data-commercial-close-workflow aria-label="Cerrar formulario">
+        <button type="button" class="w-7 h-7 rounded-full bg-surface-container hover:bg-surface-container-high text-secondary hover:text-on-surface flex items-center justify-center cursor-pointer transition-colors" data-commercial-close-workflow aria-label="Cerrar formulario">
           <span class="material-symbols-outlined text-[16px]">close</span>
         </button>
       </div>
       <input type="hidden" name="ticket_pk" value="<?php echo esc_attr((string) $pk); ?>">
       <div class="space-y-1">
-        <label class="block text-xs font-semibold text-slate-700">Estado comercial <em class="text-rose-600">*</em></label>
+        <label class="block text-xs font-semibold text-on-surface">Estado comercial <em class="text-rose-600">*</em></label>
         <?php $descriptions = CommercialStatusCatalog::descriptions(); ?>
-        <select name="estado" required data-commercial-status-select class="w-full text-xs sm:text-sm rounded-xl border border-slate-200 focus:border-[#1E3C76] p-2.5 outline-none bg-white font-medium text-slate-700">
+        <select name="estado" required data-commercial-status-select class="w-full text-xs sm:text-sm rounded-xl border border-surface-container focus:border-[#1E3C76] p-2.5 outline-none bg-white font-medium text-on-surface">
           <?php foreach ($statuses as $st): ?>
             <option value="<?php echo esc_attr($st); ?>" data-label="<?php echo esc_attr($st); ?>" data-help="<?php echo esc_attr($descriptions[$st] ?? ''); ?>"<?php selected($selected, $st); ?>><?php echo esc_html($st); ?></option>
           <?php endforeach; ?>
@@ -884,15 +884,15 @@ final class CommercialTicketModalView
         <?php echo self::statusGuide($selected, $descriptions[$selected] ?? ''); ?>
       </div>
       <div class="space-y-1">
-        <label class="block text-xs font-semibold text-slate-700">Motivo / Observaciones <em class="text-rose-600">*</em></label>
-        <textarea name="<?php echo esc_attr($field); ?>" rows="3" required placeholder="Describe el motivo de esta acción…" class="w-full text-xs sm:text-sm rounded-xl border border-slate-200 focus:border-[#1E3C76] focus:ring focus:ring-[#1E3C76]/20 p-3 placeholder-slate-400 outline-none transition"></textarea>
+        <label class="block text-xs font-semibold text-on-surface">Motivo / Observaciones <em class="text-rose-600">*</em></label>
+        <textarea name="<?php echo esc_attr($field); ?>" rows="3" required placeholder="Describe el motivo de esta acción…" class="w-full text-xs sm:text-sm rounded-xl border border-surface-container focus:border-[#1E3C76] focus:ring focus:ring-[#1E3C76]/20 p-3 placeholder-secondary/60 outline-none transition"></textarea>
       </div>
       <?php if ($attachments): ?>
         <?php echo self::attachmentFields(); ?>
       <?php endif; ?>
-      <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+      <div class="flex items-center justify-end gap-2 pt-2 border-t border-surface-container">
         <span class="text-xs text-rose-600 mr-auto font-medium" data-commercial-form-message aria-live="polite"></span>
-        <button type="button" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-colors cursor-pointer" data-commercial-close-workflow>Cancelar</button>
+        <button type="button" class="px-4 py-2 bg-surface-container hover:bg-surface-container-high text-on-surface rounded-xl text-xs font-semibold transition-colors cursor-pointer" data-commercial-close-workflow>Cancelar</button>
         <button type="submit" class="px-5 py-2 <?php echo $danger ? 'bg-rose-600 hover:bg-rose-700 text-white' : 'bg-[#061D49] hover:bg-[#1E3C76] text-white'; ?> rounded-xl text-xs font-semibold transition-all shadow-sm cursor-pointer"><?php echo esc_html($submit); ?></button>
       </div>
     </form>
@@ -905,9 +905,9 @@ final class CommercialTicketModalView
   {
     $zone = new \DateTimeZone(\SCM\Support\ColombiaBusinessCalendar::TIMEZONE);
     $today = new \DateTimeImmutable('today', $zone);
-    return '<div class="space-y-1"><label class="block text-xs font-semibold text-slate-700" for="commercial-resume-date">Retomar la tarea el <em class="text-rose-600">*</em></label>'
-      . '<input type="date" id="commercial-resume-date" name="fecha_retomar" required min="' . $today->modify('+1 day')->format('Y-m-d') . '" max="' . $today->modify('+1 year')->format('Y-m-d') . '" class="w-full sm:w-60 text-xs sm:text-sm rounded-xl border border-slate-200 focus:border-[#1E3C76] focus:ring focus:ring-[#1E3C76]/20 p-2.5 outline-none bg-white text-slate-700">'
-      . '<p class="text-[11px] text-slate-500">Ese día la tarea sale en el calendario de vencimientos para retomarla.</p></div>';
+    return '<div class="space-y-1"><label class="block text-xs font-semibold text-on-surface" for="commercial-resume-date">Retomar la tarea el <em class="text-rose-600">*</em></label>'
+      . '<input type="date" id="commercial-resume-date" name="fecha_retomar" required min="' . $today->modify('+1 day')->format('Y-m-d') . '" max="' . $today->modify('+1 year')->format('Y-m-d') . '" class="w-full sm:w-60 text-xs sm:text-sm rounded-xl border border-surface-container focus:border-[#1E3C76] focus:ring focus:ring-[#1E3C76]/20 p-2.5 outline-none bg-white text-on-surface">'
+      . '<p class="text-[11px] text-secondary">Ese día la tarea sale en el calendario de vencimientos para retomarla.</p></div>';
   }
 
   /**
@@ -917,7 +917,7 @@ final class CommercialTicketModalView
   private static function statusGuide(string $status, string $meaning): string
   {
     return '<div class="flex items-start justify-between gap-3 rounded-xl border border-[#1E3C76]/15 bg-[#EBF1FB]/70 px-3 py-2.5" data-commercial-status-help aria-live="polite">'
-      . '<p class="flex items-start gap-1.5 text-xs text-slate-700 min-w-0"><span class="material-symbols-outlined text-[16px] text-[#1E3C76] shrink-0" aria-hidden="true">info</span>'
+      . '<p class="flex items-start gap-1.5 text-xs text-on-surface min-w-0"><span class="material-symbols-outlined text-[16px] text-[#1E3C76] shrink-0" aria-hidden="true">info</span>'
       . '<span><strong class="text-[#061D49]" data-commercial-status-help-name>' . esc_html($status) . '</strong>: <span data-commercial-status-help-text>' . esc_html($meaning) . '</span></span></p>'
       . '<button type="button" class="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white hover:bg-[#061D49] hover:text-white text-[#1E3C76] border border-[#1E3C76]/25 text-[11px] font-semibold transition-colors cursor-pointer" data-commercial-open-guides><span class="material-symbols-outlined text-[14px]" aria-hidden="true">menu_book</span>Guía de estados</button></div>';
   }
@@ -930,9 +930,9 @@ final class CommercialTicketModalView
   {
     $matches = count(array_filter($guides, static fn(array $guide): bool => !empty($guide['match'])));
     $count = $guides === [] ? 'Aún no hay respuestas guía' : (count($guides) === 1 ? '1 respuesta guía' : count($guides) . ' respuestas guía') . ($matches > 0 ? ', ' . $matches . ' para este estado' : '');
-    return '<div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3.5 py-3">'
+    return '<div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-surface-container bg-white px-3.5 py-3">'
       . '<div class="flex items-center gap-3 min-w-0"><span class="w-9 h-9 rounded-xl bg-[#F8CF4A]/30 text-[#061D49] flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-[19px]" aria-hidden="true">tips_and_updates</span></span>'
-      . '<div class="min-w-0"><p class="text-xs font-bold text-[#061D49]">¿Qué responder?</p><p class="text-[11px] text-slate-500">' . esc_html($count) . '</p></div></div>'
+      . '<div class="min-w-0"><p class="text-xs font-bold text-[#061D49]">¿Qué responder?</p><p class="text-[11px] text-secondary">' . esc_html($count) . '</p></div></div>'
       . '<button type="button" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#061D49] hover:bg-[#1E3C76] text-white text-xs font-semibold transition-colors cursor-pointer" data-commercial-open-guides><span class="material-symbols-outlined text-[16px]" aria-hidden="true">menu_book</span>Ver respuestas guía</button></div>';
   }
 
@@ -973,27 +973,27 @@ final class CommercialTicketModalView
       }
       $options .= '</optgroup>';
     }
-    $field = 'w-full text-sm rounded-xl border border-slate-200 focus:border-[#1E3C76] focus:ring-2 focus:ring-[#1E3C76]/15 px-3 py-2.5 outline-none bg-white text-slate-800 transition';
+    $field = 'w-full text-sm rounded-xl border border-surface-container focus:border-[#1E3C76] focus:ring-2 focus:ring-[#1E3C76]/15 px-3 py-2.5 outline-none bg-white text-on-surface transition';
     ob_start();
 ?>
   <!-- Ventana de guías: estados y respuestas guía -->
   <div class="fixed inset-0 z-[70] hidden items-center justify-center p-3 sm:p-6 bg-[#061D49]/55 backdrop-blur-sm" data-commercial-guides-modal data-current-status="<?php echo esc_attr($current); ?>" role="dialog" aria-modal="true" aria-labelledby="commercial-guides-title" hidden>
-    <div class="bg-white w-full max-w-2xl max-h-[90vh] rounded-3xl shadow-2xl border border-slate-100 flex flex-col overflow-hidden" role="document">
-      <header class="px-6 pt-5 pb-4 flex items-start justify-between gap-4 border-b border-slate-100">
+    <div class="bg-white w-full max-w-2xl max-h-[90vh] rounded-3xl shadow-2xl border border-surface-container flex flex-col overflow-hidden" role="document">
+      <header class="px-6 pt-5 pb-4 flex items-start justify-between gap-4 border-b border-surface-container">
         <div class="flex items-start gap-3">
           <span class="w-11 h-11 rounded-2xl bg-[#EBF1FB] text-[#1E3C76] flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-[22px]" aria-hidden="true">menu_book</span></span>
           <div>
-            <span class="block text-[11px] uppercase tracking-wider font-semibold text-slate-400">Guías de la tarea</span>
+            <span class="block text-[11px] uppercase tracking-wider font-semibold text-secondary/70">Guías de la tarea</span>
             <h2 class="text-lg font-bold text-[#061D49] leading-tight" id="commercial-guides-title">Estados y respuestas guía</h2>
-            <p class="text-xs text-slate-500 mt-0.5">Elige un estado para ver qué significa y qué responderle al cliente.</p>
+            <p class="text-xs text-secondary mt-0.5">Elige un estado para ver qué significa y qué responderle al cliente.</p>
           </div>
         </div>
-        <button type="button" class="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center shrink-0 transition-colors cursor-pointer" data-commercial-close-guides aria-label="Cerrar guías">
+        <button type="button" class="w-9 h-9 rounded-full bg-surface-container hover:bg-surface-container-high text-secondary hover:text-on-surface flex items-center justify-center shrink-0 transition-colors cursor-pointer" data-commercial-close-guides aria-label="Cerrar guías">
           <span class="material-symbols-outlined text-[20px]">close</span>
         </button>
       </header>
 
-      <section class="px-6 py-4 bg-slate-50/80 border-b border-slate-100 space-y-3">
+      <section class="px-6 py-4 bg-surface-container-low/80 border-b border-surface-container space-y-3">
         <label class="block">
           <span class="sr-only">Estado comercial</span>
           <select data-commercial-guides-state class="<?php echo esc_attr($field); ?> font-semibold">
@@ -1001,11 +1001,11 @@ final class CommercialTicketModalView
             <?php echo $options; ?>
           </select>
         </label>
-        <div class="flex items-start gap-3 rounded-2xl bg-white border border-slate-200 p-3.5" data-commercial-guides-meaning aria-live="polite">
+        <div class="flex items-start gap-3 rounded-2xl bg-white border border-surface-container p-3.5" data-commercial-guides-meaning aria-live="polite">
           <span class="w-8 h-8 rounded-full bg-[#F8CF4A]/35 text-[#061D49] flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">lightbulb</span></span>
           <div class="min-w-0">
             <p class="text-sm font-bold text-[#061D49]" data-commercial-guides-meaning-title></p>
-            <p class="text-[13px] text-slate-600 leading-relaxed" data-commercial-guides-meaning-text></p>
+            <p class="text-[13px] text-secondary leading-relaxed" data-commercial-guides-meaning-text></p>
           </div>
         </div>
       </section>
@@ -1013,8 +1013,8 @@ final class CommercialTicketModalView
       <div class="flex-1 overflow-y-auto px-6 py-4 space-y-3">
         <div class="flex flex-wrap items-center gap-2">
           <label class="relative flex-1 min-w-[12rem]">
-            <span class="material-symbols-outlined text-[18px] text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true">search</span>
-            <input type="search" data-commercial-guide-search placeholder="Buscar por situación o texto" aria-label="Buscar respuestas guía" class="w-full text-sm rounded-xl border border-slate-200 focus:border-[#1E3C76] focus:ring-2 focus:ring-[#1E3C76]/15 pl-9 pr-3 py-2.5 outline-none bg-white transition">
+            <span class="material-symbols-outlined text-[18px] text-secondary/70 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true">search</span>
+            <input type="search" data-commercial-guide-search placeholder="Buscar por situación o texto" aria-label="Buscar respuestas guía" class="w-full text-sm rounded-xl border border-surface-container focus:border-[#1E3C76] focus:ring-2 focus:ring-[#1E3C76]/15 pl-9 pr-3 py-2.5 outline-none bg-white transition">
           </label>
           <?php if ($canEdit): ?>
             <button type="button" class="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-white hover:bg-[#EBF1FB] text-[#1E3C76] border border-[#1E3C76]/30 text-xs font-semibold transition-colors cursor-pointer" data-commercial-guide-new><span class="material-symbols-outlined text-[17px]" aria-hidden="true">add</span>Nueva respuesta</button>
@@ -1026,7 +1026,7 @@ final class CommercialTicketModalView
             <input type="hidden" name="id" value="">
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <label class="block space-y-1">
-                <span class="block text-xs font-semibold text-slate-700">Estado</span>
+                <span class="block text-xs font-semibold text-on-surface">Estado</span>
                 <select name="estado" class="<?php echo esc_attr($field); ?>">
                   <option value="">Sin estado (sirve para todos)</option>
                   <?php foreach ($groups as $label => $statuses): ?>
@@ -1039,32 +1039,32 @@ final class CommercialTicketModalView
                 </select>
               </label>
               <label class="block space-y-1">
-                <span class="block text-xs font-semibold text-slate-700">Situación <em class="text-rose-600">*</em></span>
+                <span class="block text-xs font-semibold text-on-surface">Situación <em class="text-rose-600">*</em></span>
                 <input type="text" name="situacion" required maxlength="255" placeholder="Ej.: Solicitud de documentos" class="<?php echo esc_attr($field); ?>">
               </label>
             </div>
             <label class="block space-y-1">
-              <span class="block text-xs font-semibold text-slate-700">Respuesta <em class="text-rose-600">*</em></span>
+              <span class="block text-xs font-semibold text-on-surface">Respuesta <em class="text-rose-600">*</em></span>
               <textarea name="respuesta" rows="6" required maxlength="<?php echo (int) CommercialReplyGuides::MAX_TEXT; ?>" placeholder="Texto que el consultor/a envía al cliente en esta situación" class="<?php echo esc_attr($field); ?>"></textarea>
             </label>
             <div class="flex flex-wrap items-center justify-end gap-2">
               <span class="text-xs text-rose-600 mr-auto font-medium" data-commercial-guide-editor-message aria-live="polite"></span>
-              <button type="button" class="px-4 py-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold transition-colors cursor-pointer" data-commercial-guide-cancel>Cancelar</button>
+              <button type="button" class="px-4 py-2 bg-white hover:bg-surface-container text-on-surface border border-surface-container rounded-xl text-xs font-semibold transition-colors cursor-pointer" data-commercial-guide-cancel>Cancelar</button>
               <button type="submit" class="px-5 py-2 bg-[#061D49] hover:bg-[#1E3C76] text-white rounded-xl text-xs font-semibold transition-colors cursor-pointer">Guardar respuesta</button>
             </div>
           </form>
         <?php endif; ?>
-        <p class="text-[11px] uppercase tracking-wider font-semibold text-slate-400 pt-1" data-commercial-guides-count></p>
+        <p class="text-[11px] uppercase tracking-wider font-semibold text-secondary/70 pt-1" data-commercial-guides-count></p>
         <ul class="space-y-2.5" data-commercial-guides-list><?php echo self::guideCards($guides, $canUse, $canEdit); ?></ul>
-        <div class="text-center py-8 rounded-2xl border border-dashed border-slate-200 bg-slate-50/60" data-commercial-guides-empty hidden>
-          <span class="material-symbols-outlined text-[28px] text-slate-300" aria-hidden="true">forum</span>
-          <p class="text-xs text-slate-500 mt-1">No hay respuestas guía para este estado<?php echo $canEdit ? '. Crea una con «Nueva respuesta».' : '.'; ?></p>
+        <div class="text-center py-8 rounded-2xl border border-dashed border-surface-container bg-surface-container-low/60" data-commercial-guides-empty hidden>
+          <span class="material-symbols-outlined text-[28px] text-secondary/50" aria-hidden="true">forum</span>
+          <p class="text-xs text-secondary mt-1">No hay respuestas guía para este estado<?php echo $canEdit ? '. Crea una con «Nueva respuesta».' : '.'; ?></p>
         </div>
       </div>
 
-      <footer class="px-6 py-3 border-t border-slate-100 flex items-center justify-between gap-3 bg-white">
-        <p class="text-[11px] text-slate-400"><?php echo $canUse ? '«Usar» lleva el texto a Responder para que lo ajustes antes de enviar.' : 'Consulta qué significa cada estado y qué responder.'; ?></p>
-        <button type="button" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors cursor-pointer" data-commercial-close-guides>Cerrar</button>
+      <footer class="px-6 py-3 border-t border-surface-container flex items-center justify-between gap-3 bg-white">
+        <p class="text-[11px] text-secondary/70"><?php echo $canUse ? '«Usar» lleva el texto a Responder para que lo ajustes antes de enviar.' : 'Consulta qué significa cada estado y qué responder.'; ?></p>
+        <button type="button" class="px-4 py-2 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface text-xs font-semibold transition-colors cursor-pointer" data-commercial-close-guides>Cerrar</button>
       </footer>
     </div>
   </div>
@@ -1086,15 +1086,15 @@ final class CommercialTicketModalView
       $text = (string) ($guide['respuesta'] ?? '');
       $match = !empty($guide['match']);
       $long = mb_strlen($text, 'UTF-8') > 200 || substr_count($text, "\n") > 2;
-      $cards .= '<li class="rounded-2xl border border-slate-200 bg-white p-4 hover:border-[#1E3C76]/35 hover:shadow-sm transition' . ($match ? ' border-l-4 border-l-[#1E3C76]' : '') . '" data-commercial-guide data-id="' . (int) ($guide['id'] ?? 0) . '" data-estado="' . esc_attr(CommercialReplyGuides::key($state)) . '" data-estado-label="' . esc_attr($state) . '" data-situacion="' . esc_attr($situation) . '">'
+      $cards .= '<li class="rounded-2xl border border-surface-container bg-white p-4 hover:border-[#1E3C76]/35 hover:shadow-sm transition' . ($match ? ' border-l-4 border-l-[#1E3C76]' : '') . '" data-commercial-guide data-id="' . (int) ($guide['id'] ?? 0) . '" data-estado="' . esc_attr(CommercialReplyGuides::key($state)) . '" data-estado-label="' . esc_attr($state) . '" data-situacion="' . esc_attr($situation) . '">'
         . '<div class="flex items-start justify-between gap-3"><strong class="text-sm font-semibold text-[#061D49]">' . esc_html($situation) . '</strong>'
-        . '<span class="shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full ' . ($match ? 'bg-[#EBF1FB] text-[#1E3C76]' : 'bg-slate-100 text-slate-500') . '">' . esc_html($state !== '' ? $state : 'Todos los estados') . '</span></div>'
-        . '<p class="mt-1.5 text-[13px] text-slate-600 leading-relaxed whitespace-pre-line' . ($long ? ' line-clamp-3' : '') . '" data-commercial-guide-text>' . esc_html($text) . '</p>'
+        . '<span class="shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full ' . ($match ? 'bg-[#EBF1FB] text-[#1E3C76]' : 'bg-surface-container text-secondary') . '">' . esc_html($state !== '' ? $state : 'Todos los estados') . '</span></div>'
+        . '<p class="mt-1.5 text-[13px] text-secondary leading-relaxed whitespace-pre-line' . ($long ? ' line-clamp-3' : '') . '" data-commercial-guide-text>' . esc_html($text) . '</p>'
         . '<div class="mt-3 flex items-center justify-between gap-2">'
         . ($long ? '<button type="button" class="text-[11px] font-semibold text-[#1E3C76] hover:underline cursor-pointer" data-commercial-guide-more aria-expanded="false">Ver más</button>' : '<span></span>')
         . '<div class="flex items-center gap-1">'
-        . ($canEdit ? '<button type="button" class="' . $icon . 'text-slate-500 hover:bg-slate-100 hover:text-[#061D49]" data-commercial-guide-edit title="Editar" aria-label="Editar ' . esc_attr($situation) . '"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">edit</span></button>'
-          . '<button type="button" class="' . $icon . 'text-slate-400 hover:bg-rose-50 hover:text-rose-600" data-commercial-guide-delete title="Eliminar" aria-label="Eliminar ' . esc_attr($situation) . '"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">delete</span></button>' : '')
+        . ($canEdit ? '<button type="button" class="' . $icon . 'text-secondary hover:bg-surface-container hover:text-[#061D49]" data-commercial-guide-edit title="Editar" aria-label="Editar ' . esc_attr($situation) . '"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">edit</span></button>'
+          . '<button type="button" class="' . $icon . 'text-secondary/70 hover:bg-rose-50 hover:text-rose-600" data-commercial-guide-delete title="Eliminar" aria-label="Eliminar ' . esc_attr($situation) . '"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">delete</span></button>' : '')
         . ($canUse ? '<button type="button" class="ml-1 inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#061D49] hover:bg-[#1E3C76] text-white text-xs font-semibold transition-colors cursor-pointer" data-commercial-use-guide><span class="material-symbols-outlined text-[15px]" aria-hidden="true">reply</span>Usar</button>' : '')
         . '</div></div></li>';
     }
@@ -1106,22 +1106,22 @@ final class CommercialTicketModalView
     $docAccept = 'image/jpeg,image/png,application/pdf,application/msword,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/zip,application/x-rar-compressed,text/html,text/plain,text/csv';
     ob_start();
 ?>
-    <div class="bg-slate-50 p-3.5 rounded-xl space-y-2 border border-slate-200">
-      <span class="block text-xs font-semibold text-slate-700">Soportes y Evidencias Opcionales</span>
+    <div class="bg-surface-container-low p-3.5 rounded-xl space-y-2 border border-surface-container">
+      <span class="block text-xs font-semibold text-on-surface">Soportes y Evidencias Opcionales</span>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <label class="block space-y-1">
-          <span class="block text-[11px] text-slate-500">Subir archivo</span>
-          <input type="file" name="evidencia[]" accept="image/jpeg,image/png,image/gif,image/webp,image/bmp,image/heic,image/heif,image/tiff" multiple class="block w-full text-[12px] text-slate-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:bg-slate-200 file:text-slate-800 file:font-semibold">
+          <span class="block text-[11px] text-secondary">Subir archivo</span>
+          <input type="file" name="evidencia[]" accept="image/jpeg,image/png,image/gif,image/webp,image/bmp,image/heic,image/heif,image/tiff" multiple class="block w-full text-[12px] text-secondary file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:bg-surface-container-high file:text-on-surface file:font-semibold">
         </label>
-        <div class="p-2.5 bg-white rounded-lg border border-dashed border-slate-300 text-center cursor-pointer scm-paste-evidence hover:border-[#1E3C76] transition-colors" tabindex="0" role="button" data-scm-paste-evidence data-file-input-name="evidencia[]">
+        <div class="p-2.5 bg-white rounded-lg border border-dashed border-outline-variant/40 text-center cursor-pointer scm-paste-evidence hover:border-[#1E3C76] transition-colors" tabindex="0" role="button" data-scm-paste-evidence data-file-input-name="evidencia[]">
           <span class="block text-xs font-semibold text-[#1E3C76]">Pegar captura (Ctrl+V)</span>
-          <span class="block text-[10px] text-slate-400">Haz clic aquí y presiona Ctrl+V</span>
-          <ul data-scm-paste-list class="text-[11px] text-left mt-1 text-slate-700"></ul>
+          <span class="block text-[10px] text-secondary/70">Haz clic aquí y presiona Ctrl+V</span>
+          <ul data-scm-paste-list class="text-[11px] text-left mt-1 text-on-surface"></ul>
         </div>
       </div>
       <div class="scm-ticket-documents-zone pt-1" data-ticket-documents-zone>
         <div class="scm-ticket-documents space-y-1" data-ticket-documents></div>
-        <button type="button" class="mt-1 px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold inline-flex items-center gap-1 cursor-pointer transition-colors" data-add-ticket-document data-document-accept="<?php echo esc_attr($docAccept); ?>">
+        <button type="button" class="mt-1 px-3 py-1 bg-surface-container hover:bg-surface-container-high text-on-surface rounded-lg text-xs font-semibold inline-flex items-center gap-1 cursor-pointer transition-colors" data-add-ticket-document data-document-accept="<?php echo esc_attr($docAccept); ?>">
           <span class="material-symbols-outlined text-[15px]">attach_file</span>
           <span>Agregar documento adicional</span>
         </button>
@@ -1144,7 +1144,7 @@ final class CommercialTicketModalView
     if ($images !== []) {
       $html .= '<div class="flex flex-wrap gap-2">';
       foreach ($images as $url) {
-        $html .= '<a href="' . esc_url($url) . '" target="_blank" rel="noopener noreferrer" class="block w-20 h-20 rounded-xl overflow-hidden border border-slate-200 shadow-sm hover:opacity-90 transition-opacity">'
+        $html .= '<a href="' . esc_url($url) . '" target="_blank" rel="noopener noreferrer" class="block w-20 h-20 rounded-xl overflow-hidden border border-surface-container shadow-sm hover:opacity-90 transition-opacity">'
           . '<img src="' . esc_url($url) . '" alt="Evidencia adjunta" class="w-full h-full object-cover" loading="lazy">'
           . '</a>';
       }
@@ -1161,7 +1161,7 @@ final class CommercialTicketModalView
         if ($label === '') {
           $label = basename((string) parse_url($url, PHP_URL_PATH)) ?: 'Ver documento';
         }
-        $html .= '<a href="' . esc_url($url) . '" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors"><span class="material-symbols-outlined text-[15px] text-slate-500">description</span>' . esc_html($label) . '</a>';
+        $html .= '<a href="' . esc_url($url) . '" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface text-xs font-semibold transition-colors"><span class="material-symbols-outlined text-[15px] text-secondary">description</span>' . esc_html($label) . '</a>';
       }
       $html .= '</div>';
     }
@@ -1266,28 +1266,28 @@ final class CommercialTicketModalView
   {
     ob_start();
 ?>
-    <form class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-card space-y-3.5 commercial-workflow-form" data-commercial-workflow-form="<?php echo esc_attr($action); ?>" hidden>
-      <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+    <form class="bg-white rounded-2xl p-5 border border-surface-container/80 shadow-card space-y-3.5 commercial-workflow-form" data-commercial-workflow-form="<?php echo esc_attr($action); ?>" hidden>
+      <div class="flex items-center justify-between pb-2 border-b border-surface-container">
         <div>
           <h3 class="text-sm font-bold text-[#061D49]"><?php echo esc_html($title); ?></h3>
-          <p class="text-xs text-slate-500">Actualiza la etapa del embudo comercial.</p>
+          <p class="text-xs text-secondary">Actualiza la etapa del embudo comercial.</p>
         </div>
-        <button type="button" class="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center cursor-pointer transition-colors" data-commercial-close-workflow aria-label="Cerrar formulario">
+        <button type="button" class="w-7 h-7 rounded-full bg-surface-container hover:bg-surface-container-high text-secondary hover:text-on-surface flex items-center justify-center cursor-pointer transition-colors" data-commercial-close-workflow aria-label="Cerrar formulario">
           <span class="material-symbols-outlined text-[16px]">close</span>
         </button>
       </div>
       <input type="hidden" name="ticket_pk" value="<?php echo esc_attr((string) $pk); ?>">
       <div class="space-y-1">
-        <label class="block text-xs font-semibold text-slate-700">Nuevo estado <em class="text-rose-600">*</em></label>
-        <select name="<?php echo esc_attr($field); ?>" required class="w-full text-xs sm:text-sm rounded-xl border border-slate-200 focus:border-[#1E3C76] p-2.5 outline-none bg-white font-medium text-slate-700">
+        <label class="block text-xs font-semibold text-on-surface">Nuevo estado <em class="text-rose-600">*</em></label>
+        <select name="<?php echo esc_attr($field); ?>" required class="w-full text-xs sm:text-sm rounded-xl border border-surface-container focus:border-[#1E3C76] p-2.5 outline-none bg-white font-medium text-on-surface">
           <?php foreach ($options as $option): ?>
             <option value="<?php echo esc_attr($option); ?>"<?php selected($selected, $option); ?>><?php echo esc_html($option); ?></option>
           <?php endforeach; ?>
         </select>
       </div>
-      <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+      <div class="flex items-center justify-end gap-2 pt-2 border-t border-surface-container">
         <span class="text-xs text-rose-600 mr-auto font-medium" data-commercial-form-message aria-live="polite"></span>
-        <button type="button" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-colors cursor-pointer" data-commercial-close-workflow>Cancelar</button>
+        <button type="button" class="px-4 py-2 bg-surface-container hover:bg-surface-container-high text-on-surface rounded-xl text-xs font-semibold transition-colors cursor-pointer" data-commercial-close-workflow>Cancelar</button>
         <button type="submit" class="px-5 py-2 bg-[#061D49] hover:bg-[#1E3C76] text-white rounded-xl text-xs font-semibold transition-all shadow-sm cursor-pointer"><?php echo esc_html($submit); ?></button>
       </div>
     </form>
@@ -1300,23 +1300,23 @@ final class CommercialTicketModalView
   {
     ob_start();
 ?>
-    <form class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-card space-y-4 commercial-workflow-form" data-commercial-workflow-form="reassign" hidden>
-      <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+    <form class="bg-white rounded-2xl p-5 border border-surface-container/80 shadow-card space-y-4 commercial-workflow-form" data-commercial-workflow-form="reassign" hidden>
+      <div class="flex items-center justify-between pb-2 border-b border-surface-container">
         <div>
           <h3 class="text-sm font-bold text-[#061D49] flex items-center gap-2">
             <span class="material-symbols-outlined text-[18px] text-[#1E3C76]">manage_accounts</span>
             <span>Reasignar responsable</span>
           </h3>
-          <p class="text-xs text-slate-500 mt-0.5">Selecciona un integrante habilitado del equipo comercial para transferir la gestión de esta tarea. Se le avisa por WhatsApp y correo.</p>
+          <p class="text-xs text-secondary mt-0.5">Selecciona un integrante habilitado del equipo comercial para transferir la gestión de esta tarea. Se le avisa por WhatsApp y correo.</p>
         </div>
-        <button type="button" class="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center cursor-pointer transition-colors" data-commercial-close-workflow aria-label="Cerrar formulario">
+        <button type="button" class="w-7 h-7 rounded-full bg-surface-container hover:bg-surface-container-high text-secondary hover:text-on-surface flex items-center justify-center cursor-pointer transition-colors" data-commercial-close-workflow aria-label="Cerrar formulario">
           <span class="material-symbols-outlined text-[16px]">close</span>
         </button>
       </div>
       <input type="hidden" name="ticket_pk" value="<?php echo esc_attr((string) $pk); ?>">
       <div class="space-y-1">
-        <label class="block text-xs font-semibold text-slate-700">Nuevo responsable <em class="text-rose-600">*</em></label>
-        <select name="id_empleado" required class="w-full text-xs sm:text-sm rounded-xl border border-slate-200 focus:border-[#1E3C76] p-2.5 outline-none bg-white font-medium text-slate-700">
+        <label class="block text-xs font-semibold text-on-surface">Nuevo responsable <em class="text-rose-600">*</em></label>
+        <select name="id_empleado" required class="w-full text-xs sm:text-sm rounded-xl border border-surface-container focus:border-[#1E3C76] p-2.5 outline-none bg-white font-medium text-on-surface">
           <option value="">Selecciona un funcionario</option>
           <?php foreach ($employees as $employee):
             $id = (string) ($employee['id'] ?? $employee['id_empleado'] ?? '');
@@ -1326,12 +1326,12 @@ final class CommercialTicketModalView
         </select>
       </div>
       <div class="space-y-1">
-        <label class="block text-xs font-semibold text-slate-700">Motivo de la reasignación <em class="text-rose-600">*</em></label>
-        <textarea name="observacion" rows="2" required placeholder="Ej: Reasignación por turno, redistribución de carga comercial o rotación de zona…" class="w-full text-xs sm:text-sm rounded-xl border border-slate-200 focus:border-[#1E3C76] p-2.5 outline-none font-medium text-slate-700"></textarea>
+        <label class="block text-xs font-semibold text-on-surface">Motivo de la reasignación <em class="text-rose-600">*</em></label>
+        <textarea name="observacion" rows="2" required placeholder="Ej: Reasignación por turno, redistribución de carga comercial o rotación de zona…" class="w-full text-xs sm:text-sm rounded-xl border border-surface-container focus:border-[#1E3C76] p-2.5 outline-none font-medium text-on-surface"></textarea>
       </div>
-      <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+      <div class="flex items-center justify-end gap-2 pt-2 border-t border-surface-container">
         <span class="text-xs text-rose-600 mr-auto font-medium" data-commercial-form-message aria-live="polite"></span>
-        <button type="button" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-colors cursor-pointer" data-commercial-close-workflow>Cancelar</button>
+        <button type="button" class="px-4 py-2 bg-surface-container hover:bg-surface-container-high text-on-surface rounded-xl text-xs font-semibold transition-colors cursor-pointer" data-commercial-close-workflow>Cancelar</button>
         <button type="submit" class="px-5 py-2 bg-[#061D49] hover:bg-[#1E3C76] text-white rounded-xl text-xs font-semibold transition-all shadow-sm cursor-pointer flex items-center gap-1.5">
           <span class="material-symbols-outlined text-[15px]">send</span>
           <span>Reasignar y notificar</span>
@@ -1393,7 +1393,7 @@ final class CommercialTicketModalView
       $safeUrl = esc_url($url);
       $displayUrl = strlen($url) > 45 ? esc_html(substr($url, 0, 42) . '…') : esc_html($url);
       return sprintf(
-        '<a href="%s" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 px-2 py-0.5 my-0.5 rounded-md bg-slate-100 hover:bg-slate-200 text-[#1E3C76] hover:underline font-medium text-xs border border-slate-200 transition-colors break-all cursor-pointer"><span class="material-symbols-outlined text-[14px]">link</span><span>%s</span><span class="material-symbols-outlined text-[12px] opacity-60">open_in_new</span></a>%s',
+        '<a href="%s" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 px-2 py-0.5 my-0.5 rounded-md bg-surface-container hover:bg-surface-container-high text-[#1E3C76] hover:underline font-medium text-xs border border-surface-container transition-colors break-all cursor-pointer"><span class="material-symbols-outlined text-[14px]">link</span><span>%s</span><span class="material-symbols-outlined text-[12px] opacity-60">open_in_new</span></a>%s',
         $safeUrl,
         $displayUrl,
         $trailing

@@ -182,7 +182,7 @@ final class CommercialQuotesView
     $mine = $listing['mine'] || !$listing['team'];
     $title = $listing['mine'] ? 'Mis cotizaciones' : 'Cotizaciones de inmuebles';
     $html = '<section class="cqt cqt-page" data-cqt-page>'
-      . '<header class="cqt-head"><div><p class="cqt-eyebrow">Actividades comerciales</p><h1>' . $title . '</h1><p>'
+      . '<header class="cqt-head"><span class="scm-head-icon" aria-hidden="true"><span class="material-symbols-outlined">request_quote</span></span><div><p class="cqt-eyebrow">Actividades comerciales</p><h1>' . $title . '</h1><p>'
       . ($mine ? 'Las cotizaciones que has enviado a tus clientes.' : 'Las cotizaciones que el equipo ha enviado a los clientes.')
       . ' Se crean desde el popup de cada tarea con el botón Cotizar inmuebles.</p></div></header>'
       . '<form class="cqt-filters cqt-list-filters" data-cqt-list-filters aria-label="Filtros de cotizaciones">'

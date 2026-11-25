@@ -55,7 +55,7 @@ final class CommercialClosingSheetsView
     $listing = $service->listing($input);
     $f = $listing['filters'];
     $html = '<section class="cqt cqt-page cst" data-ccs-page>'
-      . '<header class="cqt-head"><div><p class="cqt-eyebrow">' . ($listing['mine'] ? 'Mi portafolio' : 'Actividades comerciales · Registros') . '</p><h1>' . ($listing['mine'] ? 'Mis cierres' : 'Hojas de cierre') . '</h1><p>'
+      . '<header class="cqt-head"><span class="scm-head-icon" aria-hidden="true"><span class="material-symbols-outlined">handshake</span></span><div><p class="cqt-eyebrow">' . ($listing['mine'] ? 'Mi portafolio' : 'Actividades comerciales · Registros') . '</p><h1>' . ($listing['mine'] ? 'Mis cierres' : 'Hojas de cierre') . '</h1><p>'
       . ($listing['mine'] ? 'Las hojas de cierre que has hecho.' : 'Las hojas de cierre de todo el equipo.')
       . ' Se crean desde el mandato (Mandatos o la tarea). La revisión de servicios, la aprobación y lo demás se hacen en la misma hoja, con los permisos y políticas del panel inmobiliario.</p></div></header>'
       . '<form class="cqt-filters cqt-list-filters" data-ccs-list-filters aria-label="Filtros de hojas de cierre">'

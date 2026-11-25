@@ -35,7 +35,7 @@ final class CommercialMandatesView
     $f = $listing['filters'];
     $mine = $listing['mine'] || !$listing['team'];
     $html = '<section class="cqt cqt-page cst" data-cma-page>'
-      . '<header class="cqt-head"><div><p class="cqt-eyebrow">Actividades comerciales · Registros</p><h1>' . ($listing['mine'] ? 'Mis mandatos' : 'Contratos de mandato') . '</h1><p>'
+      . '<header class="cqt-head"><span class="scm-head-icon" aria-hidden="true"><span class="material-symbols-outlined">contract_edit</span></span><div><p class="cqt-eyebrow">Actividades comerciales · Registros</p><h1>' . ($listing['mine'] ? 'Mis mandatos' : 'Contratos de mandato') . '</h1><p>'
       . ($mine ? 'Los contratos de mandato que has creado.' : 'Los contratos de mandato de todo el equipo.')
       . ' Puedes enviarle el contrato al propietario para que lo revise (opcional); para enviarlo a firma, la hoja de cierre debe estar aprobada. Se crean desde la tarea (Gestión operativa › Contrato de mandato) o aquí con Nuevo mandato.</p></div>'
       . ($listing['can_create'] ? '<button type="button" class="cqt-primary" data-cma-form>' . self::icon('add') . 'Nuevo mandato</button>' : '') . '</header>'

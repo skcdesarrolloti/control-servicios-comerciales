@@ -326,7 +326,7 @@ final class CommercialStudiesView
     $f = $listing['filters'];
     $mine = $listing['mine'] || !$listing['team'];
     return '<section class="cqt cqt-page cst" data-cst-page>'
-      . '<header class="cqt-head"><div><p class="cqt-eyebrow">Actividades comerciales · Registros</p><h1>' . ($listing['mine'] ? 'Mis estudios' : 'Estudios de aseguradora') . '</h1><p>'
+      . '<header class="cqt-head"><span class="scm-head-icon" aria-hidden="true"><span class="material-symbols-outlined">verified_user</span></span><div><p class="cqt-eyebrow">Actividades comerciales · Registros</p><h1>' . ($listing['mine'] ? 'Mis estudios' : 'Estudios de aseguradora') . '</h1><p>'
       . ($mine ? 'Los estudios de aseguradora que has registrado.' : 'Los estudios de aseguradora de todo el equipo.')
       . ' Se crean y se editan desde el popup de cada tarea con el botón Estudio de aseguradora; los que esperan respuesta se responden también desde aquí con Responder.</p></div></header>'
       . '<form class="cqt-filters cqt-list-filters" data-cst-list-filters aria-label="Filtros de estudios">'

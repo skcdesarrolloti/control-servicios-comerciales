@@ -44,7 +44,7 @@
           '</div>' +
         '</div>' +
         '<h3 class="text-base font-bold text-[#061D49]">Cargando información de la tarea…</h3>' +
-        '<p class="text-xs text-slate-400 mt-1 max-w-sm">Obteniendo expediente comercial, historial de gestiones y opciones disponibles</p>' +
+        '<p class="text-xs text-secondary/70 mt-1 max-w-sm">Obteniendo expediente comercial, historial de gestiones y opciones disponibles</p>' +
         '<div class="sicv-search-modal__progress mt-5"><span></span><span></span><span></span></div>' +
       '</div>'
     );
@@ -236,7 +236,7 @@
 
   function assistantList(items, bulletColor) {
     if (!Array.isArray(items) || !items.length) {
-      return '<p class="text-xs text-slate-400 italic py-1">Sin hallazgos registrados.</p>';
+      return '<p class="text-xs text-secondary/70 italic py-1">Sin hallazgos registrados.</p>';
     }
     var bullet = bulletColor || "bg-[#1E3C76]";
     return (
@@ -244,7 +244,7 @@
       items
         .map(function (item) {
           return (
-            '<li class="flex items-start gap-2 text-xs text-slate-700 leading-relaxed">' +
+            '<li class="flex items-start gap-2 text-xs text-on-surface leading-relaxed">' +
             '<span class="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ' +
             bullet +
             '"></span>' +
@@ -277,13 +277,13 @@
   function assistantCard(title, content, icon, colorTheme) {
     if (!content) return "";
     var themes = {
-      client: { bg: "bg-slate-50/70", border: "border-slate-200", iconColor: "text-[#1E3C76]", titleColor: "text-[#061D49]" },
+      client: { bg: "bg-surface-container-low/70", border: "border-surface-container", iconColor: "text-[#1E3C76]", titleColor: "text-[#061D49]" },
       status: { bg: "bg-blue-50/50", border: "border-blue-100", iconColor: "text-[#1E3C76]", titleColor: "text-[#061D49]" },
       risks: { bg: "bg-rose-50/50", border: "border-rose-100", iconColor: "text-rose-600", titleColor: "text-rose-900" },
       opps: { bg: "bg-emerald-50/50", border: "border-emerald-100", iconColor: "text-emerald-600", titleColor: "text-emerald-900" },
       recs: { bg: "bg-sky-50/50", border: "border-sky-100", iconColor: "text-[#1E3C76]", titleColor: "text-[#061D49]" },
       steps: { bg: "bg-amber-50/50", border: "border-amber-100", iconColor: "text-amber-600", titleColor: "text-amber-900" },
-      missing: { bg: "bg-slate-50", border: "border-slate-200", iconColor: "text-slate-500", titleColor: "text-slate-700" },
+      missing: { bg: "bg-surface-container-low", border: "border-surface-container", iconColor: "text-secondary", titleColor: "text-on-surface" },
     };
     var t = themes[colorTheme] || themes.client;
     return (
@@ -292,7 +292,7 @@
           (icon ? '<span class="material-symbols-outlined text-[18px] ' + t.iconColor + '">' + icon + '</span>' : '') +
           '<h4 class="text-xs font-bold uppercase tracking-wider ' + t.titleColor + '">' + escapeHtml(title) + '</h4>' +
         '</div>' +
-        '<div class="text-xs text-slate-700 leading-relaxed">' + content + '</div>' +
+        '<div class="text-xs text-on-surface leading-relaxed">' + content + '</div>' +
       '</div>'
     );
   }
@@ -309,7 +309,7 @@
         '</div>' +
         '<span class="text-[11px] font-bold uppercase tracking-widest text-amber-700 bg-amber-50 px-3 py-1 rounded-full border border-amber-200 mb-3">Asistente Inteligente SuCasa</span>' +
         '<h2 class="text-xl sm:text-2xl font-bold text-[#061D49] tracking-tight">Analizando tarea comercial…</h2>' +
-        '<p class="text-xs sm:text-sm text-slate-500 max-w-md mt-2 leading-relaxed">Estoy evaluando el historial completo, estado del cliente, características del inmueble, riesgos, oportunidades y generando recomendaciones estratégicas en tiempo real.</p>' +
+        '<p class="text-xs sm:text-sm text-secondary max-w-md mt-2 leading-relaxed">Estoy evaluando el historial completo, estado del cliente, características del inmueble, riesgos, oportunidades y generando recomendaciones estratégicas en tiempo real.</p>' +
         '<div class="sicv-search-modal__progress mt-6"><span></span><span></span><span></span></div>' +
       '</div>'
     );
@@ -321,9 +321,9 @@
         '<div class="w-14 h-14 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mb-4 border border-rose-200">' +
           '<span class="material-symbols-outlined text-[32px]">error</span>' +
         '</div>' +
-        '<h3 class="text-base font-bold text-slate-800">No se pudo generar el análisis</h3>' +
-        '<p class="text-xs text-slate-500 mt-2 max-w-sm leading-relaxed">' + escapeHtml(message || "Inténtalo nuevamente en unos momentos.") + '</p>' +
-        '<button type="button" class="mt-6 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-colors cursor-pointer" data-commercial-close-assistant>' +
+        '<h3 class="text-base font-bold text-on-surface">No se pudo generar el análisis</h3>' +
+        '<p class="text-xs text-secondary mt-2 max-w-sm leading-relaxed">' + escapeHtml(message || "Inténtalo nuevamente en unos momentos.") + '</p>' +
+        '<button type="button" class="mt-6 px-4 py-2 bg-surface-container hover:bg-surface-container-high text-on-surface rounded-xl text-xs font-semibold transition-colors cursor-pointer" data-commercial-close-assistant>' +
           'Cerrar' +
         '</button>' +
       '</div>'
@@ -335,8 +335,8 @@
     var summary = escapeHtml(analysis.resumen || "Sin resumen ejecutivo generado.");
     var clientText = assistantText(analysis.cliente);
     var statusText = assistantText(analysis.estado_actual);
-    var clientHtml = clientText ? '<p class="text-xs text-slate-700">' + escapeHtml(clientText) + '</p>' : '';
-    var statusHtml = statusText ? '<p class="text-xs text-slate-700 font-medium">' + escapeHtml(statusText) + '</p>' : '';
+    var clientHtml = clientText ? '<p class="text-xs text-on-surface">' + escapeHtml(clientText) + '</p>' : '';
+    var statusHtml = statusText ? '<p class="text-xs text-on-surface font-medium">' + escapeHtml(statusText) + '</p>' : '';
     var modelName = escapeHtml(analysis.model || "MiniMax / IA");
     var author = escapeHtml(analysis.created_by ? ("Guardado por " + analysis.created_by) : "Generado por IA");
     var dateLabel = escapeHtml(analysis.created_label || analysis.generated_at || "");
@@ -352,8 +352,8 @@
               '<h4 class="text-xs font-bold uppercase tracking-wider text-[#061D49]">Mensaje Sugerido para el Cliente</h4>' +
             '</div>' +
             '<div class="flex items-center gap-2">' +
-              '<button type="button" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold shadow-sm transition-colors cursor-pointer" data-commercial-copy-assistant-message>' +
-                '<span class="material-symbols-outlined text-[15px] text-slate-500">content_copy</span>' +
+              '<button type="button" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-surface-container text-on-surface border border-surface-container text-xs font-semibold shadow-sm transition-colors cursor-pointer" data-commercial-copy-assistant-message>' +
+                '<span class="material-symbols-outlined text-[15px] text-secondary">content_copy</span>' +
                 '<span>Copiar</span>' +
               '</button>' +
               '<button type="button" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#061D49] hover:bg-[#1E3C76] text-white text-xs font-semibold shadow-sm transition-all cursor-pointer" data-commercial-use-assistant-message>' +
@@ -362,7 +362,7 @@
               '</button>' +
             '</div>' +
           '</div>' +
-          '<blockquote class="text-xs sm:text-sm text-slate-800 bg-white/80 p-4 rounded-xl border border-slate-200/80 leading-relaxed font-normal italic">' +
+          '<blockquote class="text-xs sm:text-sm text-on-surface bg-white/80 p-4 rounded-xl border border-surface-container/80 leading-relaxed font-normal italic">' +
             escapeHtml(suggestedMessage) +
           '</blockquote>' +
         '</div>';
@@ -396,7 +396,7 @@
             '<span class="material-symbols-outlined text-[20px] text-amber-600">psychology</span>' +
             '<h4 class="text-xs font-bold uppercase tracking-wider text-amber-900">Resumen Ejecutivo del Caso</h4>' +
           '</div>' +
-          '<p class="text-xs sm:text-sm text-slate-800 leading-relaxed">' + summary + '</p>' +
+          '<p class="text-xs sm:text-sm text-on-surface leading-relaxed">' + summary + '</p>' +
         '</div>' +
 
         '<!-- 2-Col Findings Grid -->' +
@@ -407,15 +407,15 @@
           assistantCard("Oportunidades Comerciales", assistantList(analysis.oportunidades, "bg-emerald-500"), "trending_up", "opps") +
           assistantCard("Recomendaciones de Acción", assistantList(analysis.recomendaciones, "bg-[#1E3C76]"), "lightbulb", "recs") +
           assistantCard("Próximos Pasos Sugeridos", assistantList(analysis.proximos_pasos, "bg-amber-500"), "check_circle", "steps") +
-          (Array.isArray(analysis.datos_faltantes) && analysis.datos_faltantes.length ? assistantCard("Datos Faltantes", assistantList(analysis.datos_faltantes, "bg-slate-400"), "help", "missing") : "") +
+          (Array.isArray(analysis.datos_faltantes) && analysis.datos_faltantes.length ? assistantCard("Datos Faltantes", assistantList(analysis.datos_faltantes, "bg-secondary/60"), "help", "missing") : "") +
           suggestedBlock +
         '</div>' +
       '</div>' +
 
       '<!-- Modal Footer -->' +
-      '<div class="px-6 py-3.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between shrink-0">' +
-        '<span class="text-xs text-slate-400">Análisis asistido con IA para toma de decisiones ágil</span>' +
-        '<button type="button" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-semibold transition-colors cursor-pointer" data-commercial-close-assistant>' +
+      '<div class="px-6 py-3.5 bg-surface-container-low border-t border-surface-container flex items-center justify-between shrink-0">' +
+        '<span class="text-xs text-secondary/70">Análisis asistido con IA para toma de decisiones ágil</span>' +
+        '<button type="button" class="px-4 py-2 bg-surface-container-high hover:bg-surface-container-highest text-on-surface rounded-xl text-xs font-semibold transition-colors cursor-pointer" data-commercial-close-assistant>' +
           'Cerrar Ventana' +
         '</button>' +
       '</div>'
@@ -425,7 +425,7 @@
   function analysisListMarkup(ticketPk, analyses) {
     analyses = Array.isArray(analyses) ? analyses : [];
     if (!analyses.length) {
-      return '<div class="py-4 text-center text-slate-400 text-xs"><p>Aún no hay análisis guardados con IA.</p></div>';
+      return '<div class="py-4 text-center text-secondary/70 text-xs"><p>Aún no hay análisis guardados con IA.</p></div>';
     }
     return analyses
       .map(function (analysis) {
@@ -437,21 +437,21 @@
         var author = escapeHtml(analysis.created_by || "Sistema");
         var json = escapeHtml(JSON.stringify(analysis));
         return (
-          '<div class="flex items-center justify-between p-3 bg-slate-50/80 hover:bg-[#EBF1FB]/60 rounded-xl border border-slate-200 transition-colors text-xs">' +
+          '<div class="flex items-center justify-between p-3 bg-surface-container-low/80 hover:bg-[#EBF1FB]/60 rounded-xl border border-surface-container transition-colors text-xs">' +
           '<button type="button" class="flex-1 text-left cursor-pointer" data-commercial-open-analysis data-analysis-json="' +
           json +
           '">' +
           '<strong class="block font-semibold text-[#061D49]">' +
           label +
           "</strong>" +
-          '<span class="block text-slate-500 text-[11px] line-clamp-1 mt-0.5">' +
+          '<span class="block text-secondary text-[11px] line-clamp-1 mt-0.5">' +
           shortSummary +
           "</span>" +
-          '<small class="text-[10px] text-slate-400 mt-0.5 block">' +
+          '<small class="text-[10px] text-secondary/70 mt-0.5 block">' +
           author +
           "</small>" +
           "</button>" +
-          '<button type="button" class="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg transition-colors cursor-pointer" data-commercial-delete-analysis data-ticket-pk="' +
+          '<button type="button" class="p-1.5 text-secondary/70 hover:text-rose-600 rounded-lg transition-colors cursor-pointer" data-commercial-delete-analysis data-ticket-pk="' +
           escapeHtml(ticketPk || currentCasePk || "") +
           '" data-analysis-id="' +
           id +
@@ -1133,24 +1133,24 @@
     dialog.setAttribute("aria-modal", "true");
     dialog.setAttribute("aria-labelledby", "commercial-link-dialog-title");
     dialog.innerHTML =
-      '<form class="bg-white w-full max-w-md rounded-3xl shadow-modal border border-slate-100 overflow-hidden" role="document" novalidate>' +
-        '<header class="px-6 pt-5 pb-4 border-b border-slate-100 flex items-start gap-3">' +
+      '<form class="bg-white w-full max-w-md rounded-3xl shadow-modal border border-surface-container overflow-hidden" role="document" novalidate>' +
+        '<header class="px-6 pt-5 pb-4 border-b border-surface-container flex items-start gap-3">' +
           '<span class="w-10 h-10 rounded-2xl bg-[#EBF1FB] text-[#1E3C76] flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-[20px]">' + (property ? "add_home_work" : "link") + '</span></span>' +
           '<div class="min-w-0 flex-1">' +
             '<p class="text-[11px] font-bold uppercase tracking-wider text-[#1E3C76]">Enlace para la respuesta</p>' +
             '<h3 class="text-base font-bold text-[#061D49] leading-tight" id="commercial-link-dialog-title">' + (property ? "Otro inmueble" : "Enlace web") + '</h3>' +
-            '<p class="text-xs text-slate-500 mt-0.5">' + (property ? "Se agrega el enlace de su ficha en la página web." : "Se agrega tal cual, para que el cliente la abra.") + '</p>' +
+            '<p class="text-xs text-secondary mt-0.5">' + (property ? "Se agrega el enlace de su ficha en la página web." : "Se agrega tal cual, para que el cliente la abra.") + '</p>' +
           '</div>' +
-          '<button type="button" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center cursor-pointer transition-colors" data-commercial-link-cancel aria-label="Cerrar"><span class="material-symbols-outlined text-[18px]">close</span></button>' +
+          '<button type="button" class="w-8 h-8 rounded-full bg-surface-container hover:bg-surface-container-high text-secondary hover:text-on-surface flex items-center justify-center cursor-pointer transition-colors" data-commercial-link-cancel aria-label="Cerrar"><span class="material-symbols-outlined text-[18px]">close</span></button>' +
         '</header>' +
         '<div class="px-6 py-5 space-y-2">' +
-          '<label class="block text-xs font-semibold text-slate-700" for="commercial-link-dialog-input">' + (property ? "Código del inmueble" : "Dirección web") + '</label>' +
-          '<input id="commercial-link-dialog-input" type="text" autocomplete="off" inputmode="' + (property ? "text" : "url") + '" placeholder="' + (property ? "Ej: 12345" : "https://…") + '" value="' + (property ? "" : "https://") + '" class="w-full text-sm rounded-xl border border-slate-200 focus:border-[#1E3C76] focus:ring focus:ring-[#1E3C76]/20 p-2.5 outline-none transition">' +
-          '<p class="text-[11px] text-slate-500 truncate" data-commercial-link-preview>' + (property ? "Escribe el código para ver el enlace." : "Pega la dirección completa de la página.") + '</p>' +
+          '<label class="block text-xs font-semibold text-on-surface" for="commercial-link-dialog-input">' + (property ? "Código del inmueble" : "Dirección web") + '</label>' +
+          '<input id="commercial-link-dialog-input" type="text" autocomplete="off" inputmode="' + (property ? "text" : "url") + '" placeholder="' + (property ? "Ej: 12345" : "https://…") + '" value="' + (property ? "" : "https://") + '" class="w-full text-sm rounded-xl border border-surface-container focus:border-[#1E3C76] focus:ring focus:ring-[#1E3C76]/20 p-2.5 outline-none transition">' +
+          '<p class="text-[11px] text-secondary truncate" data-commercial-link-preview>' + (property ? "Escribe el código para ver el enlace." : "Pega la dirección completa de la página.") + '</p>' +
           '<p class="text-xs font-medium text-rose-600" data-commercial-link-error aria-live="polite"></p>' +
         '</div>' +
-        '<footer class="px-6 py-3.5 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2">' +
-          '<button type="button" class="px-4 py-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-semibold transition-colors cursor-pointer" data-commercial-link-cancel>Cancelar</button>' +
+        '<footer class="px-6 py-3.5 bg-surface-container-low border-t border-surface-container flex items-center justify-end gap-2">' +
+          '<button type="button" class="px-4 py-2 rounded-xl bg-white border border-surface-container hover:bg-surface-container text-on-surface text-xs font-semibold transition-colors cursor-pointer" data-commercial-link-cancel>Cancelar</button>' +
           '<button type="submit" class="px-5 py-2 rounded-xl bg-[#061D49] hover:bg-[#1E3C76] text-white text-xs font-semibold shadow-sm flex items-center gap-1.5 transition-colors cursor-pointer"><span class="material-symbols-outlined text-[15px]">add_link</span><span>Insertar enlace</span></button>' +
         '</footer>' +
       '</form>';
@@ -1348,17 +1348,17 @@
     dialog.setAttribute("aria-modal", "true");
     dialog.setAttribute("aria-labelledby", "commercial-confirm-title");
     dialog.innerHTML =
-      '<div class="bg-white w-full max-w-md rounded-3xl shadow-modal border border-slate-100 overflow-hidden" role="document">' +
+      '<div class="bg-white w-full max-w-md rounded-3xl shadow-modal border border-surface-container overflow-hidden" role="document">' +
         '<div class="px-6 pt-6 pb-5 flex items-start gap-3">' +
           '<span class="w-10 h-10 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-[20px]">' + escapeHtml(options.icon || "delete") + '</span></span>' +
           '<div class="min-w-0">' +
             '<h3 class="text-base font-bold text-[#061D49] leading-tight" id="commercial-confirm-title">' + escapeHtml(options.title || "¿Confirmas?") + '</h3>' +
-            '<p class="text-xs text-slate-600 mt-1.5 leading-relaxed">' + escapeHtml(options.text || "") + '</p>' +
-            (options.quote ? '<blockquote class="mt-3 px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 line-clamp-3">' + escapeHtml(options.quote) + '</blockquote>' : "") +
+            '<p class="text-xs text-secondary mt-1.5 leading-relaxed">' + escapeHtml(options.text || "") + '</p>' +
+            (options.quote ? '<blockquote class="mt-3 px-3 py-2 rounded-xl bg-surface-container-low border border-surface-container text-xs text-secondary line-clamp-3">' + escapeHtml(options.quote) + '</blockquote>' : "") +
           '</div>' +
         '</div>' +
-        '<footer class="px-6 py-3.5 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2">' +
-          '<button type="button" class="px-4 py-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-semibold transition-colors cursor-pointer" data-commercial-confirm-cancel>Cancelar</button>' +
+        '<footer class="px-6 py-3.5 bg-surface-container-low border-t border-surface-container flex items-center justify-end gap-2">' +
+          '<button type="button" class="px-4 py-2 rounded-xl bg-white border border-surface-container hover:bg-surface-container text-on-surface text-xs font-semibold transition-colors cursor-pointer" data-commercial-confirm-cancel>Cancelar</button>' +
           '<button type="button" class="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold shadow-sm flex items-center gap-1.5 transition-colors cursor-pointer" data-commercial-confirm-ok><span class="material-symbols-outlined text-[15px]">' + escapeHtml(options.icon || "delete") + '</span><span>' + escapeHtml(options.confirm || "Confirmar") + '</span></button>' +
         '</footer>' +
       '</div>';
@@ -1692,7 +1692,7 @@
     var propModal = document.getElementById("commercial-property-detail-modal");
     var propContainer = propModal && propModal.querySelector("[data-commercial-property-detail-container]");
     if (propModal && propContainer) {
-      propContainer.innerHTML = '<div class="flex items-center justify-center py-28 text-slate-500 gap-3"><span class="w-3 h-3 rounded-full bg-[#1E3C76] animate-ping"></span><p class="font-body-md text-sm font-medium">Cargando información del inmueble…</p></div>';
+      propContainer.innerHTML = '<div class="flex items-center justify-center py-28 text-secondary gap-3"><span class="w-3 h-3 rounded-full bg-[#1E3C76] animate-ping"></span><p class="font-body-md text-sm font-medium">Cargando información del inmueble…</p></div>';
       setStandaloneModal(propModal, true);
       request("commercial_property_detail", { codigo: propCode, ticket_pk: ticketPk || "", study_id: studyId || "" })
         .then(function (res) {
