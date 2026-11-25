@@ -230,6 +230,59 @@ final class CommercialTicketsRepository
   }
 
   /**
+   * Tareas postergadas sin fecha para retomar (las de antes de que Postergar la pidiera), la más antigua primero, para
+   * repartirlas con bin/schedule-postponed-tasks.php.
+   * @return list<array<string,mixed>>
+   */
+  public function postponedWithoutResumeDate(): array
+  {
+    $table = $this->db->table('jet_cct_tickets');
+    if (!$this->schema->columnExists($table, self::RESUME_COLUMN)) {
+      throw new \RuntimeException('Falta la columna fecha_retomar: php bin/add-task-resume-field.php --aplicar');
+    }
+    [$where, $args] = $this->bucketWhere('postergados');
+    $where[] = 'COALESCE(t.`' . self::RESUME_COLUMN . '`, 0) = 0';
+    return $this->db->getResults(
+      'SELECT t.`_ID`, t.`id_empleado`, t.`nombre_empleado`, t.`estado_comercial`, t.`fecha_actualizacion`, t.`fecha`
+         FROM `' . $table . '` t WHERE ' . implode(' AND ', $where) . '
+        ORDER BY COALESCE(NULLIF(t.`fecha_actualizacion`, 0), t.`fecha`, 0) ASC, t.`_ID` ASC',
+      $args
+    );
+  }
+
+  /**
+   * Pone la fecha para retomar a una postergada que todavía no la tiene, con nota interna de constancia. Devuelve false si
+   * ya tenía fecha (no la cambia).
+   */
+  public function scheduleResume(int $ticketPk, int $timestamp, string $message): bool
+  {
+    $table = $this->db->table('jet_cct_tickets');
+    $pdo = $this->db->pdo();
+    $pdo->beginTransaction();
+    try {
+      $statement = $pdo->prepare('UPDATE `' . $table . '` SET `' . self::RESUME_COLUMN . '` = ? WHERE `_ID` = ? AND COALESCE(`' . self::RESUME_COLUMN . '`, 0) = 0');
+      $statement->execute([$timestamp, $ticketPk]);
+      if ($statement->rowCount() < 1) {
+        $pdo->rollBack();
+        return false;
+      }
+      $notes = $this->db->table('jet_cct_notas_ticket');
+      if ($this->schema->tableExists($notes)) {
+        $stamp = date('Y-m-d H:i:s');
+        $this->db->insert($notes, ['cct_status' => 'publish', 'cct_author_id' => '0', 'cct_created' => $stamp, 'cct_modified' => $stamp,
+          'id_ticket' => $ticketPk, 'fecha' => time(), 'nombre' => 'Sistema', 'id_empleado' => '', 'observacion' => $message]);
+      }
+      $pdo->commit();
+      return true;
+    } catch (\Throwable $exception) {
+      if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+      }
+      throw $exception;
+    }
+  }
+
+  /**
    * Tareas postergadas con fecha para retomar, para el calendario de vencimientos.
    * @param array<string,mixed> $filters
    * @return array<int,array<string,mixed>>

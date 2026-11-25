@@ -191,6 +191,39 @@ final class CommercialTaskWorkflowTest extends TestCase
     self::assertSame(0, $resumer->run($at('2026-11-30 08:00')), 'Una sola vez.');
   }
 
+  public function testPostponedTasksWithoutDateAreSpreadOverTheNextBusinessDays(): void
+  {
+    $now = (new \DateTimeImmutable('2026-11-25 10:00', new \DateTimeZone('America/Bogota')))->getTimestamp();
+    $days = \SCM\Commercial\CommercialPostponedScheduler::days($now);
+    self::assertSame('2026-11-26 08:00', $days[0]->format('Y-m-d H:i'), 'Desde mañana, a las 8:00 a. m.');
+    self::assertLessThanOrEqual('2026-12-25', end($days)->format('Y-m-d'));
+    foreach ($days as $day) {
+      self::assertNotSame('7', $day->format('N'), 'Sin domingos.');
+      self::assertNotSame('2026-12-08', $day->format('Y-m-d'), 'Sin festivos.');
+    }
+
+    $rows = [];
+    for ($i = 1; $i <= 60; $i++) {
+      $rows[] = ['_ID' => $i, 'id_empleado' => $i <= 52 ? '101' : '202', 'nombre_empleado' => $i <= 52 ? 'Consultora Uno' : 'Consultor Dos'];
+    }
+    $plan = \SCM\Commercial\CommercialPostponedScheduler::plan($rows, $now);
+    self::assertCount(60, $plan['assign']);
+    self::assertSame(24, $plan['days'], '30 días sin 4 domingos ni el 8 y el 25 de diciembre.');
+    self::assertSame(['total' => 52, 'por_dia' => (int) ceil(52 / 24)], array_intersect_key($plan['people']['101'], ['total' => 0, 'por_dia' => 0]), 'Parejo entre los días.');
+    self::assertEquals($days[0], $plan['assign'][1], 'La más antigua, primero.');
+    self::assertLessThanOrEqual($plan['assign'][52], $plan['assign'][51]);
+    self::assertSame(1, $plan['people']['202']['por_dia'], 'Pocas: una por día.');
+
+    // Poner la fecha: solo a las que no tienen, con nota interna.
+    $tickets = new CommercialTicketsRepository($this->db);
+    $tickets->changeStatus(900, 'Postergado');
+    self::assertSame(['900'], array_map('strval', array_column($tickets->postponedWithoutResumeDate(), '_ID')));
+    self::assertTrue($tickets->scheduleResume(900, $days[3]->getTimestamp(), 'Se programó retomar la tarea el ' . $days[3]->format('d/m/Y') . '.'));
+    self::assertFalse($tickets->scheduleResume(900, $days[5]->getTimestamp(), 'otra'), 'Ya tenía fecha: no la cambia.');
+    self::assertSame((string) $days[3]->getTimestamp(), (string) $this->task()['fecha_retomar']);
+    self::assertSame([], $tickets->postponedWithoutResumeDate());
+  }
+
   public function testResumeDateMustBeBetweenTomorrowAndThirtyDays(): void
   {
     $today = new \DateTimeImmutable('today', new \DateTimeZone('America/Bogota'));
