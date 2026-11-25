@@ -27,6 +27,8 @@ los de su inmueble) con su revisión y sus acciones:
    de arrendamiento). Si falta, cada mandato lo dice ("Para enviar a firma falta") y el servidor no lo envía
    (`CommercialMandatesService::signBlockers`). La revisión del propietario no es obligatoria: si no la aprobó, solo se
    advierte (`reviewNotice`). Crea el contrato en eSignatures o modifica el mismo.
+   **Reenviar a firma** solo aparece cuando hay cambios que no llegaron a eSignatures (`firma_pendiente` en
+   `scm_mandato_revision`).
    **Editar** un mandato ya enviado a firma actualiza solo ese mismo contrato en eSignatures (los firmantes conservan su
    enlace; solo se les reenvía si cambió su correo o celular). Si la hoja de cierre no está aprobada, queda para
    **Reenviar a firma**. Los mandatos enviados por Make (antes del panel) no tienen `id_esignatures`: editar no los
@@ -73,7 +75,9 @@ este panel:
 
 **Listados:** **Registros › Hojas de cierre** (todo el equipo, con filtro por consultor/a) y **Mi portafolio › Mis cierres**
 (las hojas que hizo la persona, por `id_empleado` exacto). Tienen pestañas por estado, búsqueda por hoja, mandato,
-inmueble, dirección, propietario o arrendatario, y el botón **Abrir hoja**. Es la vista `cierres` de Permisos, con alcance
+inmueble, dirección, propietario o arrendatario, la **tarea** relacionada (abre su ventana) y los botones **Abrir hoja**,
+**Editar** y **Desistir** (solo en los estados que lo permiten allá) e **Imprimir**. Editar abre el formulario de la hoja;
+Desistir e Imprimir abren la hoja y pulsan allí su botón, así que aplican los permisos del panel inmobiliario. Es la vista `cierres` de Permisos, con alcance
 *solo sus hojas* o *todo el equipo* (`ClosingSheetsListing`, solo lectura de `wp_jet_cct_cierres`).
 
 Cómo funciona (`MandateClosingSheet`, `public/hoja-cierre.php?mandato=ID`):

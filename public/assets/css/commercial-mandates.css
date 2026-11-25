@@ -108,3 +108,5 @@
 /* Hoja de cierre (páginas del panel inmobiliario en la ventana del panel). */
 .cma-closing .cqt-viewer-box { position:relative; }
 .cma-closing-loading { position:absolute; inset:64px 0 auto; margin:0; padding:24px; text-align:center; color:#475569; font-weight:600; }
+.cma-danger { color:#b42318 !important; border-color:#f3c2bd !important; }
+.cma-danger:hover { background:#fef3f2 !important; }

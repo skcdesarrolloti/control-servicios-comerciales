@@ -45,8 +45,12 @@ if ($sheetId > 0) {
   if (!$listing->canOpen($sheet)) {
     $stop(403, 'Tu cargo no tiene permiso para abrir esta hoja de cierre.');
   }
+  $action = in_array($_GET['accion'] ?? '', ['editar'], true) ? (string) $_GET['accion'] : '';
+  if ($action === 'editar' && !in_array(trim((string) ($sheet['estado'] ?? '')), MandateClosingSheet::EDITABLE, true)) {
+    $stop(409, 'La hoja de cierre #' . $sheetId . ' está "' . trim((string) ($sheet['estado'] ?? '')) . '": ya no se puede editar.');
+  }
   try {
-    $url = $sheets->sheetUrl($sheetId);
+    $url = $sheets->sheetUrl($sheetId, $action);
   } catch (\RuntimeException $error) {
     $stop(503, $error->getMessage());
   }

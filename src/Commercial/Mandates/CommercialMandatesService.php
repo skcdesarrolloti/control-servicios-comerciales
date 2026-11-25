@@ -197,6 +197,7 @@ final class CommercialMandatesService
       'aviso_revision' => self::reviewNotice($state),
       'pendientes' => (int) ($row['rev_pendientes'] ?? 0),
       'envios' => (int) ($row['rev_envios'] ?? 0),
+      'firma_pendiente' => (int) ($row['rev_firma_pendiente'] ?? 0) === 1,
       'pdf' => trim((string) ($row['pdf_firmado'] ?? '')),
       'enlace' => PublicMandateAccess::url($id),
     ];

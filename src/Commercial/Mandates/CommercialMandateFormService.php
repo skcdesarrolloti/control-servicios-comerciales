@@ -294,6 +294,9 @@ final class CommercialMandateFormService
         $this->db->update($this->table(), ['id_esignatures' => $contract], ['_ID' => $id]);
         $signed = true;
       }
+      if ($signed || $resend || $noContract) {
+        $this->repository->markSignPending($id, !$signed);
+      }
       $pdo->commit();
       return ['id' => $id, 'firma' => $signed, 'reenviar' => $resend, 'sin_contrato' => $noContract];
     } catch (\Throwable $error) {
@@ -332,6 +335,7 @@ final class CommercialMandateFormService
     $credit = $this->calculator->credit($post);
     $contract = $this->signature->send($post, $id, $credit, trim((string) ($mandate['id_esignatures'] ?? '')));
     $this->db->update($this->table(), MandateFields::existing($this->db, $this->table(), ['estado' => 'Enviado', 'id_esignatures' => $contract, 'cct_modified' => date('Y-m-d H:i:s')]), ['_ID' => $id]);
+    $this->repository->markSignPending($id, false);
     return ['id' => $id, 'contrato' => $contract];
   }
 

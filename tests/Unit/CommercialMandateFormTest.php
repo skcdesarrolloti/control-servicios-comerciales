@@ -452,6 +452,33 @@ final class CommercialMandateFormTest extends TestCase
     self::assertSame('36 Meses', $this->db->getVar('SELECT duracion FROM wp_jet_cct_contrato_mandato WHERE _ID = ?', [$id]), 'Lo editado sí se guarda.');
   }
 
+  public function testResendOnlyShowsWhenChangesDidNotReachESignatures(): void
+  {
+    $service = $this->service();
+    $id = $service->save($this->post())['id'];
+    $this->db->update('wp_jet_cct_contrato_mandato', ['estado_hoja_cierre' => 'Aprobada'], ['_ID' => $id]);
+    $mandates = new CommercialMandatesService($this->db, $this->policy);
+    $row = fn(): array => $mandates->summary($mandates->repository()->forTask(0, [], '28355')[0]);
+    $html = fn(): string => CommercialMandatesView::taskPanel(['ticket' => 700, 'asunto' => '', 'rows' => [$row()], 'can_create' => true, 'can_sign' => true, 'flash' => '']);
+    self::assertStringContainsString('Enviar a firma', $html(), 'Sin enviar: Enviar a firma.');
+    $service->sendToSign($id);
+    self::assertStringNotContainsString('a firma</button>', $html(), 'Enviado y al día: no hay botón (editar actualiza solo el contrato).');
+    $service->save($this->post(['duracion' => '24 Meses']), $id);
+    self::assertFalse($row()['firma_pendiente'], 'Editar con la hoja aprobada actualizó eSignatures.');
+    $this->db->update('wp_jet_cct_contrato_mandato', ['estado_hoja_cierre' => 'No aprobada'], ['_ID' => $id]);
+    $service->save($this->post(['duracion' => '36 Meses']), $id);
+    self::assertTrue($row()['firma_pendiente']);
+    self::assertStringContainsString('Reenviar a firma', $html(), 'Los cambios no llegaron a eSignatures: aparece Reenviar.');
+    $this->db->update('wp_jet_cct_contrato_mandato', ['estado_hoja_cierre' => 'Aprobada'], ['_ID' => $id]);
+    $service->sendToSign($id);
+    self::assertStringNotContainsString('Reenviar a firma', $html(), 'Reenviado: desaparece.');
+    // Enviado por Make (sin id del contrato): solo después de editarlo.
+    $this->db->update('wp_jet_cct_contrato_mandato', ['id_esignatures' => ''], ['_ID' => $id]);
+    self::assertStringNotContainsString('Reenviar a firma', $html());
+    $service->save($this->post(['duracion' => '12 Meses']), $id);
+    self::assertStringContainsString('Reenviar a firma', $html());
+  }
+
   public function testTheCountryIsMatchedIgnoringCaseOrDefaultsToColombia(): void
   {
     $countries = [['pais' => 'Colombia', 'codigo' => '+57'], ['pais' => 'Estados Unidos', 'codigo' => '+1'], ['pais' => 'España', 'codigo' => '+34']];

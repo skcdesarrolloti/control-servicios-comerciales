@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SCM\Views;
 
 use SCM\Commercial\Mandates\ClosingSheetsListing;
+use SCM\Commercial\Mandates\MandateClosingSheet;
 
 /**
  * Registros › Hojas de cierre y Mi portafolio › Mis cierres. Mismo diseño que Mandatos (clases de cotizaciones y
@@ -28,6 +29,24 @@ final class CommercialClosingSheetsView
   private static function label(string $state): string
   {
     return self::LABELS[$state] ?? $state;
+  }
+
+  /**
+   * Abrir, editar, desistir e imprimir: todo en la ventana del panel con la hoja del panel inmobiliario (allí se aplican
+   * sus permisos; editar y desistir solo en los estados que allá lo permiten).
+   * @param array<string,mixed> $row
+   */
+  private static function actions(array $row): string
+  {
+    $id = (int) $row['id'];
+    $title = 'Hoja de cierre #' . $id . ($row['mandato'] > 0 ? ' · Mandato #' . $row['mandato'] : '');
+    $button = static fn(string $class, string $action, string $icon, string $label, string $prefix): string => '<button type="button" class="' . $class . ' cqt-small" data-cma-closing-sheet="' . $id . '"'
+      . ($action !== '' ? ' data-cma-closing-action="' . $action . '"' : '') . ' data-cma-closing-title="' . self::e($prefix . $title) . '">' . self::icon($icon) . $label . '</button>';
+    $open = in_array($row['estado'], MandateClosingSheet::EDITABLE, true);
+    return $button(in_array($row['estado'], ['Esperando respuesta', 'No aprobada', 'En verificacion de servicios'], true) ? 'cqt-primary' : 'cqt-secondary', '', 'handshake', 'Abrir hoja', '')
+      . ($open ? $button('cqt-secondary', 'editar', 'edit', 'Editar', 'Editar · ') : '')
+      . $button('cqt-secondary', 'imprimir', 'print', 'Imprimir', '')
+      . ($open ? $button('cqt-secondary cma-danger', 'desistir', 'block', 'Desistir', 'Desistir negocio · ') : '');
   }
 
   /** @param array<string,mixed> $input */
@@ -66,12 +85,13 @@ final class CommercialClosingSheetsView
     if ($listing['rows'] === []) {
       return $html . '<p class="cqt-empty">No hay hojas de cierre con estos filtros.</p>';
     }
-    $html .= '<div class="cqt-table-wrap"><table class="cqt-table"><thead><tr><th>Hoja</th><th>Propietario y arrendatario</th><th>Inmueble</th><th>Revisión y respuesta</th><th>Consultor/a</th><th><span class="sr-only">Acciones</span></th></tr></thead><tbody>';
+    $html .= '<div class="cqt-table-wrap"><table class="cqt-table"><thead><tr><th>Hoja</th><th>Tarea</th><th>Propietario y arrendatario</th><th>Inmueble</th><th>Revisión y respuesta</th><th>Consultor/a</th><th><span class="sr-only">Acciones</span></th></tr></thead><tbody>';
     foreach ($listing['rows'] as $row) {
       $id = (int) $row['id'];
       $html .= '<tr>'
         . '<td data-label="Hoja"><strong>#' . $id . '</strong><small>' . self::e($row['fecha']) . ($row['mandato'] > 0 ? ' · Mandato #' . $row['mandato'] : '') . '</small>'
         . '<span class="cst-state cst-state--' . (self::TONES[$row['estado']] ?? 'wait') . '">' . self::e(self::label($row['estado']) ?: 'Sin estado') . '</span></td>'
+        . '<td data-label="Tarea">' . ($row['tarea'] > 0 ? (!empty($listing['can_task']) ? '<button type="button" class="cqt-link" data-commercial-open-case="' . $row['tarea'] . '">#' . $row['tarea'] . '</button>' : '#' . $row['tarea']) : '<span class="cqt-muted">Sin tarea</span>') . '</td>'
         . '<td data-label="Propietario"><strong>' . self::e($row['propietario'] ?: 'Sin propietario') . '</strong><small>Arrendatario: ' . self::e($row['arrendatario'] ?: 'sin definir') . '</small></td>'
         . '<td data-label="Inmueble">' . ($row['inmueble'] !== ''
           ? '<button type="button" class="cqt-link cst-property-link" data-commercial-property-detail="' . self::e($row['inmueble']) . '" title="Ver la ficha del inmueble">' . self::icon('home') . '#' . self::e($row['inmueble']) . '</button>'
@@ -80,7 +100,7 @@ final class CommercialClosingSheetsView
         . ($row['aprobador'] !== '' ? '<small>Respondió: ' . self::e($row['aprobador']) . '</small>' : '') . '</td>'
         . '<td data-label="Consultor/a">' . self::e($row['consultor'] ?: 'Sin consultor/a') . '</td>'
         . '<td data-label="Acciones"><div class="cqt-row-actions cst-row-actions">'
-        . '<button type="button" class="' . (in_array($row['estado'], ['Esperando respuesta', 'No aprobada', 'En verificacion de servicios'], true) ? 'cqt-primary' : 'cqt-secondary') . ' cqt-small" data-cma-closing-sheet="' . $id . '" data-cma-closing-title="' . self::e('Hoja de cierre #' . $id . ($row['mandato'] > 0 ? ' · Mandato #' . $row['mandato'] : '')) . '">' . self::icon('handshake') . 'Abrir hoja</button>'
+        . self::actions($row)
         . '</div></td></tr>';
     }
     $html .= '</tbody></table></div>';

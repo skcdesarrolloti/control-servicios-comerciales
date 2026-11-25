@@ -38,7 +38,7 @@ final class ClosingSheetsListing
 
   /**
    * @param array<string,mixed> $input
-   * @return array{rows:list<array<string,mixed>>,total:int,page:int,per_page:int,filters:array{q:string,estado:string,empleado:string},estados:array<string,int>,mine:bool,team:bool}
+   * @return array{rows:list<array<string,mixed>>,total:int,page:int,per_page:int,filters:array{q:string,estado:string,empleado:string},estados:array<string,int>,mine:bool,team:bool,can_task:bool}
    */
   public function listing(array $input): array
   {
@@ -53,14 +53,14 @@ final class ClosingSheetsListing
     $page = max(1, (int) ($input['hc_pag'] ?? 1));
     [$where, $args] = $this->where($filters, $employee, false);
     $total = (int) $this->db->getVar('SELECT COUNT(*) FROM `' . $this->table() . '` WHERE ' . $where, $args);
-    $rows = $this->db->getResults('SELECT `_ID`, `fecha`, `estado`, `id_inmueble`, `direccion`, `propietario`, `arrendatario`, `creador`, `id_empleado`, `verificador`, `aprobador`, `id_contrato`'
+    $rows = $this->db->getResults('SELECT `_ID`, `fecha`, `estado`, `id_inmueble`, `direccion`, `propietario`, `arrendatario`, `creador`, `id_empleado`, `verificador`, `aprobador`, `id_contrato`, `id_ticket`'
       . ' FROM `' . $this->table() . '` WHERE ' . $where . ' ORDER BY `_ID` DESC LIMIT ' . self::PER_PAGE . ' OFFSET ' . (($page - 1) * self::PER_PAGE), $args);
     [$countWhere, $countArgs] = $this->where($filters, $employee, true);
     $counts = [];
     foreach ($this->db->getResults("SELECT TRIM(COALESCE(`estado`, '')) AS estado, COUNT(*) AS total FROM `" . $this->table() . '` WHERE ' . $countWhere . " GROUP BY TRIM(COALESCE(`estado`, ''))", $countArgs) as $row) {
       $counts[(string) $row['estado']] = (int) $row['total'];
     }
-    return ['rows' => array_map([self::class, 'summary'], $rows), 'total' => $total, 'page' => $page, 'per_page' => self::PER_PAGE, 'filters' => $filters, 'estados' => $counts, 'mine' => $mine, 'team' => $team];
+    return ['rows' => array_map([self::class, 'summary'], $rows), 'total' => $total, 'page' => $page, 'per_page' => self::PER_PAGE, 'filters' => $filters, 'estados' => $counts, 'mine' => $mine, 'team' => $team, 'can_task' => $this->policy->canAct('ver_ticket')];
   }
 
   /**
@@ -109,6 +109,7 @@ final class ClosingSheetsListing
       'verificador' => trim((string) ($row['verificador'] ?? '')),
       'aprobador' => trim((string) ($row['aprobador'] ?? '')),
       'mandato' => (int) preg_replace('/\D/', '', (string) ($row['id_contrato'] ?? '')),
+      'tarea' => (int) preg_replace('/\D/', '', (string) ($row['id_ticket'] ?? '')),
     ];
   }
 

@@ -33,6 +33,21 @@ final class CommercialMandatesRepository
     $this->db->pdo()->exec('CREATE TABLE IF NOT EXISTS `' . $this->reviewTable() . "` (mandato_id BIGINT NOT NULL PRIMARY KEY, envios INT NOT NULL DEFAULT 0, enviado_at VARCHAR(19) NOT NULL DEFAULT '', enviado_por VARCHAR(40) NOT NULL DEFAULT '', enviado_por_nombre VARCHAR(190) NOT NULL DEFAULT '', huella_envio CHAR(64) NOT NULL DEFAULT '', visto_at VARCHAR(19) NOT NULL DEFAULT '', aprobado_at VARCHAR(19) NOT NULL DEFAULT '', aprobado_por VARCHAR(190) NOT NULL DEFAULT '', huella_aprobado CHAR(64) NOT NULL DEFAULT '')" . $engine);
     $this->db->pdo()->exec('CREATE TABLE IF NOT EXISTS `' . $this->notesTable() . "` (id {$pk}, mandato_id BIGINT NOT NULL, seccion VARCHAR(30) NOT NULL, nombre VARCHAR(190) NOT NULL, mensaje TEXT NOT NULL, estado VARCHAR(20) NOT NULL DEFAULT 'pendiente', respuesta TEXT NULL, respondido_por VARCHAR(190) NOT NULL DEFAULT '', respondido_id_empleado VARCHAR(40) NOT NULL DEFAULT '', respondido_at VARCHAR(19) NOT NULL DEFAULT '', huella CHAR(64) NOT NULL DEFAULT '', created_at VARCHAR(19) NOT NULL"
       . ($this->mysql ? ', KEY mandato_id (mandato_id))' : ')') . $engine);
+    // firma_pendiente = 1: se editó ya enviado a firma y eSignatures no se actualizó (hoja de cierre sin aprobar o
+    // enviado por Make): solo entonces se muestra "Reenviar a firma". Columna agregada después: se crea si falta.
+    try {
+      $this->db->pdo()->query('SELECT firma_pendiente FROM `' . $this->reviewTable() . '` LIMIT 1');
+    } catch (\PDOException $error) {
+      $this->db->pdo()->exec('ALTER TABLE `' . $this->reviewTable() . '` ADD COLUMN firma_pendiente TINYINT NOT NULL DEFAULT 0');
+    }
+  }
+
+  /** Marca o quita "hay cambios que no llegaron a eSignatures". */
+  public function markSignPending(int $id, bool $pending): void
+  {
+    if ($pending || $this->review($id) !== []) {
+      $this->saveReview($id, ['firma_pendiente' => $pending ? 1 : 0]);
+    }
   }
 
   private function reviewTable(): string
@@ -155,7 +170,7 @@ final class CommercialMandatesRepository
     $sql = ' FROM `' . $this->mandates() . '` m LEFT JOIN `' . $this->reviewTable() . '` r ON r.mandato_id = m.`_ID` WHERE ' . implode(' AND ', $where);
     $total = (int) $this->db->getVar('SELECT COUNT(*)' . $sql, $args);
     $offset = max(0, ($page - 1) * $perPage);
-    $rows = $this->db->getResults('SELECT m.*, r.envios AS rev_envios, r.enviado_at AS rev_enviado_at, r.visto_at AS rev_visto_at, r.aprobado_at AS rev_aprobado_at, r.aprobado_por AS rev_aprobado_por, r.huella_aprobado AS rev_huella_aprobado,'
+    $rows = $this->db->getResults('SELECT m.*, r.envios AS rev_envios, r.firma_pendiente AS rev_firma_pendiente, r.enviado_at AS rev_enviado_at, r.visto_at AS rev_visto_at, r.aprobado_at AS rev_aprobado_at, r.aprobado_por AS rev_aprobado_por, r.huella_aprobado AS rev_huella_aprobado,'
       . ' (SELECT COUNT(*) FROM `' . $this->notesTable() . "` o WHERE o.mandato_id = m.`_ID` AND o.estado = 'pendiente') AS rev_pendientes"
       . $sql . ' ORDER BY m.`_ID` DESC LIMIT ' . (int) $perPage . ' OFFSET ' . (int) $offset, $args);
     return ['rows' => $rows, 'total' => $total];
@@ -256,7 +271,7 @@ final class CommercialMandatesRepository
     if ($where === []) {
       return [];
     }
-    return $this->db->getResults('SELECT m.*, r.envios AS rev_envios, r.visto_at AS rev_visto_at, r.aprobado_at AS rev_aprobado_at, r.huella_aprobado AS rev_huella_aprobado,'
+    return $this->db->getResults('SELECT m.*, r.envios AS rev_envios, r.firma_pendiente AS rev_firma_pendiente, r.visto_at AS rev_visto_at, r.aprobado_at AS rev_aprobado_at, r.huella_aprobado AS rev_huella_aprobado,'
       . ' (SELECT COUNT(*) FROM `' . $this->notesTable() . "` o WHERE o.mandato_id = m.`_ID` AND o.estado = 'pendiente') AS rev_pendientes"
       . ' FROM `' . $this->mandates() . '` m LEFT JOIN `' . $this->reviewTable() . '` r ON r.mandato_id = m.`_ID` WHERE ' . implode(' OR ', $where) . ' ORDER BY m.`_ID` DESC LIMIT 20', $args);
   }

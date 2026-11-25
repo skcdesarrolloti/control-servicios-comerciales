@@ -63,11 +63,21 @@ final class MandateClosingSheet
     return $this->servicesUrl . '/hoja-cierre.php?' . http_build_query(['id_contrato' => (int) ($mandate['_ID'] ?? 0), 'embed' => '1'], '', '&', PHP_QUERY_RFC3986);
   }
 
-  /** Una hoja por su número (Hojas de cierre y Mis cierres): hoja-cierre-ver.php, aunque esté desistida. */
-  public function sheetUrl(int $id): string
+  /** Estados en los que la hoja se puede editar o desistir (como hoja-cierre.php y ClosingSheetDesist::canDesist de allá). */
+  public const EDITABLE = ['En verificacion de servicios', 'Esperando respuesta', 'No aprobada', 'Aprobada'];
+
+  /**
+   * Una hoja por su número (Hojas de cierre y Mis cierres): hoja-cierre-ver.php, aunque esté desistida. Con
+   * accion=editar, el formulario de la hoja (hoja-cierre.php?id_cierre=); desistir e imprimir abren la misma hoja y la
+   * ventana del panel pulsa allí su botón.
+   */
+  public function sheetUrl(int $id, string $action = ''): string
   {
     if (!$this->configured()) {
       throw new \RuntimeException('Falta INMOBILIARIO_URL en el .env del panel: la dirección del panel inmobiliario.');
+    }
+    if ($action === 'editar') {
+      return $this->servicesUrl . '/hoja-cierre.php?' . http_build_query(['id_cierre' => $id, 'embed' => '1'], '', '&', PHP_QUERY_RFC3986);
     }
     return $this->servicesUrl . '/hoja-cierre-ver.php?' . http_build_query(['numero' => $id, 'embed' => '1'], '', '&', PHP_QUERY_RFC3986);
   }

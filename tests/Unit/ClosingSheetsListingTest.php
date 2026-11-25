@@ -34,7 +34,7 @@ final class ClosingSheetsListingTest extends TestCase
   private function boot(bool $admin): array
   {
     [$db, $policy] = CommercialNotificationsFixture::make($admin);
-    $db->pdo()->exec('CREATE TABLE wp_jet_cct_cierres (_ID INTEGER PRIMARY KEY, fecha TEXT, estado TEXT, id_inmueble TEXT, direccion TEXT, propietario TEXT, arrendatario TEXT, creador TEXT, id_empleado TEXT, verificador TEXT, aprobador TEXT, id_contrato TEXT)');
+    $db->pdo()->exec('CREATE TABLE wp_jet_cct_cierres (_ID INTEGER PRIMARY KEY, fecha TEXT, estado TEXT, id_inmueble TEXT, direccion TEXT, propietario TEXT, arrendatario TEXT, creador TEXT, id_empleado TEXT, verificador TEXT, aprobador TEXT, id_contrato TEXT, id_ticket TEXT)');
     $rows = [
       [440, 'Aprobada', '900', 'Ana Pérez', '648', 'ANA LEYDA BLANCO'],
       [441, 'Esperando respuesta', '900', 'Ana Pérez', '649', 'Pedro Gómez'],
@@ -42,7 +42,7 @@ final class ClosingSheetsListingTest extends TestCase
       [443, 'Desistida', '', '', '651', 'Sin dueño'],
     ];
     foreach ($rows as [$id, $state, $employee, $name, $mandate, $owner]) {
-      $db->insert('wp_jet_cct_cierres', ['_ID' => $id, 'fecha' => '1795467953', 'estado' => $state, 'id_inmueble' => '152289', 'direccion' => 'Cra 80', 'propietario' => $owner, 'arrendatario' => 'Arrendatario', 'creador' => $name, 'id_empleado' => $employee, 'verificador' => '', 'aprobador' => '', 'id_contrato' => $mandate]);
+      $db->insert('wp_jet_cct_cierres', ['_ID' => $id, 'fecha' => '1795467953', 'estado' => $state, 'id_inmueble' => '152289', 'direccion' => 'Cra 80', 'propietario' => $owner, 'arrendatario' => 'Arrendatario', 'creador' => $name, 'id_empleado' => $employee, 'verificador' => '', 'aprobador' => '', 'id_contrato' => $mandate, 'id_ticket' => $id === 441 ? '700' : '']);
     }
     return [$db, $policy];
   }
@@ -77,6 +77,13 @@ final class ClosingSheetsListingTest extends TestCase
     self::assertStringContainsString('data-cma-closing-sheet="441"', $html);
     self::assertStringContainsString('Mandato #649', $html);
     self::assertStringContainsString('En verificación de servicios', $html);
+    self::assertStringContainsString('data-commercial-open-case="700"', $html, 'La tarea relacionada abre su ventana.');
+    self::assertStringContainsString('Sin tarea', $html);
+    self::assertStringContainsString('data-cma-closing-sheet="441" data-cma-closing-action="editar"', $html);
+    self::assertStringContainsString('data-cma-closing-sheet="441" data-cma-closing-action="desistir"', $html);
+    self::assertStringContainsString('data-cma-closing-sheet="442" data-cma-closing-action="imprimir"', $html);
+    self::assertStringNotContainsString('data-cma-closing-sheet="442" data-cma-closing-action="editar"', $html, 'Realizada: no se edita ni se desiste.');
+    self::assertStringNotContainsString('data-cma-closing-sheet="443" data-cma-closing-action="desistir"', $html);
     self::assertStringContainsString('<h1>Mis cierres</h1>', CommercialClosingSheetsView::page(['portafolio' => '1'], $service));
   }
 

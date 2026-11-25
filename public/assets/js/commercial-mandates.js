@@ -82,7 +82,9 @@
     var old = document.getElementById("cma-viewer");
     if (old) old.remove();
     var title = button.getAttribute("data-cma-closing-title") || (sheet ? "Hoja de cierre #" + sheet : "Hoja de cierre · Mandato #" + id);
-    var url = sheet ? "hoja-cierre.php?numero=" + encodeURIComponent(sheet) : "hoja-cierre.php?mandato=" + encodeURIComponent(id);
+    // Editar abre el formulario de la hoja; desistir e imprimir abren la hoja y pulsan allí su botón (mismo dominio).
+    var action = sheet ? (button.getAttribute("data-cma-closing-action") || "") : "";
+    var url = sheet ? "hoja-cierre.php?numero=" + encodeURIComponent(sheet) + (action === "editar" ? "&accion=editar" : "") : "hoja-cierre.php?mandato=" + encodeURIComponent(id);
     var viewer = document.createElement("div");
     viewer.id = "cma-viewer";
     viewer.className = "cqt-viewer cma-closing";
@@ -105,6 +107,14 @@
       try {
         var doc = frame.contentDocument;
         if (doc && doc.body && doc.body.classList.contains("scm-review-page")) doc.body.classList.add("is-embed");
+        if (action === "desistir" || action === "imprimir") {
+          var once = action;
+          action = "";
+          if (once === "imprimir") { frame.contentWindow.focus(); frame.contentWindow.print(); }
+          var desist = doc && doc.querySelector("[data-csf-desist-open]");
+          if (once === "desistir" && desist) desist.click();
+          else if (once === "desistir") notify("info", "Esta hoja no se puede desistir desde aquí: tu cargo no tiene ese permiso en el panel inmobiliario o la hoja ya no lo admite.");
+        }
       } catch (_error) {}
     });
     frame.src = url;
