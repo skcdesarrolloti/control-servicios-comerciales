@@ -115,11 +115,24 @@ final class CommercialTaskAssistant
     return $count;
   }
 
+  /**
+   * Limpia lo que va y viene del modelo; también se aplica a los análisis ya guardados.
+   * - Marcadores de plantilla sin reemplazar (${solicitante}, {{1}}): no son datos, ni se mandan ni se muestran.
+   * - Palabras de otros alfabetos (가치, 价值) que el modelo a veces mete: el panel solo muestra español.
+   */
+  public static function stripNoise(string $text): string
+  {
+    $text = preg_replace('/\s*[-–—:]?\s*(?:\$\{[^}]*\}|\{\{[^}]*\}\})/u', '', $text) ?? $text;
+    $text = preg_replace('/[\p{Han}\p{Hangul}\p{Hiragana}\p{Katakana}\p{Cyrillic}\p{Arabic}\p{Hebrew}\p{Thai}\p{Devanagari}]+/u', '', $text) ?? $text;
+    $text = preg_replace('/\s+/u', ' ', $text) ?? $text;
+    $text = preg_replace('/\s+([,.;:!?])/u', '$1', $text) ?? $text;
+    return trim($text);
+  }
+
   /** @param mixed $value */
   private function text($value, int $limit = 1200): string
   {
-    $text = trim(html_entity_decode(strip_tags((string) $value), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
-    $text = preg_replace('/\s+/u', ' ', $text) ?? $text;
+    $text = self::stripNoise(html_entity_decode(strip_tags((string) $value), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
     if (mb_strlen($text) > $limit) {
       return mb_substr($text, 0, $limit - 1) . '…';
     }
@@ -152,7 +165,7 @@ final class CommercialTaskAssistant
       'messages' => [
         [
           'role' => 'system',
-          'content' => 'Eres un asistente comercial inmobiliario de SuCasa. Analiza tareas comerciales con criterio práctico, sin inventar datos. Responde siempre en español claro para un consultor. Si falta información, indícalo como dato faltante. No reveles razonamiento interno.',
+          'content' => 'Eres un asistente comercial inmobiliario de SuCasa. Analiza tareas comerciales con criterio práctico, sin inventar datos. Responde siempre en español claro para un consultor, solo con alfabeto latino: nunca escribas palabras ni caracteres de otros idiomas (chino, coreano, japonés u otros). Si un dato aparece como marcador de plantilla (${...} o {{...}}), trátalo como dato faltante y no lo copies. En el mensaje sugerido, trata al cliente de usted y llama "consultor/a" a quien lo atiende. Si falta información, indícalo como dato faltante. No reveles razonamiento interno.',
         ],
         [
           'role' => 'user',

@@ -164,6 +164,15 @@ final class CommercialTaskAnalysisRepository
     $payload['resumen'] = trim((string) ($payload['resumen'] ?? $row['summary'] ?? ''));
     $payload['cliente'] = $this->cleanSavedTextValue($payload['cliente'] ?? '');
     $payload['estado_actual'] = $this->cleanSavedTextValue($payload['estado_actual'] ?? '');
+    // Los análisis guardados antes de la limpieza también se muestran sin marcadores ni palabras de otros alfabetos.
+    foreach (['resumen', 'cliente', 'estado_actual', 'mensaje_sugerido'] as $key) {
+      if (is_string($payload[$key] ?? null)) $payload[$key] = CommercialTaskAssistant::stripNoise($payload[$key]);
+    }
+    foreach (['riesgos', 'oportunidades', 'recomendaciones', 'proximos_pasos', 'datos_faltantes'] as $key) {
+      if (is_array($payload[$key] ?? null)) {
+        $payload[$key] = array_values(array_filter(array_map(static fn($item): string => CommercialTaskAssistant::stripNoise(is_scalar($item) ? (string) $item : ''), $payload[$key]), static fn(string $item): bool => $item !== ''));
+      }
+    }
 
     return $payload;
   }

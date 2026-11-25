@@ -1592,9 +1592,11 @@
     if (!caseContent) return;
     var ticketPk = button.getAttribute("data-ticket-pk") || currentCasePk || "";
     if (!ticketPk) return;
-    var originalText = button.textContent;
+    if (button.disabled) return;
+    // Se guarda el contenido tal cual (ícono + texto) para devolverlo igual; con textContent se colaba "auto_awesome".
+    var originalHtml = button.innerHTML;
     button.disabled = true;
-    button.innerHTML = '<i class="fas fa-circle-notch fa-spin" aria-hidden="true"></i><span>Analizando…</span>';
+    button.innerHTML = '<span class="material-symbols-outlined text-[16px] animate-spin" aria-hidden="true">progress_activity</span><span>Analizando…</span>';
     setAnalysisModal(true, assistantLoadingMarkup());
     request("commercial_ticket_analyze", { ticket_pk: ticketPk })
       .then(function (response) {
@@ -1609,7 +1611,7 @@
       .finally(function () {
         if (document.contains(button)) {
           button.disabled = false;
-          button.innerHTML = '<i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i><span>' + escapeHtml(originalText || "Analizar con asistente") + "</span>";
+          button.innerHTML = originalHtml;
         }
       });
   }
