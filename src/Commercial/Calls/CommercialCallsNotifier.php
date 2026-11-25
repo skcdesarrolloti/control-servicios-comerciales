@@ -297,6 +297,20 @@ final class CommercialCallsNotifier
   }
 
   /**
+   * Llegó la fecha para retomar una tarea postergada y volvió sola a Nuevo: correo al responsable con su enlace individual.
+   * @param array<string,mixed> $task La tarea ya reactivada.
+   */
+  public function taskResumed(int $id, array $task, string $date): void
+  {
+    $e = static fn($value): string => EmailTemplate::e((string) $value);
+    $this->send($task['correo_empleado'] ?? '', 'Retoma la tarea #' . $id . ' · ' . (trim((string) ($task['solicitante'] ?? '')) ?: 'cliente'), 'Tarea para retomar',
+      '<p>Estimado/a <strong>' . $e($task['nombre_empleado'] ?? '') . '</strong>, hoy (' . $e($date) . ') es la fecha para retomar la tarea comercial <strong>#' . $id . '</strong>'
+      . (trim((string) ($task['tema_ayuda'] ?? '')) !== '' ? ' de <strong>' . $e($task['tema_ayuda']) . '</strong>' : '') . ' del cliente <strong>' . $e($task['solicitante'] ?? '') . '</strong>.</p>'
+      . '<p>La tarea salió de Postergados y volvió a <strong>Nuevo</strong> para que la gestiones.</p>',
+      $this->buttons(StaffTaskLink::url($id, (string) ($task['id_empleado'] ?? '')), 'Ver tarea'), 'llamadas:tarea:' . $id . ':retomar:' . $date);
+  }
+
+  /**
    * Nombre, correo y celular de un funcionario en una sola variable de la plantilla (como en el panel inmobiliario): la
    * plantilla no necesita una variable por dato. Lo que falte no se escribe.
    * @param array<string,mixed> $task

@@ -182,6 +182,54 @@ final class CommercialTicketsRepository
   }
 
   /**
+   * Tareas postergadas cuya fecha para retomar ya llegó: vuelven solas a Nuevo (estado y estado_comercial, como una tarea
+   * recién creada) para que no se acumulen en Postergados. No toca estado_administrativo. Borra la fecha y deja una nota
+   * interna de constancia. Devuelve las tareas reactivadas (ya con el estado nuevo) para avisar a su responsable.
+   * @return list<array<string,mixed>>
+   */
+  public function resumeDuePostponed(?int $now = null): array
+  {
+    $now ??= time();
+    $table = $this->db->table('jet_cct_tickets');
+    if (!$this->schema->columnExists($table, self::RESUME_COLUMN)) {
+      return [];
+    }
+    [$where, $args] = $this->bucketWhere('postergados');
+    $where[] = 'COALESCE(t.`' . self::RESUME_COLUMN . '`, 0) > 0';
+    $where[] = 't.`' . self::RESUME_COLUMN . '` <= ?';
+    $due = $this->db->getResults('SELECT t.* FROM `' . $table . '` t WHERE ' . implode(' AND ', $where) . ' ORDER BY t.`' . self::RESUME_COLUMN . '` ASC LIMIT 500', array_merge($args, [$now]));
+    $notes = $this->db->table('jet_cct_notas_ticket');
+    $hasNotes = $this->schema->tableExists($notes);
+    $zone = new \DateTimeZone(\SCM\Support\ColombiaBusinessCalendar::TIMEZONE);
+    $resumed = [];
+    foreach ($due as $ticket) {
+      $id = (int) $ticket['_ID'];
+      $date = (new \DateTimeImmutable('@' . (int) $ticket[self::RESUME_COLUMN]))->setTimezone($zone)->format('d/m/Y');
+      $previous = trim((string) ($ticket['estado_comercial'] ?? '')) ?: 'Sin estado';
+      $message = sprintf('La tarea volvió a "Nuevo" (antes "%s"): se cumplió la fecha para retomarla (%s).', $previous, $date);
+      $pdo = $this->db->pdo();
+      $pdo->beginTransaction();
+      try {
+        $this->db->update($table, ['estado' => 'Nuevo', 'estado_comercial' => 'Nuevo', self::RESUME_COLUMN => null, 'fecha_actualizacion' => $now], ['_ID' => $id]);
+        $stamp = date('Y-m-d H:i:s', $now);
+        if ($hasNotes) {
+          $this->db->insert($notes, ['cct_status' => 'publish', 'cct_author_id' => '0', 'cct_created' => $stamp, 'cct_modified' => $stamp,
+            'id_ticket' => $id, 'fecha' => $now, 'nombre' => 'Sistema', 'id_empleado' => '', 'observacion' => $message]);
+        }
+        $pdo->commit();
+      } catch (\Throwable $exception) {
+        if ($pdo->inTransaction()) {
+          $pdo->rollBack();
+        }
+        error_log('[tareas:retomar] Tarea #' . $id . ': ' . $exception->getMessage());
+        continue;
+      }
+      $resumed[] = ['estado' => 'Nuevo', 'estado_comercial' => 'Nuevo', self::RESUME_COLUMN => null, 'scm_retomada' => $date] + $ticket;
+    }
+    return $resumed;
+  }
+
+  /**
    * Tareas postergadas con fecha para retomar, para el calendario de vencimientos.
    * @param array<string,mixed> $filters
    * @return array<int,array<string,mixed>>

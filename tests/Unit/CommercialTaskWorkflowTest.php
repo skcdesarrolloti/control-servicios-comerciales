@@ -164,6 +164,30 @@ final class CommercialTaskWorkflowTest extends TestCase
     self::assertSame([], $tickets->calendarPostponedTickets());
   }
 
+  public function testPostponedTaskReturnsToNewWhenItsResumeDateArrives(): void
+  {
+    $tickets = new CommercialTicketsRepository($this->db);
+    $tickets->changeStatus(900, 'Postergado');
+    $this->db->update('wp_jet_cct_tickets', ['estado_administrativo' => 'Postergado'], ['_ID' => 900]);
+    $resume = strtotime('2026-11-27 08:00:00 America/Bogota');
+    $tickets->setResumeDate(900, $resume);
+
+    [$notifier, $log] = $this->recorder();
+    $resumer = new \SCM\Commercial\CommercialPostponedResumer($this->db, new Settings($this->db), $notifier);
+    self::assertSame(0, $resumer->run($resume - 60), 'Antes de la fecha sigue postergada.');
+    self::assertSame('Postergado', $this->task()['estado_comercial']);
+
+    self::assertSame(1, $resumer->run($resume + 60));
+    $task = $this->task();
+    self::assertSame(['Nuevo', 'Nuevo', 'Postergado'], [$task['estado'], $task['estado_comercial'], $task['estado_administrativo']], 'No toca el estado administrativo.');
+    self::assertEmpty($task['fecha_retomar']);
+    self::assertStringContainsString('volvió a "Nuevo" (antes "Postergado")', (string) $this->db->getVar("SELECT observacion FROM wp_jet_cct_notas_ticket WHERE id_ticket = '900' ORDER BY _ID DESC LIMIT 1"));
+    self::assertCount(1, $log->mail);
+    self::assertSame('101@example.test', $log->mail[0][0]);
+    self::assertStringContainsString('ticket_id=900.', $log->mail[0][2], 'El responsable recibe su enlace individual.');
+    self::assertSame(0, $resumer->run($resume + 120), 'Una sola vez.');
+  }
+
   public function testResumeDateMustBeBetweenTomorrowAndOneYear(): void
   {
     $today = new \DateTimeImmutable('today', new \DateTimeZone('America/Bogota'));

@@ -35,6 +35,8 @@ final class CommercialDashboardController
   /** @param array<string,mixed> $input */
   public function render(array $input): string
   {
+    // Las postergadas cuya fecha para retomar llegó vuelven a Nuevo (respaldo del cron bin/resume-postponed-tasks.php).
+    (new \SCM\Commercial\CommercialPostponedResumer($this->db, $this->settings))->runThrottled();
     $repository = new CommercialTicketsRepository($this->db);
     $adminCargos = is_array($this->config['dashboard_admin_cargos'] ?? null) ? $this->config['dashboard_admin_cargos'] : ['11', '12', '13', '14'];
     $defaultCommercialEmployeeCargos = is_array($this->config['commercial_employee_cargos'] ?? null) ? $this->config['commercial_employee_cargos'] : ['1', '6', '9', '10', '11', '12', '13', '14', '17'];

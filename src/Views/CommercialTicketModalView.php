@@ -435,7 +435,7 @@ final class CommercialTicketModalView
           <?php echo self::messageForm($pk, 'follow_up', 'Registrar gestión de seguimiento', 'Deja constancia de llamadas, acuerdos o gestiones comerciales realizadas. El cliente lo recibe por correo.', 'observacion', 'Describe detalladamente la gestión comercial efectuada…', 'Guardar seguimiento', false, true); ?>
         <?php endif; ?>
         <?php if ($policy->canAct('postergar')): ?>
-          <?php echo self::messageForm($pk, 'postpone', 'Postergar tarea', 'La tarea pasa a Postergado hasta la fecha que elijas: ese día aparece en el calendario para retomarla. El cliente recibe el motivo y la fecha por correo y WhatsApp.', 'observacion', 'Indica el motivo o justificación de la postergación…', 'Postergar tarea', true, true, self::resumeField()); ?>
+          <?php echo self::messageForm($pk, 'postpone', 'Postergar tarea', 'La tarea pasa a Postergado hasta la fecha que elijas: ese día vuelve sola a Nuevo y te llega un correo para retomarla. El cliente recibe el motivo y la fecha por correo y WhatsApp.', 'observacion', 'Indica el motivo o justificación de la postergación…', 'Postergar tarea', true, true, self::resumeField()); ?>
         <?php endif; ?>
         <?php if ($policy->canAct('activar') && $isPostponedOrClosed): ?>
           <?php echo self::statusMessageForm($pk, 'activate', 'Activar tarea', 'Selecciona el estado con el que retoma la gestión activa.', 'motivo', CommercialStatusCatalog::OPEN, 'Nuevo', 'Activar tarea ahora', false, true); ?>
@@ -908,7 +908,7 @@ final class CommercialTicketModalView
     $today = new \DateTimeImmutable('today', $zone);
     return '<div class="space-y-1"><label class="block text-xs font-semibold text-on-surface" for="commercial-resume-date">Retomar la tarea el <em class="text-rose-600">*</em></label>'
       . '<input type="date" id="commercial-resume-date" name="fecha_retomar" required min="' . $today->modify('+1 day')->format('Y-m-d') . '" max="' . $today->modify('+1 year')->format('Y-m-d') . '" class="w-full sm:w-60 text-xs sm:text-sm rounded-xl border border-surface-container focus:border-[#1E3C76] focus:ring focus:ring-[#1E3C76]/20 p-2.5 outline-none bg-white text-on-surface">'
-      . '<p class="text-[11px] text-secondary">Ese día la tarea sale en el calendario de vencimientos para retomarla.</p></div>';
+      . '<p class="text-[11px] text-secondary">Ese día la tarea vuelve a Nuevo; hasta entonces sale en el calendario de vencimientos.</p></div>';
   }
 
   /**
