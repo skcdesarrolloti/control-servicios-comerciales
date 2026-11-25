@@ -62,6 +62,21 @@ el crédito de la garantía (`MandateCalculator`) y lo guarda en `wp_jet_cct_cre
   (`GET /api/templates/{id}/content`) y se guarda una hora en `storage/data/mandatos-plantillas/`; si eSignatures no
   responde, se usa la última copia o la de `resources/mandatos/` (`por-defecto.md`, `berkley.md`, `seguros-mundial.md`).
   Cambiar el texto en eSignatures basta: en máximo una hora se ve aquí.
+- La página del propietario **es el contrato completo**: los datos ya están en el Anexo 1, así que no se repiten en
+  tarjetas. Debajo, **Observaciones**: el propietario elige la sección (propietarios, inmueble, copropiedad, servicios,
+  canon y comisión, garantías, condiciones o comentario general) y escribe; las respuestas salen ahí mismo. Si una
+  plantilla no se pudiera leer, la página vuelve a mostrar los datos por secciones.
+
+## Editar las plantillas (Configuración › Actividades comerciales › Contratos de mandato)
+
+Solo administradores. Abre el texto vigente de las tres plantillas en eSignatures (Por defecto, Berkley, Seguros
+mundial) y guarda la que se está viendo (`MandateTemplateEditor`, `POST /api/templates/{id}/content`):
+- **Vista previa** con los campos sin datos; **Campos disponibles** inserta `{{campo}}` donde está el cursor.
+- Al guardar: hay que confirmar que aplica a todos los contratos nuevos; si la plantilla cambió en eSignatures desde que
+  se abrió, no se guarda; un `{{campo}}` que el panel no llena se rechaza; quitar campos pide confirmarlo.
+- La versión anterior queda en `storage/data/mandatos-plantillas/historial/` (quién y cuándo, últimas 30) y se puede
+  cargar de nuevo en el editor; la copia de la página del mandato se renueva de una vez.
+- Los contratos ya enviados a firma no cambian.
 - En el panel, cada mandato tiene **Revisión del propietario**, **Ver contrato** y **Vista pública** (lo que ve el
   propietario con su enlace: `mandato.php?id=…&como=propietario`, sin marcarlo como visto ni dejar escribir); el popup
   cambia entre las tres vistas.

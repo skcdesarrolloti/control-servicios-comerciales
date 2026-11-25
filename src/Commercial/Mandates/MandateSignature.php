@@ -121,6 +121,20 @@ final class MandateSignature
     return $template === '' ? '' : (string) (($this->http)('GET', 'templates/' . rawurlencode($template) . '/content', null)['data']['markdown'] ?? '');
   }
 
+  /**
+   * Reemplaza todo el texto de la plantilla en eSignatures (POST templates/{id}/content con find_markdown vacío) y
+   * devuelve el texto que quedó.
+   */
+  public function replaceTemplateMarkdown(string $type, string $markdown): string
+  {
+    $template = self::TEMPLATES[$type] ?? '';
+    if ($template === '') {
+      throw new \InvalidArgumentException('No hay plantilla de eSignatures para «' . $type . '».');
+    }
+    $response = ($this->http)('POST', 'templates/' . rawurlencode($template) . '/content', ['dry_run' => 'no', 'edits' => [['find_markdown' => '', 'replace_with_markdown' => $markdown]]]);
+    return (string) ($response['data']['markdown'] ?? $markdown);
+  }
+
   /** Estado y PDF del contrato (para el aviso de firma). @return array<string,mixed> */
   public function contractInfo(string $contract): array
   {

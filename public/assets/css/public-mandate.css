@@ -64,3 +64,9 @@
 .pm-contract-head-card { margin:0 0 18px; padding:0 0 14px; border-bottom:1px solid var(--ps-line); }
 .pm-contract-head-card h2 { margin:4px 0 0; }
 .pm-contract-head-card .ps-eyebrow { color:var(--ps-blue); }
+/* Observaciones debajo del contrato */
+.pm-observations .pm-observation-group { margin-top:14px; padding-top:12px; border-top:1px solid var(--ps-line); }
+.pm-observation-title { margin:0 0 6px; font-size:15px; color:var(--ps-navy); }
+.pm-observations .pm-notes { margin-top:0; padding-top:0; border-top:0; }
+.pm-observation-form { margin-top:16px; }
+.pm-contract-head-card a { color:var(--ps-blue); font-weight:600; }

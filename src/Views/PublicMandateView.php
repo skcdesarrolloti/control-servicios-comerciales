@@ -45,7 +45,6 @@ final class PublicMandateView
     }
     $staff = is_array($data['interno']);
     $preview = (string) ($page['preview'] ?? '') !== '';
-    $contract = is_array($page['contract'] ?? null) ? $page['contract'] : ['url' => '', 'open' => false];
     $hasContract = (string) ($data['contrato'] ?? '') !== '';
     $state = (string) $data['revision'];
     [$label, $tone] = CommercialMandatesService::REVIEW_STATES[$state] ?? ['', 'wait'];
@@ -54,7 +53,6 @@ final class PublicMandateView
       . '<h1>' . ($staff ? 'Revisión del propietario' : 'Hola, ' . self::e($names !== [] ? implode(' y ', $names) : 'apreciado propietario')) . '</h1>'
       . '<p class="ps-state"><span class="ps-badge ps-badge--' . self::e($tone) . '">' . self::e($label) . '</span></p>'
       . '<p>' . self::e(self::stateText($data, $staff)) . '</p>'
-      . ($hasContract && $contract['url'] !== '' ? '<p class="pm-hero-actions"><a class="ps-button ps-button--light" href="' . self::e($contract['url']) . '">Ir al contrato completo</a></p>' : '')
       . '</section>';
     if ($preview) {
       $html .= '<p class="pm-preview" role="status">Vista previa: así ve el propietario esta página con su enlace. Aquí no se pueden dejar observaciones ni aprobar. <a href="' . self::e((string) $page['preview']) . '">Volver a la vista del equipo</a></p>';
@@ -75,25 +73,29 @@ final class PublicMandateView
       $notes[$note['seccion']][] = $note;
     }
     $open = !$data['firmado'] && !$preview;
-    foreach ($data['secciones'] as $section) {
-      $html .= '<section class="ps-card pm-section" id="seccion-' . self::e($section['key']) . '"><h2>' . self::e($section['title']) . '</h2>' . self::sectionBody($section)
-        . self::notes($notes[$section['key']] ?? [], $staff, $data, $page)
-        . (!$staff && $open ? self::noteForm($section['key'], $section['title'], $names, $page) : '') . '</section>';
-    }
-    if (!$staff || ($notes['general'] ?? []) !== []) {
-      $html .= '<section class="ps-card pm-section" id="seccion-general"><h2>Comentario general</h2>'
-        . (!$staff ? '<p class="ps-hint">¿Algo que no esté en una sección o una pregunta para su consultor/a? Escríbalo aquí.</p>' : '')
-        . self::notes($notes['general'] ?? [], $staff, $data, $page)
-        . (!$staff && $open ? self::noteForm('general', 'Comentario general', $names, $page, true) : '') . '</section>';
+    if ($hasContract) {
+      // El contrato completo (cláusulas y anexos, con todos los datos del mandato) es el cuerpo de la página: los datos
+      // ya están en el Anexo 1, así que no se repiten en tarjetas. Las observaciones van en una tarjeta debajo, eligiendo
+      // la sección.
+      $html .= '<section class="ps-card pm-contract" id="contrato"><header class="pm-contract-head-card"><p class="ps-eyebrow">Texto que se enviará a firma digital</p><h2>Contrato de mandato</h2>'
+        . '<p class="ps-hint">Cláusulas y anexos con sus datos. La fecha del encabezado será la del día en que se envíe a firma.' . (!$staff && $open ? ' Si algo debe cambiar, déjelo en <a href="#observaciones">Observaciones</a>, al final.' : '') . '</p></header>'
+        . '<div class="pm-contract-body">' . (string) $data['contrato'] . '</div></section>';
+      $html .= self::observations($data, $notes, $staff, $open, $page);
+    } else {
+      foreach ($data['secciones'] as $section) {
+        $html .= '<section class="ps-card pm-section" id="seccion-' . self::e($section['key']) . '"><h2>' . self::e($section['title']) . '</h2>' . self::sectionBody($section)
+          . self::notes($notes[$section['key']] ?? [], $staff, $data, $page)
+          . (!$staff && $open ? self::noteForm($section['key'], $section['title'], $names, $page) : '') . '</section>';
+      }
+      if (!$staff || ($notes['general'] ?? []) !== []) {
+        $html .= '<section class="ps-card pm-section" id="seccion-general"><h2>Comentario general</h2>'
+          . (!$staff ? '<p class="ps-hint">¿Algo que no esté en una sección o una pregunta para su consultor/a? Escríbalo aquí.</p>' : '')
+          . self::notes($notes['general'] ?? [], $staff, $data, $page)
+          . (!$staff && $open ? self::noteForm('general', 'Comentario general', $names, $page, true) : '') . '</section>';
+      }
     }
     if (!$staff && $open) {
       $html .= self::approval($data, $page);
-    }
-    if ($hasContract) {
-      // Siempre completo (cláusulas y anexos): es el texto vigente de la plantilla de eSignatures con los datos del mandato.
-      $html .= '<section class="ps-card pm-contract" id="contrato"><header class="pm-contract-head-card"><p class="ps-eyebrow">Texto que se enviará a firma digital</p><h2>Contrato completo</h2>'
-        . '<p class="ps-hint">Cláusulas y anexos con los datos de esta página. La fecha del encabezado será la del día en que se envíe a firma.</p></header>'
-        . '<div class="pm-contract-body">' . (string) $data['contrato'] . '</div></section>';
     }
     $html .= self::advisor($data['consultor']);
     return $html . self::foot($assets['js']);
@@ -230,6 +232,45 @@ final class PublicMandateView
       $html .= '</li>';
     }
     return $html . '</ul></div>';
+  }
+
+  /**
+   * Observaciones debajo del contrato: las que hay (por sección, con su respuesta) y, para el propietario, el formulario
+   * donde elige la sección (o comentario general).
+   * @param array<string,mixed> $data
+   * @param array<string,list<array<string,mixed>>> $notes
+   * @param array<string,mixed> $page
+   */
+  private static function observations(array $data, array $notes, bool $staff, bool $open, array $page): string
+  {
+    if ($staff && $notes === []) {
+      return '';
+    }
+    $titles = ['general' => 'Comentario general'];
+    foreach ($data['secciones'] as $section) {
+      $titles[(string) $section['key']] = (string) $section['title'];
+    }
+    $html = '<section class="ps-card pm-section pm-observations" id="observaciones"><h2>Observaciones</h2>'
+      . (!$staff && $open ? '<p class="ps-hint">Si algo del contrato debe cambiar, escríbalo aquí indicando la sección. Su consultor/a le responderá en esta misma página.</p>' : '');
+    foreach ($titles as $key => $title) {
+      if (($notes[$key] ?? []) !== []) {
+        $html .= '<div class="pm-observation-group" id="seccion-' . self::e($key) . '"><h3 class="pm-observation-title">' . self::e($title) . '</h3>' . self::notes($notes[$key], $staff, $data, $page) . '</div>';
+      }
+    }
+    if (!$staff && $open) {
+      $draft = $page['draft'] ?? [];
+      $current = (string) ($draft['seccion'] ?? '');
+      $options = '';
+      foreach ($titles as $key => $title) {
+        $options .= '<option value="' . self::e($key) . '"' . ($key === $current ? ' selected' : '') . '>' . self::e($title) . '</option>';
+      }
+      $html .= '<form method="post" action="' . self::e($page['action']) . '" class="pm-form pm-observation-form"><input type="hidden" name="accion" value="observacion">'
+        . '<label class="pm-field"><span>Sección del contrato</span><select name="seccion" required><option value="">Elija la sección</option>' . $options . '</select></label>'
+        . self::who($data['propietarios'], (string) ($draft['nombre'] ?? ''))
+        . '<label class="pm-field"><span>Qué se debe cambiar</span><textarea name="mensaje" rows="3" maxlength="' . CommercialMandatesService::MAX_NOTE . '" required placeholder="Ej.: el número de cuenta correcto es…">' . self::e($draft['mensaje'] ?? '') . '</textarea></label>'
+        . '<button type="submit" class="ps-button">Enviar observación</button></form>';
+    }
+    return $html . '</section>';
   }
 
   /**

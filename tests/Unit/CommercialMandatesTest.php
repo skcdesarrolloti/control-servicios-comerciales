@@ -299,7 +299,9 @@ final class CommercialMandatesTest extends TestCase
     $html = $this->page(['m' => $reference]);
     self::assertStringContainsString('Hola, Lilia Granados y Inversiones SAS', $html);
     self::assertStringContainsString('C.C. 21235713', $html);
-    self::assertStringContainsString('¿Algo por cambiar en canon y comisión?', $html);
+    self::assertStringContainsString('CLAUSULA PRIMERA', $html, 'La página es el contrato completo.');
+    self::assertStringNotContainsString('id="seccion-propietarios"', $html, 'Los datos están en el Anexo 1: no se repiten en tarjetas.');
+    self::assertStringContainsString('<option value="canon">', $html, 'La observación se deja eligiendo la sección.');
     self::assertStringContainsString('name="nombre" required', $html, 'Con dos propietarios se elige quién escribe.');
     self::assertStringContainsString('Aprobar el contrato', $html);
     self::assertStringContainsString('Su consultor/a asignado es', $html);
@@ -311,6 +313,7 @@ final class CommercialMandatesTest extends TestCase
     $html = $this->page(['m' => $reference, 'ok' => 'observacion']);
     self::assertStringContainsString('Recibimos su observación', $html);
     self::assertStringContainsString('Falta el depósito', $html);
+    self::assertStringContainsString('id="seccion-inmueble"', $html, 'Cada observación sale bajo su sección.');
     self::assertStringContainsString('Tiene <strong>1</strong> observación(es) pendiente(s)', $html);
 
     self::assertStringContainsString('no es válido o venció', $this->page(['m' => '50.123.abc']));

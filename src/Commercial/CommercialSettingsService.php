@@ -58,7 +58,7 @@ final class CommercialSettingsService
     'factor_prestacional' => ['Factor prestacional', 0, 0, 100],
   ];
 
-  public const SECTIONS = ['notificaciones_internas', 'calendario', 'tiempos', 'cotizaciones', 'estudios', 'avisos', 'actualizaciones', 'destacados', 'aseo', 'utm', 'medios', 'analitica', 'plan', 'material_pop', 'banner_revista'];
+  public const SECTIONS = ['notificaciones_internas', 'calendario', 'tiempos', 'cotizaciones', 'estudios', 'mandatos', 'avisos', 'actualizaciones', 'destacados', 'aseo', 'utm', 'medios', 'analitica', 'plan', 'material_pop', 'banner_revista'];
 
   /** Operaciones de la sección "medios" (todas guardan, salvo preview, que solo cuenta). */
   public const MEDIOS_OPS = ['add', 'rename', 'toggle', 'merge', 'aliases', 'alias_raw', 'rewrite_raw', 'preview'];
@@ -124,6 +124,8 @@ final class CommercialSettingsService
       'cotizaciones' => \SCM\Commercial\Quotes\CommercialQuotesService::settingsFrom($this->settings),
       'estudios' => $section === 'estudios' ? \SCM\Commercial\Studies\CommercialStudiesService::settingsView($this->settings, new \SCM\Commercial\Studies\CommercialStudiesRepository($this->db)) : [],
       'respuestas' => $section === 'respuestas' ? $this->replyGuideSettings() : [],
+      // Texto de las plantillas del contrato de mandato en eSignatures: solo al abrir esa sección (lee la API).
+      'mandatos' => $section === 'mandatos' ? $this->mandateTemplates()->load() : [],
       'avisos' => ['values' => $signs],
       'actualizaciones' => ['limits' => self::propertyUpdateLimits($this->settings)],
       'destacados' => ['portals' => $highlights],
@@ -297,6 +299,8 @@ final class CommercialSettingsService
         return 'Responsable de las entregas guardado.';
       case 'respuestas':
         return $this->saveReplyGuides($data);
+      case 'mandatos':
+        return $this->saveMandateTemplate($data);
       case 'avisos':
         return $this->saveSigns($data);
       case 'actualizaciones':
@@ -346,6 +350,34 @@ final class CommercialSettingsService
         return 'Configuración de la analítica web guardada.';
     }
     throw new \InvalidArgumentException('Sección de configuración no válida.');
+  }
+
+  /** Editor de las plantillas del contrato de mandato en eSignatures (Configuración › Contratos de mandato). */
+  private function mandateTemplates(): \SCM\Commercial\Mandates\MandateTemplateEditor
+  {
+    return new \SCM\Commercial\Mandates\MandateTemplateEditor(\SCM\Commercial\Mandates\MandateSignature::fromConfig($this->config));
+  }
+
+  /**
+   * Contratos de mandato: vista previa, cargar una versión del historial o guardar el texto en eSignatures.
+   * @param array<string,mixed> $data
+   */
+  private function saveMandateTemplate(array $data): string
+  {
+    $action = (string) ($data['accion'] ?? '');
+    if ($action === 'vista_previa') {
+      $type = (string) ($data['tipo'] ?? '');
+      if (!isset(\SCM\Commercial\Mandates\MandateSignature::TEMPLATES[$type])) {
+        throw new \InvalidArgumentException('Elige la plantilla.');
+      }
+      $this->lastResult = ['html' => \SCM\Commercial\Mandates\MandateTemplateEditor::preview($type, (string) ($data['markdown'] ?? ''))];
+      return 'Vista previa lista.';
+    }
+    if ($action === 'version') {
+      $this->lastResult = ['markdown' => $this->mandateTemplates()->version((string) ($data['id'] ?? ''))];
+      return 'Versión cargada en el editor. Revísala y guarda para volver a ella.';
+    }
+    return $this->mandateTemplates()->save($data, Auth::employeeId(), Auth::user());
   }
 
   /**

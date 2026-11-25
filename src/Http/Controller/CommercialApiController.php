@@ -237,7 +237,8 @@ final class CommercialApiController
       $message = $service->save($section, is_array($payload) ? $payload : []);
       // "Medios" es una lista que se administra en el mismo popup: se devuelve su detalle actualizado y los conteos.
       // Una vista previa (conteos antes de confirmar) no cambia nada: no se recarga la configuración.
-      $preview = $section === 'medios' && is_array($payload) && ($payload['op'] ?? '') === 'preview';
+      $preview = ($section === 'medios' && is_array($payload) && ($payload['op'] ?? '') === 'preview')
+        || ($section === 'mandatos' && is_array($payload) && in_array($payload['accion'] ?? '', ['vista_previa', 'version'], true));
       JsonResponse::success(['message' => $message, 'result' => $service->lastResult(), 'settings' => $preview ? [] : $this->settingsService()->load($section)]);
     } catch (\InvalidArgumentException $exception) {
       JsonResponse::error($exception->getMessage(), 422);
