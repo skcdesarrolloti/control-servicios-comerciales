@@ -474,4 +474,14 @@ Acepto.`{\"input_type\":\"every_signer\"}`",
     array_map('unlink', glob($cache . '/*') ?: []);
     @rmdir($cache);
   }
+
+  public function testASentMandateCountsAsReviewedByTheOwner(): void
+  {
+    $none = ['envios' => 0, 'visto_at' => '', 'aprobado_at' => '', 'huella_aprobado' => ''];
+    self::assertSame('aprobado', CommercialMandatesService::reviewState(['estado' => 'Enviado'], $none, 0, 'h'), 'Enviado a firma sin revisión registrada: revisado.');
+    self::assertSame('aprobado', CommercialMandatesService::reviewState(['estado' => 'Enviado'], ['aprobado_at' => '2026-11-20 10:00', 'huella_aprobado' => 'vieja'] + $none, 0, 'h'), 'Lo que cuenta es la versión enviada.');
+    self::assertSame('observaciones', CommercialMandatesService::reviewState(['estado' => 'Enviado'], $none, 1, 'h'), 'Con observaciones pendientes se sigue viendo.');
+    self::assertSame('sin_enviar', CommercialMandatesService::reviewState(['estado' => 'No enviado'], $none, 0, 'h'));
+    self::assertSame('', CommercialMandatesService::reviewNotice('aprobado'));
+  }
 }

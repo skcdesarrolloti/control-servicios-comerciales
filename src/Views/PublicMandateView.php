@@ -130,13 +130,15 @@ final class PublicMandateView
         'visto' => 'El propietario abrió el contrato pero todavía no lo ha aprobado ni ha dejado observaciones.',
         'observaciones' => 'El propietario pidió cambios: corrige el mandato, responde cada observación y márcala resuelta antes de enviarlo a firma.',
         'cambio' => 'El propietario lo aprobó (' . $data['aprobado_at'] . '), pero el mandato cambió después. Envíaselo otra vez para que revise la versión actual.',
-        'aprobado' => $data['aprobado_por'] . ' aprobó el contrato el ' . $data['aprobado_at'] . '. Ya puede enviarse a firma.',
+        'aprobado' => $data['aprobado_at'] === '' ? ($data['estado'] === 'Enviado' ? 'Ya se envió a firma: se da por revisado por el propietario.' : 'Se da por revisado por el propietario.') : $data['aprobado_por'] . ' aprobó el contrato el ' . $data['aprobado_at'] . '.' . ($data['estado'] === 'Enviado' ? ' Ya se envió a firma.' : ' Ya puede enviarse a firma.'),
         default => 'El contrato ya fue firmado en eSignatures.',
       };
     }
     return match ($state) {
       'firmado' => 'Este contrato ya fue firmado. Si necesita algún cambio, comuníquese con su consultor/a.',
-      'aprobado' => 'Usted aprobó este contrato el ' . $data['aprobado_at'] . '. Le enviaremos la firma digital a su correo y celular.',
+      'aprobado' => $data['estado'] === 'Enviado'
+        ? 'Este contrato ya se envió a firma digital: revise su correo y celular. Si necesita algún cambio, déjelo en Observaciones o comuníquese con su consultor/a.'
+        : 'Usted aprobó este contrato el ' . $data['aprobado_at'] . '. Le enviaremos la firma digital a su correo y celular.',
       'cambio' => 'Su consultor/a actualizó el contrato después de su aprobación. Revíselo de nuevo y, si todo está correcto, apruébelo otra vez.',
       'observaciones' => 'Recibimos sus observaciones. Su consultor/a hará los ajustes y le responderá en cada sección.',
       default => 'Antes de enviarle el contrato para la firma digital, revise sus datos. Si algo debe cambiar, déjenos su observación en la sección que corresponda. Cuando todo esté correcto, apruébelo al final de la página.',
@@ -307,7 +309,9 @@ final class PublicMandateView
     $pending = array_filter($data['observaciones'], static fn(array $note): bool => $note['estado'] === 'pendiente');
     $html = '<section class="ps-card pm-approve" id="aprobar"><h2>Aprobar el contrato</h2>';
     if ($data['revision'] === 'aprobado') {
-      return $html . '<p>Usted aprobó este contrato el <strong>' . self::e($data['aprobado_at']) . '</strong>. No tiene que hacer nada más: le enviaremos la firma digital.</p></section>';
+      return $html . ($data['aprobado_at'] === ''
+        ? '<p>Este contrato ya se envió a firma digital. Solo falta firmarlo desde el enlace que le llegó al correo y al celular.</p></section>'
+        : '<p>Usted aprobó este contrato el <strong>' . self::e($data['aprobado_at']) . '</strong>. No tiene que hacer nada más: le enviaremos la firma digital.</p></section>');
     }
     if ($pending !== []) {
       return $html . '<p>Tiene <strong>' . count($pending) . '</strong> observación(es) pendiente(s). Cuando su consultor/a las resuelva, podrá aprobar el contrato aquí.</p></section>';

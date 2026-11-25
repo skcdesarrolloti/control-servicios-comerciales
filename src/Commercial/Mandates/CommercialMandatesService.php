@@ -97,6 +97,10 @@ final class CommercialMandatesService
     if ($pending > 0) {
       return 'observaciones';
     }
+    // Enviado a firma: se da por revisado por el propietario (también los enviados antes de existir la revisión).
+    if (trim((string) ($mandate['estado'] ?? '')) === 'Enviado') {
+      return 'aprobado';
+    }
     if (trim((string) ($review['aprobado_at'] ?? '')) !== '') {
       return hash_equals((string) ($review['huella_aprobado'] ?? ''), $fingerprint ?? MandateDocument::fingerprint($mandate)) ? 'aprobado' : 'cambio';
     }
