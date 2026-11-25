@@ -27,6 +27,10 @@ los de su inmueble) con su revisión y sus acciones:
    de arrendamiento). Si falta, cada mandato lo dice ("Para enviar a firma falta") y el servidor no lo envía
    (`CommercialMandatesService::signBlockers`). La revisión del propietario no es obligatoria: si no la aprobó, solo se
    advierte (`reviewNotice`). Crea el contrato en eSignatures o modifica el mismo.
+   Al modificar el mismo contrato, los campos de texto se actualizan solos (siguen como `{{campo}}` en el texto), pero las
+   tablas (`tabla_propietarios`, `tabla_acuerdos`) quedaron escritas en el texto al crearlo. Por eso se reemplazan ahí
+   (`POST contracts/{id}/content`, `MandateSignature::refreshTables`) y se comprueba que quedaron. Si no se puede, se crea
+   un contrato nuevo y se anula el anterior.
 6. Al firmar todos, eSignatures avisa al panel: el mandato queda **Firmado** con su PDF.
 
 Lo mismo se hace desde **Registros › Mandatos** (y Nuevo mandato sin tarea, escribiendo el código del inmueble).

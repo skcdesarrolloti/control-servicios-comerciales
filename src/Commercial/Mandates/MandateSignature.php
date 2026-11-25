@@ -384,6 +384,10 @@ final class MandateSignature
     }
     $path = 'contracts/' . rawurlencode($id);
     ($this->http)('POST', $path . '/placeholder_fields', ['placeholder_fields' => $body['placeholder_fields']]);
+    // Los campos de texto siguen vivos en el contrato ({{precio_canon}}) y se actualizan con lo anterior, pero las tablas
+    // (tabla_propietarios, tabla_acuerdos) quedaron escritas en el texto al crearlo: se reemplazan ahí mismo. Si no se
+    // puede, la excepción hace que send() cree un contrato nuevo y anule este.
+    $this->refreshTables($id, $body);
     for ($k = 0; $k < $n; $k++) {
       $changed = false;
       foreach (['name', 'email', 'mobile', 'company_name'] as $field) {
@@ -399,6 +403,109 @@ final class MandateSignature
       }
     }
     return true;
+  }
+
+  /**
+   * Reemplaza en el texto del contrato enviado las tablas que cambiaron y comprueba que quedaron.
+   * @param array<string,mixed> $body Cuerpo de POST /contracts (contract()).
+   */
+  private function refreshTables(string $id, array $body): void
+  {
+    $tables = [];
+    foreach ($body['placeholder_fields'] as $field) {
+      if (isset($field['replace_with_markdown'])) {
+        $tables[(string) $field['placeholder_key']] = (string) $field['replace_with_markdown'];
+      }
+    }
+    if ($tables === []) {
+      return;
+    }
+    $template = (string) (($this->http)('GET', 'templates/' . rawurlencode((string) $body['template_id']) . '/content', null)['data']['markdown'] ?? '');
+    $path = 'contracts/' . rawurlencode($id) . '/content';
+    $content = (string) (($this->http)('GET', $path, null)['data']['markdown'] ?? '');
+    $edits = [];
+    foreach ($tables as $key => $markdown) {
+      $edit = self::tableEdit($template, $content, $key, $markdown);
+      if ($edit === null) {
+        throw new \RuntimeException('No se encontró {{' . $key . '}} en el texto del contrato ' . $id . '.');
+      }
+      if ($edit !== []) {
+        $edits[] = $edit;
+      }
+    }
+    if ($edits === []) {
+      return;
+    }
+    $after = (string) (($this->http)('POST', $path, ['dry_run' => 'no', 'edits' => $edits])['data']['markdown'] ?? '');
+    if ($after === '') {
+      $after = (string) (($this->http)('GET', $path, null)['data']['markdown'] ?? '');
+    }
+    $lines = array_map('trim', self::split($after));
+    foreach ($tables as $key => $markdown) {
+      foreach (self::lines($markdown) as $line) {
+        if (!in_array($line, $lines, true)) {
+          throw new \RuntimeException('El contrato ' . $id . ' no quedó con la tabla {{' . $key . '}} nueva.');
+        }
+      }
+    }
+  }
+
+  /**
+   * Cambio del texto del contrato para una tabla: lo que hay entre la línea anterior y la siguiente a {{key}} en la
+   * plantilla (esas líneas no cambian: sus campos de texto siguen como {{…}}). [] si ya está igual; null si no se ubica.
+   * @return array{find_markdown:string,replace_with_markdown:string}|array{}|null
+   */
+  public static function tableEdit(string $template, string $content, string $key, string $markdown): ?array
+  {
+    $template = self::split($template);
+    $content = self::split($content);
+    $at = array_search('{{' . $key . '}}', array_map('trim', $template), true);
+    if ($at === false) {
+      return null;
+    }
+    $before = '';
+    for ($i = $at - 1; $i >= 0 && $before === ''; $i--) {
+      $before = trim($template[$i]);
+    }
+    $next = '';
+    for ($i = $at + 1; $i < count($template) && $next === ''; $i++) {
+      $next = trim($template[$i]);
+    }
+    $trimmed = array_map('trim', $content);
+    $starts = array_keys($trimmed, $before, true);
+    if ($before === '' || $next === '' || count($starts) !== 1) {
+      return null;
+    }
+    $end = array_search($next, array_slice($trimmed, $starts[0] + 1), true);
+    if ($end === false) {
+      return null;
+    }
+    $region = array_slice($content, $starts[0] + 1, (int) $end);
+    while ($region !== [] && trim($region[0]) === '') {
+      array_shift($region);
+    }
+    while ($region !== [] && trim($region[count($region) - 1]) === '') {
+      array_pop($region);
+    }
+    if (self::lines(implode("\n", $region)) === self::lines($markdown)) {
+      return [];
+    }
+    // Sin tabla escrita (quedó vacía): se agrega después de la línea anterior.
+    return $region === []
+      ? ['find_markdown' => $content[$starts[0]], 'replace_with_markdown' => $content[$starts[0]] . "\n" . $markdown]
+      : ['find_markdown' => implode("\n", $region), 'replace_with_markdown' => $markdown];
+  }
+
+  /** @return list<string> */
+  private static function split(string $markdown): array
+  {
+    return preg_split('/\r\n|\r|\n/', $markdown) ?: [];
+  }
+
+  /** Líneas con contenido, sin espacios a los lados (para comparar tablas sin importar las líneas en blanco). @return list<string> */
+  private static function lines(string $markdown): array
+  {
+    return array_values(array_filter(array_map('trim', self::split($markdown)), static fn(string $line): bool => $line !== ''));
   }
 
   /** @param array<string,mixed> $signer */

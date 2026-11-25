@@ -36,6 +36,17 @@ final class CommercialMandateFormTest extends TestCase
   private array $calls = [];
   /** @var array<string,array<string,mixed>> */
   private array $contracts = [];
+  /** eSignatures simulado: si es true, el cambio del texto del contrato no se aplica (para probar el reenvío). */
+  private bool $frozenContent = false;
+  /** Texto de las plantillas en el eSignatures simulado: las tablas van entre líneas fijas, como en las reales. */
+  private const TEMPLATE_TEXT = "# **ANEXO 1**
+**1). DATOS DEL PROPIETARIO**`{\"alignment\":\"justify\"}`
+{{tabla_propietarios}}
+**2). DATOS DEL INMUEBLE**
+| Escritura Pública | {{escritura}} |
+**Tipo de acuerdo:** {{acuerdo}}
+{{tabla_acuerdos}}
+# **ANEXO 2**";
 
   protected function setUp(): void
   {
@@ -111,8 +122,28 @@ final class CommercialMandateFormTest extends TestCase
       $this->calls[] = [$method, $path, $body];
       if ($method === 'POST' && $path === 'contracts') {
         $id = 'c' . (count($this->contracts) + 1);
-        $this->contracts[$id] = ['id' => $id, 'status' => 'sent', 'metadata' => $body['metadata'], 'signers' => array_map(static fn(array $s, int $k): array => $s + ['id' => 's' . $k], $body['signers'], array_keys($body['signers'])), 'contract_pdf_url' => 'https://esig.test/' . $id . '.pdf'];
+        $tables = [];
+        foreach ($body['placeholder_fields'] as $field) {
+          if (isset($field['replace_with_markdown'])) {
+            $tables['{{' . $field['placeholder_key'] . '}}'] = $field['replace_with_markdown'];
+          }
+        }
+        $this->contracts[$id] = ['id' => $id, 'status' => 'sent', 'metadata' => $body['metadata'], 'signers' => array_map(static fn(array $s, int $k): array => $s + ['id' => 's' . $k], $body['signers'], array_keys($body['signers'])), 'contract_pdf_url' => 'https://esig.test/' . $id . '.pdf', 'content' => strtr(self::TEMPLATE_TEXT, $tables)];
         return ['data' => ['contract' => ['id' => $id]]];
+      }
+      if ($method === 'GET' && preg_match('#^templates/[\w-]+/content$#', $path) === 1) {
+        return ['data' => ['markdown' => self::TEMPLATE_TEXT]];
+      }
+      if (preg_match('#^contracts/(c\d+)/content$#', $path, $m) === 1) {
+        if ($method === 'POST' && !$this->frozenContent) {
+          foreach ($body['edits'] as $edit) {
+            if (!str_contains($this->contracts[$m[1]]['content'], $edit['find_markdown'])) {
+              throw new \RuntimeException('eSignatures respondió con error 422: find_markdown no encontrado');
+            }
+            $this->contracts[$m[1]]['content'] = str_replace($edit['find_markdown'], $edit['replace_with_markdown'], $this->contracts[$m[1]]['content']);
+          }
+        }
+        return ['data' => ['markdown' => $this->contracts[$m[1]]['content']]];
       }
       if ($method === 'GET' && preg_match('#^contracts/(c\d+)$#', $path, $m) === 1) {
         return ['data' => ['contract' => $this->contracts[$m[1]]]];
@@ -265,10 +296,56 @@ final class CommercialMandateFormTest extends TestCase
     self::assertContains('POST contracts/c1/placeholder_fields', $paths);
     self::assertContains('POST contracts/c1/signers/s0/send_contract', $paths, 'Al propietario con otro correo se le reenvía.');
     self::assertNotContains('POST contracts', $paths);
+    self::assertStringContainsString('otro@example.test', $this->contracts['c1']['content'], 'El correo también va en la tabla de propietarios del texto.');
 
-    $this->contracts['c1']['status'] = 'signed';
+    // Cambian los datos de un propietario: la tabla escrita en el texto del contrato se reemplaza ahí mismo (los campos
+    // de texto se actualizan solos, la tabla no).
+    $this->calls = [];
+    $this->db->update('wp_jet_cct_contrato_mandato', ['fallecimiento_2' => 'Margarita Zabaleta'], ['_ID' => $id]);
+    $this->ready($id);
+    self::assertSame('c1', $service->sendToSign($id)['contrato']);
+    self::assertStringContainsString('| **En caso de fallecimiento se designa a** | Margarita Zabaleta |', $this->contracts['c1']['content']);
+    self::assertStringContainsString('**2). DATOS DEL INMUEBLE**', $this->contracts['c1']['content'], 'Lo demás del texto queda igual.');
+    self::assertSame(1, substr_count($this->contracts['c1']['content'], '**PROPIETARIO 1:'));
+
+    // Si el texto no se pudo cambiar, no se deja el contrato con datos viejos: se crea uno nuevo y se anula el anterior.
+    $this->frozenContent = true;
+    $this->calls = [];
+    $this->db->update('wp_jet_cct_contrato_mandato', ['fallecimiento_2' => 'Otra persona'], ['_ID' => $id]);
+    $this->ready($id);
+    self::assertSame('c2', $service->sendToSign($id)['contrato']);
+    $paths = array_map(static fn(array $call): string => $call[0] . ' ' . $call[1], $this->calls);
+    self::assertContains('POST contracts/c1/withdraw', $paths);
+    self::assertStringContainsString('Otra persona', $this->contracts['c2']['content']);
+    $this->frozenContent = false;
+
+    $this->contracts['c2']['status'] = 'signed';
     $this->expectException(\InvalidArgumentException::class);
     $service->sendToSign($id);
+  }
+
+  public function testTheTableInTheContractTextIsFoundBetweenTheTemplateLines(): void
+  {
+    $table = "**PROPIETARIO 1: Ana**
+
+| Dato | Valor |
+| --- | --- |
+| **Celular** | 300 |";
+    // eSignatures quita las líneas en blanco: igual se reconoce como la misma tabla.
+    $content = strtr(self::TEMPLATE_TEXT, ['{{tabla_propietarios}}' => str_replace("
+
+", "
+", $table), '{{tabla_acuerdos}}' => '']);
+    self::assertSame([], MandateSignature::tableEdit(self::TEMPLATE_TEXT, $content, 'tabla_propietarios', $table));
+    $edit = MandateSignature::tableEdit(self::TEMPLATE_TEXT, $content, 'tabla_propietarios', str_replace('300', '301', $table));
+    self::assertSame("**PROPIETARIO 1: Ana**
+| Dato | Valor |
+| --- | --- |
+| **Celular** | 300 |", $edit['find_markdown'] ?? '');
+    $empty = MandateSignature::tableEdit(self::TEMPLATE_TEXT, $content, 'tabla_acuerdos', '| Año | IPC |');
+    self::assertSame('**Tipo de acuerdo:** {{acuerdo}}', $empty['find_markdown'] ?? '', 'Tabla vacía: se agrega después de la línea anterior.');
+    self::assertNull(MandateSignature::tableEdit(self::TEMPLATE_TEXT, $content, 'tabla_otra', $table));
+    self::assertNull(MandateSignature::tableEdit(self::TEMPLATE_TEXT, str_replace('**2). DATOS DEL INMUEBLE**', '', $content), 'tabla_propietarios', $table), 'Sin la línea siguiente no se adivina.');
   }
 
   public function testAnOwnerWithoutContactCannotBeSentToSign(): void
