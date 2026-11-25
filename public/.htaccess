@@ -9,7 +9,8 @@ DirectoryIndex index.php
   Header always set X-Content-Type-Options "nosniff"
   Header always set X-Frame-Options "SAMEORIGIN"
   Header always set Referrer-Policy "no-referrer"
-  Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(self)"
+  # El micrófono se permite solo al propio panel: lo usa el dictado del llenado inteligente (Registrar llamada).
+  Header always set Permissions-Policy "camera=(), microphone=(self), geolocation=(self)"
 </IfModule>
 
 <IfModule mod_rewrite.c>

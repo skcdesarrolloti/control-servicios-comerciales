@@ -145,6 +145,11 @@
       smartStatus(box, "Este navegador no permite dictar. Usa Chrome o Edge, o escribe o pega el texto.", "error");
       return;
     }
+    // Si la página prohíbe el micrófono (cabecera Permissions-Policy del servidor), el permiso del navegador no basta.
+    if (document.featurePolicy && typeof document.featurePolicy.allowsFeature === "function" && !document.featurePolicy.allowsFeature("microphone")) {
+      smartStatus(box, "El servidor del panel tiene bloqueado el micrófono (Permissions-Policy). Hay que permitirlo en public/.htaccess.", "error");
+      return;
+    }
     var recognition = new Recognition();
     recognition.lang = "es-CO";
     recognition.continuous = true;
@@ -161,8 +166,15 @@
       smartStatus(box, interim ? "Escuchando: " + interim : "Escuchando… habla con normalidad.", "");
     };
     recognition.onerror = function (event) {
-      var denied = event.error === "not-allowed" || event.error === "service-not-allowed";
-      smartStatus(box, denied ? "Permite el uso del micrófono en el navegador para dictar." : "No se pudo dictar (" + event.error + "). Intenta de nuevo o escribe el texto.", "error");
+      var messages = {
+        "not-allowed": "El micrófono está bloqueado. Revisa el permiso del sitio en el candado de la barra de direcciones y recarga la página.",
+        "service-not-allowed": "Este navegador no tiene servicio de dictado (pasa en Brave, Opera o Firefox). Usa Chrome o Edge, o escribe el texto.",
+        "audio-capture": "No se encontró un micrófono. Conéctalo o revisa cuál usa el equipo.",
+        "network": "El dictado necesita internet y no pudo conectarse. Intenta de nuevo.",
+        "no-speech": "No se escuchó nada. Pulsa Dictar y habla cerca del micrófono.",
+        "aborted": "Se detuvo el dictado.",
+      };
+      smartStatus(box, messages[event.error] || "No se pudo dictar (" + event.error + "). Intenta de nuevo o escribe el texto.", event.error === "aborted" ? "" : "error");
     };
     recognition.onend = function () {
       listening = null;
