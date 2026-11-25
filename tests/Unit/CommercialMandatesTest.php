@@ -199,6 +199,14 @@ final class CommercialMandatesTest extends TestCase
     $service->ownerNote(50, 'canon', 'Inversiones SAS', 'El canon acordado es 1.700.000');
     self::assertSame('observaciones', $service->viewData(50)['revision']);
     self::assertSame(['ana@example.test'], $this->emails[0][0], 'La observación le llega a quien creó el mandato.');
+    $staff = array_values(array_filter($this->whatsapps, static fn(array $row): bool => $row[1] === CommercialMandatesNotifier::TEMPLATE_STAFF));
+    self::assertCount(1, $staff, 'Y por WhatsApp al consultor/a.');
+    $body = array_column($staff[0][2][0]['parameters'], 'text');
+    self::assertSame(['Inversiones SAS', '50'], [$body[1], $body[2]]);
+    self::assertStringContainsString('Canon y comisión: «El canon acordado es 1.700.000»', $body[4]);
+    $link = PublicMandateAccess::verifyStaff($staff[0][2][1]['parameters'][0]['text']);
+    self::assertSame(50, $link['id'] ?? 0, 'El botón lleva su enlace individual firmado al mandato.');
+    self::assertNull(PublicMandateAccess::verifyStaff('50.' . (time() + 99) . '.900.' . str_repeat('a', 64)), 'Una firma falsa no abre nada.');
     try {
       $service->ownerApprove(50, 'Lilia Granados', true);
       self::fail('No se aprueba con observaciones pendientes.');

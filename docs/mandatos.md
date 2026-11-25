@@ -137,6 +137,34 @@ Si algo debe cambiar, puede dejar sus observaciones en el enlace; si todo está 
   - URL: `https://sucasainmobiliaria.com.co/dashboard-comercial/public/mandato.php?m={{1}}`
   - Muestra: `https://sucasainmobiliaria.com.co/dashboard-comercial/public/mandato.php?m=629.1795000000.3f6c1a9e0b7d4c2a8e5f1b3d7a9c0e2f4b6d8a1c3e5f7092b4d6f8a0c2e4b6d8`
 
+### Plantilla de WhatsApp al consultor/a (crear en Meta)
+
+Cuando el propietario deja una observación o aprueba el contrato, le llega a quien creó el mandato (y a los elegidos en
+**Notificaciones internas › Contratos de mandato**), además del correo. Cada uno recibe su enlace individual firmado
+(`PublicMandateAccess::staffLink`): inicia su sesión y abre el mandato en el panel (`index.php?mandato=…`).
+
+- **Nombre:** `scm_mandato_respuesta_propietario_v1`
+- **Idioma:** Español (Colombia) `es_CO` · **Categoría:** Utilidad
+- **Cuerpo:**
+
+```
+Hola {{1}}, el propietario {{2}} respondió la revisión del contrato de mandato #{{3}} del inmueble {{4}}.
+
+Detalle: {{5}}.
+
+Ábrelo en el panel para revisarlo y continuar con la firma.
+
+*Construimos confianza, protegemos su patrimonio.*
+```
+
+- **Ejemplos:** `{{1}}` Monica · `{{2}}` Ana Leyda Blanco Ortega · `{{3}}` 648 ·
+  `{{4}}` Cra 80 # 15-164 torre 10 apto 139 (código 152289) ·
+  `{{5}}` Dejó una observación en Canon y comisión: «El canon acordado es 1.700.000»
+  (o: `Aprobó el contrato. Ya puede enviarse a firma`)
+- **Botón** de URL dinámica, texto **"Abrir mandato"**:
+  - URL: `https://sucasainmobiliaria.com.co/dashboard-comercial/public/index.php?mandato={{1}}`
+  - Muestra: `https://sucasainmobiliaria.com.co/dashboard-comercial/public/index.php?mandato=648.1795000000.123.3f6c1a9e0b7d4c2a8e5f1b3d7a9c0e2f4b6d8a1c3e5f7092b4d6f8a0c2e4b6d8`
+
 ## Tablas propias (se crean solas al primer uso)
 
 - `wp_scm_mandato_revision`: envíos al propietario, primera vez que lo abrió y aprobación (con la huella).

@@ -16,6 +16,12 @@ if ($taskRedirect !== null) {
   header('Location: ' . $taskRedirect, true, 303);
   exit;
 }
+// Enlace individual de un aviso de mandato (?mandato=<firma>, WhatsApp al consultor/a): igual, abre el mandato.
+$mandateRedirect = \SCM\Support\PublicMandateAccess::staffRedirect($scmAuth, $_GET);
+if ($mandateRedirect !== null) {
+  header('Location: ' . $mandateRedirect, true, 303);
+  exit;
+}
 // Sin sesión, el login vuelve a la misma tarea o pestaña.
 \SCM\Core\Auth::requireLogin(\SCM\Support\StaffTaskLink::loginUrl($_GET));
 
