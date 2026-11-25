@@ -184,13 +184,29 @@ final class CommercialCallsService
     $this->requireAct('llamadas_crear', 'No tienes permiso para registrar llamadas.');
     $call = ['id_empleado' => $this->me(), 'fecha' => time(), 'indicativo' => '57'];
     $from = (int) ($input['desde_llamada'] ?? 0);
+    $deserved = false;
     if ($from > 0) {
       $source = $this->accessible($from);
       foreach (['cliente', 'email', 'celular', 'indicativo', 'celular_wsp', 'usuario_wsp'] as $field) {
         $call[$field] = $source[$field] ?? '';
       }
+      $deserved = $this->contactDeservedTask(CommercialCallsRepository::digits((string) ($source['celular'] ?? '')));
     }
-    return ['mode' => $from > 0 ? 'repeat' : 'new', 'call' => $call, 'factores' => [], 'can_repeat' => false];
+    return ['mode' => $from > 0 ? 'repeat' : 'new', 'call' => $call, 'factores' => [], 'can_repeat' => false, 'deserved' => $deserved];
+  }
+
+  /** Si el contacto ya mereció tarea: alguna llamada suya la mereció o ya tiene una tarea. */
+  private function contactDeservedTask(string $digits): bool
+  {
+    if (strlen($digits) < 7) {
+      return false;
+    }
+    foreach ($this->repository->contactCalls($digits) as $call) {
+      if (trim((string) ($call['merece_ticket'] ?? '')) === 'Si' || self::taskId($call) > 0) {
+        return true;
+      }
+    }
+    return $this->repository->contactTasks($digits) !== [];
   }
 
   /**

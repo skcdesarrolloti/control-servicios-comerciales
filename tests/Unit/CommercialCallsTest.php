@@ -227,6 +227,11 @@ final class CommercialCallsTest extends TestCase
     $repeat = CommercialCallsView::form($service->formData(['desde_llamada' => (string) $id]), $service->options());
     self::assertStringNotContainsString('¿Merece tarea?', $repeat);
     self::assertStringContainsString('<input type="hidden" name="merece_ticket" value="Si">', $repeat);
+    // Si la persona nunca mereció tarea, la nueva solicitud vuelve a preguntar.
+    $neverDeserved = $this->create(['merece_ticket' => 'No', 'celular' => '3005550000', 'medio' => 'Aviso']);
+    $asks = CommercialCallsView::form($service->formData(['desde_llamada' => (string) $neverDeserved]), $service->options());
+    self::assertStringContainsString('¿Merece tarea?', $asks);
+    self::assertStringNotContainsString('name="merece_ticket" value="Si"', $asks);
     $new = CommercialCallsView::form($service->formData([]), $service->options());
     self::assertStringContainsString('¿Merece tarea?', $new);
     self::assertLessThan(strpos($new, 'name="tipo_inmueble"'), strpos($new, 'name="tiene_codigo"'), 'Primero se pregunta por el código.');

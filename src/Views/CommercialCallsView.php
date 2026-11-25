@@ -216,8 +216,8 @@ final class CommercialCallsView
     }
     $money = 'inputmode="numeric" autocomplete="off" data-ccl-money';
     $employees = array_map(static fn(array $employee): array => ['value' => (string) $employee['id'], 'label' => (string) $employee['name']], $options['funcionarios']);
-    // Una solicitud nueva de un contacto conocido siempre lleva tarea: no se pregunta.
-    $merit = $mode === 'repeat'
+    // Una solicitud nueva de un contacto que ya mereció tarea lleva tarea sin preguntar; si nunca la mereció, se pregunta.
+    $merit = $mode === 'repeat' && !empty($data['deserved'])
       ? '<input type="hidden" name="merece_ticket" value="Si"><p class="ccl-hint ccl-wide">Al guardar se abre su tarea para la persona asignada.</p>'
       : self::selectField('merece_ticket', '¿Merece tarea?', $yesNo, '', true);
     return $html
