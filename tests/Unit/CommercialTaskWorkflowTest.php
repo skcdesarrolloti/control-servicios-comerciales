@@ -191,6 +191,19 @@ final class CommercialTaskWorkflowTest extends TestCase
     self::assertSame(0, $resumer->run($at('2026-11-30 08:00')), 'Una sola vez.');
   }
 
+  public function testResumedTaskButtonCanPointToWordPressWhileTasksAreNotEnabledInThePanel(): void
+  {
+    $task = ['id_ticket' => 'T-900', 'id_empleado' => '101'];
+    putenv('TAREAS_WORDPRESS_URL=https://wp.example.test/tarea/?id_ticket=');
+    try {
+      self::assertSame('https://wp.example.test/tarea/?id_ticket=T-900', \SCM\Commercial\Calls\CommercialCallsNotifier::resumedTaskUrl(900, $task));
+      self::assertSame('https://wp.example.test/tarea/?id_ticket=900', \SCM\Commercial\Calls\CommercialCallsNotifier::resumedTaskUrl(900, ['id_empleado' => '101']), 'Sin id_ticket, el número interno.');
+    } finally {
+      putenv('TAREAS_WORDPRESS_URL');
+    }
+    self::assertStringContainsString('ticket_id=900.', \SCM\Commercial\Calls\CommercialCallsNotifier::resumedTaskUrl(900, $task), 'Sin la variable, el enlace individual del panel.');
+  }
+
   public function testPostponedTasksWithoutDateAreSpreadOverTheNextBusinessDays(): void
   {
     $now = (new \DateTimeImmutable('2026-11-25 10:00', new \DateTimeZone('America/Bogota')))->getTimestamp();

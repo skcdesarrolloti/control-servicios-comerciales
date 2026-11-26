@@ -307,7 +307,22 @@ final class CommercialCallsNotifier
       '<p>Estimado/a <strong>' . $e($task['nombre_empleado'] ?? '') . '</strong>, llegó la fecha para retomar (' . $e($date) . ') la tarea comercial <strong>#' . $id . '</strong>'
       . (trim((string) ($task['tema_ayuda'] ?? '')) !== '' ? ' de <strong>' . $e($task['tema_ayuda']) . '</strong>' : '') . ' del cliente <strong>' . $e($task['solicitante'] ?? '') . '</strong>.</p>'
       . '<p>La tarea salió de Postergados y volvió a <strong>Nuevo</strong> para que la gestiones.</p>',
-      $this->buttons(StaffTaskLink::url($id, (string) ($task['id_empleado'] ?? '')), 'Ver tarea'), 'llamadas:tarea:' . $id . ':retomar:' . $date);
+      $this->buttons(self::resumedTaskUrl($id, $task), 'Ver tarea'), 'llamadas:tarea:' . $id . ':retomar:' . $date);
+  }
+
+  /**
+   * Botón del correo de tarea retomada. Mientras las tareas no estén habilitadas en el panel, TAREAS_WORDPRESS_URL (en el
+   * .env, la página de la tarea en WordPress, terminada en "=") lo lleva allá con el número de la tarea; sin esa variable,
+   * al enlace individual firmado del panel. Para pasar al panel basta con borrar la variable del .env.
+   * @param array<string,mixed> $task
+   */
+  public static function resumedTaskUrl(int $id, array $task): string
+  {
+    $wordpress = trim((string) getenv('TAREAS_WORDPRESS_URL'));
+    if ($wordpress !== '') {
+      return $wordpress . rawurlencode(trim((string) ($task['id_ticket'] ?? '')) ?: (string) $id);
+    }
+    return StaffTaskLink::url($id, (string) ($task['id_empleado'] ?? ''));
   }
 
   /**
