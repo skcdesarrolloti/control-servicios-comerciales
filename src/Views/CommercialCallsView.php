@@ -242,14 +242,14 @@ final class CommercialCallsView
       . '<p class="ccl-hint" data-ccl-property-result role="status" hidden></p>'
       . '<div data-ccl-property-fields><div class="ccl-grid">'
       . self::selectField('tipo_inmueble', 'Tipo de inmueble', $options['tipos'], '', false)
-      . self::selectField('destinacion', 'Destinación', $options['destinaciones'], '', false)
+      // En captación solo se piden tipo, uso y barrio: destinación y factores se ocultan (data-ccl-topic-field="detalle").
+      . '<div data-ccl-topic-field="detalle">' . self::selectField('destinacion', 'Destinación', $options['destinaciones'], '', false) . '</div>'
       . self::selectField('uso', 'Uso', $options['usos'], '', false)
       . self::neighborhoodField('', $options['barrios'] ?? [], false)
       . '<div data-ccl-topic-field="presupuesto" hidden>' . self::selectField('tiene_presupuesto', '¿El cliente cuenta con presupuesto?', $yesNo, '', false) . '</div>'
       . '<div data-ccl-budget-field hidden>' . self::input('presupuesto', 'Presupuesto', '', 'text', false, $money) . '</div>'
-      . '<div data-ccl-topic-field="precio" hidden>' . self::input('precio', 'Precio', '', 'text', false, $money) . '</div>'
       . '</div>'
-      . self::checks('factores_importantes', 'Factores importantes', $options['factores'], $data['factores'])
+      . '<div data-ccl-topic-field="detalle">' . self::checks('factores_importantes', 'Factores importantes', $options['factores'], $data['factores']) . '</div>'
       . '</div>'
       // La descripción se arma sola con los datos de arriba mientras nadie la escriba a mano (commercial-calls.js).
       . '<div class="ccl-field"><div class="ccl-desc-head"><label for="ccl-descripcion">Descripción</label>'

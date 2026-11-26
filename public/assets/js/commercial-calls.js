@@ -92,8 +92,14 @@
   function syncTopic(form) {
     var topic = value(form, "tema_ayuda");
     var offer = ["Arriendo", "Venta", "Arriendo o venta"].indexOf(topic) >= 0;
-    var visible = { codigo: offer, presupuesto: offer, factores: offer, cliente: offer, precio: topic === "Captacion" || topic === "Recaptacion" };
+    var listing = topic === "Captacion" || topic === "Recaptacion";
+    var visible = { codigo: offer, presupuesto: offer, factores: offer, cliente: offer, precio: listing, detalle: !listing };
     form.querySelectorAll("[data-ccl-topic-field]").forEach(function (node) { node.hidden = !visible[node.getAttribute("data-ccl-topic-field")]; });
+    // Registrar llamada en captación: solo tipo, uso y barrio; destinación y factores no se envían.
+    if (listing && form.matches("[data-ccl-form]")) {
+      if (form.elements.destinacion) form.elements.destinacion.value = "";
+      form.querySelectorAll('[name="factores_importantes[]"], [name="factores_importantes"]').forEach(function (box) { box.checked = false; });
+    }
     // Tipo de cliente (comisionista, inmediato) solo se pide en arriendo y venta; en otros motivos no se envía.
     ["comisionista", "cliente_inmediato"].forEach(function (name) {
       var field = form.elements[name];

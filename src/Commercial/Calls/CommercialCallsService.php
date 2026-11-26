@@ -352,7 +352,9 @@ final class CommercialCallsService
     if ($employee === null || ($employee['activo'] ?? '') !== 'Si') {
       throw new \InvalidArgumentException('Selecciona un funcionario activo para asignar la llamada.');
     }
-    $factors = array_values(array_intersect((array) ($input['factores_importantes'] ?? []), $options['factores']));
+    // En captación la llamada solo lleva tipo, uso y barrio: sin destinación, factores ni precio.
+    $listing = in_array($topic, self::LISTING_TOPICS, true);
+    $factors = $listing ? [] : array_values(array_intersect((array) ($input['factores_importantes'] ?? []), $options['factores']));
     [$budget, $description] = self::budget($input, is_scalar($input['descripcion'] ?? null) ? trim(strip_tags((string) $input['descripcion'])) : '', $offer);
     return $contact + [
       'tema_ayuda' => $topic,
@@ -360,12 +362,12 @@ final class CommercialCallsService
       'cliente_inmediato' => $immediate,
       'mes_inmueble' => $immediate === 'No' ? $choice('mes_inmueble', $options['meses'], 'el mes en que necesita el inmueble') : '',
       'tipo_inmueble' => $choice('tipo_inmueble', $options['tipos'], 'el tipo de inmueble', false),
-      'destinacion' => $choice('destinacion', $options['destinaciones'], 'la destinación', false),
+      'destinacion' => $listing ? '' : $choice('destinacion', $options['destinaciones'], 'la destinación', false),
       'uso' => $choice('uso', $options['usos'], 'el uso', false),
       'id_inmueble' => $offer && $code > 0 ? (string) $code : '',
       'barrio' => $this->neighborhood($offer && $code > 0 ? (string) $code : '', $text('barrio')),
       'presupuesto' => $budget,
-      'precio' => in_array($topic, self::LISTING_TOPICS, true) ? self::amount($text('precio')) : '',
+      'precio' => '',
       'factores_importantes' => implode(', ', $factors),
       'descripcion' => $description,
       'merece_ticket' => $yesNo('merece_ticket', 'si merece tarea'),

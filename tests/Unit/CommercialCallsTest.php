@@ -134,7 +134,7 @@ final class CommercialCallsTest extends TestCase
     self::assertSame('', $rent['precio']);
     self::assertSame('45', $rent['id_inmueble']);
     $listing = $this->row($this->create(['tema_ayuda' => 'Captacion', 'celular' => '3003334444', 'presupuesto' => '1.000', 'precio' => '250.000.000', 'id_inmueble' => '45']));
-    self::assertSame('250000000', $listing['precio']);
+    self::assertSame('', $listing['precio']);
     self::assertSame('', $listing['presupuesto']);
     self::assertSame('', $listing['id_inmueble']);
     self::assertSame('1.500.000', CommercialCallsService::money('1500000.00'));
@@ -187,6 +187,15 @@ final class CommercialCallsTest extends TestCase
     $service = $this->service();
     $html = CommercialCallsView::form($service->formData([]), $service->options());
     self::assertStringContainsString('<div data-ccl-topic-field="cliente" hidden><h3>Tipo de cliente</h3>', $html);
+    self::assertStringContainsString('<div data-ccl-topic-field="detalle"><label class="ccl-field "><span>Destinación', $html);
+    self::assertStringContainsString('<div data-ccl-topic-field="detalle"><fieldset class="ccl-checks"><legend>Factores importantes', $html);
+    self::assertStringNotContainsString('name="precio"', $html);
+  }
+
+  public function testListingCallKeepsOnlyTypeUseAndNeighborhood(): void
+  {
+    $row = $this->row($this->create(['tema_ayuda' => 'Captacion', 'celular' => '3001000005', 'destinacion' => 'Vivienda', 'factores_importantes' => ['Vista'], 'precio' => '250.000.000']));
+    self::assertSame(['', '', ''], [$row['destinacion'], $row['factores_importantes'], $row['precio']]);
   }
 
   public function testOldCallWithoutMedioCanBeCompletedOnce(): void
