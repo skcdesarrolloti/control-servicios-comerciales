@@ -569,7 +569,7 @@ final class CommercialApiController
     $newEmployeeId = trim((string) ($input['id_empleado'] ?? ''));
     $observacion = trim((string) ($input['observacion'] ?? ''));
     if ($observacion === '') {
-      JsonResponse::error('Escribe el motivo de la reasignación: queda en el historial y le llega al nuevo responsable.', 422);
+      JsonResponse::error('Escribe el motivo de la reasignación: queda en el historial y le llega al nuevo responsable (al cliente no).', 422);
     }
 
     try {

@@ -1308,7 +1308,7 @@ final class CommercialTicketModalView
             <span class="material-symbols-outlined text-[18px] text-[#1E3C76]">manage_accounts</span>
             <span>Reasignar responsable</span>
           </h3>
-          <p class="text-xs text-secondary mt-0.5">Selecciona un integrante habilitado del equipo comercial para transferir la gestión de esta tarea. Se le avisa por WhatsApp y correo.</p>
+          <p class="text-xs text-secondary mt-0.5">Selecciona un integrante habilitado del equipo comercial para transferir la gestión de esta tarea. Se le avisa por WhatsApp y correo, y al cliente le llega el contacto y la ficha de su nuevo consultor/a (el motivo no se le envía).</p>
         </div>
         <button type="button" class="w-7 h-7 rounded-full bg-surface-container hover:bg-surface-container-high text-secondary hover:text-on-surface flex items-center justify-center cursor-pointer transition-colors" data-commercial-close-workflow aria-label="Cerrar formulario">
           <span class="material-symbols-outlined text-[16px]">close</span>

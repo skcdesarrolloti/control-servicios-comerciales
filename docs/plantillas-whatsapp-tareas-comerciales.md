@@ -1,8 +1,8 @@
 # Plantillas de WhatsApp de las tareas comerciales
 
-Crea las plantillas 1 a 5 y 9 a 13 en **Meta Business Suite → Administrador de WhatsApp → Plantillas de mensajes → Crear plantilla**, en la misma cuenta que usa el panel.
+Crea las plantillas 1 a 5 y 9 a 14 en **Meta Business Suite → Administrador de WhatsApp → Plantillas de mensajes → Crear plantilla**, en la misma cuenta que usa el panel.
 
-Para todas: categoría **Utilidad**, idioma **Spanish (COL)** (`es_CO`), tipo de variable **Número**, pie de página `SKC SuCasa Inmobiliaria` y un botón **Ir al sitio web** con URL **Dinámica**. Usa los nombres exactos. La 2 lleva encabezado de imagen y la 5 de documento (PDF).
+Para todas: categoría **Utilidad**, idioma **Spanish (COL)** (`es_CO`), tipo de variable **Número**, pie de página `SKC SuCasa Inmobiliaria` y un botón **Ir al sitio web** con URL **Dinámica**. Usa los nombres exactos. La 2 y la 14 llevan encabezado de imagen y la 5 de documento (PDF).
 
 Cada dato es una sola variable: el contacto de un funcionario (nombre, correo y celular) lo arma el sistema en una línea, como en el panel inmobiliario. Meta no acepta cuerpos que empiecen o terminen con una variable ni dos variables seguidas: por eso el cuerpo siempre cierra con la línea `*Construimos confianza, protegemos su patrimonio.*` (la 1 ya estaba creada y queda como está).
 
@@ -220,6 +220,26 @@ Ejemplos: `{{1}}` Jocabeth Cantillo · `{{2}}` Royner Guardo · `{{3}}` 1686 · 
 
 Botón `Ver tarea`. URL del sitio web `https://sucasainmobiliaria.com.co/dashboard-comercial/public/index.php?tab=abiertos&ticket_id=`. URL de muestra `https://sucasainmobiliaria.com.co/dashboard-comercial/public/index.php?tab=abiertos&ticket_id=1686`.
 
+## 14. `scm_tarea_comercial_trasladada_cliente_v1`
+
+Para el cliente, cuando su tarea pasa a otro consultor/a (**Reasignar** en el popup), salvo que haya bloqueado el WhatsApp. El motivo del traslado es interno y no se le envía. También le llega un correo con el mismo contacto. Código: `CommercialCallsNotifier::TEMPLATE_CLIENT_TRANSFERRED`. **Encabezado:** en "Muestra de contenido multimedia" elige **Imagen** y sube una ficha de ejemplo (JPG o PNG, datos inventados). El panel envía la ficha del nuevo consultor/a (Promoción › Fichas de funcionarios) o, si no tiene, el banner de los correos.
+
+```text
+Hola *{{1}}.*
+
+Tu tarea *#{{2}}* de *{{3}}* pasó a un nuevo consultor/a, que continuará con tu atención.
+
+*Su consultor/a asignado es* {{4}}.
+
+Desde el botón puedes ver tu tarea y escribirnos.
+
+*Construimos confianza, protegemos su patrimonio.*
+```
+
+Ejemplos: `{{1}}` Luis Prada · `{{2}}` 1686 · `{{3}}` Arriendo · `{{4}}` Jocabeth Cantillo · Correo: jocabeth@ejemplo.com · Celular: 3001234567
+
+Botón `Ver y responder`. URL del sitio web `https://sucasainmobiliaria.com.co/dashboard-comercial/public/tarea.php?t=`. URL de muestra `https://sucasainmobiliaria.com.co/dashboard-comercial/public/tarea.php?t=1686.1893456000.ejemplo`.
+
 ## Plantillas compartidas con el panel inmobiliario (6, 7 y 8)
 
 Las usan este panel y `control-servicios-inmobiliarios`, con los mismos nombres de siempre. Se **editan** en Meta (texto y botón); no se crean nuevas. Tenían fija en el botón la página de tickets anterior (`https://sucasainmobiliaria.com.co/ticket/?id_ticket={{1}}`) y el texto decía "solicitud" o "ticket".
@@ -230,7 +250,7 @@ Orden del cambio: publicar el código de los dos paneles y editar las tres plant
 
 ## 6. `pqr_trasladada_funcionario_v1` (editar)
 
-Para el nuevo responsable cuando se reasigna (traslada) una tarea o un caso. Código: `CommercialCallsNotifier::TEMPLATE_TRANSFERRED`.
+Para el nuevo responsable cuando se reasigna (traslada) una tarea o un caso; al cliente le llega la 14. Código: `CommercialCallsNotifier::TEMPLATE_TRANSFERRED`.
 
 ```text
 Hola *{{1}}*.

@@ -38,6 +38,8 @@ final class CommercialCallsNotifier
   public const SILENT_CLOSURES = ['Duplicado', 'Trasladado'];
   /** Compartida con control-servicios-inmobiliarios: su botón es el dominio + {{1}} (SharedButtonUrl). */
   public const TEMPLATE_TRANSFERRED = 'pqr_trasladada_funcionario_v1';
+  /** Al cliente cuando su tarea pasa a otro consultor/a; encabezado con la ficha del nuevo consultor/a. */
+  public const TEMPLATE_CLIENT_TRANSFERRED = 'scm_tarea_comercial_trasladada_cliente_v1';
   public const TEMPLATE_LANGUAGE = 'es_CO';
 
   private const BROCHURE = 'https://sucasainmobiliaria.com.co/brochure-skc-sucasa-inmobiliaria/';
@@ -350,7 +352,8 @@ final class CommercialCallsNotifier
 
   /**
    * La tarea pasó a otro funcionario (Reasignar en el panel). Al nuevo responsable le llegan correo y WhatsApp con su
-   * enlace individual; el WhatsApp usa la plantilla de traslado que comparte con el panel inmobiliario.
+   * enlace individual; el WhatsApp usa la plantilla de traslado que comparte con el panel inmobiliario. Al cliente, el
+   * contacto y la ficha de su nuevo consultor/a (clientReassigned).
    * @param array<string,mixed> $task La tarea con el nuevo responsable.
    */
   public function taskReassigned(int $id, array $task, string $previous, string $reason, string $by, bool $email = true, bool $whatsapp = true): void
@@ -370,6 +373,31 @@ final class CommercialCallsNotifier
       $this->whatsappTo((string) ($task['celular_empleado'] ?? ''), '57', self::TEMPLATE_TRANSFERRED,
         [$task['nombre_empleado'] ?? '', 'Tarea #' . $id, trim((string) ($task['tema_ayuda'] ?? '')) ?: (trim((string) ($task['asunto'] ?? '')) ?: 'Tarea comercial'), $previous !== '' ? $previous : 'Sin asignar'],
         SharedButtonUrl::suffix(StaffTaskLink::url($id, $employee)), $key . ':whatsapp');
+    }
+    $this->clientReassigned($id, $task, $key . ':cliente');
+  }
+
+  /**
+   * Al cliente de una tarea trasladada: correo y WhatsApp (salvo el canal que haya bloqueado) con el contacto del nuevo
+   * consultor/a y el enlace a la vista pública de su tarea; el WhatsApp lleva de encabezado la ficha del nuevo consultor/a.
+   * El motivo del traslado es interno y no se le cuenta.
+   * @param array<string,mixed> $task La tarea con el nuevo responsable.
+   */
+  private function clientReassigned(int $id, array $task, string $key): void
+  {
+    $e = static fn($value): string => EmailTemplate::e((string) $value);
+    $topic = trim((string) ($task['tema_ayuda'] ?? '')) ?: (trim((string) ($task['asunto'] ?? '')) ?: 'Tarea comercial');
+    $client = $this->clientPreferences($task);
+    if (!$this->blocked($client, 'email')) {
+      $this->send($task['correo_solicitante'] ?? '', 'Tu tarea #' . $id . ' tiene un nuevo consultor/a', 'Nuevo consultor/a asignado',
+        '<p>Estimado/a <strong>' . $e($task['solicitante'] ?? '') . '</strong>, tu tarea <strong>#' . $id . '</strong> de <strong>' . $e($topic) . '</strong> pasó a un nuevo consultor/a, que continuará con tu atención.</p>'
+        . '<p><strong>Su consultor/a asignado es</strong> ' . $e(self::contactLine($task)) . '.</p><p>Desde el botón puedes ver tu tarea y escribirnos.</p>',
+        $this->buttons(PublicTaskAccess::url($id), 'Ver y responder'), $key, (string) ($task['correo_empleado'] ?? ''));
+    }
+    if (!$this->blocked($client, 'whatsapp')) {
+      $this->whatsappTo(self::clientPhone($task), (string) ($task['indicativo'] ?? ''), self::TEMPLATE_CLIENT_TRANSFERRED,
+        [$task['solicitante'] ?? '', (string) $id, $topic, self::contactLine($task)], PublicTaskAccess::reference($id),
+        $key . ':whatsapp', $this->cardImage((string) ($task['id_empleado'] ?? '')));
     }
   }
 

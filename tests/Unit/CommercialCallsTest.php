@@ -581,6 +581,26 @@ final class CommercialCallsTest extends TestCase
     $suffix = end($log->whatsapp[0][2])['parameters'][0]['text'];
     self::assertStringStartsWith('public/index.php?tab=abiertos&ticket_id=', $suffix, 'El botón compartido lleva la ruta del panel, sin el dominio fijo de la plantilla.');
     self::assertSame('202', StaffTaskLink::verify(substr($suffix, strlen('public/index.php?tab=abiertos&ticket_id=')))['employee'] ?? '');
+
+    // Al cliente: contacto del nuevo consultor/a, su ficha de encabezado y la vista pública, sin el motivo interno.
+    $client = array_values(array_filter($log->mail, static fn(array $mail): bool => $mail[0] === 'laura@example.test'))[0];
+    self::assertStringContainsString('Consultor Dos · Correo: 202@example.test · Celular: 3000000202', $client[2]);
+    self::assertStringContainsString('tarea.php?t=' . $id . '.', $client[2]);
+    self::assertStringNotContainsString('Vacaciones', $client[2], 'El motivo del traslado es interno.');
+    self::assertStringNotContainsString('ticket_id=', $client[2], 'Nunca el enlace del panel.');
+    self::assertSame(['+573000000202', '+573001234567'], array_column($log->whatsapp, 0));
+    $whatsapp = $log->whatsapp[1];
+    self::assertSame('scm_tarea_comercial_trasladada_cliente_v1', $whatsapp[1]);
+    self::assertSame('header', $whatsapp[2][0]['type'], 'Lleva la ficha del nuevo consultor/a.');
+    self::assertSame(['Laura Prueba', (string) $id, 'Arriendo', 'Consultor Dos · Correo: 202@example.test · Celular: 3000000202'], array_column($whatsapp[2][1]['parameters'], 'text'));
+    self::assertSame($id, PublicTaskAccess::verify(end($whatsapp[2])['parameters'][0]['text']));
+
+    $this->db->update('wp_jet_cct_funcionarios', ['ficha' => 'https://panel.test/public/file.php?n=ficha-202.jpg&s=abc'], ['id_empleado' => '202']);
+    $this->db->insert('wp_jet_cct_clientes', ['nombre' => 'Laura', 'celular' => '3001234567', 'bloqueo_email' => '1']);
+    [$notifier, $log] = $this->recorder();
+    $notifier->taskReassigned($id, array_merge($task, ['id_empleado' => '202', 'nombre_empleado' => 'Consultor Dos', 'correo_empleado' => '202@example.test', 'celular_empleado' => '3000000202']), 'Consultora Uno', 'Vacaciones', 'Coordinación');
+    self::assertSame(['202@example.test'], array_column($log->mail, 0), 'Quien bloqueó el correo no lo recibe.');
+    self::assertSame('https://panel.test/public/file.php?n=ficha-202.jpg&s=abc', $log->whatsapp[1][2][0]['parameters'][0]['image']['link'], 'La ficha es la del nuevo consultor/a.');
   }
 
   public function testNoLinkPointsToTheOldTicketPage(): void
