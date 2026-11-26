@@ -383,14 +383,29 @@ final class CommercialCallsService
    * Captación: para qué ofrece el inmueble (arriendo, venta o ambos). La llamada no tiene columna propia,
    * así que queda al inicio de la descripción si no lo dice ya (commercial-calls.js arma la misma frase).
    */
+  /** Lo que la llamada anotó en su descripción ("Ofrece su inmueble para arrendar…"), para traerlo a la tarea. */
+  public static function offerFrom(string $description): string
+  {
+    foreach (['Arriendo o venta' => 'arrendar o vender', 'Arriendo' => 'arrendar', 'Venta' => 'vender'] as $offer => $verb) {
+      if (preg_match('/Ofrece su inmueble para ' . $verb . '\b/u', $description) === 1) {
+        return $offer;
+      }
+    }
+    return '';
+  }
+
   public static function offerNote(string $offer, string $description): string
   {
     $verb = ['Arriendo' => 'arrendar', 'Venta' => 'vender', 'Arriendo o venta' => 'arrendar o vender'][$offer] ?? '';
-    $note = 'Ofrece su inmueble para ' . $verb;
-    if ($verb === '' || str_starts_with($description, $note . ':') || str_starts_with($description, $note . '.')) {
+    if ($verb === '') {
       return $description;
     }
-    return trim($note . '. ' . $description);
+    // Si ya dice para qué lo ofrece (p. ej. la descripción de la llamada en la tarea), se corrige a lo elegido.
+    $pattern = '/^Ofrece su inmueble para (arrendar o vender|arrendar|vender)(?=[:.])/u';
+    if (preg_match($pattern, $description) === 1) {
+      return (string) preg_replace($pattern, 'Ofrece su inmueble para ' . $verb, $description);
+    }
+    return trim('Ofrece su inmueble para ' . $verb . '. ' . $description);
   }
 
   /**
@@ -625,6 +640,14 @@ final class CommercialCallsService
       throw new \InvalidArgumentException('Selecciona el tema de la tarea.');
     }
     $offer = isset(self::CLIENT_TOPICS[$topic]);
+    // Captación: para qué ofrece el inmueble, al inicio del resumen (como en la llamada).
+    if (in_array($topic, self::LISTING_TOPICS, true)) {
+      $offered = $text('oferta');
+      if (!isset(self::CLIENT_TOPICS[$offered])) {
+        throw new \InvalidArgumentException('Selecciona para qué ofrece el inmueble.');
+      }
+      $descripcion = self::offerNote($offered, $descripcion);
+    }
     $priority = $text('prioridad');
     $priority = in_array($priority, $options['prioridades'], true) ? $priority : self::DEFAULT_PRIORITY;
     $factors = array_values(array_intersect((array) ($input['factores'] ?? []), array_merge($options['factores'], self::factors($call['factores_importantes'] ?? ''))));

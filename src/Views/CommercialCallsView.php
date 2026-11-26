@@ -316,6 +316,8 @@ final class CommercialCallsView
       . self::pairField('id_empleado', 'Asignar a', array_map(static fn(array $employee): array => ['value' => (string) $employee['id'], 'label' => (string) $employee['name']], $options['funcionarios']), $v('id_empleado'), true)
       . self::selectField('prioridad', 'Prioridad', $options['prioridades'], 'Prioridad comercial', true)
       . self::selectField('tema_ayuda', 'Tema', $options['temas'], $topic, true)
+      // Captación: para qué ofrece el inmueble, traído de la llamada (su descripción lo dice).
+      . '<div data-ccl-topic-field="captacion" hidden>' . self::selectField('oferta', '¿Para qué ofrece el inmueble?', array_keys(CommercialCallsService::CLIENT_TOPICS), CommercialCallsService::offerFrom((string) ($call['descripcion'] ?? '')), true) . '</div>'
       . '<div data-ccl-topic-field="codigo" hidden>' . self::input('id_inmueble', 'Código del inmueble', $v('id_inmueble'), 'text', false, 'inputmode="numeric" data-ccl-property-code') . '<p class="ccl-hint" data-ccl-property-result role="status" hidden></p></div>'
       . self::selectField('tipo_inmueble', 'Tipo de inmueble', $options['tipos'], $v('tipo_inmueble'), false)
       . self::selectField('destinacion', 'Destinación', $options['destinaciones'], $v('destinacion'), false)

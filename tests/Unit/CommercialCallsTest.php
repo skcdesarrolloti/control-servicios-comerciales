@@ -195,6 +195,18 @@ final class CommercialCallsTest extends TestCase
     self::assertGreaterThan((int) strpos($html, 'Factores importantes'), (int) strpos($html, 'Tipo de cliente'));
   }
 
+  public function testListingTaskBringsAndCorrectsWhatTheOwnerOffers(): void
+  {
+    $id = $this->create(['tema_ayuda' => 'Captacion', 'oferta' => 'Arriendo o venta', 'celular' => '3001000009', 'descripcion' => 'Ofrece su inmueble para arrendar o vender: casa en Manga.', 'merece_ticket' => 'No']);
+    $service = $this->service();
+    self::assertStringContainsString('value="Arriendo o venta" selected', CommercialCallsView::taskForm($service->taskData($id), $service->options()));
+    $result = $service->createTask($this->taskInput($id, ['tema_ayuda' => 'Captacion', 'oferta' => 'Venta', 'descripcion' => 'Ofrece su inmueble para arrendar o vender: casa en Manga.']));
+    $task = $this->db->getRow('SELECT * FROM wp_jet_cct_tickets WHERE _ID = ?', [$result['id']]) ?? [];
+    self::assertSame('Ofrece su inmueble para vender: casa en Manga.', $task['descripcion']);
+    $this->expectExceptionMessage('Selecciona para qué ofrece el inmueble.');
+    $service->createTask($this->taskInput($this->create(['tema_ayuda' => 'Captacion', 'oferta' => 'Venta', 'celular' => '3001000010', 'merece_ticket' => 'No']), ['tema_ayuda' => 'Captacion']));
+  }
+
   public function testListingCallAsksWhatTheOwnerOffers(): void
   {
     $row = $this->row($this->create(['tema_ayuda' => 'Captacion', 'oferta' => 'Arriendo', 'celular' => '3001000006', 'descripcion' => 'Apartamento en Laureles.']));

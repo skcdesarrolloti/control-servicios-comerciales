@@ -98,6 +98,10 @@
     if (form.elements.oferta) {
       form.elements.oferta.required = listing;
       if (!listing) form.elements.oferta.value = "";
+      // Un resumen que ya dice para qué lo ofrece (el de la llamada) se corrige a lo elegido, como hace el servidor.
+      var summary = form.elements.descripcion;
+      var verb = OFFER_VERBS[value(form, "oferta")];
+      if (listing && verb && summary) summary.value = summary.value.replace(/^Ofrece su inmueble para (arrendar o vender|arrendar|vender)(?=[:.])/, "Ofrece su inmueble para " + verb);
     }
     // Captación: solo tipo, destinación y barrio; el uso (y en la llamada, los factores) no se envían.
     if (listing && form.elements.uso) form.elements.uso.value = "";
