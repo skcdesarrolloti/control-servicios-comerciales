@@ -1,6 +1,6 @@
 # Plantillas de WhatsApp de las tareas comerciales
 
-Crea las plantillas 1 a 5 y 9 a 14 en **Meta Business Suite → Administrador de WhatsApp → Plantillas de mensajes → Crear plantilla**, en la misma cuenta que usa el panel.
+Crea las plantillas 1 a 5 y 9 a 16 en **Meta Business Suite → Administrador de WhatsApp → Plantillas de mensajes → Crear plantilla**, en la misma cuenta que usa el panel.
 
 Para todas: categoría **Utilidad**, idioma **Spanish (COL)** (`es_CO`), tipo de variable **Número**, pie de página `SKC SuCasa Inmobiliaria` y un botón **Ir al sitio web** con URL **Dinámica**. Usa los nombres exactos. La 2 y la 14 llevan encabezado de imagen y la 5 de documento (PDF).
 
@@ -8,7 +8,7 @@ Cada dato es una sola variable: el contacto de un funcionario (nombre, correo y 
 
 En el botón, **URL del sitio web** lleva todo lo que está antes de `{{1}}` (Meta pone `{{1}}` al final) y el panel completa solo el final. En **URL de muestra** va la URL completa. Deja sin marcar **Permite que Meta use el seguimiento de enlaces**.
 
-En las plantillas para funcionarios (1, 3 y 13) el final de `ticket_id=` es el enlace individual firmado de quien recibe el mensaje (`StaffTaskLink::reference`, por ejemplo `1686.1893456000.101.<firma>`): al tocar **Ver tarea** inicia su sesión y abre la tarea en su ventana. Si el enlace venció (30 días), pasa por el login y vuelve a la misma tarea. Las plantillas ya aprobadas no cambian.
+En las plantillas para funcionarios (1, 3, 13 y 16) el final de `ticket_id=` es el enlace individual firmado de quien recibe el mensaje (`StaffTaskLink::reference`, por ejemplo `1686.1893456000.101.<firma>`): al tocar **Ver tarea** inicia su sesión y abre la tarea en su ventana. Si el enlace venció (30 días), pasa por el login y vuelve a la misma tarea. Las plantillas ya aprobadas no cambian.
 
 Los WhatsApp siempre están activos y los nombres de las plantillas son fijos en el código (`CommercialCallsNotifier::TEMPLATE_*`, idioma `es_CO`): llegan en cuanto Meta apruebe cada plantilla.
 
@@ -239,6 +239,49 @@ Desde el botón puedes ver tu tarea y escribirnos.
 Ejemplos: `{{1}}` Luis Prada · `{{2}}` 1686 · `{{3}}` Arriendo · `{{4}}` Jocabeth Cantillo · Correo: jocabeth@ejemplo.com · Celular: 3001234567
 
 Botón `Ver y responder`. URL del sitio web `https://sucasainmobiliaria.com.co/dashboard-comercial/public/tarea.php?t=`. URL de muestra `https://sucasainmobiliaria.com.co/dashboard-comercial/public/tarea.php?t=1686.1893456000.ejemplo`.
+
+## 15. `scm_tarea_comercial_reabierta_v1`
+
+Para el cliente, cuando el consultor/a reabre una tarea postergada o cerrada (botón **Activar** del popup). Lleva el motivo. Con la tarea reabierta el cliente vuelve a poder escribir en su enlace. Código: `CommercialCallsNotifier::TEMPLATE_REOPENED`. Sin encabezado.
+
+```text
+Hola *{{1}}.*
+
+Retomamos tu tarea *#{{2}}*.
+
+*Motivo:* {{3}}.
+
+*Su consultor/a asignado es* {{4}}.
+
+Desde el botón puedes ver tu tarea y escribirnos.
+
+*Construimos confianza, protegemos su patrimonio.*
+```
+
+Ejemplos: `{{1}}` Luis Prada · `{{2}}` 1686 · `{{3}}` El propietario regresó y retomamos las visitas · `{{4}}` Jocabeth Cantillo · Correo: jocabeth@ejemplo.com · Celular: 3001234567
+
+Botón `Ver tarea`. URL del sitio web `https://sucasainmobiliaria.com.co/dashboard-comercial/public/tarea.php?t=`. URL de muestra `https://sucasainmobiliaria.com.co/dashboard-comercial/public/tarea.php?t=1686.1893456000.ejemplo`.
+
+## 16. `scm_tarea_comercial_movimiento_v1`
+
+Para funcionarios cuando una tarea se posterga, se cierra (también Duplicado y Trasladado) o se reabre. La recibe el consultor/a asignado cuando lo hace otra persona, y quienes estén marcados en **Configuración › Notificaciones internas** en **Tarea postergada**, **Tarea cerrada** o **Tarea reabierta**. Quien lo hace no recibe aviso de lo suyo. `{{5}}` es el movimiento que arma el sistema (`Postergada hasta el lunes 7 de diciembre de 2026`, `Cerrada como Ganado`, `Reabierta en Contactado`) y `{{6}}` el motivo u observación. Código: `CommercialCallsNotifier::TEMPLATE_STAFF_MOVED`. Sin encabezado.
+
+```text
+Hola *{{1}}.*
+
+*{{2}}* actualizó la tarea comercial *#{{3}}* del cliente *{{4}}*.
+
+*Movimiento:* {{5}}.
+*Detalle:* {{6}}.
+
+Consulta los detalles en el panel.
+
+*Construimos confianza, protegemos su patrimonio.*
+```
+
+Ejemplos: `{{1}}` Jocabeth Cantillo · `{{2}}` Royner Guardo · `{{3}}` 1686 · `{{4}}` Luis Prada · `{{5}}` Postergada hasta el lunes 7 de diciembre de 2026 · `{{6}}` El propietario viaja y retomamos las visitas a su regreso
+
+Botón `Ver tarea`. URL del sitio web `https://sucasainmobiliaria.com.co/dashboard-comercial/public/index.php?tab=abiertos&ticket_id=`. URL de muestra `https://sucasainmobiliaria.com.co/dashboard-comercial/public/index.php?tab=abiertos&ticket_id=1686`.
 
 ## Plantillas compartidas con el panel inmobiliario (6, 7 y 8)
 

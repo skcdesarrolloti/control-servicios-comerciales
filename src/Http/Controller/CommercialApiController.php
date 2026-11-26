@@ -808,6 +808,7 @@ final class CommercialApiController
     $this->tickets->setResumeDate($ticketPk, $resume->getTimestamp());
     $label = self::longDate($resume);
     $notice = $this->clientNotice($ticketPk, static fn(\SCM\Commercial\Calls\CommercialCallsNotifier $notifier, array $task) => $notifier->taskPostponed($ticketPk, $task, wp_strip_all_tags($message, true), $label, \SCM\Core\Auth::user(), \SCM\Core\Auth::employeeId()));
+    $this->staffNotice($ticketPk, \SCM\Commercial\Calls\CommercialCallsNotifier::EVENT_POSTPONED, 'Postergada hasta el ' . $label, $message);
     JsonResponse::success(['message' => 'Tarea postergada hasta el ' . $label . '.' . $notice, 'refresh' => true]);
   }
 
@@ -833,7 +834,9 @@ final class CommercialApiController
     $this->ensureWorkflowSucceeded($result);
     $this->tickets->changeStatus($ticketPk, $status);
     $this->tickets->setResumeDate($ticketPk, null);
-    JsonResponse::success(['message' => (string) ($result['message'] ?? 'Tarea activada.'), 'refresh' => true]);
+    $notice = $this->clientNotice($ticketPk, static fn(\SCM\Commercial\Calls\CommercialCallsNotifier $notifier, array $task) => $notifier->taskReopened($ticketPk, $task, wp_strip_all_tags($message, true), \SCM\Core\Auth::user(), \SCM\Core\Auth::employeeId()));
+    $this->staffNotice($ticketPk, \SCM\Commercial\Calls\CommercialCallsNotifier::EVENT_REOPENED, 'Reabierta en ' . $status, $message);
+    JsonResponse::success(['message' => (string) ($result['message'] ?? 'Tarea activada.') . $notice, 'refresh' => true]);
   }
 
   /** @param array<string,mixed> $input */
@@ -855,6 +858,7 @@ final class CommercialApiController
     $notice = in_array($status, \SCM\Commercial\Calls\CommercialCallsNotifier::SILENT_CLOSURES, true)
       ? ''
       : $this->clientNotice($ticketPk, static fn(\SCM\Commercial\Calls\CommercialCallsNotifier $notifier, array $task) => $notifier->taskClosed($ticketPk, $task, $status, wp_strip_all_tags($message, true), \SCM\Core\Auth::user(), \SCM\Core\Auth::employeeId()));
+    $this->staffNotice($ticketPk, \SCM\Commercial\Calls\CommercialCallsNotifier::EVENT_CLOSED, 'Cerrada como ' . $status, $message);
     JsonResponse::success(['message' => 'Tarea cerrada como ' . $status . '.' . $notice, 'refresh' => true]);
   }
 
@@ -1431,6 +1435,22 @@ final class CommercialApiController
     } catch (\Throwable $exception) {
       error_log('[tareas:aviso-cliente] ' . $exception->getMessage());
       return ' No se pudo avisar al cliente.';
+    }
+  }
+
+  /**
+   * Aviso a funcionarios de postergar, cerrar o reabrir (CommercialCallsNotifier::taskMoved): el responsable si lo hizo otra
+   * persona y los marcados en el evento de Notificaciones internas. Un fallo no detiene la acción.
+   */
+  private function staffNotice(int $ticketPk, string $event, string $movement, string $message): void
+  {
+    try {
+      $task = $this->db->getRow('SELECT * FROM `' . $this->db->table('jet_cct_tickets') . '` WHERE `_ID` = ? LIMIT 1', [$ticketPk]);
+      if ($task !== null) {
+        (new \SCM\Commercial\Calls\CommercialCallsNotifier($this->db, $this->settings))->taskMoved($ticketPk, $task, $event, $movement, wp_strip_all_tags($message, true), \SCM\Core\Auth::user(), \SCM\Core\Auth::employeeId());
+      }
+    } catch (\Throwable $exception) {
+      error_log('[tareas:aviso-funcionarios] ' . $exception->getMessage());
     }
   }
 

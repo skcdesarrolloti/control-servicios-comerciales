@@ -27,6 +27,9 @@ final class CommercialInternalNotifications
         'llamada_tarea_creada' => ['label' => 'Tarea creada desde una llamada', 'description' => 'Copia del aviso de la tarea nueva. El responsable asignado la recibe siempre.', 'channel' => 'Correo y WhatsApp'],
         'llamada_respuesta_cliente' => ['label' => 'El cliente respondió una tarea', 'description' => 'Copia del mensaje que el cliente escribe desde su enlace. El responsable lo recibe siempre.', 'channel' => 'Correo y WhatsApp'],
         'tarea_seguimiento_registrado' => ['label' => 'Seguimiento registrado en una tarea', 'description' => 'Copia del seguimiento que se registra en una tarea. El responsable lo recibe siempre que lo registra otra persona; nadie recibe aviso de lo que registra él mismo.', 'channel' => 'Correo y WhatsApp'],
+        'tarea_postergada' => ['label' => 'Tarea postergada', 'description' => 'Hasta qué fecha y el motivo. El responsable lo recibe siempre que la posterga otra persona; nadie recibe aviso de lo que hace él mismo.', 'channel' => 'Correo y WhatsApp'],
+        'tarea_cerrada' => ['label' => 'Tarea cerrada', 'description' => 'El resultado del cierre (también Duplicado y Trasladado) y la observación. El responsable lo recibe siempre que la cierra otra persona; nadie recibe aviso de lo que hace él mismo.', 'channel' => 'Correo y WhatsApp'],
+        'tarea_reabierta' => ['label' => 'Tarea reabierta', 'description' => 'Una tarea postergada o cerrada que vuelve a gestión, con su estado y el motivo. El responsable lo recibe siempre que la reabre otra persona; nadie recibe aviso de lo que hace él mismo.', 'channel' => 'Correo y WhatsApp'],
       ],
     ],
     'precaptacion' => [

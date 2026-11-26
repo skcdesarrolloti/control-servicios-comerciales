@@ -438,13 +438,13 @@ final class CommercialTicketModalView
           <?php echo self::messageForm($pk, 'follow_up', 'Registrar gestión de seguimiento', 'Deja constancia de llamadas, acuerdos o gestiones comerciales realizadas. El cliente lo recibe por correo.', 'observacion', 'Describe detalladamente la gestión comercial efectuada…', 'Guardar seguimiento', false, true); ?>
         <?php endif; ?>
         <?php if ($policy->canAct('postergar')): ?>
-          <?php echo self::messageForm($pk, 'postpone', 'Postergar tarea', 'La tarea pasa a Postergado hasta la fecha que elijas: ese día a las 7:00 a. m. (o el siguiente día hábil si es domingo o festivo) vuelve sola a Nuevo y te llega un correo para retomarla. El cliente recibe el motivo y la fecha por correo y WhatsApp.', 'observacion', 'Indica el motivo o justificación de la postergación…', 'Postergar tarea', true, true, self::resumeField()); ?>
+          <?php echo self::messageForm($pk, 'postpone', 'Postergar tarea', 'La tarea pasa a Postergado hasta la fecha que elijas: ese día a las 7:00 a. m. (o el siguiente día hábil si es domingo o festivo) vuelve sola a Nuevo y te llega un correo para retomarla. El cliente recibe el motivo y la fecha por correo y WhatsApp, y se avisa a los funcionarios de Notificaciones internas.', 'observacion', 'Indica el motivo o justificación de la postergación…', 'Postergar tarea', true, true, self::resumeField()); ?>
         <?php endif; ?>
         <?php if ($policy->canAct('activar') && $isPostponedOrClosed): ?>
-          <?php echo self::statusMessageForm($pk, 'activate', 'Activar tarea', 'Selecciona el estado con el que retoma la gestión activa.', 'motivo', CommercialStatusCatalog::OPEN, 'Nuevo', 'Activar tarea ahora', false, true); ?>
+          <?php echo self::statusMessageForm($pk, 'activate', 'Activar tarea', 'Selecciona el estado con el que retoma la gestión activa. El cliente recibe el motivo por correo y WhatsApp, y se avisa a los funcionarios de Notificaciones internas.', 'motivo', CommercialStatusCatalog::OPEN, 'Nuevo', 'Activar tarea ahora', false, true); ?>
         <?php endif; ?>
         <?php if ($policy->canAct('cerrar')): ?>
-          <?php echo self::statusMessageForm($pk, 'close', 'Cerrar tarea', 'Selecciona el resultado final y registra las observaciones. El cliente las recibe por correo y WhatsApp, salvo en Duplicado y Trasladado.', 'observacion', CommercialStatusCatalog::CLOSED, 'Finalizado', 'Confirmar cierre de tarea', true); ?>
+          <?php echo self::statusMessageForm($pk, 'close', 'Cerrar tarea', 'Selecciona el resultado final y registra las observaciones. El cliente las recibe por correo y WhatsApp, salvo en Duplicado y Trasladado, y se avisa a los funcionarios de Notificaciones internas.', 'observacion', CommercialStatusCatalog::CLOSED, 'Finalizado', 'Confirmar cierre de tarea', true); ?>
         <?php endif; ?>
         <?php if ($policy->canAct('reasignar')): ?>
           <?php echo self::employeeForm($pk, $employees, (string) ($ticket['id_empleado'] ?? '')); ?>

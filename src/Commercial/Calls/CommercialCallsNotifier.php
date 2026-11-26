@@ -34,6 +34,13 @@ final class CommercialCallsNotifier
   public const TEMPLATE_CLOSED = 'scm_tarea_comercial_cerrada_v1';
   public const TEMPLATE_FOLLOW_UP = 'scm_tarea_comercial_seguimiento_v1';
   public const EVENT_FOLLOW_UP = 'tarea_seguimiento_registrado';
+  /** Al cliente cuando su tarea cerrada o postergada vuelve a gestión activa (Activar en el popup). */
+  public const TEMPLATE_REOPENED = 'scm_tarea_comercial_reabierta_v1';
+  /** A funcionarios cuando una tarea se posterga, se cierra o se reabre: una sola plantilla con el movimiento en una variable. */
+  public const TEMPLATE_STAFF_MOVED = 'scm_tarea_comercial_movimiento_v1';
+  public const EVENT_POSTPONED = 'tarea_postergada';
+  public const EVENT_CLOSED = 'tarea_cerrada';
+  public const EVENT_REOPENED = 'tarea_reabierta';
   /** Cierres que no se le cuentan al cliente: la gestión sigue en otra tarea o con otro responsable. */
   public const SILENT_CLOSURES = ['Duplicado', 'Trasladado'];
   /** Compartida con control-servicios-inmobiliarios: su botón es el dominio + {{1}} (SharedButtonUrl). */
@@ -233,6 +240,72 @@ final class CommercialCallsNotifier
     if (!$this->blocked($client, 'whatsapp')) {
       $this->whatsappTo(self::clientPhone($task), (string) ($task['indicativo'] ?? ''), self::TEMPLATE_CLOSED,
         [$task['solicitante'] ?? '', (string) $id, $text, self::contactLine($task)], PublicTaskAccess::reference($id), $key . ':whatsapp');
+    }
+  }
+
+  /**
+   * Activar en el popup (tarea postergada o cerrada que vuelve a gestión): al cliente le llegan correo y WhatsApp con el
+   * motivo y el contacto de su consultor/a (salvo el canal que haya bloqueado); vuelve a poder escribir en su enlace.
+   * @param array<string,mixed> $task
+   */
+  public function taskReopened(int $id, array $task, string $reason, string $author, string $employee = ''): void
+  {
+    $text = trim($reason);
+    if ($text === '') {
+      return;
+    }
+    $e = static fn($value): string => EmailTemplate::e((string) $value);
+    $key = 'llamadas:tarea:' . $id . ':reabierta:' . substr(hash('sha256', $text . '|' . date('YmdHi')), 0, 16);
+    $client = $this->clientPreferences($task);
+    if (!$this->blocked($client, 'email')) {
+      $staff = $this->repository->employee($employee) ?? [];
+      $this->send($task['correo_solicitante'] ?? '', 'Retomamos tu tarea #' . $id, 'Tarea retomada',
+        '<p>Estimado/a <strong>' . $e($task['solicitante'] ?? '') . '</strong>, <strong>' . $e($author !== '' ? $author : ($task['nombre_empleado'] ?? '')) . '</strong> retomó tu tarea <strong>#' . $id . '</strong>:</p>'
+        . '<blockquote style="margin:12px 0;padding:12px 16px;background:#f1f5f9;border-left:4px solid #1e3c76;">' . nl2br($e($text)) . '</blockquote>'
+        . '<p><strong>Su consultor/a asignado es</strong> ' . $e(self::contactLine($task)) . '.</p><p>Desde el botón puedes ver tu tarea y escribirnos.</p>',
+        $this->buttons(PublicTaskAccess::url($id), 'Ver y responder'), $key, trim((string) ($staff['correo'] ?? '')) ?: (string) ($task['correo_empleado'] ?? ''));
+    }
+    if (!$this->blocked($client, 'whatsapp')) {
+      $this->whatsappTo(self::clientPhone($task), (string) ($task['indicativo'] ?? ''), self::TEMPLATE_REOPENED,
+        [$task['solicitante'] ?? '', (string) $id, $text, self::contactLine($task)], PublicTaskAccess::reference($id), $key . ':whatsapp');
+    }
+  }
+
+  /**
+   * Postergar, cerrar o reabrir una tarea: aviso a funcionarios por correo y WhatsApp. El responsable lo recibe cuando lo
+   * hizo otra persona (como un coordinador) con su enlace individual; los marcados en el evento de Notificaciones internas
+   * (EVENT_POSTPONED, EVENT_CLOSED, EVENT_REOPENED), siempre. Quien lo hizo no recibe aviso de lo suyo.
+   * @param array<string,mixed> $task La tarea ya con su nuevo estado.
+   * @param string $movement Lo que pasó, en una línea ("Postergada hasta el …", "Cerrada como Ganado", "Reabierta en Contactado").
+   */
+  public function taskMoved(int $id, array $task, string $event, string $movement, string $detail, string $author, string $employee): void
+  {
+    $text = trim($detail) !== '' ? trim($detail) : 'Sin detalle';
+    $e = static fn($value): string => EmailTemplate::e((string) $value);
+    $employee = trim($employee);
+    $author = trim($author) !== '' ? trim($author) : 'Un funcionario';
+    $key = 'llamadas:tarea:' . $id . ':' . $event . ':' . substr(hash('sha256', $employee . '|' . $movement . '|' . $text . '|' . date('YmdHi')), 0, 16);
+    $people = array_values(array_filter($this->staff($task, $event), static fn(array $person): bool => $person['id'] !== '' && $person['id'] !== $employee));
+    $client = trim((string) ($task['solicitante'] ?? '')) ?: 'Sin nombre';
+    $body = '<p><strong>' . $e($author) . '</strong> actualizó la tarea comercial <strong>#' . $id . '</strong> del cliente <strong>' . $e($client) . '</strong>'
+      . (trim((string) ($task['nombre_empleado'] ?? '')) !== '' ? ', a cargo de <strong>' . $e($task['nombre_empleado']) . '</strong>' : '') . '.</p>'
+      . '<p><strong>Movimiento:</strong> ' . $e($movement) . '</p>'
+      . '<blockquote style="margin:12px 0;padding:12px 16px;background:#f1f5f9;border-left:4px solid #1e3c76;">' . nl2br($e($text)) . '</blockquote>';
+    $subject = $movement . ' · tarea #' . $id . ' · ' . $client;
+    $assigned = '';
+    foreach ($people as $person) {
+      if (!$person['copia']) {
+        $assigned = trim($person['correo']);
+        $this->send($assigned, $subject, 'Movimiento en una tarea', $body, $this->buttons(StaffTaskLink::url($id, $person['id']), 'Ver tarea'), $key);
+      }
+    }
+    $copies = array_values(array_diff(array_unique($this->copies($people)), [$assigned]));
+    if ($copies !== []) {
+      $this->send($copies, $subject, 'Movimiento en una tarea', $body, $this->buttons(self::panelUrl($id), 'Ver tarea'), $key . ':copias');
+    }
+    foreach ($people as $person) {
+      $this->whatsappTo($person['celular'], '57', self::TEMPLATE_STAFF_MOVED,
+        [$person['nombre'], $author, (string) $id, $client, $movement, $text], StaffTaskLink::reference($id, $person['id']), $key . ':whatsapp:' . $person['id']);
     }
   }
 

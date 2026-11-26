@@ -132,6 +132,46 @@ final class CommercialTaskWorkflowTest extends TestCase
     self::assertNotContains('+573000000101', array_column($log->whatsapp, 0));
   }
 
+  public function testPostponeCloseAndReopenNotifyTheConfiguredStaff(): void
+  {
+    $events = [CommercialCallsNotifier::EVENT_POSTPONED, CommercialCallsNotifier::EVENT_CLOSED, CommercialCallsNotifier::EVENT_REOPENED];
+    foreach ($events as $event) {
+      self::assertContains($event, \SCM\Commercial\CommercialInternalNotifications::events(), 'Se configura en Notificaciones internas: ' . $event);
+    }
+    (new \SCM\Commercial\CommercialInternalNotifications($this->db, new Settings($this->db)))->save([CommercialCallsNotifier::EVENT_CLOSED => ['404']]);
+
+    // La cierra la coordinación (303): al responsable con su enlace firmado y la copia a 404, por correo y WhatsApp.
+    [$notifier, $log] = $this->recorder();
+    $notifier->taskMoved(900, $this->task(), CommercialCallsNotifier::EVENT_CLOSED, 'Cerrada como Trasladado', 'Va en la tarea 901', 'Coordinación', '303');
+    self::assertSame(['101@example.test', ['404@example.test']], array_column($log->mail, 0), 'Duplicado o Trasladado también se avisa a funcionarios.');
+    self::assertStringContainsString('ticket_id=900.', $log->mail[0][2]);
+    self::assertStringContainsString('Cerrada como Trasladado', $log->mail[0][1]);
+    self::assertSame(['+573000000101', '+573000000404'], array_column($log->whatsapp, 0));
+    self::assertSame([CommercialCallsNotifier::TEMPLATE_STAFF_MOVED], array_values(array_unique(array_column($log->whatsapp, 1))));
+    self::assertSame(['Consultora Uno', 'Coordinación', '900', 'Laura Prueba', 'Cerrada como Trasladado', 'Va en la tarea 901'], array_column($log->whatsapp[0][2][0]['parameters'], 'text'));
+
+    // La posterga el mismo responsable sin nadie marcado: nadie recibe aviso.
+    [$notifier, $log] = $this->recorder();
+    $notifier->taskMoved(900, $this->task(), CommercialCallsNotifier::EVENT_POSTPONED, 'Postergada hasta el lunes 7 de diciembre de 2026', 'Viaja', 'Consultora Uno', '101');
+    self::assertSame([[], []], [$log->mail, $log->whatsapp]);
+
+    // Reabrir: el cliente recibe el motivo y el contacto de su consultor/a.
+    [$notifier, $log] = $this->recorder();
+    $notifier->taskReopened(900, $this->task(), 'El propietario regresó', 'Consultora Uno', '101');
+    self::assertSame(['laura@example.test'], array_column($log->mail, 0));
+    self::assertSame('Retomamos tu tarea #900', $log->mail[0][1]);
+    self::assertStringContainsString('tarea.php?t=900.', $log->mail[0][2]);
+    self::assertSame([CommercialCallsNotifier::TEMPLATE_REOPENED], array_column($log->whatsapp, 1));
+    self::assertSame(['Laura Prueba', '900', 'El propietario regresó', 'Consultora Uno · Correo: 101@example.test · Celular: 3000000101'], array_column($log->whatsapp[0][2][0]['parameters'], 'text'));
+    self::assertSame(900, PublicTaskAccess::verify(end($log->whatsapp[0][2])['parameters'][0]['text']));
+
+    // Las tres acciones del controlador avisan a funcionarios con su evento.
+    $source = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Http/Controller/CommercialApiController.php');
+    foreach (['EVENT_POSTPONED', 'EVENT_CLOSED', 'EVENT_REOPENED'] as $constant) {
+      self::assertStringContainsString('$this->staffNotice($ticketPk, \SCM\Commercial\Calls\CommercialCallsNotifier::' . $constant, $source);
+    }
+  }
+
   public function testStatusChangeIsAnInternalNoteNotAClientReply(): void
   {
     $before = (int) $this->db->getVar('SELECT COUNT(*) FROM wp_jet_cct_historial_del_ticket');
