@@ -755,6 +755,13 @@ final class CommercialCallsTest extends TestCase
     self::assertStringContainsString('enctype="multipart/form-data"', $html);
     self::assertStringContainsString('name="imagenes[]"', $html);
     self::assertStringContainsString('name="archivos[]"', $html);
+    // WhatsApp directo a su consultor/a, con la tarea en el mensaje, y un botón a lo más reciente (la última entrada).
+    self::assertStringContainsString('href="https://wa.me/573000000101?text=Hola%20Consultora%20Uno%2C%20le%20escribo%20por%20mi%20tarea%20%23' . $id . '%20', $html);
+    self::assertStringContainsString('<a href="#ptk-ultima" class="ptk-ghost ptk-jump">Ver última actualización</a>', $html);
+    self::assertSame(1, substr_count($html, 'id="ptk-ultima"'));
+    self::assertMatchesRegularExpression('/<li class="ptk-entry is-external is-latest" id="ptk-ultima">.*?Puedo el lunes/s', $html, 'Lo más reciente es la última entrada.');
+    $single = PublicTaskView::render(\SCM\Commercial\Calls\PublicTaskData::fromTicket($task), [$history[0]], 'x', self::assets());
+    self::assertStringNotContainsString('ptk-jump', $single, 'Con una sola entrada no hace falta el botón.');
     $this->db->update('wp_jet_cct_tickets', ['estado_comercial' => CommercialStatusCatalog::statusesForBucket('cerrados')[0]], ['_ID' => $id]);
     $closed = PublicTaskView::render(\SCM\Commercial\Calls\PublicTaskData::fromTicket($conversation->task($id)), [], 'x', self::assets(), '', false, '', false);
     self::assertStringNotContainsString('name="mensaje"', $closed);

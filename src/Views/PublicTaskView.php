@@ -20,6 +20,23 @@ final class PublicTaskView
   }
 
   /**
+   * Botón para escribirle por WhatsApp al consultor/a asignado, con un mensaje que nombra la tarea. Sin celular válido no sale.
+   * @param array{id:int,consultor:string,celular_consultor:string} $task
+   */
+  private static function whatsappButton(array $task): string
+  {
+    $phone = ltrim(\SCM\Commercial\Calls\CommercialCallsNotifier::phone($task['celular_consultor']), '+');
+    if ($phone === '') {
+      return '';
+    }
+    $name = trim($task['consultor']);
+    $text = 'Hola' . ($name !== '' ? ' ' . $name : '') . ', le escribo por mi tarea #' . $task['id'] . ' de SKC SuCasa Inmobiliaria.';
+    return '<a class="ptk-whatsapp" href="' . self::e('https://wa.me/' . $phone . '?text=' . rawurlencode($text)) . '" target="_blank" rel="noopener">'
+      . '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.2-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.8 11.9 11.9 0 0 0 4.6 4c1.7.7 2.4.8 3.2.7.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.5-.3Z"/></svg>'
+      . 'Escribir a mi consultor/a por WhatsApp</a>';
+  }
+
+  /**
    * @param array{id:int,asunto:string,motivo:string,estado:string,inmueble:string,fecha:string,solicitante:string,consultor:string,celular_consultor:string,correo_consultor:string}|null $task
    * @param list<array{author:string,date:string,text:string,external:bool,images:list<string>,documents:list<array{url:string,name:string}>}> $history
    * @param array{css?:string,js?:string,loader_css?:string,loader_js?:string,logo?:string,favicon?:string} $assets
@@ -62,15 +79,19 @@ final class PublicTaskView
         $html .= '<div><dt>' . $label . '</dt><dd>' . $e($value) . '</dd></div>';
       }
     }
-    $html .= '</dl></section>';
+    $html .= '</dl>' . self::whatsappButton($task) . '</section>';
 
-    $html .= '<section class="ptk-history" aria-labelledby="ptk-history-title"><h2 id="ptk-history-title" class="ptk-title">Historial de la tarea</h2>';
+    // Lo más reciente queda al final del historial: con más de una entrada, un botón lleva directo allá.
+    $html .= '<section class="ptk-history" aria-labelledby="ptk-history-title"><div class="ptk-history-head"><h2 id="ptk-history-title" class="ptk-title">Historial de la tarea</h2>'
+      . (count($history) > 1 ? '<a href="#ptk-ultima" class="ptk-ghost ptk-jump">Ver última actualización</a>' : '') . '</div>';
     if ($history === []) {
       $html .= '<p class="ptk-muted">Aún no hay respuestas registradas en esta tarea. Puedes escribirnos abajo.</p>';
     } else {
       $html .= '<ol class="ptk-timeline">';
-      foreach ($history as $entry) {
-        $html .= '<li class="ptk-entry' . ($entry['external'] ? ' is-external' : '') . '"><p class="ptk-entry-head"><b>' . $e($entry['author']) . '</b>'
+      $last = count($history) - 1;
+      foreach ($history as $index => $entry) {
+        $latest = $index === $last;
+        $html .= '<li class="ptk-entry' . ($entry['external'] ? ' is-external' : '') . ($latest ? ' is-latest' : '') . '"' . ($latest ? ' id="ptk-ultima"' : '') . '><p class="ptk-entry-head"><b>' . $e($entry['author']) . ($latest ? ' <em class="ptk-latest-tag">Lo más reciente</em>' : '') . '</b>'
           . ($entry['date'] !== '' ? '<span>' . $e($entry['date']) . '</span>' : '') . '</p>';
         if ($entry['text'] !== '') {
           $html .= '<p class="ptk-entry-text">' . $e($entry['text']) . '</p>';

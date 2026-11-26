@@ -1,6 +1,7 @@
 /* Vista pública de una tarea (public/tarea.php, PublicTaskView). Copia adaptada de
    control-servicios-inmobiliarios/public/assets/css/public-case.css: mantener ambas iguales. */
 :root { color-scheme:light; --navy:#061d49; --blue:#1e3c76; --orange:#f59120; --line:#e2e8f0; --ink:#0f172a; --text:#334155; --muted:#64748b; }
+html { scroll-behavior:smooth; }
 * { box-sizing:border-box; }
 body.ptk { margin:0; background:#f1f5f9; color:var(--ink); font-family:Poppins,Arial,sans-serif; line-height:1.5; }
 .ptk-main { min-height:100vh; display:flex; justify-content:center; align-items:flex-start; padding:16px; }
@@ -74,6 +75,15 @@ body.ptk { margin:0; background:#f1f5f9; color:var(--ink); font-family:Poppins,A
 .ptk-timeline { list-style:none; margin:.875rem 0 0; padding:0; display:flex; flex-direction:column; gap:.75rem; }
 .ptk-entry { border:1px solid var(--line); border-left:4px solid var(--navy); border-radius:.75rem; background:#fff; padding:.75rem 1rem; min-width:0; break-inside:avoid; }
 .ptk-entry.is-external { border-left-color:var(--orange); background:#fffaf3; }
+.ptk-history-head { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:.5rem; }
+.ptk-entry.is-latest { scroll-margin-top:1rem; box-shadow:0 0 0 2px rgb(245 145 32 / .25); }
+.ptk-entry:target { box-shadow:0 0 0 3px var(--orange); }
+.ptk-latest-tag { margin-left:.5rem; border-radius:999px; background:#fff7ed; padding:.125rem .5rem; font-size:.6875rem; font-style:normal; font-weight:600; color:#b45309; }
+.ptk-whatsapp { display:inline-flex; align-items:center; gap:.5rem; margin-top:1rem; border-radius:.625rem; background:#1f9d55; padding:.625rem 1rem; font-size:.875rem; font-weight:600; color:#fff; text-decoration:none; }
+.ptk-whatsapp:hover { background:#17834a; }
+.ptk-whatsapp:focus-visible, .ptk-jump:focus-visible { outline:2px solid var(--orange); outline-offset:2px; }
+.ptk-whatsapp svg { width:1.125rem; height:1.125rem; fill:currentColor; }
+.ptk-jump { text-decoration:none; }
 .ptk-entry-head { display:flex; flex-wrap:wrap; justify-content:space-between; gap:.25rem .75rem; margin:0; font-size:.8125rem; color:var(--ink); }
 .ptk-entry-head span { font-size:.75rem; color:var(--muted); }
 .ptk-entry-text { margin:.5rem 0 0; white-space:pre-wrap; overflow-wrap:anywhere; font-size:.875rem; line-height:1.55; color:var(--text); }
@@ -98,7 +108,7 @@ body.ptk { margin:0; background:#f1f5f9; color:var(--ink); font-family:Poppins,A
   .ptk-head { padding:8px; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   .ptk-logo { width:130px; height:36px; }
   .ptk-body { padding:8px; gap:12px; }
-  .ptk-reply, .ptk-alert, .ptk-head-actions, .ptk-preview, [data-preview="pdf"] { display:none !important; }
+  .ptk-reply, .ptk-alert, .ptk-head-actions, .ptk-preview, .ptk-whatsapp, .ptk-jump, .ptk-latest-tag, [data-preview="pdf"] { display:none !important; }
   .ptk-timeline { gap:6px; margin-top:6px; }
   .ptk-entry { padding:6px 8px; border-radius:6px; page-break-inside:avoid; }
   .ptk-entry-text { margin-top:3px; font-size:9pt; line-height:1.35; }
