@@ -378,6 +378,7 @@ final class CommercialCalendarApiTest extends TestCase
     $this->api('13', '300');
     $service = new CommercialSettingsService($this->db, $this->settings, new CommercialAccessPolicy($this->settings, $this->db, ['13']), []);
     $base = ['cargo_ids' => ['9'], 'category_ids' => ['3'], 'available_category_ids' => ['3', '8', '50']];
+    $this->db->update('categorias_calendario', ['descripcion' => 'Del panel administrativo', 'roles_notificar' => '100'], ['id' => 8]);
 
     try {
       $service->save('calendario', $base + ['deleted_category_ids' => ['3'], 'categories' => []]);
@@ -390,13 +391,17 @@ final class CommercialCalendarApiTest extends TestCase
     $service->save('calendario', $base + [
       'deleted_category_ids' => ['50'],
       'categories' => [
-        ['id' => '3', 'nombre' => 'Cita con cliente', 'color' => '#112233', 'comercial' => true],
+        ['id' => '3', 'nombre' => 'Cita con cliente', 'color' => '#112233', 'comercial' => true, 'notificar' => ['300', '999', '300']],
+        ['id' => '8', 'nombre' => 'Mantenimiento', 'color' => '#0D4715', 'comercial' => false],
         ['id' => '', 'nombre' => 'Feria', 'color' => '#445566', 'comercial' => true],
       ],
       'report_cargo_ids' => ['9', '13'],
       'cita_category_id' => '3',
     ]);
     self::assertSame('#112233', $this->db->getVar('SELECT color FROM categorias_calendario WHERE id = 3'));
+    self::assertSame('300', $this->db->getVar('SELECT roles_notificar FROM categorias_calendario WHERE id = 3'), 'Notificar a guarda solo funcionarios que existen, sin repetir.');
+    self::assertSame('Del panel administrativo', $this->db->getVar('SELECT descripcion FROM categorias_calendario WHERE id = 8'), 'Sin descripción en la fila se conserva la que tenía.');
+    self::assertSame('100', $this->db->getVar('SELECT roles_notificar FROM categorias_calendario WHERE id = 8'), 'Sin Notificar a en la fila se conserva el que tenía.');
     self::assertNull($this->db->getVar('SELECT id FROM categorias_calendario WHERE id = 50'));
     $feria = (string) $this->db->getVar("SELECT id FROM categorias_calendario WHERE nombre = 'Feria'");
     $loaded = $service->load('calendario')['calendario'];
@@ -404,9 +409,28 @@ final class CommercialCalendarApiTest extends TestCase
     self::assertArrayNotHasKey('notifications', $loaded, 'Los avisos del calendario no se configuran: siempre salen.');
     self::assertSame(['9', '13'], $loaded['report_cargo_ids']);
     self::assertSame('3', $loaded['cita_category_id']);
+    self::assertSame(['100', '300', '200'], array_column($loaded['employees'], 'id'), 'Notificar a ofrece los funcionarios activos, por nombre.');
 
     $this->expectException(\InvalidArgumentException::class);
     $service->save('calendario', $base + ['categories' => [['id' => '', 'nombre' => 'feria', 'color' => '#000000']]]);
+  }
+
+  public function testNewEventEmailCopiesTheCategoryNotifyList(): void
+  {
+    $this->api('13', '300');
+    $this->db->update('categorias_calendario', ['roles_notificar' => '200, 300'], ['id' => 3]);
+    $mailer = new class(new CalendarStore($this->db), [], new SharedNotificationsBridge($this->db, 'C:/no-existe')) extends CalendarMailer {
+      /** @var array<int,array<int,string>> */
+      public array $sent = [];
+      protected function sendEmail(array $destinations, string $subject, string $title, string $body, string $module, string $dedupe, array $meta): void
+      {
+        $this->sent[] = $destinations;
+      }
+    };
+    $mailer->newEvent(['id_empleado' => '100', 'titulo' => 'Visita', 'fecha_inicio' => '2030-01-02 09:00:00', 'fecha_fin' => '2030-01-02 10:00:00', 'id_categoria' => 3, 'notificar_funcionarios' => ['300']], 99);
+    $to = $mailer->sent[0];
+    sort($to);
+    self::assertSame(['ana@skc.test', 'g@skc.test', 'luis@skc.test'], $to);
   }
 
   public function testNonAdminCannotConfigure(): void

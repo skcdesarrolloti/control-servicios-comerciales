@@ -86,15 +86,45 @@
     }).join("") + "</div>";
   }
 
+  // Funcionarios activos para "Notificar a" de cada categoría (los llena la sección Calendario al abrir).
+  var calendarEmployees = [];
+
+  function notifyIds(row) {
+    return String(row.roles_notificar || "").split(",").map(function (id) { return id.trim(); }).filter(Boolean);
+  }
+
+  // Fila desplegable bajo la categoría con los funcionarios que reciben copia de sus avisos (roles_notificar).
+  function categoryNotifyRowHtml(row) {
+    var selected = notifyIds(row);
+    var checks = calendarEmployees.map(function (employee) {
+      return '<label class="flex items-center gap-2 px-2 py-1 rounded-lg text-xs cursor-pointer hover:bg-surface-container-low" data-employee-name="' + esc(String(employee.nombre || "").toLowerCase()) + '">' +
+        '<input type="checkbox" data-category-notify value="' + esc(employee.id) + '"' + (selected.indexOf(String(employee.id)) !== -1 ? " checked" : "") + ' class="rounded text-primary">' +
+        '<span class="text-on-surface">' + esc(employee.nombre) + "</span></label>";
+    }).join("");
+    return '<tr data-category-notify-row hidden><td colspan="6" class="px-2 pb-2"><div class="bg-surface-container-low rounded-xl p-2 border border-surface-container">' +
+      '<input type="search" data-category-notify-filter class="w-full sm:w-72 mb-2 px-2 py-1.5 rounded-lg border border-outline-variant/40 text-sm" placeholder="Buscar funcionario" aria-label="Buscar funcionario">' +
+      (checks ? '<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-0.5 max-h-48 overflow-y-auto">' + checks + "</div>" : '<p class="text-xs text-secondary">No hay funcionarios activos.</p>') +
+      "</div></td></tr>";
+  }
+
+  function categoryNotifyLabel(count) {
+    return count ? count + (count === 1 ? " funcionario" : " funcionarios") : "Nadie más";
+  }
+
   function categoryRowHtml(row, enabled) {
     var id = String(row.id || "");
     var events = Number(row.eventos || 0);
+    var notifyCount = notifyIds(row).filter(function (employeeId) {
+      return calendarEmployees.some(function (employee) { return String(employee.id) === employeeId; });
+    }).length;
     return '<tr data-category-row data-id="' + esc(id) + '">' +
       '<td class="py-1.5 px-2 text-center"><input type="checkbox" name="category_ids" value="' + esc(id) + '"' + (enabled ? " checked" : "") + ' aria-label="Usar en comercial"></td>' +
       '<td class="py-1.5 px-2"><input type="color" data-field="color" value="' + esc(/^#[0-9a-fA-F]{6}$/.test(String(row.color || "")) ? row.color : "#1e3c76") + '" class="w-8 h-8 rounded border border-outline-variant/40 cursor-pointer" aria-label="Color"></td>' +
       '<td class="py-1.5 px-2"><input data-field="nombre" value="' + esc(row.nombre || "") + '" maxlength="100" required class="w-full px-2 py-1.5 rounded-lg border border-outline-variant/40 text-sm" aria-label="Nombre"></td>' +
+      '<td class="py-1.5 px-2"><button type="button" data-category-notify-toggle aria-expanded="false" class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-surface-container text-xs font-semibold text-on-surface whitespace-nowrap"><span class="material-symbols-outlined text-[16px]" aria-hidden="true">notifications</span><span data-category-notify-count>' + categoryNotifyLabel(notifyCount) + "</span></button></td>" +
       '<td class="py-1.5 px-2 text-right text-xs text-secondary whitespace-nowrap">' + events + "</td>" +
-      '<td class="py-1.5 px-2 text-right">' + (events > 0 ? "" : '<button type="button" data-category-remove class="px-2 py-1 rounded-lg text-xs font-semibold text-rose-700 hover:bg-rose-50">Eliminar</button>') + "</td></tr>";
+      '<td class="py-1.5 px-2 text-right">' + (events > 0 ? "" : '<button type="button" data-category-remove class="px-2 py-1 rounded-lg text-xs font-semibold text-rose-700 hover:bg-rose-50">Eliminar</button>') + "</td></tr>" +
+      categoryNotifyRowHtml(row);
   }
   var sections = {
     calendario: {
@@ -103,6 +133,7 @@
         var data = { settings: settings };
         var current = (settings.category_ids || []).map(String);
         var categories = settings.categories || [];
+        calendarEmployees = settings.employees || [];
         var reportCargos = (settings.report_cargo_ids || []).map(String);
         var citaCategory = String(settings.cita_category_id || "");
         var cargos = (data.settings.cargo_options || []).map(function (row) {
@@ -111,11 +142,11 @@
         var selectedCargos = (data.settings.cargo_ids || []).map(String);
         return '<form data-config-form class="text-left space-y-4">' +
           "<section>" + '<h4 class="text-sm font-bold text-on-surface mb-1">Categorías del calendario</h4>' +
-          intro("Marca las que se usan en comercial: solo esas salen al crear y agendar. Los nombres y colores son compartidos con el panel administrativo. Una categoría con eventos no se puede eliminar.") +
+          intro("Marca las que se usan en comercial: solo esas salen al crear y agendar. Nombres, colores y <strong>Notificar a</strong> son compartidos con el panel administrativo: al crear un evento se avisa por correo al responsable y a los funcionarios de Notificar a de su categoría. Una categoría con eventos no se puede eliminar.") +
           (categories.length
             ? '<div class="flex gap-2 mb-2"><button type="button" class="px-3 py-1 rounded-lg bg-surface-container text-xs font-semibold" data-toggle-all="category_ids" data-value="1">Marcar todas</button><button type="button" class="px-3 py-1 rounded-lg bg-surface-container text-xs font-semibold" data-toggle-all="category_ids" data-value="0">Quitar todas</button></div>'
             : '<p class="text-sm text-rose-700 mb-2">No se pudieron consultar las categorías del calendario.</p>') +
-          '<div class="max-h-[34vh] overflow-y-auto border border-surface-container rounded-xl"><table class="w-full text-sm text-left"><thead><tr class="text-[11px] uppercase tracking-wider text-secondary border-b border-surface-container"><th class="py-2 px-2 text-center">Comercial</th><th class="py-2 px-2">Color</th><th class="py-2 px-2">Nombre</th><th class="py-2 px-2 text-right">Eventos</th><th></th></tr></thead><tbody data-category-rows class="divide-y divide-surface-container">' +
+          '<div class="max-h-[34vh] overflow-y-auto border border-surface-container rounded-xl"><table class="w-full text-sm text-left"><thead><tr class="text-[11px] uppercase tracking-wider text-secondary border-b border-surface-container"><th class="py-2 px-2 text-center">Comercial</th><th class="py-2 px-2">Color</th><th class="py-2 px-2">Nombre</th><th class="py-2 px-2">Notificar a</th><th class="py-2 px-2 text-right">Eventos</th><th></th></tr></thead><tbody data-category-rows class="divide-y divide-surface-container">' +
           categories.map(function (row) { return categoryRowHtml(row, !current.length || current.indexOf(String(row.id)) !== -1); }).join("") +
           "</tbody></table></div>" +
           '<button type="button" data-category-add class="mt-2 px-3 py-1.5 rounded-lg bg-[#1E3C76] text-white text-xs font-semibold">Agregar categoría</button>' +
@@ -145,6 +176,7 @@
             nombre: row.querySelector('[data-field="nombre"]').value,
             color: row.querySelector('[data-field="color"]').value,
             comercial: row.querySelector('[name="category_ids"]').checked,
+            notificar: Array.prototype.slice.call(row.nextElementSibling.querySelectorAll("[data-category-notify]:checked")).map(function (input) { return input.value; }),
           };
         });
         var existing = function (list) { return list.filter(Boolean); };
@@ -163,11 +195,19 @@
         var body = popup.querySelector("[data-category-rows]");
         popup.querySelector("[data-category-add]").addEventListener("click", function () {
           body.insertAdjacentHTML("beforeend", categoryRowHtml({ id: "", color: "#1e3c76", nombre: "", eventos: 0 }, true));
-          var input = body.querySelector("tr:last-child [data-field='nombre']");
+          var rows = body.querySelectorAll("[data-category-row]");
+          var input = rows[rows.length - 1].querySelector("[data-field='nombre']");
           input.focus();
           input.scrollIntoView({ block: "nearest" });
         });
         body.addEventListener("click", function (event) {
+          var toggle = event.target.closest("[data-category-notify-toggle]");
+          if (toggle) {
+            var detail = toggle.closest("[data-category-row]").nextElementSibling;
+            detail.hidden = !detail.hidden;
+            toggle.setAttribute("aria-expanded", detail.hidden ? "false" : "true");
+            return;
+          }
           var button = event.target.closest("[data-category-remove]");
           if (!button) return;
           var row = button.closest("[data-category-row]");
@@ -175,7 +215,20 @@
           if (!window.confirm("¿Eliminar " + name + "? Se aplica al guardar.")) return;
           var id = row.getAttribute("data-id");
           if (id) form.setAttribute("data-deleted-categories", [form.getAttribute("data-deleted-categories"), id].filter(Boolean).join(","));
+          if (row.nextElementSibling && row.nextElementSibling.hasAttribute("data-category-notify-row")) row.nextElementSibling.remove();
           row.remove();
+        });
+        body.addEventListener("change", function (event) {
+          if (!event.target.matches("[data-category-notify]")) return;
+          var detail = event.target.closest("[data-category-notify-row]");
+          detail.previousElementSibling.querySelector("[data-category-notify-count]").textContent = categoryNotifyLabel(detail.querySelectorAll("[data-category-notify]:checked").length);
+        });
+        body.addEventListener("input", function (event) {
+          if (!event.target.matches("[data-category-notify-filter]")) return;
+          var term = event.target.value.trim().toLowerCase();
+          event.target.closest("[data-category-notify-row]").querySelectorAll("[data-employee-name]").forEach(function (label) {
+            label.classList.toggle("hidden", term !== "" && label.getAttribute("data-employee-name").indexOf(term) < 0);
+          });
         });
       },
       after: function (settings) {

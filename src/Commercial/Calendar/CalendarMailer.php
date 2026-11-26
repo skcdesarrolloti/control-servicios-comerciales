@@ -227,11 +227,16 @@ class CalendarMailer
     }
   }
 
-  /** @param array<string,mixed> $event @return array<int,string> */
+  /**
+   * Responsable más los funcionarios de "Notificar a" de la categoría (Configuración › Calendario comercial, compartido con
+   * el panel administrativo) y los elegidos en el formulario, como en calendario/backend/helpers/email.php.
+   * @param array<string,mixed> $event @return array<int,string>
+   */
   private function withExtras(string $main, array $event): array
   {
     $emails = [$main];
-    foreach (is_array($event['notificar_funcionarios'] ?? null) ? $event['notificar_funcionarios'] : [] as $id) {
+    $extra = array_merge($this->store->categoryNotifyIds((int) ($event['id_categoria'] ?? 0)), is_array($event['notificar_funcionarios'] ?? null) ? $event['notificar_funcionarios'] : []);
+    foreach (array_unique(array_map('strval', $extra)) as $id) {
       $emails[] = (string) ($this->store->employee((string) $id)['correo'] ?? '');
     }
     return $emails;

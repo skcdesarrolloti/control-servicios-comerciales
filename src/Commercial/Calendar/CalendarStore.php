@@ -55,10 +55,10 @@ final class CalendarStore
   public function categoriesWithUsage(): array
   {
     return $this->db->getResults(
-      'SELECT c.`id`, c.`nombre`, c.`color`, c.`descripcion`, COUNT(e.`id`) AS eventos
+      'SELECT c.`id`, c.`nombre`, c.`color`, c.`descripcion`, c.`roles_notificar`, COUNT(e.`id`) AS eventos
          FROM `' . self::CATEGORIES . '` c
          LEFT JOIN `' . self::EVENTS . '` e ON e.`id_categoria` = c.`id`
-        GROUP BY c.`id`, c.`nombre`, c.`color`, c.`descripcion`
+        GROUP BY c.`id`, c.`nombre`, c.`color`, c.`descripcion`, c.`roles_notificar`
         ORDER BY c.`nombre` ASC'
     );
   }
@@ -66,7 +66,7 @@ final class CalendarStore
   /** @return array<string,mixed>|null */
   public function category(int $id): ?array
   {
-    return $this->db->getRow('SELECT `id`, `nombre`, `color`, `descripcion` FROM `' . self::CATEGORIES . '` WHERE `id` = ?', [$id]);
+    return $this->db->getRow('SELECT `id`, `nombre`, `color`, `descripcion`, `roles_notificar` FROM `' . self::CATEGORIES . '` WHERE `id` = ?', [$id]);
   }
 
   public function categoryEventCount(int $id): int
@@ -79,15 +79,34 @@ final class CalendarStore
     return (int) $this->db->getVar('SELECT COUNT(*) FROM `' . self::CATEGORIES . '` WHERE LOWER(`nombre`) = LOWER(?) AND `id` <> ?', [$name, $exceptId]) > 0;
   }
 
-  public function insertCategory(string $name, string $color, string $description): int
+  /** @param array<int,string> $notify IDs de funcionarios que reciben copia de los avisos (`roles_notificar`). */
+  public function insertCategory(string $name, string $color, string $description, array $notify = []): int
   {
-    $this->db->insert(self::CATEGORIES, ['nombre' => $name, 'color' => $color, 'descripcion' => $description]);
+    $this->db->insert(self::CATEGORIES, ['nombre' => $name, 'color' => $color, 'descripcion' => $description, 'roles_notificar' => implode(',', $notify)]);
     return (int) $this->db->lastInsertId();
   }
 
-  public function updateCategory(int $id, string $name, string $color, string $description): void
+  /**
+   * La descripción y "Notificar a" se editan también en el panel administrativo: null = no se cambian.
+   * @param array<int,string>|null $notify
+   */
+  public function updateCategory(int $id, string $name, string $color, ?string $description, ?array $notify = null): void
   {
-    $this->db->update(self::CATEGORIES, ['nombre' => $name, 'color' => $color, 'descripcion' => $description], ['id' => $id]);
+    $data = ['nombre' => $name, 'color' => $color];
+    if ($description !== null) {
+      $data['descripcion'] = $description;
+    }
+    if ($notify !== null) {
+      $data['roles_notificar'] = implode(',', $notify);
+    }
+    $this->db->update(self::CATEGORIES, $data, ['id' => $id]);
+  }
+
+  /** @return array<int,string> IDs de funcionarios en "Notificar a" de la categoría. */
+  public function categoryNotifyIds(int $id): array
+  {
+    $raw = $id > 0 ? (string) ($this->db->getVar('SELECT `roles_notificar` FROM `' . self::CATEGORIES . '` WHERE `id` = ?', [$id]) ?? '') : '';
+    return array_values(array_unique(array_filter(array_map('trim', explode(',', $raw)), static fn(string $employee): bool => $employee !== '')));
   }
 
   public function deleteCategory(int $id): void

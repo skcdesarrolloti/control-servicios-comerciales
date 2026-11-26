@@ -82,14 +82,22 @@ async function closeSwal(page) {
   await page.locator('[data-config-form] [name="category_ids"]').first().waitFor();
   assert(await page.locator('[data-category-row][data-id="3"] [data-category-remove]').count() === 0, 'Una categoría con eventos se puede eliminar');
   assert(await page.locator('[data-category-row][data-id="12"] [data-category-remove]').count() === 1, 'Una categoría sin eventos no ofrece Eliminar');
+  // Notificar a: cada categoría despliega los funcionarios activos que reciben copia de sus avisos.
+  await page.locator('[data-category-row][data-id="3"] [data-category-notify-toggle]').click();
+  const notifyRow = page.locator('[data-category-row][data-id="3"] + [data-category-notify-row]');
+  assert(await notifyRow.isVisible(), 'Notificar a no despliega los funcionarios');
+  await notifyRow.locator('[data-category-notify]').first().check();
+  assert(/1 funcionario/.test(await page.locator('[data-category-row][data-id="3"] [data-category-notify-count]').textContent()), 'El conteo de Notificar a no se actualiza');
   await page.locator('[data-category-add]').click();
-  await page.locator('[data-category-rows] tr:last-child [data-field="nombre"]').fill('Feria inmobiliaria');
+  const newCategory = page.locator('[data-category-rows] [data-category-row]').last();
+  await newCategory.locator('[data-field="nombre"]').fill('Feria inmobiliaria');
   const categorySave = page.waitForResponse(response => response.request().method() === 'POST' && (response.request().postData() || '').includes('commercial_settings_save'));
   await page.locator('[data-toggle-all="category_ids"][data-value="0"]').click();
   await page.locator('[name="category_ids"][value="3"]').check();
   await page.locator('[name="category_ids"][value="26"]').check();
-  await page.locator('[data-category-rows] tr:last-child [name="category_ids"]').check();
+  await newCategory.locator('[name="category_ids"]').check();
   await page.locator('.swal2-confirm').click();
+  assert(/"id":"3"[^}]*"notificar":\["[^"]+"\]/.test((await categorySave).request().postData() || ''), 'No se envía Notificar a de la categoría');
   const savedCategories = ((await (await categorySave).json()).data.settings || {}).calendario || {};
   assert((savedCategories.categories || []).some(row => row.nombre === 'Feria inmobiliaria'), 'La categoría nueva no quedó guardada');
   assert((savedCategories.category_ids || []).length === 3, 'La categoría nueva no quedó habilitada para comercial');

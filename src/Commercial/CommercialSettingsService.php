@@ -114,6 +114,7 @@ final class CommercialSettingsService
       'calendario' => [
         'category_ids' => $calendar->categoryIds(),
         'categories' => $this->calendarCategories(),
+        'employees' => $section === 'calendario' ? (new CommercialInternalNotifications($this->db, $this->settings))->employees() : [],
         'cita_category_id' => $calendar->citaCategoryId(),
         'report_cargo_ids' => $this->ids($this->systemValue(CalendarCommercialReport::CARGOS_SETTING) ?? []),
         'cargo_ids' => $calendar->calendarCargos(),
@@ -518,6 +519,8 @@ final class CommercialSettingsService
     }
     $clean = [];
     $names = [];
+    // "Notificar a" solo guarda IDs de funcionarios que existen; un ID desconocido no recibiría el correo.
+    $known = array_fill_keys(array_map('strval', $this->db->getCol('SELECT `id_empleado` FROM `' . $this->db->table('jet_cct_funcionarios') . "` WHERE `id_empleado` IS NOT NULL AND `id_empleado` <> ''")), true);
     foreach ($rows as $row) {
       if (!is_array($row)) {
         continue;
@@ -536,14 +539,18 @@ final class CommercialSettingsService
         throw new \InvalidArgumentException('Ya existe una categoría llamada "' . $name . '".');
       }
       $names[$key] = true;
-      $clean[] = ['id' => $id, 'nombre' => $name, 'color' => $color, 'descripcion' => trim((string) ($row['descripcion'] ?? '')), 'comercial' => !empty($row['comercial'])];
+      $notify = null;
+      if (is_array($row['notificar'] ?? null)) {
+        $notify = array_values(array_unique(array_filter(array_map(static fn($employee): string => trim((string) $employee), $row['notificar']), static fn(string $employee): bool => isset($known[$employee]))));
+      }
+      $clean[] = ['id' => $id, 'nombre' => $name, 'color' => $color, 'descripcion' => array_key_exists('descripcion', $row) ? trim((string) $row['descripcion']) : null, 'comercial' => !empty($row['comercial']), 'notificar' => $notify];
     }
     foreach ($clean as $row) {
       if ($row['id'] > 0) {
-        $store->updateCategory($row['id'], $row['nombre'], $row['color'], $row['descripcion']);
+        $store->updateCategory($row['id'], $row['nombre'], $row['color'], $row['descripcion'], $row['notificar']);
         continue;
       }
-      $id = (string) $store->insertCategory($row['nombre'], $row['color'], $row['descripcion']);
+      $id = (string) $store->insertCategory($row['nombre'], $row['color'], $row['descripcion'] ?? '', $row['notificar'] ?? []);
       $available[] = $id;
       if ($row['comercial']) {
         $enabled[] = $id;
