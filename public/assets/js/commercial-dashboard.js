@@ -788,6 +788,7 @@
       "fecha_desde",
       "fecha_hasta",
       "sla_filter",
+      "orden",
       "property_subtab",
       "precaptaciones_estado_contacto", "precaptaciones_agenda", "precaptaciones_pendientes", "precaptaciones_id", "abrir",
       "tipo_inmueble",
@@ -2192,6 +2193,12 @@
   });
 
   root.addEventListener("change", function (event) {
+    // Ordenar (barra de la tabla de tareas): recarga el listado al elegir.
+    var sortForm = event.target.closest("[data-commercial-sort-form]");
+    if (sortForm && event.target.matches('select[name="orden"]')) {
+      sortForm.requestSubmit();
+      return;
+    }
     var form = event.target.closest("[data-commercial-global-filter-form]");
     if (form && event.target.matches('select[name="id_empleado"]')) {
       form.requestSubmit();

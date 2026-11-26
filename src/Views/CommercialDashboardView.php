@@ -7,6 +7,7 @@ namespace SCM\Views;
 use SCM\Commercial\CommercialAccessPolicy;
 use SCM\Commercial\CommercialPropertiesRepository;
 use SCM\Commercial\CommercialStatusCatalog;
+use SCM\Commercial\CommercialTicketsRepository;
 use SCM\Commercial\PropertySearchFilters;
 use SCM\Core\Auth;
 
@@ -2222,6 +2223,9 @@ final class CommercialDashboardView
           <?php if ($isMyTasks && $effectiveBucket !== ''): ?>
             <input type="hidden" name="mis_bucket" value="<?php echo esc_attr($effectiveBucket); ?>">
           <?php endif; ?>
+          <?php if (CommercialTicketsRepository::sortKey($filters) !== ''): ?>
+            <input type="hidden" name="orden" value="<?php echo esc_attr(CommercialTicketsRepository::sortKey($filters)); ?>">
+          <?php endif; ?>
 
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 <?php echo $canFilterEmployees ? 'xl:grid-cols-6' : 'xl:grid-cols-5'; ?> gap-space-sm pt-space-xs">
             <!-- Input Búsqueda Rápida -->
@@ -2330,6 +2334,43 @@ final class CommercialDashboardView
   }
 
   /** @param array<int,array<string,mixed>> $rows @param array<string,int> $pagination @param array<string,mixed> $filters */
+  /**
+   * Selector "Ordenar" de la tabla de tareas: lleva los filtros activos ocultos y, al cambiar, recarga el listado con el orden
+   * (commercial-dashboard.js lo envía solo). Sin orden elegido, las abiertas van por semáforo y las demás por actividad.
+   * @param array<string,mixed> $filters
+   */
+  private static function renderTicketSortForm(string $bucket, array $filters, string $baseUrl, string $listBucket): string
+  {
+    $current = CommercialTicketsRepository::sortKey($filters);
+    $options = ['' => $listBucket === 'abiertos' ? 'Más urgentes primero' : 'Actividad más reciente'];
+    foreach (CommercialTicketsRepository::SORTS as $key => $label) {
+      if (($key === 'actividad' && $listBucket !== 'abiertos') || ($key === 'retomar' && $listBucket !== 'postergados')) {
+        continue;
+      }
+      $options[$key] = $label;
+    }
+    $hidden = ['tab' => $bucket] + array_diff_key(self::filterParams($filters), ['page' => true, 'orden' => true]);
+    ob_start();
+?>
+    <form class="flex items-center gap-2" data-commercial-filter-form data-commercial-sort-form method="get" action="<?php echo esc_url($baseUrl . '/index.php'); ?>">
+      <?php foreach ($hidden as $name => $value): ?>
+        <input type="hidden" name="<?php echo esc_attr($name); ?>" value="<?php echo esc_attr($value); ?>">
+      <?php endforeach; ?>
+      <label for="commercial-ticket-sort" class="flex items-center gap-1 font-label-sm text-label-sm font-semibold text-secondary whitespace-nowrap">
+        <span class="material-symbols-outlined text-[18px]" aria-hidden="true">swap_vert</span>
+        <span>Ordenar</span>
+      </label>
+      <select id="commercial-ticket-sort" name="orden" class="px-3 py-2 rounded-xl bg-surface-container-low border border-outline-variant/40 font-body-sm text-body-sm text-on-surface outline-none cursor-pointer focus:border-outline-variant">
+        <?php foreach ($options as $key => $label): ?>
+          <option value="<?php echo esc_attr($key); ?>"<?php selected($current, $key); ?>><?php echo esc_html($label); ?></option>
+        <?php endforeach; ?>
+      </select>
+      <noscript><button type="submit" class="px-3 py-2 rounded-xl bg-primary text-white font-label-sm text-label-sm font-semibold">Ordenar</button></noscript>
+    </form>
+<?php
+    return (string) ob_get_clean();
+  }
+
   private static function renderTicketsTableSection(
     string $bucket,
     array $rows,
@@ -2337,7 +2378,8 @@ final class CommercialDashboardView
     int $visibleTotal,
     $policy,
     string $baseUrl,
-    array $filters
+    array $filters,
+    string $effectiveBucket = ''
   ): string {
     ob_start();
 ?>
@@ -2350,6 +2392,7 @@ final class CommercialDashboardView
             <span class="px-2 py-0.5 rounded-full bg-secondary-fixed text-on-secondary-fixed font-label-sm text-label-sm font-semibold">Mostrando <?php echo esc_html((string) count($rows)); ?> de <?php echo esc_html((string) $visibleTotal); ?></span>
           </div>
           <div class="flex items-center gap-space-xs">
+            <?php echo self::renderTicketSortForm($bucket, $filters, $baseUrl, $effectiveBucket !== '' ? $effectiveBucket : $bucket); ?>
             <button type="button" class="p-2 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface transition-colors cursor-pointer" title="Actualizar vista" onclick="window.location.reload()">
               <span class="material-symbols-outlined text-[18px]">sync</span>
             </button>
@@ -2868,7 +2911,7 @@ final class CommercialDashboardView
       <?php echo self::renderFiltersSection($bucket, $filters, $ticketEmployees, $filterOptions, $baseUrl, $isMyTasks, $effectiveBucket, $policy); ?>
 
       <!-- Tabla de Tareas -->
-      <?php echo self::renderTicketsTableSection($bucket, $rows, $pagination, $visibleTotal, $policy, $baseUrl, $filters); ?>
+      <?php echo self::renderTicketsTableSection($bucket, $rows, $pagination, $visibleTotal, $policy, $baseUrl, $filters, $effectiveBucket); ?>
 
       <!-- Drawer Auditoría -->
       <?php if (!empty($slaSummary) && !$isMyTasks): ?>
@@ -5499,7 +5542,7 @@ final class CommercialDashboardView
       'estado', 'mis_bucket', 'busqueda', 'id_empleado', 'ticket_id', 'solicitante', 'celular', 'correo',
       'inmueble', 'barrio', 'medio', 'prioridad', 'tema', 'seguimiento', 'fecha_desde', 'fecha_hasta',
       'encargado_seguimiento', 'fecha_seguimiento_desde', 'fecha_seguimiento_hasta', 'sin_actualizar',
-      'estado_administrativo', 'sla_filter', 'page',
+      'estado_administrativo', 'sla_filter', 'orden', 'page',
     ];
     $params = [];
     foreach ($keys as $key) {

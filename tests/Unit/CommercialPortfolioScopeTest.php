@@ -148,6 +148,35 @@ final class CommercialPortfolioScopeTest extends TestCase
     self::assertSame(8, $navigation['tabs']['abiertos'], 'Tareas abiertas conserva el total del equipo.');
   }
 
+  public function testTaskListsCanBeSortedByCreationOrActivity(): void
+  {
+    [$db] = $this->adminWithTasks();
+    // Tareas 5 a 9 (abiertas de 900): creada hace 5, 1, 4, 2 y 3 días; última actividad hace 1, 5, 2, 4 y 3 días.
+    foreach ([5 => [5, 1], 6 => [1, 5], 7 => [4, 2], 8 => [2, 4], 9 => [3, 3]] as $id => [$created, $activity]) {
+      $db->update('wp_jet_cct_tickets', ['fecha' => strtotime("-{$created} days"), 'fecha_actualizacion' => strtotime("-{$activity} days")], ['_ID' => $id]);
+    }
+    $repository = new CommercialTicketsRepository($db);
+    $ids = static fn(string $order): array => array_map('intval', array_column($repository->search('abiertos', ['id_empleado' => '900', 'orden' => $order])['rows'], '_ID'));
+
+    self::assertSame([5, 7, 9, 8, 6], $ids('antiguas'));
+    self::assertSame([6, 8, 9, 7, 5], $ids('recientes'));
+    self::assertSame([6, 8, 9, 7, 5], $ids('sin_actividad'), 'Primero las que llevan más tiempo sin actividad.');
+    self::assertSame([5, 7, 9, 8, 6], $ids('actividad'));
+    self::assertSame(CommercialTicketsRepository::sortKey(['orden' => 'DROP TABLE']), '', 'Un orden desconocido queda en el de siempre.');
+    self::assertCount(5, $ids('DROP TABLE'));
+
+    $form = new \ReflectionMethod(CommercialDashboardView::class, 'renderTicketSortForm');
+    $open = (string) $form->invoke(null, 'abiertos', ['id_empleado' => '900', 'orden' => 'antiguas', 'page' => 3], '/panel', 'abiertos');
+    self::assertStringContainsString('<option value="antiguas" selected', $open);
+    self::assertStringContainsString('<option value="">Más urgentes primero</option>', $open, 'En abiertas, por defecto el semáforo.');
+    self::assertStringContainsString('name="id_empleado" value="900"', $open, 'Conserva los filtros activos.');
+    self::assertStringNotContainsString('name="page"', $open, 'Al ordenar vuelve a la primera página.');
+    self::assertStringNotContainsString('value="retomar"', $open);
+    $postponed = (string) $form->invoke(null, 'postergados', [], '/panel', 'postergados');
+    self::assertMatchesRegularExpression('/<option value="" selected="selected">Actividad más reciente<\/option>/', $postponed, 'En las demás, por defecto la actividad más reciente.');
+    self::assertStringContainsString('value="retomar"', $postponed, 'Postergadas se pueden ordenar por fecha para retomar.');
+  }
+
   public function testPortfolioOnlyNarrowsTheScope(): void
   {
     [, $policy] = $this->adminWithTasks();

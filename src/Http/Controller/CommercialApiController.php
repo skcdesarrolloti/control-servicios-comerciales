@@ -1491,6 +1491,7 @@ final class CommercialApiController
       'fecha_desde' => $clean('fecha_desde'),
       'fecha_hasta' => $clean('fecha_hasta'),
       'sla_filter' => $clean('sla_filter'),
+      'orden' => $clean('orden'),
       'page' => max(1, (int) ($input['page'] ?? 1)),
       'per_page' => 24,
     ];

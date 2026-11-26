@@ -71,7 +71,10 @@ final class CommercialTicketsRepository
     $whereSql = implode(' AND ', $where);
 
     // Fecha para retomar: el semáforo de las postergadas muestra hasta cuándo lo están.
-    $resumeSql = $this->schema->columnExists($table, self::RESUME_COLUMN) ? ', t.`' . self::RESUME_COLUMN . '`' : '';
+    $hasResume = $this->schema->columnExists($table, self::RESUME_COLUMN);
+    $resumeSql = $hasResume ? ', t.`' . self::RESUME_COLUMN . '`' : '';
+    $order = self::sortKey($filters);
+    $orderSql = self::sortSql($order === 'retomar' && !$hasResume ? '' : $order);
     $selectSql = "SELECT t.`_ID`, t.`id_ticket`, t.`estado_comercial`, t.`asunto`, t.`descripcion`,
               t.`solicitante`, t.`correo_solicitante`, t.`celular_solicitante`,
               t.`id_empleado`, t.`nombre_empleado`, t.`correo_empleado`, t.`celular_empleado`,
@@ -80,7 +83,7 @@ final class CommercialTicketsRepository
               t.`fecha`, t.`fecha_actualizacion`, t.`cct_created`, t.`cct_modified`{$resumeSql}
          FROM `{$table}` t
         WHERE {$whereSql}
-        ORDER BY COALESCE(NULLIF(t.`fecha_actualizacion`, 0), NULLIF(t.`fecha`, 0), UNIX_TIMESTAMP(t.`cct_created`)) DESC, t.`_ID` DESC";
+        ORDER BY {$orderSql}";
     $summary = null;
 
     if ($effectiveBucket === 'abiertos') {
@@ -92,17 +95,20 @@ final class CommercialTicketsRepository
           return (string) ($row['scm_sla_status'] ?? '') === $slaFilter;
         }));
       }
-      usort($allRows, static function (array $a, array $b): int {
-        $priority = (int) ($b['scm_sla_priority'] ?? 0) <=> (int) ($a['scm_sla_priority'] ?? 0);
-        if ($priority !== 0) {
-          return $priority;
-        }
-        $days = (int) ($b['scm_attention_days'] ?? 0) <=> (int) ($a['scm_attention_days'] ?? 0);
-        if ($days !== 0) {
-          return $days;
-        }
-        return (int) ($b['_ID'] ?? 0) <=> (int) ($a['_ID'] ?? 0);
-      });
+      // Sin orden elegido, las abiertas van por semáforo; con uno, queda el de la consulta.
+      if ($order === '') {
+        usort($allRows, static function (array $a, array $b): int {
+          $priority = (int) ($b['scm_sla_priority'] ?? 0) <=> (int) ($a['scm_sla_priority'] ?? 0);
+          if ($priority !== 0) {
+            return $priority;
+          }
+          $days = (int) ($b['scm_attention_days'] ?? 0) <=> (int) ($a['scm_attention_days'] ?? 0);
+          if ($days !== 0) {
+            return $days;
+          }
+          return (int) ($b['_ID'] ?? 0) <=> (int) ($a['_ID'] ?? 0);
+        });
+      }
       $total = count($allRows);
       $totalPages = max(1, (int) ceil($total / $perPage));
       $page = min($page, $totalPages);
@@ -136,6 +142,39 @@ final class CommercialTicketsRepository
     }
 
     return $payload;
+  }
+
+  /**
+   * Órdenes del listado de tareas (selector "Ordenar" de la tabla). Sin orden elegido, las abiertas van por semáforo (las más
+   * urgentes primero) y las demás por actividad más reciente. "retomar" solo tiene sentido en Postergadas.
+   */
+  public const SORTS = [
+    'actividad' => 'Actividad más reciente',
+    'sin_actividad' => 'Más tiempo sin actividad',
+    'recientes' => 'Creadas: más recientes primero',
+    'antiguas' => 'Creadas: más antiguas primero',
+    'retomar' => 'Próximas a retomar',
+  ];
+
+  /** @param array<string,mixed> $filters */
+  public static function sortKey(array $filters): string
+  {
+    $order = trim((string) ($filters['orden'] ?? ''));
+    return array_key_exists($order, self::SORTS) ? $order : '';
+  }
+
+  private static function sortSql(string $order): string
+  {
+    $activity = 'COALESCE(NULLIF(t.`fecha_actualizacion`, 0), NULLIF(t.`fecha`, 0), UNIX_TIMESTAMP(t.`cct_created`))';
+    $created = 'COALESCE(NULLIF(t.`fecha`, 0), UNIX_TIMESTAMP(t.`cct_created`))';
+    return match ($order) {
+      'sin_actividad' => $activity . ' ASC, t.`_ID` ASC',
+      'recientes' => $created . ' DESC, t.`_ID` DESC',
+      'antiguas' => $created . ' ASC, t.`_ID` ASC',
+      // Las que no tienen fecha para retomar van al final.
+      'retomar' => 'CASE WHEN COALESCE(t.`' . self::RESUME_COLUMN . '`, 0) > 0 THEN 0 ELSE 1 END ASC, t.`' . self::RESUME_COLUMN . '` ASC, t.`_ID` ASC',
+      default => $activity . ' DESC, t.`_ID` DESC',
+    };
   }
 
   /**
