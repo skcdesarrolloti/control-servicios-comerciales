@@ -881,6 +881,12 @@
       .catch(function (error) {
         if (error.name === "AbortError") return;
         caseContent.removeAttribute("aria-busy");
+        // Al recargar la tarea abierta (p. ej. después de trasladarla) sin permiso para verla, se cierra con el aviso.
+        if (preserveFocus && error.status === 403) {
+          showCaseModal(false);
+          notify("info", error.message);
+          return;
+        }
         caseContent.innerHTML = '<div class="commercial-case-error"><i class="fas fa-circle-exclamation" aria-hidden="true"></i><h2>No pudimos abrir la tarea</h2><p></p><button type="button" class="commercial-primary-btn" data-commercial-retry-case>Reintentar</button></div>';
         var paragraph = caseContent.querySelector("p");
         if (paragraph) paragraph.textContent = error.message;
@@ -1470,13 +1476,10 @@
     request(action, new FormData(form))
       .then(function (response) {
         notify("success", response.message || "Acción guardada.");
-        var movesTicket = ["postpone", "activate", "close", "status", "reassign"].indexOf(key) !== -1;
-        var refreshUrl = window.location.href;
-        if (movesTicket) {
-          showCaseModal(false);
-          return loadTickets(refreshUrl, { history: false });
-        }
-        return Promise.all([loadCase(currentCasePk, true), loadTickets(refreshUrl, { history: false })]);
+        // Ninguna acción cierra la ventana de la tarea: se recarga con el resultado (estado, historial, botones) y
+        // la lista de detrás se actualiza. Solo se cierra si, tras trasladarla, la persona ya no puede verla.
+        var ticketPk = currentCasePk || String((form.querySelector('[name="ticket_pk"]') || {}).value || "");
+        return Promise.all([loadCase(ticketPk, true), loadTickets(window.location.href, { history: false })]);
       })
       .catch(function (error) {
         if (message) message.textContent = error.message;
