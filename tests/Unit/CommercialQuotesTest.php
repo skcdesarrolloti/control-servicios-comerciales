@@ -499,6 +499,16 @@ final class CommercialQuotesTest extends TestCase
     self::assertStringContainsString('data-commercial-property-detail="501" data-property-origin="cotizacion" data-ticket-pk="700">Ver ficha</button>', $withTask);
     self::assertStringNotContainsString('Ver ficha</a>', $withTask);
 
+    // La ficha toma el nombre del propietario de su tabla cuando el inmueble lo trae vacío (solo con id_propietario).
+    $this->db->insert('wp_jet_cct_propietarios', ['_ID' => 77, 'nombre' => 'Rosa Propietaria', 'documento' => '123']);
+    $this->db->update('wp_jet_cct_inmuebles', ['propietario' => '', 'id_propietario' => '77'], ['codigo' => '502']);
+    $detail = (new \SCM\Commercial\CommercialPropertiesRepository($this->db))->propertyDetail('502', false);
+    self::assertSame('Rosa Propietaria', $detail['propietario']);
+    self::assertSame('123', $detail['propietario_documento']);
+    self::assertArrayNotHasKey('propietario_nombre_tabla', $detail);
+    self::assertArrayNotHasKey('user_quotas', $detail, 'Sin la vista Inmuebles no se consultan destacados ni cupos.');
+    self::assertSame('Propietario reservado', (new \SCM\Commercial\CommercialPropertiesRepository($this->db))->propertyDetail('501', false)['propietario'], 'Si el inmueble trae el nombre, se respeta.');
+
     $this->create();
     $again = CommercialQuotesView::taskForm($this->service()->formData(700));
     self::assertStringContainsString('Cotizaciones de esta tarea', $again);

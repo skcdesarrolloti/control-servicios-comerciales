@@ -318,7 +318,8 @@ final class CommercialPropertiesRepository
                    f.`rol` AS funcionario_rol,
                    p.`celular` AS propietario_celular,
                    p.`correo` AS propietario_correo,
-                   p.`documento` AS propietario_documento
+                   p.`documento` AS propietario_documento,
+                   COALESCE(NULLIF(TRIM(p.`nombre`), ''), NULLIF(TRIM(p.`nombre_juridico`), ''), '') AS propietario_nombre_tabla
               FROM `{$table}` i
          LEFT JOIN `{$funcionarios}` f 
                 ON (TRIM(COALESCE(i.`id_funcionario`, '')) <> '' AND TRIM(f.`id_empleado`) = TRIM(i.`id_funcionario`))
@@ -328,6 +329,13 @@ final class CommercialPropertiesRepository
              LIMIT 1";
 
     $property = $this->db->getRow($sql, $args);
+    if (is_array($property) && $property !== []) {
+      // Muchos inmuebles traen vacío el nombre del propietario pero sí su id_propietario: se toma de su tabla.
+      if (trim((string) ($property['propietario'] ?? '')) === '') {
+        $property['propietario'] = (string) ($property['propietario_nombre_tabla'] ?? '');
+      }
+      unset($property['propietario_nombre_tabla']);
+    }
     if (!is_array($property) || $property === []) {
       return null;
     }
@@ -585,8 +593,11 @@ final class CommercialPropertiesRepository
         i.`propietario` LIKE ? OR
         i.`arrendatario` LIKE ? OR
         i.`copropiedad` LIKE ? OR
-        i.`tipo_inmueble` LIKE ?
+        i.`tipo_inmueble` LIKE ? OR
+        EXISTS (SELECT 1 FROM `" . $this->db->table('jet_cct_propietarios') . "` po WHERE TRIM(COALESCE(i.`id_propietario`, '')) <> '' AND CAST(po.`_ID` AS CHAR) = TRIM(i.`id_propietario`) AND (po.`nombre` LIKE ? OR po.`nombre_juridico` LIKE ? OR po.`documento` LIKE ?))
       )";
+      // El propietario también se busca en su tabla (nombre, razón social o documento): muchos inmuebles no traen el nombre.
+      array_push($args, $searchWildcard, $searchWildcard, $searchWildcard);
       $args[] = $searchWildcard;
       $args[] = $searchWildcard;
       $args[] = $searchWildcard;

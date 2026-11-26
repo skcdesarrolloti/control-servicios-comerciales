@@ -22,7 +22,7 @@ final class CommercialQuotesDatabase
     'jet_cct_cargos' => ['nombre_cargo'],
     'jet_cct_funcionarios' => ['id_empleado', 'nombre', 'correo', 'celular', 'activo', 'id_cargo', 'id_sucursal', 'ficha', 'rol'],
     // Ficha del inmueble ("Ver ficha" del buscador de la cotización).
-    'jet_cct_propietarios' => ['nombre', 'celular', 'correo', 'documento'],
+    'jet_cct_propietarios' => ['nombre', 'nombre_juridico', 'celular', 'correo', 'documento'],
     'jet_cct_caract_internas' => ['valor', 'etiqueta', 'icono'],
     'jet_cct_caract_externas' => ['valor', 'etiqueta', 'icono'],
     'jet_cct_zonas_sociales' => ['valor', 'etiqueta', 'icono'],

@@ -1579,18 +1579,13 @@ final class CommercialApiController
     $repo = new CommercialPropertiesRepository($this->db);
     $property = $repo->propertyDetail($identifier, $highlights);
     $full = $general || (is_array($property) && ($this->canOpenPropertyFromStudy($property, (int) ($input['study_id'] ?? 0), (int) ($input['ticket_pk'] ?? 0)) || $this->canOpenPropertyFromContext($property, (int) ($input['ticket_pk'] ?? 0))));
-    // Desde el buscador de la cotización se ve la ficha del inmueble, sin los datos privados del propietario.
+    // También desde el buscador de la cotización ("Ver ficha"), con todos sus datos.
     $fromQuote = !$full && is_array($property) && $this->canOpenPropertyFromQuote($property, $input);
     if (!$full && !$fromQuote) {
       JsonResponse::error('No tienes permiso para consultar inmuebles.', 403);
     }
     if (!is_array($property) || $property === []) {
       JsonResponse::error('Inmueble no encontrado.', 404);
-    }
-    if ($fromQuote) {
-      foreach (self::PROPERTY_PRIVATE_FIELDS as $field) {
-        $property[$field] = '';
-      }
     }
     $html = CommercialDashboardView::renderPropertyDetailModalContent($property, $highlights);
     if (!$highlights) {
@@ -1627,12 +1622,6 @@ final class CommercialApiController
     $code = trim((string) ($study['id_inmueble'] ?? ''));
     return $code !== '' && $code === trim((string) ($property['codigo'] ?? ''));
   }
-
-  /** Datos del propietario, el arrendatario, la matrícula y las llaves: no salen en la ficha abierta desde la cotización. */
-  private const PROPERTY_PRIVATE_FIELDS = [
-    'propietario', 'id_propietario', 'propietario_celular', 'propietario_correo', 'propietario_documento', 'arrendatario', 'id_arrendatario',
-    'matricula_inmobiliaria', 'referencia_catastral', 'contacto_llaves', 'telefono_contacto_llaves', 'ubicacion_llaves', 'en_donde_estan_las_llaves',
-  ];
 
   /**
    * Desde el buscador de la cotización de una tarea ("Ver ficha"): quien puede crear cotizaciones ve la ficha de los
