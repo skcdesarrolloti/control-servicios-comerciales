@@ -2367,7 +2367,7 @@ final class CommercialDashboardView
                 <th class="py-3 px-space-md font-semibold">Tarea &amp; Solicitante</th>
                 <th class="py-3 px-space-md font-semibold">Responsable</th>
                 <th class="py-3 px-space-md font-semibold">Inmueble / Zona</th>
-                <th class="py-3 px-space-md font-semibold">Tipo</th>
+                <th class="py-3 px-space-md font-semibold">Estado comercial</th>
                 <th class="py-3 px-space-md font-semibold">Semáforo de Tiempo</th>
                 <th class="py-3 px-space-md font-semibold text-right">Acciones</th>
               </tr>
