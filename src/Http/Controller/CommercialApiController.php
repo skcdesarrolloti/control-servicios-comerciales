@@ -305,6 +305,12 @@ final class CommercialApiController
     $detail['studies_approved'] = count(array_filter($progress['studies'], static fn(array $study): bool => self::approvedStudy($study)));
     $detail['mandates_count'] = count($progress['mandates']);
     $detail['closing_mandate'] = $progress['closing'];
+    // Código adelantado en borrador vinculado (también los de WordPress, que no tienen fila CCT): "Completar inmueble #código".
+    try {
+      $detail['draft_code'] = (new \SCM\Commercial\CommercialPropertyEntryService($this->db, $this->policy, $this->config))->linkedDraftCode($detail['ticket']);
+    } catch (\Throwable $exception) {
+      error_log('[tareas:codigo-adelantado] ' . $exception->getMessage());
+    }
     JsonResponse::success([
       'html' => CommercialTicketModalView::render(
         $detail,
@@ -1033,6 +1039,9 @@ final class CommercialApiController
     $this->authorizeTicketScope($taskId);
     try {
       $this->authorizeTaskTool(\SCM\Commercial\CommercialTaskTools::SIGN, $taskId);
+      // Código adelantado creado en WordPress (solo el post): se le crea su fila CCT para que el aviso lo encuentre.
+      $task = $this->db->getRow('SELECT * FROM `' . $this->db->table('jet_cct_tickets') . '` WHERE `_ID` = ? LIMIT 1', [$taskId]);
+      if (is_array($task)) (new \SCM\Commercial\CommercialPropertyEntryService($this->db, $this->policy, $this->config))->ensureDraftRow($task);
       $service = new \SCM\Commercial\CommercialSignService($this->db, $this->policy, $this->config);
       JsonResponse::success(['html'=>'<div class="commercial-entry-shell">' . \SCM\Views\CommercialSignView::render($service, $this->policy, $service->taskContext($taskId)) . '</div>']);
     } catch (\SCM\Commercial\CommercialSignAccessDenied $exception) {

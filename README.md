@@ -338,6 +338,10 @@ ya creado. Los códigos adelantados pueden recuperar su multimedia actual antes 
 borrador vinculado, el botón **Ingresar inmueble** pasa a **Completar inmueble #código**:
 el formulario abre con ese código fijo, trae su multimedia y lo que dejó el aviso
 (¿presenta aviso?, punto de referencia), y el servidor no deja generar otro código para esa tarea.
+El borrador se reconoce por el estado del post, así que los códigos adelantados creados en
+WordPress (solo post, sin fila CCT) también muestran **Completar inmueble #código**; al abrir
+**Aviso nuevo** desde la tarea se les crea su fila en `jet_cct_inmuebles` para que el aviso los encuentre.
+Una tarea cerrada no muestra **Cerrar Tarea** (sí **Activar** para reabrirla).
 La tarea también muestra **Multimedia del inmueble** cuando ya tiene un inmueble asociado.
 Este paso usa el permiso `ingresar_inmueble` y comprueba la asignación de la tarea y
 la relación entre tarea, inmueble y adjuntos. Permite portada, galería ordenable y video

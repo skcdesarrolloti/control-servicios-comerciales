@@ -14,7 +14,7 @@ use SCM\Commercial\CommercialTimelineEditor;
 final class CommercialTicketModalView
 {
   /**
-   * @param array{ticket:array<string,mixed>,timeline:array<int,array<string,mixed>>,analyses?:array<int,array<string,mixed>>,reply_guides?:array<int,array<string,mixed>>,quotes_count?:int,studies_count?:int,studies_approved?:int,mandates_count?:int,closing_mandate?:array{id:int,hoja:array{id:int,estado:string},total:int}|null} $detail
+   * @param array{ticket:array<string,mixed>,timeline:array<int,array<string,mixed>>,analyses?:array<int,array<string,mixed>>,reply_guides?:array<int,array<string,mixed>>,quotes_count?:int,studies_count?:int,studies_approved?:int,mandates_count?:int,closing_mandate?:array{id:int,hoja:array{id:int,estado:string},total:int}|null,draft_code?:int} $detail
    * @param array<int,array<string,string>> $employees
    */
   public static function render(array $detail, CommercialAccessPolicy $policy, array $employees): string
@@ -27,9 +27,11 @@ final class CommercialTicketModalView
     $logicalId = trim((string) ($ticket['id_ticket'] ?? '')) ?: (string) $pk;
     $status = trim((string) ($ticket['estado_comercial'] ?? '')) ?: 'Sin estado';
     $generalStatus = trim((string) ($ticket['estado'] ?? ''));
-    $isPostponedOrClosed = CommercialStatusCatalog::isPostponed($status, $generalStatus)
-      || CommercialStatusCatalog::isClosed($status, $generalStatus)
-      || in_array(mb_strtolower($status, 'UTF-8'), ['postergado', 'aplazado', 'cerrado', 'finalizado'], true);
+    // Una tarea ya cerrada no muestra "Cerrar Tarea" (sí "Activar" para reabrirla).
+    $isClosed = CommercialStatusCatalog::isClosed($status, $generalStatus)
+      || in_array(mb_strtolower($status, 'UTF-8'), ['cerrado', 'finalizado'], true);
+    $isPostponedOrClosed = $isClosed || CommercialStatusCatalog::isPostponed($status, $generalStatus)
+      || in_array(mb_strtolower($status, 'UTF-8'), ['postergado', 'aplazado'], true);
     $subject = trim((string) ($ticket['asunto'] ?? '')) ?: 'Tarea comercial';
     $description = trim(wp_strip_all_tags((string) ($ticket['descripcion'] ?? ''), true));
     $requester = trim((string) ($ticket['solicitante'] ?? '')) ?: 'Sin solicitante';
@@ -203,7 +205,10 @@ final class CommercialTicketModalView
             // Código adelantado: sin inmueble vinculado se puede reservar el código para pegar el aviso nuevo antes de
             // llenar el inmueble; con el código en borrador vinculado, el botón del inmueble completa ese código.
             $canEnterProperty = $policy->canAct('ingresar_inmueble') && CommercialTaskTools::allowsTask(CommercialTaskTools::PROPERTY, $ticket);
-            $draftCode = $propertyCode !== '' && \SCM\Commercial\CommercialPropertyEntryService::isDraftState((string) ($property['estado'] ?? '')) ? $propertyCode : '';
+            // draft_code lo calcula el servidor desde el post (los códigos de WordPress no tienen fila CCT); si no viene, el estado del CCT.
+            $draftCode = isset($detail['draft_code'])
+              ? ((int) $detail['draft_code'] > 0 ? (string) (int) $detail['draft_code'] : '')
+              : ($propertyCode !== '' && \SCM\Commercial\CommercialPropertyEntryService::isDraftState((string) ($property['estado'] ?? '')) ? $propertyCode : '');
           ?>
           <?php if ($canEnterProperty && $propertyCode === '' && (int) ($ticket['id_inmueble_data'] ?? 0) <= 0): ?>
             <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-surface-container-low hover:bg-[#EBF1FB] text-on-surface border border-surface-container text-xs font-semibold transition-all cursor-pointer" data-commercial-reserve-code data-ticket-pk="<?php echo esc_attr((string) $pk); ?>"><span class="material-symbols-outlined text-[16px]">pin</span><span>Código adelantado</span></button>
@@ -277,7 +282,7 @@ final class CommercialTicketModalView
               <span>Activar</span>
             </button>
           <?php endif; ?>
-          <?php if ($policy->canAct('cerrar')): ?>
+          <?php if ($policy->canAct('cerrar') && !$isClosed): ?>
             <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-semibold transition-all cursor-pointer" data-commercial-open-workflow="close">
               <span class="material-symbols-outlined text-[16px] text-rose-600">check_circle</span>
               <span>Cerrar Tarea</span>
@@ -454,7 +459,7 @@ final class CommercialTicketModalView
         <?php if ($policy->canAct('activar') && $isPostponedOrClosed): ?>
           <?php echo self::statusMessageForm($pk, 'activate', 'Activar tarea', 'Selecciona el estado con el que retoma la gestión activa. El cliente recibe el motivo por correo y WhatsApp, y se avisa a los funcionarios de Notificaciones internas.', 'motivo', CommercialStatusCatalog::OPEN, 'Nuevo', 'Activar tarea ahora', false, true); ?>
         <?php endif; ?>
-        <?php if ($policy->canAct('cerrar')): ?>
+        <?php if ($policy->canAct('cerrar') && !$isClosed): ?>
           <?php echo self::statusMessageForm($pk, 'close', 'Cerrar tarea', 'Selecciona el resultado final y registra las observaciones. El cliente las recibe por correo y WhatsApp, salvo en Duplicado y Trasladado, y se avisa a los funcionarios de Notificaciones internas.', 'observacion', CommercialStatusCatalog::CLOSED, 'Finalizado', 'Confirmar cierre de tarea', true); ?>
         <?php endif; ?>
         <?php if ($policy->canAct('reasignar')): ?>

@@ -409,6 +409,28 @@ final class CommercialPropertyEntryService
     return self::isDraftState($state) ? $code : 0;
   }
 
+  /**
+   * Los códigos adelantados del formulario de WordPress solo crearon el post: si el de la tarea no tiene fila en
+   * jet_cct_inmuebles, la crea con los datos del post (para que el aviso nuevo lo encuentre) y la vincula a la tarea.
+   */
+  public function ensureDraftRow(array $task): int
+  {
+    $code = $this->linkedDraftCode($task);
+    if ($code <= 0) return 0;
+    $table = $this->db->table('jet_cct_inmuebles');
+    $propertyId = (int) $this->db->getVar('SELECT _ID FROM `' . $table . '` WHERE codigo=? LIMIT 1', [$code]);
+    if ($propertyId <= 0) {
+      $post = $this->db->getRow('SELECT * FROM `' . $this->db->table('posts') . '` WHERE ID=? AND post_type=?', [$code,'inmuebles']);
+      if (!$post || ($post['post_status'] ?? '') === 'trash') return 0;
+      $owner = $this->meta($code, 'id_empleado') ?: (string) ($post['post_author'] ?? '');
+      $date = date('Y-m-d H:i:s');
+      $propertyId = $this->insert('jet_cct_inmuebles', ['cct_status'=>'publish','cct_author_id'=>$owner,'cct_created'=>$date,'cct_modified'=>$date] + self::definition()['cct_defaults'] + ['codigo'=>$code,'id_funcionario'=>$owner,'funcionario'=>$this->meta($code, 'empleado'),'sucursal'=>$this->meta($code, 'sucursal'),'id_ticket'=>(int) ($task['_ID'] ?? 0),'id_propietario'=>$task['id_propietario'] ?? '']);
+      $this->setMeta($code, 'id_inmueble_data', $propertyId);
+    }
+    if ((int) ($task['_ID'] ?? 0) > 0 && (int) ($task['id_inmueble_data'] ?? 0) !== $propertyId) $this->update('jet_cct_tickets', ['id_inmueble_data'=>$propertyId], ['_ID'=>(int) $task['_ID']]);
+    return $code;
+  }
+
   /** Lo que el aviso nuevo ya dejó en el código adelantado y el formulario propone al completarlo. */
   public function draftDefaults(int $code): array
   {

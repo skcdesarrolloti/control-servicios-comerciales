@@ -356,6 +356,38 @@ final class CommercialPropertyEntryTest extends TestCase
     self::assertSame('Casa de prueba', $this->db->getVar('SELECT post_title FROM wp_posts WHERE ID=?', [$code]));
   }
 
+  public function testWordpressAdvanceCodeWithoutCctIsCompletedAndGetsItsRowForTheSign(): void
+  {
+    // El código 800 del fixture es como los del formulario de WordPress: post en borrador y sin fila CCT.
+    $this->db->update('wp_jet_cct_tickets', ['id_inmueble'=>'800'], ['_ID'=>100]);
+    $task = $this->db->getRow('SELECT * FROM wp_jet_cct_tickets WHERE _ID=100');
+    self::assertSame(800, $this->service->linkedDraftCode($task));
+    $html = CommercialTicketModalView::render(['ticket'=>$task,'timeline'=>[],'draft_code'=>800], $this->policy, []);
+    self::assertStringContainsString('Completar inmueble #800', $html);
+    self::assertStringNotContainsString('data-commercial-reserve-code', $html);
+
+    self::assertSame(0, (int) $this->db->getVar('SELECT COUNT(*) FROM wp_jet_cct_inmuebles WHERE codigo=800'));
+    self::assertSame(800, $this->service->ensureDraftRow($task));
+    self::assertSame(800, $this->service->ensureDraftRow($task));
+    $property = $this->db->getRow('SELECT * FROM wp_jet_cct_inmuebles WHERE codigo=800');
+    self::assertSame(1, (int) $this->db->getVar('SELECT COUNT(*) FROM wp_jet_cct_inmuebles WHERE codigo=800'));
+    self::assertSame('En borrador', $property['estado']);
+    self::assertSame('101', $property['id_funcionario']);
+    self::assertSame((string) $property['_ID'], $this->db->getVar('SELECT id_inmueble_data FROM wp_jet_cct_tickets WHERE _ID=100'));
+    $sign = new \SCM\Commercial\CommercialSignService($this->db, $this->policy);
+    self::assertSame('800', (string) $sign->lookup(100, '800')['property']['codigo']);
+  }
+
+  public function testClosedTaskHidesTheCloseButton(): void
+  {
+    $task = $this->db->getRow('SELECT * FROM wp_jet_cct_tickets WHERE _ID=100');
+    $open = CommercialTicketModalView::render(['ticket'=>$task,'timeline'=>[]], $this->policy, []);
+    self::assertStringContainsString('data-commercial-open-workflow="close"', $open);
+    $closed = CommercialTicketModalView::render(['ticket'=>['estado'=>'Cerrado','estado_comercial'=>'Finalizado'] + $task,'timeline'=>[]], $this->policy, []);
+    self::assertStringNotContainsString('data-commercial-open-workflow="close"', $closed);
+    self::assertStringNotContainsString('data-commercial-workflow-form="close"', $closed);
+  }
+
   public function testASeparateSubmissionCanUpdateTheSameDraftWithoutAnEmailKeyCollision(): void
   {
     $input = $this->input(['modo_ingreso'=>'adelantado','codigo_adelantado'=>'800','presenta-aviso'=>'No']);
