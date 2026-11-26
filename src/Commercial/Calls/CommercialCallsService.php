@@ -769,6 +769,8 @@ final class CommercialCallsService
         'aliado' => $mine ? (string) ($call['nombre_pph'] ?? '') : '',
         'descripcion' => $mine ? (string) ($call['descripcion'] ?? '') : '',
         'propia' => $mine,
+        // Igual que en la tabla: quien puede editar la llamada puede crearle su tarea desde el historial.
+        'editable' => $mine && $this->policy->canAct('llamadas_editar'),
       ];
     }
     foreach ($tasks as $task) {
@@ -777,7 +779,7 @@ final class CommercialCallsService
           'tipo' => 'Tarea sin llamada', 'id' => (int) $task['_ID'], 'ts' => (int) ($task['fecha'] ?? 0), 'fecha' => self::dateLabel($task['fecha'] ?? 0),
           'medio' => (string) ($task['medio'] ?? ''), 'tema' => (string) ($task['tema_ayuda'] ?? ''),
           'responsable' => $names[trim((string) ($task['id_empleado'] ?? ''))] ?? '',
-          'tarea' => (int) $task['_ID'], 'tarea_estado' => (string) ($task['estado_comercial'] ?? ''), 'aliado' => '', 'descripcion' => '', 'propia' => false,
+          'tarea' => (int) $task['_ID'], 'tarea_estado' => (string) ($task['estado_comercial'] ?? ''), 'aliado' => '', 'descripcion' => '', 'propia' => false, 'editable' => false,
         ];
       }
     }

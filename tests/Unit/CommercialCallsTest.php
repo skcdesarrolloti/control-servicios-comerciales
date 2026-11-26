@@ -401,7 +401,22 @@ final class CommercialCallsTest extends TestCase
     self::assertSame('Referido', $history['items'][0]['medio']);
     self::assertSame('', $history['items'][0]['descripcion']);
     self::assertSame([], $history['contact']);
-    self::assertStringNotContainsString('reservado', CommercialCallsView::history($history, CommercialCallsDatabase::policy($this->db)));
+    $html = CommercialCallsView::history($history, CommercialCallsDatabase::policy($this->db));
+    self::assertStringNotContainsString('reservado', $html);
+    self::assertStringNotContainsString('data-ccl-task=', $html, 'La solicitud de otro consultor/a no se le crea tarea desde el historial.');
+  }
+
+  public function testHistoryCreatesTaskForEachRequestWithoutOne(): void
+  {
+    $first = $this->create(['merece_ticket' => 'No']);
+    $second = $this->create(['merece_ticket' => 'No', 'medio' => 'Aviso']);
+    $service = $this->service();
+    $service->createTask($this->taskInput($second));
+    $html = CommercialCallsView::history($service->history(['id' => (string) $first]), CommercialCallsDatabase::policy($this->db));
+    self::assertStringContainsString('data-ccl-task="' . $first . '">Crear tarea</button>', $html);
+    self::assertStringNotContainsString('data-ccl-task="' . $second . '"', $html);
+    $listing = CommercialCallsView::results($service->listing([]), $service, CommercialCallsDatabase::policy($this->db));
+    self::assertStringNotContainsString('De la solicitud del', $listing, 'La fila con tarea no ofrece crearla.');
   }
 
   public function testHistoryIncludesTasksWithoutCall(): void
