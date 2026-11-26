@@ -268,6 +268,18 @@ final class CommercialTicketsRepository
     $where[] = 'COALESCE(t.`' . self::RESUME_COLUMN . '`, 0) > 0';
     $where[] = 'EXISTS (SELECT 1 FROM `' . $notes . "` n WHERE CAST(n.`id_ticket` AS CHAR) = CAST(t.`_ID` AS CHAR) AND n.`nombre` = 'Sistema' AND n.`observacion` LIKE ?)";
     $args[] = '%' . $mark . '%';
+    // La fecha sigue siendo la del script: después de su última nota ningún funcionario escribió en la tarea (si la
+    // volvió a postergar un consultor/a, la fecha es suya).
+    $lastMark = '(SELECT MAX(COALESCE(m.`fecha`, 0) + 0) FROM `' . $notes . "` m WHERE CAST(m.`id_ticket` AS CHAR) = CAST(t.`_ID` AS CHAR) AND m.`nombre` = 'Sistema' AND m.`observacion` LIKE ?)";
+    $where[] = 'NOT EXISTS (SELECT 1 FROM `' . $notes . "` h WHERE CAST(h.`id_ticket` AS CHAR) = CAST(t.`_ID` AS CHAR) AND COALESCE(h.`nombre`, '') <> 'Sistema' AND COALESCE(h.`fecha`, 0) + 0 > " . $lastMark . ')';
+    $args[] = '%' . $mark . '%';
+    foreach (['jet_cct_historial_del_ticket', 'jet_cct_seguimiento_ticket'] as $other) {
+      $otherTable = $this->db->table($other);
+      if ($this->schema->tableExists($otherTable)) {
+        $where[] = 'NOT EXISTS (SELECT 1 FROM `' . $otherTable . '` o WHERE CAST(o.`id_ticket` AS CHAR) = CAST(t.`_ID` AS CHAR) AND COALESCE(o.`fecha`, 0) + 0 > ' . $lastMark . ')';
+        $args[] = '%' . $mark . '%';
+      }
+    }
     return $this->db->getResults(
       'SELECT t.`_ID`, t.`id_empleado`, t.`nombre_empleado`, t.`estado_comercial`, t.`fecha_actualizacion`, t.`fecha`, t.`' . self::RESUME_COLUMN . '`
          FROM `' . $table . '` t WHERE ' . implode(' AND ', $where) . '
@@ -318,11 +330,11 @@ final class CommercialTicketsRepository
   }
 
   /**
-   * Vuelve a postergar una tarea que el sistema devolvió a Nuevo (resumedBySystemSince): Postergado con su nueva fecha
+   * Vuelve a postergar una tarea que el sistema devolvió a Nuevo (resumedBySystemSince): Postergado con su nueva fecha (null: sin fecha)
    * para retomar, como la deja Postergar (estado "En proceso"; no toca estado_administrativo), y nota interna. Devuelve
    * false si ya no está en Nuevo.
    */
-  public function repostpone(int $ticketPk, int $timestamp, string $message): bool
+  public function repostpone(int $ticketPk, ?int $timestamp, string $message): bool
   {
     $table = $this->db->table('jet_cct_tickets');
     $pdo = $this->db->pdo();
@@ -352,9 +364,9 @@ final class CommercialTicketsRepository
 
   /**
    * Pone la fecha para retomar a una postergada que todavía no la tiene, con nota interna de constancia. Devuelve false si
-   * ya tenía fecha (no la cambia), salvo con $replace (reparto de nuevo de las que programó el script).
+   * ya tenía fecha (no la cambia), salvo con $replace (reparto de nuevo de las que programó el script; null le quita la fecha).
    */
-  public function scheduleResume(int $ticketPk, int $timestamp, string $message, bool $replace = false): bool
+  public function scheduleResume(int $ticketPk, ?int $timestamp, string $message, bool $replace = false): bool
   {
     $table = $this->db->table('jet_cct_tickets');
     $pdo = $this->db->pdo();

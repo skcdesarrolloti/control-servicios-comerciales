@@ -301,6 +301,32 @@ final class CommercialTaskWorkflowTest extends TestCase
     self::assertSame([], $tickets->resumedBySystemSince($at('2026-11-30 00:00'), $mark), 'Ya la tocó un funcionario.');
   }
 
+  public function testUnscheduleLeavesTheScriptTasksPostponedWithoutDateButNotTheConsultantOnes(): void
+  {
+    $mark = \SCM\Commercial\CommercialPostponedScheduler::NOTE_MARK;
+    $tickets = new CommercialTicketsRepository($this->db);
+    $tickets->changeStatus(900, 'Postergado');
+    $later = time() + 86400 * 40;
+    self::assertTrue($tickets->scheduleResume(900, $later, 'Se programó retomar la tarea: ' . $mark . '.'));
+    self::assertSame(['900'], array_map('strval', array_column($tickets->postponedScheduledBySystem($mark), '_ID')));
+    self::assertTrue($tickets->scheduleResume(900, null, 'Se quitó la fecha.', true), 'Quitar la fecha del reparto.');
+    self::assertEmpty($this->task()['fecha_retomar']);
+    self::assertSame('Postergado', $this->task()['estado_comercial']);
+    self::assertSame(['900'], array_map('strval', array_column($tickets->postponedWithoutResumeDate(), '_ID')), 'Queda para ponerle fecha más adelante.');
+
+    // Si después la postergó un consultor/a con su fecha, esa no se toca.
+    self::assertTrue($tickets->scheduleResume(900, $later, 'Se programó retomar la tarea: ' . $mark . '.'));
+    $this->db->insert('wp_jet_cct_notas_ticket', ['id_ticket' => '900', 'fecha' => time() + 60, 'nombre' => 'Consultora Uno', 'observacion' => 'Postergada: el cliente viaja.']);
+    self::assertSame([], $tickets->postponedScheduledBySystem($mark));
+
+    // Las que volvieron a Nuevo regresan a Postergado sin fecha.
+    $this->db->update('wp_jet_cct_tickets', ['estado' => 'Nuevo', 'estado_comercial' => 'Nuevo', 'fecha_retomar' => null], ['_ID' => 900]);
+    self::assertTrue($tickets->repostpone(900, null, 'La tarea volvió a "Postergado" sin fecha.'));
+    $task = $this->task();
+    self::assertSame(['En proceso', 'Postergado'], [$task['estado'], $task['estado_comercial']]);
+    self::assertEmpty($task['fecha_retomar']);
+  }
+
   public function testPostponedAndClosedClientNoticesUseTheirTemplates(): void
   {
     [$notifier, $log] = $this->recorder();
