@@ -15,7 +15,7 @@ use SCM\Support\SchemaInspector;
  *  - relación JetEngine 941 (funcionario → inmueble) en modo "append", como el formulario;
  *  - historial del inmueble "Traslado".
  * Solo se transfiere al personal comercial: funcionarios activos de los cargos comerciales (Configuración ›
- * commercial_employee_cargos), los mismos de reasignar tareas.
+ * commercial_employee_cargos), los mismos de trasladar tareas.
  * La actualización de panel_inmueble (base panelapi) del hook ya no se usa y no se hace.
  */
 final class CommercialPropertyTransfer

@@ -351,7 +351,7 @@ final class CommercialCallsNotifier
   }
 
   /**
-   * La tarea pasó a otro funcionario (Reasignar en el panel). Al nuevo responsable le llegan correo y WhatsApp con su
+   * La tarea pasó a otro funcionario (Trasladar en el popup de la tarea). Al nuevo responsable le llegan correo y WhatsApp con su
    * enlace individual; el WhatsApp usa la plantilla de traslado que comparte con el panel inmobiliario. Al cliente, el
    * contacto y la ficha de su nuevo consultor/a (clientReassigned).
    * @param array<string,mixed> $task La tarea con el nuevo responsable.

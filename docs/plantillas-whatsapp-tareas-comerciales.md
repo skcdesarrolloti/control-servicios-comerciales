@@ -222,7 +222,7 @@ Botón `Ver tarea`. URL del sitio web `https://sucasainmobiliaria.com.co/dashboa
 
 ## 14. `scm_tarea_comercial_trasladada_cliente_v1`
 
-Para el cliente, cuando su tarea pasa a otro consultor/a (**Reasignar** en el popup), salvo que haya bloqueado el WhatsApp. El motivo del traslado es interno y no se le envía. También le llega un correo con el mismo contacto. Código: `CommercialCallsNotifier::TEMPLATE_CLIENT_TRANSFERRED`. **Encabezado:** en "Muestra de contenido multimedia" elige **Imagen** y sube una ficha de ejemplo (JPG o PNG, datos inventados). El panel envía la ficha del nuevo consultor/a (Promoción › Fichas de funcionarios) o, si no tiene, el banner de los correos.
+Para el cliente, cuando su tarea pasa a otro consultor/a (**Trasladar** en el popup), salvo que haya bloqueado el WhatsApp. El motivo del traslado es interno y no se le envía. También le llega un correo con el mismo contacto. Código: `CommercialCallsNotifier::TEMPLATE_CLIENT_TRANSFERRED`. **Encabezado:** en "Muestra de contenido multimedia" elige **Imagen** y sube una ficha de ejemplo (JPG o PNG, datos inventados). El panel envía la ficha del nuevo consultor/a (Promoción › Fichas de funcionarios) o, si no tiene, el banner de los correos.
 
 ```text
 Hola *{{1}}.*
@@ -250,7 +250,7 @@ Orden del cambio: publicar el código de los dos paneles y editar las tres plant
 
 ## 6. `pqr_trasladada_funcionario_v1` (editar)
 
-Para el nuevo responsable cuando se reasigna (traslada) una tarea o un caso; al cliente le llega la 14. Código: `CommercialCallsNotifier::TEMPLATE_TRANSFERRED`.
+Para el nuevo responsable cuando se traslada una tarea o un caso; al cliente le llega la 14. Código: `CommercialCallsNotifier::TEMPLATE_TRANSFERRED`.
 
 ```text
 Hola *{{1}}*.

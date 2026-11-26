@@ -257,7 +257,7 @@ final class CommercialTicketModalView
           <?php if ($policy->canAct('reasignar')): ?>
             <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-surface-container-low hover:bg-surface-container text-on-surface border border-surface-container text-xs font-semibold transition-all group cursor-pointer" data-commercial-open-workflow="reassign">
               <span class="material-symbols-outlined text-[16px] text-secondary group-hover:text-[#061D49]">manage_accounts</span>
-              <span>Reasignar</span>
+              <span>Trasladar</span>
             </button>
           <?php endif; ?>
           <?php if ($policy->canAct('activar') && $isPostponedOrClosed): ?>
@@ -1309,7 +1309,7 @@ final class CommercialTicketModalView
         <div>
           <h3 class="text-sm font-bold text-[#061D49] flex items-center gap-2">
             <span class="material-symbols-outlined text-[18px] text-[#1E3C76]">manage_accounts</span>
-            <span>Reasignar responsable</span>
+            <span>Trasladar tarea</span>
           </h3>
           <p class="text-xs text-secondary mt-0.5">Selecciona un integrante habilitado del equipo comercial para transferir la gestión de esta tarea. Se le avisa por WhatsApp y correo, y al cliente le llega el contacto y la ficha de su nuevo consultor/a (el motivo no se le envía).</p>
         </div>
@@ -1330,15 +1330,15 @@ final class CommercialTicketModalView
         </select>
       </div>
       <div class="space-y-1">
-        <label class="block text-xs font-semibold text-on-surface">Motivo de la reasignación <em class="text-rose-600">*</em></label>
-        <textarea name="observacion" rows="2" required placeholder="Ej: Reasignación por turno, redistribución de carga comercial o rotación de zona…" class="w-full text-xs sm:text-sm rounded-xl border border-surface-container focus:border-[#1E3C76] p-2.5 outline-none font-medium text-on-surface"></textarea>
+        <label class="block text-xs font-semibold text-on-surface">Motivo del traslado <em class="text-rose-600">*</em></label>
+        <textarea name="observacion" rows="2" required placeholder="Ej: Traslado por turno, redistribución de carga comercial o rotación de zona…" class="w-full text-xs sm:text-sm rounded-xl border border-surface-container focus:border-[#1E3C76] p-2.5 outline-none font-medium text-on-surface"></textarea>
       </div>
       <div class="flex items-center justify-end gap-2 pt-2 border-t border-surface-container">
         <span class="text-xs text-rose-600 mr-auto font-medium" data-commercial-form-message aria-live="polite"></span>
         <button type="button" class="px-4 py-2 bg-surface-container hover:bg-surface-container-high text-on-surface rounded-xl text-xs font-semibold transition-colors cursor-pointer" data-commercial-close-workflow>Cancelar</button>
         <button type="submit" class="px-5 py-2 bg-[#061D49] hover:bg-[#1E3C76] text-white rounded-xl text-xs font-semibold transition-all shadow-sm cursor-pointer flex items-center gap-1.5">
           <span class="material-symbols-outlined text-[15px]">send</span>
-          <span>Reasignar y notificar</span>
+          <span>Trasladar y notificar</span>
         </button>
       </div>
     </form>

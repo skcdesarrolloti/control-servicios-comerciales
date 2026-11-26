@@ -562,14 +562,14 @@ final class CommercialApiController
   {
     $this->verify($input);
     if (!$this->policy->canAct('reasignar')) {
-      JsonResponse::error('No tienes permiso para reasignar tareas.', 403);
+      JsonResponse::error('No tienes permiso para trasladar tareas.', 403);
     }
     $ticketPk = (int) ($input['ticket_pk'] ?? 0);
     $this->authorizeTicketScope($ticketPk);
     $newEmployeeId = trim((string) ($input['id_empleado'] ?? ''));
     $observacion = trim((string) ($input['observacion'] ?? ''));
     if ($observacion === '') {
-      JsonResponse::error('Escribe el motivo de la reasignación: queda en el historial y le llega al nuevo responsable (al cliente no).', 422);
+      JsonResponse::error('Escribe el motivo del traslado: queda en el historial y le llega al nuevo responsable (al cliente no).', 422);
     }
 
     try {
@@ -603,7 +603,7 @@ final class CommercialApiController
     }
 
     $hasWhatsapp = trim($newEmpCelular) !== '';
-    $message = 'Tarea reasignada a ' . ($newEmpNombre ?: 'nuevo responsable') . '.';
+    $message = 'Tarea trasladada a ' . ($newEmpNombre ?: 'nuevo responsable') . '.';
     if ($hasWhatsapp) {
       $message .= ' Notificación por WhatsApp encolada.';
     }

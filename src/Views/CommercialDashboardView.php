@@ -1792,7 +1792,7 @@ final class CommercialDashboardView
           </div>
           <p class="font-body-sm text-body-sm text-on-surface-variant leading-relaxed">
             <?php if ($taskOverdue > 0): ?>
-              Hay <strong><?php echo esc_html((string) $taskOverdue); ?> tareas comerciales</strong> que superaron el tiempo máximo de atención permitido. Te sugerimos gestionarlas o reasignarlas de inmediato.
+              Hay <strong><?php echo esc_html((string) $taskOverdue); ?> tareas comerciales</strong> que superaron el tiempo máximo de atención permitido. Te sugerimos gestionarlas o trasladarlas de inmediato.
             <?php else: ?>
               ¡Excelente! No tienes tareas atrasadas en este momento. Todas las actividades comerciales se encuentran al día.
             <?php endif; ?>
@@ -1977,7 +1977,7 @@ final class CommercialDashboardView
                   <span class="font-body-sm text-body-sm text-secondary">/ <?php echo esc_html((string) $taskTotal); ?> abiertas</span>
                 </div>
                 <p class="font-body-sm text-body-sm text-on-surface-variant">
-                  <?php echo esc_html((string) $taskOnTime); ?> casos al día. Se requiere reasignación prioritaria de cartera comercial.
+                  <?php echo esc_html((string) $taskOnTime); ?> casos al día. Se requiere traslado prioritario de cartera comercial.
                 </p>
               </div>
             </div>
@@ -5231,7 +5231,7 @@ final class CommercialDashboardView
         <form id="commercial-permissions-form" class="overflow-y-auto p-space-lg space-y-space-md flex-1">
           <div class="flex flex-wrap gap-1 p-1 bg-surface-container-low rounded-xl w-fit" role="tablist" aria-label="Secciones de accesos">
             <button type="button" role="tab" aria-selected="true" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-secondary hover:text-on-surface aria-selected:bg-inverse-surface aria-selected:text-on-secondary aria-selected:shadow-sm transition-colors cursor-pointer" data-perm-pane-tab="cargos">Permisos por cargo</button>
-            <button type="button" role="tab" aria-selected="false" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-secondary hover:text-on-surface aria-selected:bg-inverse-surface aria-selected:text-on-secondary aria-selected:shadow-sm transition-colors cursor-pointer" data-perm-pane-tab="filtros">Cargos en filtros y reasignación</button>
+            <button type="button" role="tab" aria-selected="false" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-secondary hover:text-on-surface aria-selected:bg-inverse-surface aria-selected:text-on-secondary aria-selected:shadow-sm transition-colors cursor-pointer" data-perm-pane-tab="filtros">Cargos en filtros y traslados</button>
           </div>
 
           <div class="space-y-space-md" data-perm-pane="cargos">
@@ -5354,8 +5354,8 @@ final class CommercialDashboardView
           </div>
 
           <div class="bg-surface-container-low rounded-xl p-space-md border border-surface-container space-y-space-xs" data-perm-pane="filtros" hidden>
-            <span class="font-label-md font-semibold text-on-surface block">Cargos visibles en filtros y reasignación</span>
-            <span class="block text-[11px] text-secondary">Los funcionarios de estos cargos aparecen en los filtros, la reasignación y la búsqueda de responsables.</span>
+            <span class="font-label-md font-semibold text-on-surface block">Cargos visibles en filtros y traslados</span>
+            <span class="block text-[11px] text-secondary">Los funcionarios de estos cargos aparecen en los filtros, los traslados y la búsqueda de responsables.</span>
             <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1">
               <?php foreach ($cargos as $cargo): ?>
                 <label class="flex items-center gap-2 p-2 bg-surface-container-lowest rounded-lg text-body-sm cursor-pointer border border-transparent hover:border-surface-container">

@@ -6,7 +6,7 @@ namespace SCM\Commercial;
 
 /**
  * Herramientas de Gestión Operativa del popup de la tarea que dependen del tema. Responder, Nota interna, Seguimiento,
- * Postergar, Reasignar y Cerrar van en todos los temas; estas solo en los temas donde se usan. La vista oculta el botón
+ * Postergar, Trasladar y Cerrar van en todos los temas; estas solo en los temas donde se usan. La vista oculta el botón
  * y el servidor rechaza abrir o guardar el formulario desde una tarea de otro tema. Es regla del negocio fija en el
  * código, no va en Configuración.
  */

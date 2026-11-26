@@ -42,7 +42,7 @@ final class CommercialAccessPolicy
     'activar' => 'Activar tareas',
     'cerrar' => 'Cerrar tareas',
     'cambiar_estado' => 'Cambiar estado comercial',
-    'reasignar' => 'Reasignar responsable',
+    'reasignar' => 'Trasladar tareas',
     'respuestas_guia_editar' => 'Respuestas guía: crear, editar y eliminar las respuestas comerciales desde la tarea',
     'historial_editar' => 'Historial de la tarea: editar (hasta 2 veces) y eliminar sus propias respuestas, seguimientos y notas',
     'enviar_notificacion' => 'Enviar notificaciones comerciales',
