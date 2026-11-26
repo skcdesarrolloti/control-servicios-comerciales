@@ -162,6 +162,13 @@ final class CommercialTaskWorkflowTest extends TestCase
 
     $tickets->setResumeDate(900, null);
     self::assertSame([], $tickets->calendarPostponedTickets());
+
+    // Salir de Postergado por cualquier camino (como Responder con un estado activo) borra la fecha; entre estados postergados, no.
+    $tickets->setResumeDate(900, $resume->getTimestamp());
+    $tickets->changeStatus(900, 'Aplazado');
+    self::assertSame((string) $resume->getTimestamp(), (string) $this->task()['fecha_retomar']);
+    $tickets->changeStatus(900, 'Contactado');
+    self::assertEmpty($this->task()['fecha_retomar'], 'Activada a mano, el script de retomar ya no la toca.');
   }
 
   public function testPostponedTaskReturnsToNewWhenItsResumeDateArrives(): void

@@ -1870,13 +1870,17 @@ final class CommercialTicketsRepository
       return;
     }
 
+    $table = $this->db->table('jet_cct_tickets');
+    $data = ['estado_comercial' => $status, 'fecha_actualizacion' => time()];
+    // Si sale de Postergado por cualquier camino (Activar, Responder con un estado activo, Cerrar), la fecha para retomar se
+    // borra: el script de retomar no la vuelve a Nuevo y el calendario de vencimientos ya no la muestra.
+    if (!in_array($status, CommercialStatusCatalog::POSTPONED, true) && $this->schema->columnExists($table, self::RESUME_COLUMN)) {
+      $data[self::RESUME_COLUMN] = null;
+    }
     $pdo = $this->db->pdo();
     $pdo->beginTransaction();
     try {
-      $this->db->update($this->db->table('jet_cct_tickets'), [
-        'estado_comercial' => $status,
-        'fecha_actualizacion' => time(),
-      ], ['_ID' => $ticketPk]);
+      $this->db->update($table, $data, ['_ID' => $ticketPk]);
       // El cambio de estado es trazabilidad interna: va como nota (no cuenta como respuesta ni lo ve el cliente en su enlace).
       $this->insertStatusNote($ticketPk, sprintf('Estado comercial actualizado de "%s" a "%s".', $previous ?: 'Sin estado', $status));
       $pdo->commit();
