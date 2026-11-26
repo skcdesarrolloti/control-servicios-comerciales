@@ -253,16 +253,58 @@ final class CommercialTicketsRepository
   }
 
   /**
-   * Pone la fecha para retomar a una postergada que todavía no la tiene, con nota interna de constancia. Devuelve false si
-   * ya tenía fecha (no la cambia).
+   * Postergadas cuya fecha para retomar la puso el script de reparto (su nota lleva $mark) y no un consultor/a: las que
+   * se pueden volver a repartir. La más antigua primero, como postponedWithoutResumeDate.
+   * @return list<array<string,mixed>>
    */
-  public function scheduleResume(int $ticketPk, int $timestamp, string $message): bool
+  public function postponedScheduledBySystem(string $mark): array
+  {
+    $table = $this->db->table('jet_cct_tickets');
+    $notes = $this->db->table('jet_cct_notas_ticket');
+    if (!$this->schema->columnExists($table, self::RESUME_COLUMN) || !$this->schema->tableExists($notes)) {
+      return [];
+    }
+    [$where, $args] = $this->bucketWhere('postergados');
+    $where[] = 'COALESCE(t.`' . self::RESUME_COLUMN . '`, 0) > 0';
+    $where[] = 'EXISTS (SELECT 1 FROM `' . $notes . "` n WHERE CAST(n.`id_ticket` AS CHAR) = CAST(t.`_ID` AS CHAR) AND n.`nombre` = 'Sistema' AND n.`observacion` LIKE ?)";
+    $args[] = '%' . $mark . '%';
+    return $this->db->getResults(
+      'SELECT t.`_ID`, t.`id_empleado`, t.`nombre_empleado`, t.`estado_comercial`, t.`fecha_actualizacion`, t.`fecha`, t.`' . self::RESUME_COLUMN . '`
+         FROM `' . $table . '` t WHERE ' . implode(' AND ', $where) . '
+        ORDER BY COALESCE(NULLIF(t.`fecha_actualizacion`, 0), t.`fecha`, 0) ASC, t.`_ID` ASC',
+      $args
+    );
+  }
+
+  /**
+   * Postergadas de un responsable (id_empleado exacto) que vuelven después de $after, sin contar $exceptPk: el cupo de
+   * postergadas largas (CommercialApiController::RESUME_LONG_LIMIT).
+   */
+  public function countLongPostponed(string $employee, int $after, int $exceptPk = 0): int
+  {
+    $table = $this->db->table('jet_cct_tickets');
+    if (!$this->schema->columnExists($table, self::RESUME_COLUMN)) {
+      return 0;
+    }
+    [$where, $args] = $this->bucketWhere('postergados');
+    $where[] = "TRIM(COALESCE(t.`id_empleado`, '')) = ?";
+    $where[] = 'COALESCE(t.`' . self::RESUME_COLUMN . '`, 0) > ?';
+    $where[] = 't.`_ID` <> ?';
+    array_push($args, trim($employee), $after, $exceptPk);
+    return (int) $this->db->getVar('SELECT COUNT(*) FROM `' . $table . '` t WHERE ' . implode(' AND ', $where), $args);
+  }
+
+  /**
+   * Pone la fecha para retomar a una postergada que todavía no la tiene, con nota interna de constancia. Devuelve false si
+   * ya tenía fecha (no la cambia), salvo con $replace (reparto de nuevo de las que programó el script).
+   */
+  public function scheduleResume(int $ticketPk, int $timestamp, string $message, bool $replace = false): bool
   {
     $table = $this->db->table('jet_cct_tickets');
     $pdo = $this->db->pdo();
     $pdo->beginTransaction();
     try {
-      $statement = $pdo->prepare('UPDATE `' . $table . '` SET `' . self::RESUME_COLUMN . '` = ? WHERE `_ID` = ? AND COALESCE(`' . self::RESUME_COLUMN . '`, 0) = 0');
+      $statement = $pdo->prepare('UPDATE `' . $table . '` SET `' . self::RESUME_COLUMN . '` = ? WHERE `_ID` = ?' . ($replace ? '' : ' AND COALESCE(`' . self::RESUME_COLUMN . '`, 0) = 0'));
       $statement->execute([$timestamp, $ticketPk]);
       if ($statement->rowCount() < 1) {
         $pdo->rollBack();

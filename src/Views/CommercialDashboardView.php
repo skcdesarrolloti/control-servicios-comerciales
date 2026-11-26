@@ -2477,7 +2477,7 @@ final class CommercialDashboardView
         $left = (int) $today->diff($resumeDay)->format('%r%a');
         $postponedLabel = 'Hasta ' . $resumeDay->format('d/m/Y');
         $slaBadgeLabel = $left > 1 ? 'Faltan ' . $left . ' días' : ($left === 1 ? 'Mañana' : 'Hoy');
-        $slaBarPct = max(5, min(100, (int) round((1 - max(0, $left) / \SCM\Http\Controller\CommercialApiController::RESUME_MAX_DAYS) * 100)));
+        $slaBarPct = max(5, min(100, (int) round((1 - max(0, $left) / \SCM\Http\Controller\CommercialApiController::RESUME_FREE_DAYS) * 100)));
       }
     } elseif ($isOverdue) {
       $slaBadgeLabel = 'Vencido';

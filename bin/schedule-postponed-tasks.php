@@ -3,9 +3,10 @@ declare(strict_types=1);
 if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }
 require dirname(__DIR__) . '/bootstrap/app.php';
 
-// Uso de una sola vez: a las tareas postergadas sin fecha para retomar les pone una, repartida en los días hábiles de los
-// próximos 30 días, por responsable y de la más antigua a la más reciente. Cada una queda con una nota interna y el cron
-// bin/resume-postponed-tasks.php las devuelve a Nuevo de a pocas (con su correo al responsable).
+// A las tareas postergadas sin fecha para retomar les pone una, repartida en los días hábiles entre dentro de un mes y
+// dentro de dos, por responsable y de la más antigua a la más reciente. También vuelve a repartir las que este script ya
+// había programado (su nota dice "estaba postergada sin fecha") y siguen postergadas; las que puso un consultor/a no se
+// tocan. Cada una queda con una nota interna y el cron bin/resume-postponed-tasks.php las devuelve a Nuevo de a pocas.
 //
 // Uso: php bin/schedule-postponed-tasks.php            (solo muestra el plan)
 //      php bin/schedule-postponed-tasks.php --aplicar  (pone las fechas)
@@ -17,14 +18,30 @@ $apply = in_array('--aplicar', $argv, true);
 
 try {
   $repository = new CommercialTicketsRepository(\SCM\Core\App::db());
-  $rows = $repository->postponedWithoutResumeDate();
+  $withoutDate = $repository->postponedWithoutResumeDate();
+  $bySystem = $repository->postponedScheduledBySystem(CommercialPostponedScheduler::NOTE_MARK);
+  $rows = array_merge($withoutDate, $bySystem);
   if ($rows === []) {
-    echo "No hay tareas postergadas sin fecha para retomar.\n";
+    echo "No hay tareas postergadas sin fecha ni programadas por el script.\n";
     exit(0);
   }
+  $replace = array_fill_keys(array_map(static fn(array $row): int => (int) $row['_ID'], $bySystem), true);
+  // Juntas, la más antigua primero (como las ordena el repositorio): fecha de actualización o, si no hay, de creación.
+  $age = static function (array $row): int {
+    foreach (['fecha_actualizacion', 'fecha'] as $key) {
+      $raw = trim((string) ($row[$key] ?? ''));
+      $time = is_numeric($raw) ? (int) $raw : (int) strtotime($raw);
+      if ($time > 0) {
+        return $time;
+      }
+    }
+    return 0;
+  };
+  usort($rows, static fn(array $a, array $b): int => [$age($a), (int) $a['_ID']] <=> [$age($b), (int) $b['_ID']]);
   $plan = CommercialPostponedScheduler::plan($rows, time());
   $days = CommercialPostponedScheduler::days(time());
-  echo 'Postergadas sin fecha: ' . count($rows) . ' · repartidas en ' . $plan['days'] . ' días hábiles, del ' . $days[0]->format('d/m/Y') . ' al ' . end($days)->format('d/m/Y') . ".\n\n";
+  echo 'Sin fecha: ' . count($withoutDate) . ' · ya programadas por el script (se reprograman): ' . count($bySystem) . "\n";
+  echo 'Total ' . count($rows) . ', repartidas en ' . $plan['days'] . ' días hábiles, del ' . $days[0]->format('d/m/Y') . ' al ' . end($days)->format('d/m/Y') . ".\n\n";
   printf("%-40s %8s %12s\n", 'Responsable', 'Tareas', 'Máx. por día');
   foreach ($plan['people'] as $person) {
     printf("%-40s %8d %12d\n", mb_strimwidth($person['nombre'], 0, 40, '…', 'UTF-8'), $person['total'], $person['por_dia']);
@@ -43,7 +60,9 @@ try {
   }
   $done = 0;
   foreach ($plan['assign'] as $id => $date) {
-    if ($repository->scheduleResume($id, $date->getTimestamp(), 'Se programó retomar la tarea el ' . $date->format('d/m/Y') . ': estaba postergada sin fecha. Ese día vuelve a "Nuevo".')) {
+    $again = isset($replace[$id]);
+    $message = ($again ? 'Se reprogramó' : 'Se programó') . ' retomar la tarea el ' . $date->format('d/m/Y') . ': ' . CommercialPostponedScheduler::NOTE_MARK . '. Ese día vuelve a "Nuevo".';
+    if ($repository->scheduleResume($id, $date->getTimestamp(), $message, $again)) {
       $done++;
     }
   }

@@ -4,27 +4,34 @@ declare(strict_types=1);
 
 namespace SCM\Commercial;
 
-use SCM\Http\Controller\CommercialApiController;
 use SCM\Support\ColombiaBusinessCalendar;
 
 /**
  * Reparte las tareas postergadas que no tienen fecha para retomar (las de antes de que Postergar la pidiera) en los días
- * hábiles de los próximos 30 días (CommercialApiController::RESUME_MAX_DAYS), por responsable y de la más antigua a la
- * más reciente, para que vuelvan a Nuevo de a pocas (CommercialPostponedResumer) y no todas el mismo día.
+ * hábiles entre dentro de un mes y dentro de 50 días (FROM_DAY a TO_DAY; no pasa de RESUME_FREE_DAYS para no gastar el cupo
+ * de postergadas largas de nadie), por responsable y de la más antigua a la más
+ * reciente, para que vuelvan a Nuevo de a pocas (CommercialPostponedResumer) y no todas el mismo día. También vuelve a
+ * repartir las que el script ya había programado (desde el día siguiente) y siguen postergadas.
  * Uso de una sola vez: bin/schedule-postponed-tasks.php.
  */
 final class CommercialPostponedScheduler
 {
+  /** Primer y último día (contados desde hoy) en que pueden volver: de dentro de un mes a dentro de 50 días. */
+  public const FROM_DAY = 30;
+  public const TO_DAY = 50;
+  /** Texto de la nota del script: marca las tareas que programó él (y no un consultor/a). */
+  public const NOTE_MARK = 'estaba postergada sin fecha';
+
   /**
-   * Días hábiles (lunes a sábado sin festivos) desde mañana hasta RESUME_MAX_DAYS, a las 8:00 a. m. de Colombia, como
-   * la fecha que pide Postergar.
+   * Días hábiles (lunes a sábado sin festivos) entre FROM_DAY y TO_DAY, a las 8:00 a. m. de Colombia, como la fecha que
+   * pide Postergar.
    * @return list<\DateTimeImmutable>
    */
   public static function days(int $now): array
   {
     $today = (new \DateTimeImmutable('@' . $now))->setTimezone(new \DateTimeZone(ColombiaBusinessCalendar::TIMEZONE))->setTime(8, 0);
     $days = [];
-    for ($i = 1; $i <= CommercialApiController::RESUME_MAX_DAYS; $i++) {
+    for ($i = self::FROM_DAY; $i <= self::TO_DAY; $i++) {
       $day = $today->modify('+' . $i . ' days');
       if (ColombiaBusinessCalendar::isBusinessDay($day)) {
         $days[] = $day;

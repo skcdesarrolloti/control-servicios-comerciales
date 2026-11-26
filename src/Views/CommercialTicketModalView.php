@@ -901,14 +901,14 @@ final class CommercialTicketModalView
     return (string) ob_get_clean();
   }
 
-  /** Fecha para retomar la tarea postergada: desde mañana y hasta 30 días (lo valida también el servidor). */
+  /** Fecha para retomar la tarea postergada: desde mañana; a más de 50 días, solo 10 por responsable (lo valida el servidor). */
   private static function resumeField(): string
   {
     $zone = new \DateTimeZone(\SCM\Support\ColombiaBusinessCalendar::TIMEZONE);
     $today = new \DateTimeImmutable('today', $zone);
     return '<div class="space-y-1"><label class="block text-xs font-semibold text-on-surface" for="commercial-resume-date">Retomar la tarea el <em class="text-rose-600">*</em></label>'
       . '<input type="date" id="commercial-resume-date" name="fecha_retomar" required min="' . $today->modify('+1 day')->format('Y-m-d') . '" max="' . $today->modify('+' . \SCM\Http\Controller\CommercialApiController::RESUME_MAX_DAYS . ' days')->format('Y-m-d') . '" class="w-full sm:w-60 text-xs sm:text-sm rounded-xl border border-surface-container focus:border-[#1E3C76] focus:ring focus:ring-[#1E3C76]/20 p-2.5 outline-none bg-white text-on-surface">'
-      . '<p class="text-[11px] text-secondary">Máximo 30 días. Ese día a las 7:00 a. m. vuelve a Nuevo (domingos y festivos, el siguiente día hábil); hasta entonces sale en el calendario de vencimientos.</p></div>';
+      . '<p class="text-[11px] text-secondary">Hasta ' . \SCM\Http\Controller\CommercialApiController::RESUME_FREE_DAYS . ' días, la fecha que quieras; a más de ' . \SCM\Http\Controller\CommercialApiController::RESUME_FREE_DAYS . ' días, solo ' . \SCM\Http\Controller\CommercialApiController::RESUME_LONG_LIMIT . ' tareas por responsable. Ese día a las 7:00 a. m. vuelve a Nuevo (domingos y festivos, el siguiente día hábil); hasta entonces sale en el calendario de vencimientos.</p></div>';
   }
 
   /**
