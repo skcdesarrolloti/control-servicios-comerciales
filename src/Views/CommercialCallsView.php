@@ -238,9 +238,9 @@ final class CommercialCallsView
       . '<p class="ccl-hint" data-ccl-property-result role="status" hidden></p>'
       . '<div data-ccl-property-fields><div class="ccl-grid">'
       . self::selectField('tipo_inmueble', 'Tipo de inmueble', $options['tipos'], '', false)
-      // En captación solo se piden tipo, uso y barrio: destinación y factores se ocultan (data-ccl-topic-field="detalle").
-      . '<div data-ccl-topic-field="detalle">' . self::selectField('destinacion', 'Destinación', $options['destinaciones'], '', false) . '</div>'
-      . self::selectField('uso', 'Uso', $options['usos'], '', false)
+      // En captación solo se piden tipo, destinación y barrio: uso y factores se ocultan (data-ccl-topic-field="detalle").
+      . self::selectField('destinacion', 'Destinación', $options['destinaciones'], '', false)
+      . '<div data-ccl-topic-field="detalle">' . self::selectField('uso', 'Uso', $options['usos'], '', false) . '</div>'
       . self::neighborhoodField('', $options['barrios'] ?? [], false)
       . '<div data-ccl-topic-field="presupuesto" hidden>' . self::selectField('tiene_presupuesto', '¿El cliente cuenta con presupuesto?', $yesNo, '', false) . '</div>'
       . '<div data-ccl-budget-field hidden>' . self::input('presupuesto', 'Presupuesto', '', 'text', false, $money) . '</div>'
@@ -319,7 +319,8 @@ final class CommercialCallsView
       . '<div data-ccl-topic-field="codigo" hidden>' . self::input('id_inmueble', 'Código del inmueble', $v('id_inmueble'), 'text', false, 'inputmode="numeric" data-ccl-property-code') . '<p class="ccl-hint" data-ccl-property-result role="status" hidden></p></div>'
       . self::selectField('tipo_inmueble', 'Tipo de inmueble', $options['tipos'], $v('tipo_inmueble'), false)
       . self::selectField('destinacion', 'Destinación', $options['destinaciones'], $v('destinacion'), false)
-      . self::selectField('uso', 'Uso', $options['usos'], $v('uso'), false)
+      // En captación no se pide el uso, solo la destinación.
+      . '<div data-ccl-topic-field="detalle">' . self::selectField('uso', 'Uso', $options['usos'], $v('uso'), false) . '</div>'
       . self::neighborhoodField($v('barrio'), $options['barrios'] ?? [], (int) $v('id_inmueble') > 0 && $v('barrio') !== '')
       . '<div data-ccl-topic-field="precio" hidden>' . self::input('precio', 'Precio', CommercialCallsService::money($v('precio')), 'text', false, 'inputmode="numeric" autocomplete="off" data-ccl-money') . '</div>'
       . '<div data-ccl-topic-field="presupuesto" hidden>' . self::selectField('tiene_presupuesto', '¿El cliente cuenta con presupuesto?', ['Si', 'No'], (int) $v('presupuesto') > 0 ? 'Si' : (str_contains((string) ($call['descripcion'] ?? ''), CommercialCallsService::NO_BUDGET_NOTE) ? 'No' : ''), false) . '</div>'

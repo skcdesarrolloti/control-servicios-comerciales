@@ -95,13 +95,13 @@
     var listing = topic === "Captacion" || topic === "Recaptacion";
     var visible = { codigo: offer, presupuesto: offer, factores: offer, cliente: offer, captacion: listing, precio: listing, detalle: !listing };
     form.querySelectorAll("[data-ccl-topic-field]").forEach(function (node) { node.hidden = !visible[node.getAttribute("data-ccl-topic-field")]; });
-    // Registrar llamada en captación: solo tipo, uso y barrio; destinación y factores no se envían.
     if (form.elements.oferta) {
       form.elements.oferta.required = listing;
       if (!listing) form.elements.oferta.value = "";
     }
+    // Captación: solo tipo, destinación y barrio; el uso (y en la llamada, los factores) no se envían.
+    if (listing && form.elements.uso) form.elements.uso.value = "";
     if (listing && form.matches("[data-ccl-form]")) {
-      if (form.elements.destinacion) form.elements.destinacion.value = "";
       form.querySelectorAll('[name="factores_importantes[]"], [name="factores_importantes"]').forEach(function (box) { box.checked = false; });
     }
     // Tipo de cliente (comisionista, inmediato) solo se pide en arriendo y venta; en otros motivos no se envía.

@@ -352,7 +352,7 @@ final class CommercialCallsService
     if ($employee === null || ($employee['activo'] ?? '') !== 'Si') {
       throw new \InvalidArgumentException('Selecciona un funcionario activo para asignar la llamada.');
     }
-    // En captación la llamada solo lleva tipo, uso y barrio: sin destinación, factores ni precio.
+    // En captación la llamada solo lleva tipo, destinación y barrio: sin uso, factores ni precio.
     $listing = in_array($topic, self::LISTING_TOPICS, true);
     $description = is_scalar($input['descripcion'] ?? null) ? trim(strip_tags((string) $input['descripcion'])) : '';
     if ($listing) {
@@ -366,8 +366,8 @@ final class CommercialCallsService
       'cliente_inmediato' => $immediate,
       'mes_inmueble' => $immediate === 'No' ? $choice('mes_inmueble', $options['meses'], 'el mes en que necesita el inmueble') : '',
       'tipo_inmueble' => $choice('tipo_inmueble', $options['tipos'], 'el tipo de inmueble', false),
-      'destinacion' => $listing ? '' : $choice('destinacion', $options['destinaciones'], 'la destinación', false),
-      'uso' => $choice('uso', $options['usos'], 'el uso', false),
+      'destinacion' => $choice('destinacion', $options['destinaciones'], 'la destinación', false),
+      'uso' => $listing ? '' : $choice('uso', $options['usos'], 'el uso', false),
       'id_inmueble' => $offer && $code > 0 ? (string) $code : '',
       'barrio' => $this->neighborhood($offer && $code > 0 ? (string) $code : '', $text('barrio')),
       'presupuesto' => $budget,
@@ -659,7 +659,7 @@ final class CommercialCallsService
       'id_inmueble' => $inmueble > 0 && $offer ? (string) $inmueble : '',
       'tipo_inmueble' => $text('tipo_inmueble'),
       'destinacion' => $text('destinacion'),
-      'uso' => $text('uso'),
+      'uso' => in_array($topic, self::LISTING_TOPICS, true) ? '' : $text('uso'),
       'medio' => $medio,
       'precio' => in_array($topic, self::LISTING_TOPICS, true) ? self::amount($text('precio')) : '',
       'presupuesto' => $budget,
