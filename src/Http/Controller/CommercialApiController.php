@@ -299,38 +299,12 @@ final class CommercialApiController
     }
     // Gestión operativa en orden: Estudio de aseguradora sale si la tarea tiene cotización (o ya tiene estudios), Contrato
     // de mandato si tiene un estudio aprobado (o ya tiene mandatos) y Hoja de cierre si ya tiene mandato.
-    $detail['quotes_count'] = 0;
-    try {
-      $detail['quotes_count'] = count((new \SCM\Commercial\Quotes\CommercialQuotesRepository($this->db))->forTask($ticketPk));
-    } catch (\Throwable $exception) {
-      error_log('[tareas:cotizaciones] ' . $exception->getMessage());
-    }
-    $detail['studies_count'] = 0;
-    $detail['studies_approved'] = 0;
-    $studies = [];
-    try {
-      $studies = (new \SCM\Commercial\Studies\CommercialStudiesRepository($this->db))->forTask($ticketPk);
-      $detail['studies_count'] = count($studies);
-      $detail['studies_approved'] = count(array_filter($studies, static fn(array $study): bool => self::approvedStudy($study)));
-    } catch (\Throwable $exception) {
-      error_log('[tareas:estudios] ' . $exception->getMessage());
-    }
-    $detail['mandates_count'] = 0;
-    $detail['closing_mandate'] = null;
-    try {
-      $mandates = new \SCM\Commercial\Mandates\CommercialMandatesService($this->db, $this->policy);
-      if ($this->policy->canView('mandatos')) {
-        $rows = $mandates->repository()->forTask($ticketPk, array_map(static fn(array $study): int => (int) $study['_ID'], $studies), \SCM\Commercial\Mandates\CommercialMandatesRepository::taskProperty($detail['ticket'], $studies));
-        $rows = array_values(array_filter($rows, static fn(array $row): bool => $mandates->canOpen($row)));
-        $detail['mandates_count'] = count($rows);
-        // Hoja de cierre: abre la del mandato más reciente.
-        if ($mandates->canClosing() && $rows !== []) {
-          $detail['closing_mandate'] = ['id' => (int) $rows[0]['_ID'], 'hoja' => $mandates->repository()->closing($rows[0]), 'total' => count($rows)];
-        }
-      }
-    } catch (\Throwable $exception) {
-      error_log('[tareas:mandatos] ' . $exception->getMessage());
-    }
+    $progress = $this->taskProgress($ticketPk, $detail['ticket']);
+    $detail['quotes_count'] = count($progress['quotes']);
+    $detail['studies_count'] = count($progress['studies']);
+    $detail['studies_approved'] = count(array_filter($progress['studies'], static fn(array $study): bool => self::approvedStudy($study)));
+    $detail['mandates_count'] = count($progress['mandates']);
+    $detail['closing_mandate'] = $progress['closing'];
     JsonResponse::success([
       'html' => CommercialTicketModalView::render(
         $detail,
@@ -339,6 +313,43 @@ final class CommercialApiController
       ),
     ]);
   }
+  /**
+   * Cotizaciones, estudios de aseguradora y mandatos de la tarea (con la hoja de cierre del más reciente): los usan los
+   * botones de Gestión operativa y el asistente. Los mandatos solo si el cargo los puede abrir; la hoja, si puede verla.
+   * @param array<string,mixed> $ticket
+   * @return array{quotes:list<array<string,mixed>>,studies:list<array<string,mixed>>,mandates:list<array<string,mixed>>,closing:?array<string,mixed>}
+   */
+  private function taskProgress(int $ticketPk, array $ticket): array
+  {
+    $progress = ['quotes' => [], 'studies' => [], 'mandates' => [], 'closing' => null];
+    try {
+      $progress['quotes'] = (new \SCM\Commercial\Quotes\CommercialQuotesRepository($this->db))->forTask($ticketPk);
+    } catch (\Throwable $exception) {
+      error_log('[tareas:cotizaciones] ' . $exception->getMessage());
+    }
+    try {
+      $progress['studies'] = (new \SCM\Commercial\Studies\CommercialStudiesRepository($this->db))->forTask($ticketPk);
+    } catch (\Throwable $exception) {
+      error_log('[tareas:estudios] ' . $exception->getMessage());
+    }
+    try {
+      $mandates = new \SCM\Commercial\Mandates\CommercialMandatesService($this->db, $this->policy);
+      if ($this->policy->canView('mandatos')) {
+        $studies = $progress['studies'];
+        $rows = $mandates->repository()->forTask($ticketPk, array_map(static fn(array $study): int => (int) $study['_ID'], $studies), \SCM\Commercial\Mandates\CommercialMandatesRepository::taskProperty($ticket, $studies));
+        $progress['mandates'] = array_values(array_filter($rows, static fn(array $row): bool => $mandates->canOpen($row)));
+        // Hoja de cierre: la del mandato más reciente.
+        if ($mandates->canClosing() && $progress['mandates'] !== []) {
+          $first = $progress['mandates'][0];
+          $progress['closing'] = ['id' => (int) $first['_ID'], 'hoja' => $mandates->repository()->closing($first), 'total' => count($progress['mandates'])];
+        }
+      }
+    } catch (\Throwable $exception) {
+      error_log('[tareas:mandatos] ' . $exception->getMessage());
+    }
+    return $progress;
+  }
+
   /** Estudio aprobado que sigue en curso (no desistido): habilita el contrato de mandato. @param array<string,mixed> $study */
   private static function approvedStudy(array $study): bool
   {
@@ -487,6 +498,19 @@ final class CommercialApiController
         (string) ($this->config['minimax_model'] ?? 'MiniMax-M3'),
         (int) ($this->config['minimax_timeout'] ?? 45)
       );
+      // El asistente ve la gestión operativa de la tarea, pero solo lo que el cargo puede ver en el panel.
+      $progress = $this->taskProgress($ticketPk, $detail['ticket']);
+      $detail['gestion'] = [
+        'cotizaciones' => $this->policy->canView('cotizaciones') ? $progress['quotes'] : [],
+        'estudios' => $this->policy->canView('estudios') ? $progress['studies'] : [],
+        'mandatos' => $progress['mandates'],
+        'hoja_cierre' => $progress['closing']['hoja'] ?? null,
+        'ocultos' => array_values(array_filter([
+          $this->policy->canView('cotizaciones') ? '' : 'cotizaciones',
+          $this->policy->canView('estudios') ? '' : 'estudios de aseguradora',
+          $this->policy->canView('mandatos') ? '' : 'contratos de mandato',
+        ])),
+      ];
       $analysis = $this->analyses->save($detail['ticket'], $assistant->analyze($detail));
       JsonResponse::success([
         'analysis' => $analysis,

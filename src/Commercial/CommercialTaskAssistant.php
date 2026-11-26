@@ -19,7 +19,7 @@ final class CommercialTaskAssistant
   }
 
   /**
-   * @param array{ticket:array<string,mixed>,timeline:array<int,array<string,mixed>>} $detail
+   * @param array{ticket:array<string,mixed>,timeline:array<int,array<string,mixed>>,gestion?:array<string,mixed>} $detail
    * @return array<string,mixed>
    */
   public function analyze(array $detail): array
@@ -34,7 +34,7 @@ final class CommercialTaskAssistant
   }
 
   /**
-   * @param array{ticket:array<string,mixed>,timeline:array<int,array<string,mixed>>} $detail
+   * @param array{ticket:array<string,mixed>,timeline:array<int,array<string,mixed>>,gestion?:array<string,mixed>} $detail
    * @return array<string,mixed>
    */
   private function buildContext(array $detail): array
@@ -61,7 +61,108 @@ final class CommercialTaskAssistant
         'seguimientos' => $this->countTimelineType($timeline, 'seguimiento'),
         'notas' => $this->countTimelineType($timeline, 'nota'),
       ],
+      'postergada_hasta' => (int) ($ticket['fecha_retomar'] ?? 0) > 0 ? date('d/m/Y', (int) $ticket['fecha_retomar']) : '',
+      'gestion_operativa' => self::operationalContext(is_array($detail['gestion'] ?? null) ? $detail['gestion'] : []),
     ];
+  }
+
+  /**
+   * Gestión operativa de la tarea en el panel: cotizaciones → estudio de aseguradora → contrato de mandato → hoja de
+   * cierre. La etapa sale de los registros, no del estado comercial escrito, para que el análisis no se quede atrás.
+   * @param array<string,mixed> $gestion cotizaciones, estudios, mandatos, hoja_cierre y ocultos (lo que el cargo no ve)
+   * @return array<string,mixed>
+   */
+  public static function operationalContext(array $gestion): array
+  {
+    $list = static fn(string $key): array => array_values(array_filter(is_array($gestion[$key] ?? null) ? $gestion[$key] : [], 'is_array'));
+    $value = static function (array $row, string ...$keys): string {
+      foreach ($keys as $key) {
+        $text = is_scalar($row[$key] ?? null) ? self::stripNoise(html_entity_decode(strip_tags((string) $row[$key]), ENT_QUOTES | ENT_HTML5, 'UTF-8')) : '';
+        if ($text !== '') {
+          return mb_substr($text, 0, 400);
+        }
+      }
+      return '';
+    };
+    $date = static function ($raw): string {
+      if (is_numeric($raw) && (int) $raw > 0) {
+        return date('d/m/Y', (int) $raw);
+      }
+      $parsed = is_string($raw) && trim($raw) !== '' ? strtotime($raw) : false;
+      return $parsed !== false ? date('d/m/Y', $parsed) : '';
+    };
+    $clean = static fn(array $row): array => array_filter($row, static fn($item): bool => $item !== '' && $item !== []);
+
+    $quotes = array_map(static fn(array $quote): array => $clean([
+      'numero' => (string) ($quote['_ID'] ?? ''),
+      'fecha' => $date($quote['cct_created'] ?? $quote['fecha'] ?? ''),
+      'tipo' => $value($quote, 'tipo'),
+      'inmuebles' => \SCM\Commercial\Quotes\CommercialQuotesRepository::codes($quote['inmuebles'] ?? ''),
+      'enviada_a' => $value($quote, 'destinatario'),
+      'observaciones' => $value($quote, 'observaciones'),
+      'consultor' => $value($quote, 'creador'),
+    ]), array_slice($list('cotizaciones'), 0, 10));
+
+    $studies = array_map(static fn(array $study): array => $clean([
+      'numero' => (string) ($study['_ID'] ?? ''),
+      'solicitud' => $value($study, 'num_solicitud'),
+      'fecha' => $date($study['cct_created'] ?? $study['fecha'] ?? ''),
+      'aseguradora' => $value($study, 'aseguradora'),
+      'estado' => $value($study, 'estado'),
+      'estado_contrato' => $value($study, 'estado_contrato'),
+      'fecha_respuesta' => $date($study['fecha_respuesta'] ?? ''),
+      'faltante' => $value($study, 'faltante'),
+      'razon_desistido' => $value($study, 'razon_desistido'),
+      'inmueble' => $value($study, 'id_inmueble'),
+      'canon' => $value($study, 'valor'),
+      'posible_entrega' => $date($study['fecha_posible_entrega'] ?? ''),
+    ]), array_slice($list('estudios'), 0, 10));
+
+    $mandates = array_map(static fn(array $mandate): array => $clean([
+      'numero' => (string) ($mandate['_ID'] ?? ''),
+      'fecha' => $date($mandate['cct_created'] ?? $mandate['fecha'] ?? ''),
+      'estado' => $value($mandate, 'estado'),
+      'tipo' => $value($mandate, 'tipo_contrato', 'tipo'),
+      'inmueble' => $value($mandate, 'id_inmueble'),
+      'canon' => $value($mandate, 'canon', 'valor'),
+      'firma_pendiente' => (int) ($mandate['rev_firma_pendiente'] ?? 0) > 0 ? 'sí' : '',
+      'observaciones_pendientes' => (int) ($mandate['rev_pendientes'] ?? 0) > 0 ? (string) (int) $mandate['rev_pendientes'] : '',
+    ]), array_slice($list('mandatos'), 0, 10));
+
+    $closing = is_array($gestion['hoja_cierre'] ?? null) ? $gestion['hoja_cierre'] : [];
+    $closingState = trim((string) ($closing['estado'] ?? ''));
+    $approved = array_filter($studies, static fn(array $study): bool => ($study['estado'] ?? '') === 'Aprobado' && mb_strtolower((string) ($study['estado_contrato'] ?? ''), 'UTF-8') !== 'desistido');
+
+    if ($closingState !== '') {
+      $stage = 'Hoja de cierre (' . $closingState . ')';
+      $next = 'Completar la hoja de cierre y la entrega del inmueble.';
+    } elseif ($mandates !== []) {
+      $stage = 'Contrato de mandato';
+      $next = 'Lograr la firma del mandato y abrir la hoja de cierre.';
+    } elseif ($approved !== []) {
+      $stage = 'Estudio aprobado';
+      $next = 'Elaborar y enviar el contrato de mandato.';
+    } elseif ($studies !== []) {
+      $stage = 'Estudio de aseguradora en curso';
+      $next = 'Hacer seguimiento al estudio y completar lo que falte para que lo aprueben.';
+    } elseif ($quotes !== []) {
+      $stage = 'Cotización enviada';
+      $next = 'Confirmar el interés del cliente en un inmueble cotizado y, si sigue, radicar el estudio de aseguradora.';
+    } else {
+      $stage = 'Sin cotización';
+      $next = 'Enviar una cotización con inmuebles que se ajusten a lo que pide el cliente.';
+    }
+
+    $hidden = array_values(array_filter(is_array($gestion['ocultos'] ?? null) ? $gestion['ocultos'] : [], 'is_string'));
+    return $clean([
+      'flujo' => 'Cotización → Estudio de aseguradora → Contrato de mandato (con estudio aprobado) → Hoja de cierre',
+      'etapa' => $stage,
+      'siguiente_paso_del_flujo' => $next,
+      'cotizaciones' => $quotes,
+      'estudios_aseguradora' => $studies,
+      'contratos_mandato' => $mandates,
+      'sin_acceso' => $hidden,
+    ]) + ['conteo' => ['cotizaciones' => count($quotes), 'estudios' => count($studies), 'estudios_aprobados' => count($approved), 'mandatos' => count($mandates)]];
   }
 
   /** @param array<string,mixed> $item @return array<string,mixed> */
@@ -159,7 +260,7 @@ final class CommercialTaskAssistant
         ],
         [
           'role' => 'user',
-          'content' => "Analiza esta tarea comercial. Usa la información de la tarea, inmueble, historial, respuestas, seguimientos, notas y adjuntos disponibles. Devuelve únicamente JSON válido con estas llaves: resumen, cliente, estado_actual, riesgos, oportunidades, recomendaciones, proximos_pasos, mensaje_sugerido, datos_faltantes. Las llaves riesgos, oportunidades, recomendaciones, proximos_pasos y datos_faltantes deben ser arreglos de textos breves.\n\nContexto:\n{$contextJson}",
+          'content' => "Analiza esta tarea comercial. Usa la información de la tarea, inmueble, historial, respuestas, seguimientos, notas, adjuntos y la gestión operativa (cotizaciones, estudios de aseguradora, contratos de mandato y hoja de cierre). La gestión operativa es la fuente de verdad del avance: en estado_actual di en qué etapa del flujo va según gestion_operativa.etapa, y basa los próximos pasos en siguiente_paso_del_flujo y en el detalle de cada registro (aseguradora, estado del estudio, lo que falta, firma pendiente u observaciones del mandato). No recomiendes un paso que ya se hizo ni saltarte uno del flujo. Si la tarea está postergada (postergada_hasta), tenlo en cuenta. Si algo aparece en sin_acceso, no supongas su contenido. Devuelve únicamente JSON válido con estas llaves: resumen, cliente, estado_actual, riesgos, oportunidades, recomendaciones, proximos_pasos, mensaje_sugerido, datos_faltantes. Las llaves riesgos, oportunidades, recomendaciones, proximos_pasos y datos_faltantes deben ser arreglos de textos breves.\n\nContexto:\n{$contextJson}",
         ],
       ],
     ];
