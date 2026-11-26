@@ -209,11 +209,11 @@ final class CommercialTaskWorkflowTest extends TestCase
     $now = (new \DateTimeImmutable('2026-11-25 10:00', new \DateTimeZone('America/Bogota')))->getTimestamp();
     $days = \SCM\Commercial\CommercialPostponedScheduler::days($now);
     self::assertSame('2026-12-26 08:00', $days[0]->format('Y-m-d H:i'), 'Desde dentro de un mes (el 25 de diciembre es festivo), a las 8:00 a. m.');
-    self::assertSame('2027-01-14', end($days)->format('Y-m-d'), 'Hasta dentro de 50 días: no gasta el cupo de postergadas largas.');
+    self::assertSame('2027-01-14', end($days)->format('Y-m-d'), 'Hasta dentro de 50 días.');
     foreach ($days as $day) {
       self::assertNotSame('7', $day->format('N'), 'Sin domingos.');
       self::assertNotContains($day->format('Y-m-d'), ['2026-12-25', '2027-01-01', '2027-01-11'], 'Sin festivos.');
-      self::assertLessThanOrEqual(CommercialApiController::RESUME_FREE_DAYS, (int) (new \DateTimeImmutable('2026-11-25'))->diff($day)->days);
+      self::assertLessThanOrEqual(\SCM\Commercial\CommercialPostponedScheduler::TO_DAY, (int) (new \DateTimeImmutable('2026-11-25'))->diff($day)->days);
     }
 
     $rows = [];
@@ -260,33 +260,45 @@ final class CommercialTaskWorkflowTest extends TestCase
     self::assertStringContainsString('0 / 30 días', $row(['estado_comercial' => 'Nuevo', 'estado' => 'Nuevo', 'scm_sla_status' => 'a_tiempo']), 'Las abiertas siguen con su semáforo.');
   }
 
-  public function testResumeDateIsFreeFromTomorrowWithATypoCap(): void
+  public function testResumeDateIsAnyDateFromTomorrow(): void
   {
     $today = new \DateTimeImmutable('today', new \DateTimeZone('America/Bogota'));
     self::assertNull(CommercialApiController::resumeDate($today->format('Y-m-d')), 'Hoy no: desde mañana.');
-    self::assertNull(CommercialApiController::resumeDate($today->modify('+2 years')->format('Y-m-d')));
-    self::assertSame([50, 10], [CommercialApiController::RESUME_FREE_DAYS, CommercialApiController::RESUME_LONG_LIMIT]);
-    self::assertNotNull(CommercialApiController::resumeDate($today->modify('+90 days')->format('Y-m-d')), 'Febrero o más adelante, sí (con el cupo de largas).');
-    self::assertNotNull(CommercialApiController::resumeDate($today->modify('+365 days')->format('Y-m-d')));
-    self::assertNull(CommercialApiController::resumeDate($today->modify('+366 days')->format('Y-m-d')), 'Más de un año: fecha mal escrita.');
+    self::assertNull(CommercialApiController::resumeDate($today->modify('-3 days')->format('Y-m-d')));
+    self::assertNotNull(CommercialApiController::resumeDate($today->modify('+90 days')->format('Y-m-d')), 'Febrero o más adelante, sí.');
+    self::assertNotNull(CommercialApiController::resumeDate($today->modify('+2 years')->format('Y-m-d')), 'Sin tope.');
     self::assertNull(CommercialApiController::resumeDate('2026-02-30'));
     self::assertNull(CommercialApiController::resumeDate(''));
     self::assertSame('08:00', CommercialApiController::resumeDate($today->modify('+1 day')->format('Y-m-d'))?->format('H:i'));
     self::assertSame('lunes 7 de diciembre de 2026', CommercialApiController::longDate(new \DateTimeImmutable('2026-12-07')));
   }
 
-  public function testOnlyTenTasksPerResponsibleCanBePostponedBeyondFiftyDays(): void
+  public function testTasksTheScriptBroughtBackToNewCanBePostponedAgainIfNobodyTouchedThem(): void
   {
+    $mark = \SCM\Commercial\CommercialPostponedScheduler::NOTE_MARK;
+    $at = static fn(string $local): int => (new \DateTimeImmutable($local, new \DateTimeZone('America/Bogota')))->getTimestamp();
     $tickets = new CommercialTicketsRepository($this->db);
     $tickets->changeStatus(900, 'Postergado');
-    $employee = trim((string) $this->task()['id_empleado']);
-    $after = (new \DateTimeImmutable('today', new \DateTimeZone('America/Bogota')))->modify('+' . CommercialApiController::RESUME_FREE_DAYS . ' days')->setTime(23, 59, 59)->getTimestamp();
-    $tickets->setResumeDate(900, $after + 86400 * 20);
-    self::assertSame(1, $tickets->countLongPostponed($employee, $after), 'Cuenta la postergada a más de 50 días.');
-    self::assertSame(0, $tickets->countLongPostponed($employee, $after, 900), 'Sin contar la que se está postergando.');
-    self::assertSame(0, $tickets->countLongPostponed('otro-' . $employee, $after), 'Por responsable, exacto por id_empleado.');
-    $tickets->setResumeDate(900, $after - 86400);
-    self::assertSame(0, $tickets->countLongPostponed($employee, $after), 'Dentro de 50 días no gasta cupo.');
+    $this->db->update('wp_jet_cct_tickets', ['estado_administrativo' => 'Postergado'], ['_ID' => 900]);
+    self::assertTrue($tickets->scheduleResume(900, $at('2026-11-30 08:00'), 'Se programó retomar la tarea el 30/11/2026: ' . $mark . '.'));
+    [$notifier] = $this->recorder();
+    self::assertSame(1, (new \SCM\Commercial\CommercialPostponedResumer($this->db, new Settings($this->db), $notifier))->run($at('2026-11-30 07:00')));
+
+    self::assertSame([], $tickets->resumedBySystemSince($at('2026-12-01 00:00'), $mark), 'Volvió antes de --desde.');
+    self::assertSame(['900'], array_map('strval', array_column($tickets->resumedBySystemSince($at('2026-11-30 00:00'), $mark), '_ID')));
+
+    self::assertTrue($tickets->repostpone(900, $at('2027-01-04 08:00'), 'La tarea volvió a "Postergado": ' . $mark . '.'));
+    $task = $this->task();
+    self::assertSame(['En proceso', 'Postergado', 'Postergado'], [$task['estado'], $task['estado_comercial'], $task['estado_administrativo']], 'Como Postergar; no toca el estado administrativo.');
+    self::assertSame((string) $at('2027-01-04 08:00'), (string) $task['fecha_retomar']);
+    self::assertFalse($tickets->repostpone(900, $at('2027-01-05 08:00'), 'otra'), 'Ya no está en Nuevo.');
+    self::assertSame([], $tickets->resumedBySystemSince($at('2026-11-30 00:00'), $mark), 'Ya está postergada.');
+
+    // Si un funcionario ya la trabajó después de volver, no se toca.
+    $this->db->update('wp_jet_cct_tickets', ['estado' => 'Nuevo', 'estado_comercial' => 'Nuevo', 'fecha_retomar' => null], ['_ID' => 900]);
+    self::assertCount(1, $tickets->resumedBySystemSince($at('2026-11-30 00:00'), $mark));
+    $this->db->insert('wp_jet_cct_notas_ticket', ['id_ticket' => '900', 'fecha' => $at('2026-11-30 09:00'), 'nombre' => 'Consultora Uno', 'observacion' => 'La llamé.']);
+    self::assertSame([], $tickets->resumedBySystemSince($at('2026-11-30 00:00'), $mark), 'Ya la tocó un funcionario.');
   }
 
   public function testPostponedAndClosedClientNoticesUseTheirTemplates(): void
@@ -440,7 +452,7 @@ final class CommercialTaskWorkflowTest extends TestCase
     $html = CommercialTicketModalView::render(['ticket' => $this->task(), 'timeline' => [], 'reply_guides' => []], $policy, []);
 
     preg_match('/data-commercial-workflow-form="postpone".*?<\/form>/s', $html, $postpone);
-    self::assertMatchesRegularExpression('/name="fecha_retomar" required min="\d{4}-\d{2}-\d{2}" max="\d{4}-\d{2}-\d{2}"/', $postpone[0]);
+    self::assertMatchesRegularExpression('/name="fecha_retomar" required min="\d{4}-\d{2}-\d{2}" class=/', $postpone[0], 'Desde mañana, sin fecha máxima.');
     preg_match('/data-commercial-workflow-form="close".*?<\/form>/s', $html, $close);
     self::assertStringContainsString('data-commercial-status-help-text>' . CommercialStatusCatalog::descriptions()['Finalizado'], $close[0]);
     preg_match('/data-commercial-workflow-form="reassign".*?<\/form>/s', $html, $reassign);

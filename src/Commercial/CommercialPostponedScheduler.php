@@ -8,8 +8,7 @@ use SCM\Support\ColombiaBusinessCalendar;
 
 /**
  * Reparte las tareas postergadas que no tienen fecha para retomar (las de antes de que Postergar la pidiera) en los días
- * hábiles entre dentro de un mes y dentro de 50 días (FROM_DAY a TO_DAY; no pasa de RESUME_FREE_DAYS para no gastar el cupo
- * de postergadas largas de nadie), por responsable y de la más antigua a la más
+ * hábiles entre dentro de un mes y dentro de 50 días (FROM_DAY a TO_DAY), por responsable y de la más antigua a la más
  * reciente, para que vuelvan a Nuevo de a pocas (CommercialPostponedResumer) y no todas el mismo día. También vuelve a
  * repartir las que el script ya había programado (desde el día siguiente) y siguen postergadas.
  * Uso de una sola vez: bin/schedule-postponed-tasks.php.

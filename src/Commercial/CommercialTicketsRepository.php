@@ -277,21 +277,77 @@ final class CommercialTicketsRepository
   }
 
   /**
-   * Postergadas de un responsable (id_empleado exacto) que vuelven después de $after, sin contar $exceptPk: el cupo de
-   * postergadas largas (CommercialApiController::RESUME_LONG_LIMIT).
+   * Tareas que el sistema devolvió a Nuevo desde $since porque llegó la fecha que les puso el script de reparto (su nota
+   * lleva $mark) y que nadie ha tocado desde entonces: siguen en Nuevo y sin respuestas, seguimientos ni notas de un
+   * funcionario. Son las que se pueden volver a postergar (repostpone). La más antigua primero.
+   * @return list<array<string,mixed>>
    */
-  public function countLongPostponed(string $employee, int $after, int $exceptPk = 0): int
+  public function resumedBySystemSince(int $since, string $mark): array
   {
     $table = $this->db->table('jet_cct_tickets');
-    if (!$this->schema->columnExists($table, self::RESUME_COLUMN)) {
-      return 0;
+    $notes = $this->db->table('jet_cct_notas_ticket');
+    if (!$this->schema->columnExists($table, self::RESUME_COLUMN) || !$this->schema->tableExists($notes)) {
+      return [];
     }
-    [$where, $args] = $this->bucketWhere('postergados');
-    $where[] = "TRIM(COALESCE(t.`id_empleado`, '')) = ?";
-    $where[] = 'COALESCE(t.`' . self::RESUME_COLUMN . '`, 0) > ?';
-    $where[] = 't.`_ID` <> ?';
-    array_push($args, trim($employee), $after, $exceptPk);
-    return (int) $this->db->getVar('SELECT COUNT(*) FROM `' . $table . '` t WHERE ' . implode(' AND ', $where), $args);
+    // Desde $since: por la fecha (timestamp) o, si no la tiene, por cct_created (dos parámetros cada vez).
+    $when = static fn(string $alias): string => '(COALESCE(' . $alias . '.`fecha`, 0) + 0 >= ? + 0 OR ' . $alias . '.`cct_created` >= ?)';
+    $sinceArgs = [$since, date('Y-m-d H:i:s', $since)];
+    $same = static fn(string $alias): string => 'CAST(' . $alias . '.`id_ticket` AS CHAR) = CAST(t.`_ID` AS CHAR)';
+    $where = [
+      "TRIM(COALESCE(t.`estado_comercial`, '')) = 'Nuevo'",
+      "TRIM(COALESCE(t.`estado`, '')) = 'Nuevo'",
+      'COALESCE(t.`' . self::RESUME_COLUMN . '`, 0) = 0',
+      'EXISTS (SELECT 1 FROM `' . $notes . '` r WHERE ' . $same('r') . " AND r.`nombre` = 'Sistema' AND r.`observacion` LIKE ? AND COALESCE(r.`fecha`, 0) + 0 >= ? + 0)",
+      'EXISTS (SELECT 1 FROM `' . $notes . '` m WHERE ' . $same('m') . " AND m.`nombre` = 'Sistema' AND m.`observacion` LIKE ?)",
+      'NOT EXISTS (SELECT 1 FROM `' . $notes . '` n WHERE ' . $same('n') . " AND COALESCE(n.`nombre`, '') <> 'Sistema' AND " . $when('n') . ')',
+    ];
+    $args = ['La tarea volvió a "Nuevo"%se cumplió la fecha para retomarla%', $since, '%' . $mark . '%', ...$sinceArgs];
+    foreach (['jet_cct_historial_del_ticket', 'jet_cct_seguimiento_ticket'] as $other) {
+      $otherTable = $this->db->table($other);
+      if ($this->schema->tableExists($otherTable)) {
+        $where[] = 'NOT EXISTS (SELECT 1 FROM `' . $otherTable . '` o WHERE ' . $same('o') . ' AND ' . $when('o') . ')';
+        array_push($args, ...$sinceArgs);
+      }
+    }
+    return $this->db->getResults(
+      'SELECT t.`_ID`, t.`id_empleado`, t.`nombre_empleado`, t.`estado_comercial`, t.`fecha_actualizacion`, t.`fecha`
+         FROM `' . $table . '` t WHERE ' . implode(' AND ', $where) . '
+        ORDER BY COALESCE(NULLIF(t.`fecha_actualizacion`, 0), t.`fecha`, 0) ASC, t.`_ID` ASC',
+      $args
+    );
+  }
+
+  /**
+   * Vuelve a postergar una tarea que el sistema devolvió a Nuevo (resumedBySystemSince): Postergado con su nueva fecha
+   * para retomar, como la deja Postergar (estado "En proceso"; no toca estado_administrativo), y nota interna. Devuelve
+   * false si ya no está en Nuevo.
+   */
+  public function repostpone(int $ticketPk, int $timestamp, string $message): bool
+  {
+    $table = $this->db->table('jet_cct_tickets');
+    $pdo = $this->db->pdo();
+    $pdo->beginTransaction();
+    try {
+      $statement = $pdo->prepare('UPDATE `' . $table . "` SET `estado` = 'En proceso', `estado_comercial` = 'Postergado', `" . self::RESUME_COLUMN . "` = ?, `fecha_actualizacion` = ? WHERE `_ID` = ? AND TRIM(COALESCE(`estado_comercial`, '')) = 'Nuevo'");
+      $statement->execute([$timestamp, time(), $ticketPk]);
+      if ($statement->rowCount() < 1) {
+        $pdo->rollBack();
+        return false;
+      }
+      $notes = $this->db->table('jet_cct_notas_ticket');
+      if ($this->schema->tableExists($notes)) {
+        $stamp = date('Y-m-d H:i:s');
+        $this->db->insert($notes, ['cct_status' => 'publish', 'cct_author_id' => '0', 'cct_created' => $stamp, 'cct_modified' => $stamp,
+          'id_ticket' => $ticketPk, 'fecha' => time(), 'nombre' => 'Sistema', 'id_empleado' => '', 'observacion' => $message]);
+      }
+      $pdo->commit();
+      return true;
+    } catch (\Throwable $exception) {
+      if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+      }
+      throw $exception;
+    }
   }
 
   /**

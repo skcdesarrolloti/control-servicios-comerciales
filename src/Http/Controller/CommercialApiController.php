@@ -793,17 +793,7 @@ final class CommercialApiController
     }
     $resume = self::resumeDate((string) ($input['fecha_retomar'] ?? ''));
     if ($resume === null) {
-      JsonResponse::error('Elige la fecha para retomar la tarea: desde mañana y dentro de un año como mucho.', 422);
-    }
-    // Más de RESUME_FREE_DAYS días: solo RESUME_LONG_LIMIT tareas por responsable a la vez (sus postergadas que hoy
-    // vuelven después de ese plazo, sin contar esta).
-    $zone = new \DateTimeZone(\SCM\Support\ColombiaBusinessCalendar::TIMEZONE);
-    $longFrom = (new \DateTimeImmutable('today', $zone))->modify('+' . self::RESUME_FREE_DAYS . ' days')->setTime(23, 59, 59);
-    if ($resume > $longFrom) {
-      $responsible = trim((string) $this->db->getVar('SELECT `id_empleado` FROM `' . $this->db->table('jet_cct_tickets') . '` WHERE `_ID` = ? LIMIT 1', [$ticketPk]));
-      if ($this->tickets->countLongPostponed($responsible, $longFrom->getTimestamp(), $ticketPk) >= self::RESUME_LONG_LIMIT) {
-        JsonResponse::error('A más de ' . self::RESUME_FREE_DAYS . ' días solo se pueden postergar ' . self::RESUME_LONG_LIMIT . ' tareas por responsable, y ya tiene ' . self::RESUME_LONG_LIMIT . '. Elige una fecha dentro de ' . self::RESUME_FREE_DAYS . ' días.', 422);
-      }
+      JsonResponse::error('Elige la fecha para retomar la tarea: desde mañana en adelante.', 422);
     }
     $result = $this->workflow->postponeTicket(
       $ticketPk,
@@ -1444,14 +1434,7 @@ final class CommercialApiController
     }
   }
 
-  /** Hasta estos días se posterga con la fecha que se quiera. */
-  public const RESUME_FREE_DAYS = 50;
-  /** Tareas que cada responsable puede tener postergadas a más de RESUME_FREE_DAYS días a la vez. */
-  public const RESUME_LONG_LIMIT = 10;
-  /** Tope solo para fechas mal escritas (2062 en vez de 2026). */
-  public const RESUME_MAX_DAYS = 365;
-
-  /** Fecha para retomar una tarea postergada (8:00 a. m. de Colombia): desde mañana y hasta un año. */
+  /** Fecha para retomar una tarea postergada (8:00 a. m. de Colombia): cualquiera desde mañana, sin tope. */
   public static function resumeDate(string $value): ?\DateTimeImmutable
   {
     $zone = new \DateTimeZone(\SCM\Support\ColombiaBusinessCalendar::TIMEZONE);
@@ -1460,7 +1443,7 @@ final class CommercialApiController
       return null;
     }
     $today = new \DateTimeImmutable('today', $zone);
-    if ($date <= $today || $date > $today->modify('+' . self::RESUME_MAX_DAYS . ' days')) {
+    if ($date <= $today) {
       return null;
     }
     return $date->setTime(8, 0);
