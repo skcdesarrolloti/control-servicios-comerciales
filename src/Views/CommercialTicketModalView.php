@@ -101,6 +101,9 @@ final class CommercialTicketModalView
       </div>
       <!-- Top-right Action Buttons and Close Modal Button -->
       <div class="flex items-center gap-2">
+        <button aria-label="Actualizar tarea" title="Actualizar tarea" class="w-8 h-8 rounded-full bg-surface-container hover:bg-surface-container-high text-secondary hover:text-on-surface flex items-center justify-center transition-all cursor-pointer disabled:opacity-60 disabled:cursor-wait" type="button" data-commercial-refresh-case>
+          <span class="material-symbols-outlined text-[18px]">refresh</span>
+        </button>
         <button aria-label="Cerrar modal" class="w-8 h-8 rounded-full bg-surface-container hover:bg-surface-container-high text-secondary hover:text-on-surface flex items-center justify-center transition-all ml-1 cursor-pointer" type="button" data-commercial-close-case>
           <span class="material-symbols-outlined text-[18px]">close</span>
         </button>

@@ -440,6 +440,7 @@ final class CommercialTaskWorkflowTest extends TestCase
     $guides->save([['estado' => 'Mostrando', 'situacion' => 'Después de la visita', 'respuesta' => 'Gracias por visitar "el inmueble" & más.']], false, '101');
     $policy = CommercialCallsDatabase::policy($this->db);
     $html = CommercialTicketModalView::render(['ticket' => $this->task(), 'timeline' => [], 'reply_guides' => $guides->forStatus('Mostrando')], $policy, []);
+    self::assertMatchesRegularExpression('/data-commercial-refresh-case>\s*<span[^>]*>refresh<\/span>\s*<\/button>\s*<button aria-label="Cerrar modal"/', $html, 'Botón para actualizar el popup junto a la X.');
 
     // Responder: solo mantener o un estado activo, con la guía de cada uno.
     preg_match('/data-commercial-workflow-form="reply".*?<\/form>/s', $html, $reply);

@@ -2307,6 +2307,18 @@
         return;
       }
       if (event.target.closest("[data-commercial-retry-case]")) loadCase(currentCasePk, false);
+      // Actualizar (junto a la X): vuelve a traer la tarea sin cerrar el popup; el ícono gira hasta que llega.
+      var refreshCase = event.target.closest("[data-commercial-refresh-case]");
+      if (refreshCase && !refreshCase.disabled) {
+        refreshCase.disabled = true;
+        var refreshIcon = refreshCase.querySelector(".material-symbols-outlined");
+        if (refreshIcon) refreshIcon.classList.add("animate-spin");
+        loadCase(currentCasePk, true).then(function () {
+          // Si la tarea no se pudo traer, el popup muestra el error con Reintentar y este botón ya no está.
+          refreshCase.disabled = false;
+          if (refreshIcon) refreshIcon.classList.remove("animate-spin");
+        });
+      }
     });
     // Guía del estado elegido bajo cada lista de estado comercial.
     caseModal.addEventListener("change", function (event) {
