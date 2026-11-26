@@ -226,7 +226,7 @@ trait HandlesMaintenanceActions
 
     $table = $this->db->table('jet_cct_tickets');
     if (!$this->ensure_magnitud_caso_column($table)) {
-      $this->jsonFail('No se pudo preparar la columna magnitud_caso en tickets.');
+      $this->jsonFail('No se pudo preparar la columna magnitud_caso en tareas.');
     }
 
     $service = new \SCM\Modules\ServiciosInmobiliarios\DamageMagnitudeService($this->db->pdo(), $this->db->prefix());
@@ -293,7 +293,7 @@ trait HandlesMaintenanceActions
     $allowed = ['critico', 'alto', 'medio', 'bajo'];
 
     if ($ticketPk <= 0) {
-      $this->jsonFail('Ticket invalido.');
+      $this->jsonFail('Tarea inválida.');
     }
     if (!in_array($magnitud, $allowed, true)) {
       $this->jsonFail('Magnitud no valida.');
@@ -301,7 +301,7 @@ trait HandlesMaintenanceActions
 
     $table = $this->db->table('jet_cct_tickets');
     if (!$this->column_exists($table, 'magnitud_caso')) {
-      $this->jsonFail('No existe la columna magnitud_caso en tickets.');
+      $this->jsonFail('No existe la columna magnitud_caso en tareas.');
     }
 
     $this->db->update($table, ['magnitud_caso' => $magnitud], ['_ID' => $ticketPk]);
@@ -325,7 +325,7 @@ trait HandlesMaintenanceActions
     $mapsLocation = $this->normalizePropertyLocationInput($mapsLocationRaw);
 
     if ($ticketPk <= 0) {
-      $this->jsonFail('Ticket invalido.');
+      $this->jsonFail('Tarea inválida.');
     }
     if ($propertyRowId === '' && $propertyCode === '') {
       $this->jsonFail('No se encontro el inmueble asociado al caso.');
@@ -393,7 +393,7 @@ trait HandlesMaintenanceActions
     $notifyNewEmp  = !empty($_POST['notify_funcionario']) || !empty($_POST['notify_nuevo']);
 
     if ($ticketPk <= 0) {
-      $this->jsonFail('Ticket invalido.');
+      $this->jsonFail('Tarea inválida.');
     }
     if ($newEmpId === '') {
       $this->jsonFail('Debe seleccionar un funcionario.');
@@ -407,7 +407,7 @@ trait HandlesMaintenanceActions
       [$ticketPk]
     );
     if (!is_array($ticket)) {
-      $this->jsonFail('Ticket no encontrado.');
+      $this->jsonFail('Tarea no encontrada.');
     }
 
     $newEmp = $this->db->getRow(
@@ -448,7 +448,7 @@ trait HandlesMaintenanceActions
     ]);
 
     if (empty($update)) {
-      $this->jsonFail('No se pudo actualizar el ticket.');
+      $this->jsonFail('No se pudo actualizar la tarea.');
     }
 
     $this->db->update($ticketsTable, $update, ['_ID' => $ticketPk]);

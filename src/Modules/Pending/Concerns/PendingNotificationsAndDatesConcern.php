@@ -27,9 +27,9 @@ trait PendingNotificationsAndDatesConcern
     $ticketUrl = \SCM\Support\StaffTaskLink::openBase() . rawurlencode((string) $ticketId);
     $subject = $mode === 'preventiva'
       ? 'Aviso de revision preventiva del contrato ' . (string) ($ticketPayload['contrato'] ?? '')
-      : 'Ticket administrativo #' . $ticketId . ' creado';
-    $content = '<p style="font-weight:600;margin:0 0 12px;">Se ha creado un ticket administrativo.</p>';
-    $content .= '<p style="margin:4px 0;"><b>Ticket:</b> #' . EmailTemplate::e((string) $ticketId) . '</p>';
+      : 'Tarea administrativa #' . $ticketId . ' creada';
+    $content = '<p style="font-weight:600;margin:0 0 12px;">Se ha creado una tarea administrativa.</p>';
+    $content .= '<p style="margin:4px 0;"><b>Tarea:</b> #' . EmailTemplate::e((string) $ticketId) . '</p>';
     $content .= '<p style="margin:4px 0;"><b>Tema:</b> ' . EmailTemplate::e((string) ($ticketPayload['tema_ayuda'] ?? '')) . '</p>';
     $content .= '<p style="margin:4px 0;"><b>Asunto:</b> ' . EmailTemplate::e((string) ($ticketPayload['asunto'] ?? '')) . '</p>';
     $content .= '<p style="margin:4px 0;"><b>Contrato:</b> ' . EmailTemplate::e((string) ($ticketPayload['contrato'] ?? '')) . '</p>';

@@ -1041,7 +1041,7 @@
         var tickets = (json.data && json.data.tickets) || [];
         if (!tickets.length) {
           body.innerHTML =
-            '<p class="scm-muted">Este ticket no tiene magnitud calculable para esa revision.</p>';
+            '<p class="scm-muted">Esta tarea no tiene magnitud calculable para esa revision.</p>';
           prependCaseLocationPanel(body, caseBtn, modal);
           return;
         }
@@ -1076,7 +1076,7 @@
         '<div class="scm-case-magnitude-popup" data-ticket-pk="' +
         escHtml(ticketPk) +
         '">' +
-        '<p class="scm-muted">Esta magnitud es manual y queda guardada en el ticket.</p>' +
+        '<p class="scm-muted">Esta magnitud es manual y queda guardada en la tarea.</p>' +
         '<div class="scm-case-magnitude-options">' +
         options
           .map(function (key) {
@@ -1239,7 +1239,7 @@
     if (title) {
       title.textContent = isPublicPqr
         ? "Agregar nota a la solicitud"
-        : "Agregar nota al ticket";
+        : "Agregar nota a la tarea";
     }
     setCaseSubmodalMeta(sub, caseBtn);
     if (body) {
@@ -1251,7 +1251,7 @@
         '<label class="scm-seg-field"><span>Nota</span><textarea name="observacion" rows="6" required placeholder="' +
         (isPublicPqr
           ? "Escribe una nota interna para la solicitud..."
-          : "Escribe una nota interna para el ticket...") +
+          : "Escribe una nota interna para la tarea...") +
         '"></textarea></label>' +
         '<div class="scm-seg-actions">' +
         '<button type="submit" class="scm-btn-primary">Guardar nota</button>' +
@@ -1275,7 +1275,7 @@
     var isPublicPqr = (caseBtn.dataset.caseKind || "") === "public-pqr";
 
     if (title) {
-      title.textContent = isPublicPqr ? "Postergar solicitud" : "Postergar ticket";
+      title.textContent = isPublicPqr ? "Postergar solicitud" : "Postergar tarea";
     }
     setCaseSubmodalMeta(sub, caseBtn);
     if (body) {
@@ -1285,12 +1285,12 @@
         escHtml(ticketPk) +
         '">' +
         '<p class="scm-muted">Esta acci&oacute;n mantendr&aacute; ' +
-        (isPublicPqr ? "la solicitud" : "el ticket") +
+        (isPublicPqr ? "la solicitud" : "la tarea") +
         ' abierta y marcar&aacute; el estado administrativo como Postergado.</p>' +
         '<label class="scm-seg-field"><span>Motivo de postergaci&oacute;n</span><textarea name="observacion" rows="6" required placeholder="' +
         (isPublicPqr
           ? "Describe por qu&eacute; se posterga la solicitud..."
-          : "Describe por qu&eacute; se posterga el ticket...") +
+          : "Describe por qu&eacute; se posterga la tarea...") +
         '"></textarea></label>' +
         '<label class="scm-seg-field"><span>Imagenes / Evidencias (opcional)</span><input type="file" name="evidencia[]" accept="image/jpeg,image/png,image/gif,image/webp,image/bmp,image/heic,image/heif,image/tiff" multiple></label>' +
         renderPasteEvidenceBox("evidencia[]") +
@@ -1426,7 +1426,7 @@
     var body = sub.querySelector(".scm-case-submodal-body");
     var ticketPk = caseBtn.dataset.ticketPk || "";
     var isPublicPqr = (caseBtn.dataset.caseKind || "") === "public-pqr";
-    if (title) title.textContent = isPublicPqr ? "Responder solicitud" : "Responder ticket";
+    if (title) title.textContent = isPublicPqr ? "Responder solicitud" : "Responder tarea";
     setCaseSubmodalMeta(sub, caseBtn);
     if (body) {
       body.innerHTML =
@@ -1588,7 +1588,7 @@
     categoryName = String(categoryName || "Actividad").trim();
     var contract = cleanCalendarContractLabel(contractLabel);
     if (contract && contract !== "-") return "Contrato #" + contract + " - " + categoryName;
-    return "Ticket #" + String(ticketPk || "").trim() + " - " + categoryName;
+    return "Tarea #" + String(ticketPk || "").trim() + " - " + categoryName;
   }
 
   function formatCalendarDateForMessage(value) {
@@ -1850,7 +1850,7 @@
       '<div><small>Fin</small><strong>' + escHtml(formatCalendarDateTime(row.fecha_fin || row.end)) + '</strong></div>' +
       (category ? '<div><small>Categor&iacute;a</small><strong>' + escHtml(category) + '</strong></div>' : "") +
       (employee ? '<div><small>Funcionario</small><strong>' + escHtml(employee) + '</strong></div>' : "") +
-      (ticket ? '<div><small>Ticket</small><strong>#' + escHtml(ticket) + '</strong></div>' : "") +
+      (ticket ? '<div><small>Tarea</small><strong>#' + escHtml(ticket) + '</strong></div>' : "") +
       (location ? '<div class="is-wide"><small>Ubicaci&oacute;n</small><strong>' + escHtml(location) + '</strong></div>' : "") +
       "</div>" +
       (description ? '<div class="scm-case-calendar-event-mini-description"><small>Descripci&oacute;n</small><p>' + escHtml(description).replace(/\n/g, "<br>") + "</p></div>" : "") +
@@ -1866,7 +1866,7 @@
           '<label><span>Hora inicio</span><input type="time" name="hora_inicio" required value="' + escHtml(calendarTimePartFromDateTime(row.fecha_inicio || row.fecha || row.start)) + '"></label>' +
           '<label><span>Hora fin</span><input type="time" name="hora_fin" required value="' + escHtml(calendarTimePartFromDateTime(row.fecha_fin || row.end)) + '"></label>' +
           '</div>' +
-          '<label><span>Motivo del traslado</span><textarea name="observacion" rows="3" required placeholder="Explica por qu&eacute; se traslada este evento..."></textarea><small>Si es una cita relacionada con ticket, tambi&eacute;n se preparar&aacute; el mensaje de reprogramaci&oacute;n.</small></label>' +
+          '<label><span>Motivo del traslado</span><textarea name="observacion" rows="3" required placeholder="Explica por qu&eacute; se traslada este evento..."></textarea><small>Si es una cita relacionada con tarea, tambi&eacute;n se preparar&aacute; el mensaje de reprogramaci&oacute;n.</small></label>' +
           '<div><button type="submit" class="scm-case-calendar-complete-save">Guardar traslado</button><button type="button" class="scm-case-calendar-complete-cancel" data-scm-case-calendar-transfer-cancel>Cancelar</button></div>' +
           '<small data-scm-case-calendar-transfer-msg aria-live="polite"></small>' +
           "</form>"
@@ -2160,7 +2160,7 @@
       var category = caseCalendarEventDetailValue(row, ["categoria", "nombre_categoria"]);
       return '<article class="scm-case-calendar-pending-row">' +
         '<div><strong>' + escHtml(row.titulo || "Evento") + '</strong><span>' + escHtml(formatCalendarDateTime(row.fecha_inicio || row.fecha || row.start)) + (row.fecha_fin ? " - " + escHtml(formatCalendarDateTime(row.fecha_fin)) : "") + '</span></div>' +
-        '<p>' + (category ? '<b>Categor&iacute;a:</b> ' + escHtml(category) + ' ' : "") + (ticket ? '<b>Ticket:</b> #' + escHtml(ticket) : "") + '</p>' +
+        '<p>' + (category ? '<b>Categor&iacute;a:</b> ' + escHtml(category) + ' ' : "") + (ticket ? '<b>Tarea:</b> #' + escHtml(ticket) : "") + '</p>' +
         '<button type="button" class="scm-case-calendar-complete-btn" data-scm-case-calendar-pending-detail="' + index + '">Ver detalle</button>' +
         '</article>';
     }).join("");
@@ -2343,7 +2343,7 @@
         '<input type="hidden" name="id_ticket" value="' + escHtml(ticketPk) + '">' +
         '<input type="hidden" name="id_empleado" value="' + escHtml(employeeId) + '">' +
         '<input type="hidden" name="es_cita" value="si">' +
-        '<div class="scm-calendar-case-note">Se crear&aacute; el evento en el calendario y quedar&aacute; enlazado al ticket #' + escHtml(ticketPk || "-") + '.</div>' +
+        '<div class="scm-calendar-case-note">Se crear&aacute; el evento en el calendario y quedar&aacute; enlazado a la tarea #' + escHtml(ticketPk || "-") + '.</div>' +
         '<div class="scm-grid">' +
         '<label class="scm-seg-field"><span>T&iacute;tulo</span><input class="input input-bordered input-sm scm-input" name="titulo" required value="' + escHtml(buildCaseCalendarTitle("", contractLabel, ticketPk)) + '" data-auto-calendar-title="1"></label>' +
         '<label class="scm-seg-field"><span>Categor&iacute;a</span><select class="select select-bordered select-sm scm-select" name="id_categoria" required data-scm-calendar-case-categories><option value="">Cargando...</option></select></label>' +
@@ -3076,7 +3076,7 @@
       '<div class="skc-rp-card"><div class="skc-rp-lbl">\u00c1rea afectada</div><div class="skc-rp-val">' +
       escHtml(String(areaAfect)) +
       " m2</div></div>" +
-      '<div class="skc-rp-card"><div class="skc-rp-lbl">Ticket / Inmueble</div><div class="skc-rp-val">#' +
+      '<div class="skc-rp-card"><div class="skc-rp-lbl">Tarea / Inmueble</div><div class="skc-rp-val">#' +
       escHtml(String(idTicket)) +
       "</div>" +
       (codigo
@@ -3094,13 +3094,13 @@
     var diasHtml =
       '<div class="skc-rp-sec">C\u00e1lculo de d\u00edas</div>' +
       '<div class="skc-rp-formula">' +
-      "<strong>Fecha ticket:</strong> " +
+      "<strong>Fecha tarea:</strong> " +
       escHtml(String(fechaTicket)) +
       "<br>" +
       "<strong>Fecha cotizaci\u00f3n:</strong> " +
       escHtml(String(fechaCot)) +
       "<br>" +
-      "<strong>D\u00edas desde ticket:</strong> " +
+      "<strong>D\u00edas desde tarea:</strong> " +
       escHtml(String(diasTicket)) +
       "<br>" +
       "<strong>Duraci\u00f3n del trabajo:</strong> " +
@@ -3156,7 +3156,7 @@
     var body = sub.querySelector(".scm-case-submodal-body");
     var ticketPk = caseBtn.dataset.ticketPk || "";
     var isPublicPqr = (caseBtn.dataset.caseKind || "") === "public-pqr";
-    if (title) title.textContent = isPublicPqr ? "Cerrar solicitud" : "Cerrar ticket";
+    if (title) title.textContent = isPublicPqr ? "Cerrar solicitud" : "Cerrar tarea";
     setCaseSubmodalMeta(sub, caseBtn);
     if (body) {
       body.innerHTML =
@@ -3165,12 +3165,12 @@
         escHtml(ticketPk) +
         '">' +
         '<p class="scm-muted">Esta acci&oacute;n cerrar&aacute; ' +
-        (isPublicPqr ? "la solicitud" : "el ticket") +
+        (isPublicPqr ? "la solicitud" : "la tarea") +
         ' y marcar&aacute; el estado administrativo como Finalizado.</p>' +
         '<label class="scm-seg-field"><span>Mensaje de cierre</span><textarea name="observacion" rows="6" required placeholder="' +
         (isPublicPqr
           ? "Escribe el mensaje o motivo para cerrar la solicitud..."
-          : "Escribe el mensaje o motivo para cerrar el ticket...") +
+          : "Escribe el mensaje o motivo para cerrar la tarea...") +
         '"></textarea></label>' +
         '<div class="scm-seg-actions"><button type="submit" class="scm-btn-primary">Confirmar cierre</button><span class="scm-seg-msg" aria-live="polite"></span></div>' +
         "</form>";
@@ -3264,7 +3264,7 @@
       if (subtitle) {
         subtitle.textContent =
           btn.dataset.asunto ||
-          (isPublicPqr ? "Solicitud creada desde un portal web" : "Ticket de servicios inmobiliarios");
+          (isPublicPqr ? "Solicitud creada desde un portal web" : "Tarea de servicios inmobiliarios");
       }
       modal.dataset.ticketPk = btn.dataset.ticketPk || "";
       modal.dataset.caseKind = isPublicPqr ? "public-pqr" : "";
@@ -3408,15 +3408,15 @@
           caseActionsHtml +=
             '<button type="button" class="scm-case-work-btn" data-scm-open-note>Agregar nota</button>';
           caseActionsHtml +=
-            '<button type="button" class="scm-case-work-btn" data-scm-open-postpone-ticket>Postergar ticket</button>';
+            '<button type="button" class="scm-case-work-btn" data-scm-open-postpone-ticket>Postergar tarea</button>';
         }
         if (!isPublicPqr && (statusBucket === "postergados" || statusBucket === "cerrados")) {
           caseActionsHtml +=
-            '<button type="button" class="scm-case-work-btn" data-scm-activate-ticket>Activar ticket</button>';
+            '<button type="button" class="scm-case-work-btn" data-scm-activate-ticket>Activar tarea</button>';
         }
         if (!isPublicPqr) {
           caseActionsHtml +=
-            '<button type="button" class="scm-case-work-btn" data-scm-open-ticket-response>Responder ticket</button>';
+            '<button type="button" class="scm-case-work-btn" data-scm-open-ticket-response>Responder tarea</button>';
           caseActionsHtml +=
             '<button type="button" class="scm-case-work-btn" data-scm-open-trasladar>Trasladar caso</button>';
         }
@@ -3934,7 +3934,7 @@
       return;
     }
     if (skipped > 0) {
-      var skippedText = "Evento creado, pero no se encoló WhatsApp. Revisa celular del ticket o funcionario.";
+      var skippedText = "Evento creado, pero no se encoló WhatsApp. Revisa celular de la tarea o funcionario.";
       if (msg) msg.textContent = skippedText;
       scmNotify("warning", skippedText, "WhatsApp");
     }

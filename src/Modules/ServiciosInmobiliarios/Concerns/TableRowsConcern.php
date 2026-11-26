@@ -15,7 +15,7 @@ trait TableRowsConcern
   public function renderTbody(array $rows, array $config, bool $canSeguimiento, string $statusBucket = ''): string
   {
     if (empty($rows)) {
-      return '<div class="scm-empty scm-empty-cards">No hay tickets con los filtros actuales.</div>';
+      return '<div class="scm-empty scm-empty-cards">No hay tareas con los filtros actuales.</div>';
     }
 
     $html = '';
@@ -172,7 +172,7 @@ trait TableRowsConcern
       $caseSource .= '</div>';
       $caseSource .= $this->renderHistorialBlock($historialItems);
       $caseSource .= $this->renderRecordSection('Seguimientos realizados', $seguimientosItems, '', ['evidencia' => 'Evidencia']);
-      $caseSource .= $this->renderRecordSection('Notas del ticket', $notasItems);
+      $caseSource .= $this->renderRecordSection('Notas de la tarea', $notasItems);
       $caseSource .= '<div class="scm-case-action-buttons">';
       $caseSource .= '<button type="button" class="btn btn-primary btn-sm" data-scm-open-section="scm-sec-contrato">Ver contrato</button>';
       $caseSource .= '<button type="button" class="btn btn-primary btn-sm" data-scm-open-section="scm-sec-inmueble">Ver inmueble</button>';
@@ -215,7 +215,7 @@ trait TableRowsConcern
       $html .= '<p class="scm-ticket-card-barrio">Area afectada <strong>' . esc_html($areaAfectadaLabel) . '</strong></p>';
       $html .= '<div class="scm-ticket-card-footer">';
       if ($statusBucket !== '') {
-        $html .= '<button class="btn btn-outline btn-sm scm-activate-ticket-btn" type="button" data-scm-activate-ticket>Activar ticket</button>';
+        $html .= '<button class="btn btn-outline btn-sm scm-activate-ticket-btn" type="button" data-scm-activate-ticket>Activar tarea</button>';
       }
       $html .= '<button class="scm-btn-case btn btn-primary btn-sm"'
         . ' data-ticket="' . esc_attr($idTicket) . '"'

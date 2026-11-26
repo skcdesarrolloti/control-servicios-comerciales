@@ -17,18 +17,18 @@ trait NotificationDeliveryConcern
       return 0;
     }
     $ticketUrl = \SCM\Support\StaffTaskLink::openBase() . rawurlencode($logicalTicket);
-    $subject = $estado === 'Cerrado' ? 'Ticket #' . $logicalTicket . ' cerrado' : 'Ticket #' . $logicalTicket . ' con nueva respuesta';
+    $subject = $estado === 'Cerrado' ? 'Tarea #' . $logicalTicket . ' cerrada' : 'Tarea #' . $logicalTicket . ' con nueva respuesta';
     $sent = 0;
     foreach ($this->emailRecipientsForTargets($ticket, $notifyTargets) as $recipient) {
       $html = EmailTemplate::renderNamed('respuesta_ticket', [
         'asunto_correo' => EmailTemplate::e($subject),
         'destinatario' => EmailTemplate::e($recipient['name'] !== '' ? $recipient['name'] : 'cliente'),
         'mensaje_intro' => $estado === 'Cerrado'
-          ? 'Te informamos que el ticket ha sido cerrado.'
-          : 'Te informamos que el ticket ha tenido una nueva respuesta.',
+          ? 'Te informamos que la tarea ha sido cerrada.'
+          : 'Te informamos que la tarea ha tenido una nueva respuesta.',
         'respuesta' => wp_kses_post($respuesta),
         'usuario' => EmailTemplate::e($userName),
-        'botones' => EmailTemplate::buttons([['url' => $ticketUrl, 'label' => 'Ver ticket']]),
+        'botones' => EmailTemplate::buttons([['url' => $ticketUrl, 'label' => 'Ver tarea']]),
       ]);
       $sent += $this->sendMailToUnique($recipient['email'], $subject, $html);
     }
@@ -90,7 +90,7 @@ trait NotificationDeliveryConcern
     }
     $logicalTicket = $this->firstNonEmpty([$ticket['id_ticket'] ?? '', $ticket['_ID'] ?? '']);
     $ticketUrl = \SCM\Support\StaffTaskLink::openBase() . rawurlencode($logicalTicket);
-    $subject = 'Nuevo seguimiento del ticket #' . $logicalTicket;
+    $subject = 'Nuevo seguimiento de la tarea #' . $logicalTicket;
     $sent = 0;
     foreach ($this->emailRecipientsForTargets($ticket, $notifyTargets) as $recipient) {
       $html = EmailTemplate::renderNamed('nuevo_seguimiento', [
@@ -99,7 +99,7 @@ trait NotificationDeliveryConcern
         'observacion' => wp_kses_post($observacion),
         'usuario' => EmailTemplate::e($userName),
         'fecha' => EmailTemplate::e(date('Y-m-d H:i')),
-        'botones' => EmailTemplate::buttons([['url' => $ticketUrl, 'label' => 'Ver ticket']]),
+        'botones' => EmailTemplate::buttons([['url' => $ticketUrl, 'label' => 'Ver tarea']]),
       ]);
       $sent += $this->sendMailToUnique($recipient['email'], $subject, $html, [
         'cc' => [],

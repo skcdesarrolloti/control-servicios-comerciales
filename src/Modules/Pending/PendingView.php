@@ -211,7 +211,7 @@ final class PendingView
               <input id="sra_categoria" name="sra_categoria" type="text" value="<?php echo esc_attr((string) ($filters['categoria'] ?? '')); ?>" placeholder="Categoria">
             </div>
             <div class="scm-field">
-              <label for="sra_ticket">Ticket</label>
+              <label for="sra_ticket">Tarea</label>
               <input id="sra_ticket" name="sra_ticket" type="text" value="<?php echo esc_attr((string) ($filters['id_ticket'] ?? '')); ?>" placeholder="ID ticket">
             </div>
             <div class="scm-field">
@@ -249,7 +249,7 @@ final class PendingView
       <div class="scm-pending-header scm-pending-header--brand">
         <div>
           <h2>Contratos de Arrendamiento</h2>
-          <p>Consulta contratos por estado y crea tickets administrativos sin salir del panel.</p>
+          <p>Consulta contratos por estado y crea tareas administrativas sin salir del panel.</p>
         </div>
         <div>
           <div class="scm-pending-count" id="sca-kpi-count">0</div>
@@ -345,7 +345,7 @@ final class PendingView
       . '<table class="scm-table scm-table-prev">'
       . '<thead><tr>'
       . '<th>ID</th><th>Fecha</th><th>Categoria</th><th>Descripcion</th>'
-      . '<th>Valor</th><th>Inmueble</th><th>Contrato</th><th>Funcionario</th><th>Arrendatario</th><th>Ticket</th><th>Acciones</th>'
+      . '<th>Valor</th><th>Inmueble</th><th>Contrato</th><th>Funcionario</th><th>Arrendatario</th><th>Tarea</th><th>Acciones</th>'
       . '</tr></thead><tbody>';
 
     foreach ($items as $item) {
@@ -369,7 +369,7 @@ final class PendingView
       $html .= '<td>' . esc_html($ticketRef !== '' ? $ticketRef : '-') . '</td>';
       $html .= '<td class="scm-pending-action-cell" style="display:flex;gap:8px;flex-wrap:wrap;">';
       if ($ticketUrl !== '') {
-        $html .= '<button type="button" class="scm-pending-action-btn" data-scm-open-iframe data-iframe-url="' . esc_attr($ticketUrl) . '" data-iframe-title="Ver ticket">Ver ticket</button>';
+        $html .= '<button type="button" class="scm-pending-action-btn" data-scm-open-iframe data-iframe-url="' . esc_attr($ticketUrl) . '" data-iframe-title="Ver tarea">Ver tarea</button>';
       }
       if ($estado === 'pendiente') {
         $html .= '<button type="button" class="scm-pending-action-btn scm-pending-action-btn--blue" style="color:#fff;" data-sra-action="approve" data-sra-id="' . esc_attr((string) $preId) . '">Aprobar</button>';
@@ -437,15 +437,15 @@ final class PendingView
       if ($ticketId !== '') {
         $viewUrl = esc_attr(\SCM\Support\StaffTaskLink::openBase() . rawurlencode($ticketId));
         $html .= '<button type="button" class="scm-pending-action-btn"'
-          . ' data-scm-open-iframe data-no-emp-check data-iframe-url="' . $viewUrl . '" data-iframe-title="Ver ticket">'
-          . 'Ver ticket</button>';
+          . ' data-scm-open-iframe data-no-emp-check data-iframe-url="' . $viewUrl . '" data-iframe-title="Ver tarea">'
+          . 'Ver tarea</button>';
       } else {
         $html .= '<button type="button" class="scm-pending-action-btn"'
           . ' data-scm-open-admin-ticket data-ticket-mode="preventiva"'
-          . ' data-ticket-title="Crear ticket preventivo"'
+          . ' data-ticket-title="Crear tarea preventiva"'
           . $this->contractTicketAttrs($row)
           . '>'
-          . 'Crear ticket</button>';
+          . 'Crear tarea</button>';
       }
       $html .= '</td>';
 
@@ -491,9 +491,9 @@ final class PendingView
           . 'Contrato recibido</button>';
       }
       $html .= '<button type="button" class="scm-pending-action-btn scm-pending-action-btn--blue" style="color:#fff;"'
-        . ' data-scm-open-admin-ticket data-ticket-mode="administrativo" data-ticket-title="Crear ticket administrativo"'
+        . ' data-scm-open-admin-ticket data-ticket-mode="administrativo" data-ticket-title="Crear tarea administrativa"'
         . $this->contractTicketAttrs($row)
-        . '>Crear ticket</button>';
+        . '>Crear tarea</button>';
       $html .= '</td>';
       $html .= '</tr>';
     }

@@ -124,7 +124,7 @@ trait HandlesTicketWorkflowActions
     }
 
     if ($ticketPk <= 0) {
-      $this->jsonFail('Ticket invalido.');
+      $this->jsonFail('Tarea inválida.');
     }
     if ($observacion === '') {
       $this->jsonFail('La observacion es obligatoria.');
@@ -159,7 +159,7 @@ trait HandlesTicketWorkflowActions
     $observacion = trim(wp_kses_post(stripslashes((string) ($_POST['observacion'] ?? ''))));
 
     if ($ticketPk <= 0) {
-      $this->jsonFail('Ticket invalido.');
+      $this->jsonFail('Tarea inválida.');
     }
     if ($observacion === '') {
       $this->jsonFail('La nota no puede estar vacia.');
@@ -193,7 +193,7 @@ trait HandlesTicketWorkflowActions
     }
 
     if ($ticketPk <= 0) {
-      $this->jsonFail('Ticket invalido.');
+      $this->jsonFail('Tarea inválida.');
     }
     if ($observacion === '') {
       $this->jsonFail('El motivo de postergacion es obligatorio.');
@@ -209,7 +209,7 @@ trait HandlesTicketWorkflowActions
     $documentos = $this->handleDocumentUploads('documento', $documentTitles, 10);
     $result = $service->postponeTicket($ticketPk, $observacion, $notifyRecipients, $evidencias, $documentos);
     if (($result['ok'] ?? '0') !== '1') {
-      $this->jsonFail((string) ($result['message'] ?? 'No se pudo postergar el ticket.'));
+      $this->jsonFail((string) ($result['message'] ?? 'No se pudo postergar la tarea.'));
     }
 
     $this->jsonOk($result);
@@ -222,7 +222,7 @@ trait HandlesTicketWorkflowActions
     $bucketKey = $this->normalize_status_bucket((string) ($_POST['bucket'] ?? ''));
     $topicKey = $this->normalize_status_topic((string) ($_POST['topic'] ?? ''));
     if ($bucketKey === '' || $topicKey === '') {
-      $this->jsonFail('Vista de tickets no reconocida.');
+      $this->jsonFail('Vista de tareas no reconocida.');
     }
     if (!$this->canAccessDashboardTab($bucketKey)) {
       $this->jsonFail('No tienes permiso para ver esta pestaña.');
@@ -262,7 +262,7 @@ trait HandlesTicketWorkflowActions
     $ticketPk = isset($_POST['ticket_pk']) ? (int) $_POST['ticket_pk'] : 0;
     $motivo = trim(wp_kses_post(stripslashes((string) ($_POST['motivo'] ?? ($_POST['observacion'] ?? '')))));
     if ($ticketPk <= 0) {
-      $this->jsonFail('Ticket invalido.');
+      $this->jsonFail('Tarea inválida.');
     }
     if ($motivo === '') {
       $this->jsonFail('El motivo de activacion es obligatorio.');
@@ -275,7 +275,7 @@ trait HandlesTicketWorkflowActions
 
     $result = $service->activateTicket($ticketPk, $motivo);
     if (($result['ok'] ?? '0') !== '1') {
-      $this->jsonFail((string) ($result['message'] ?? 'No se pudo activar el ticket.'));
+      $this->jsonFail((string) ($result['message'] ?? 'No se pudo activar la tarea.'));
     }
     $this->jsonOk($result);
   }
@@ -298,7 +298,7 @@ trait HandlesTicketWorkflowActions
     }
 
     if ($ticketPk <= 0) {
-      $this->jsonFail('Ticket invalido.');
+      $this->jsonFail('Tarea inválida.');
     }
     if ($respuesta === '') {
       $this->jsonFail('La respuesta no puede estar vacia.');
@@ -330,7 +330,7 @@ trait HandlesTicketWorkflowActions
     }
 
     if ($ticketPk <= 0) {
-      $this->jsonFail('Ticket invalido.');
+      $this->jsonFail('Tarea inválida.');
     }
     if (!in_array($estado, ['Aprobada', 'Desaprobada'], true)) {
       $this->jsonFail('Selecciona si la cotizacion fue aprobada o desaprobada.');
@@ -526,7 +526,7 @@ trait HandlesTicketWorkflowActions
     $controller = $this->get_pending_controller();
     $result = $controller->createAdministrativeTicket($input, $imagenes, $documentos, $notifyRecipients);
     if (($result['ok'] ?? '0') !== '1') {
-      $this->jsonFail((string) ($result['message'] ?? 'No se pudo crear el ticket.'));
+      $this->jsonFail((string) ($result['message'] ?? 'No se pudo crear la tarea.'));
     }
 
     $this->jsonOk($result);
@@ -573,7 +573,7 @@ trait HandlesTicketWorkflowActions
     $ticketPk = isset($_POST['ticket_pk']) ? (int) $_POST['ticket_pk'] : 0;
     $observacion = trim(wp_kses_post(stripslashes((string) ($_POST['observacion'] ?? ($_POST['motivo'] ?? '')))));
     if ($ticketPk <= 0) {
-      $this->jsonFail('Ticket invalido.');
+      $this->jsonFail('Tarea inválida.');
     }
     if ($observacion === '') {
       $this->jsonFail('El mensaje de cierre es obligatorio.');
@@ -582,7 +582,7 @@ trait HandlesTicketWorkflowActions
     $service = $this->get_seguimiento_service();
     $result = $service->closeTicket($ticketPk, $observacion);
     if (($result['ok'] ?? '0') !== '1') {
-      $this->jsonFail((string) ($result['message'] ?? 'No se pudo cerrar el ticket.'));
+      $this->jsonFail((string) ($result['message'] ?? 'No se pudo cerrar la tarea.'));
     }
     $this->jsonOk($result);
   }
@@ -699,7 +699,7 @@ trait HandlesTicketWorkflowActions
             $queued++;
           } else {
             $detail = method_exists($smsQueue, 'lastError') ? trim((string) $smsQueue->lastError()) : '';
-            $errors[] = 'No se pudo encolar WhatsApp al funcionario del ticket #' . $logicalTicket . ($detail !== '' ? ': ' . $detail : '.') ;
+            $errors[] = 'No se pudo encolar WhatsApp al funcionario de la tarea #' . $logicalTicket . ($detail !== '' ? ': ' . $detail : '.') ;
           }
         } else {
           $skipped++;
@@ -754,7 +754,7 @@ trait HandlesTicketWorkflowActions
           $queued++;
         } else {
           $detail = method_exists($smsQueue, 'lastError') ? trim((string) $smsQueue->lastError()) : '';
-          $errors[] = 'No se pudo encolar WhatsApp al solicitante del ticket #' . $logicalTicket . ($detail !== '' ? ': ' . $detail : '.') ;
+          $errors[] = 'No se pudo encolar WhatsApp al solicitante de la tarea #' . $logicalTicket . ($detail !== '' ? ': ' . $detail : '.') ;
         }
       } elseif ($requesterPhone === '') {
         $skipped++;
@@ -990,7 +990,7 @@ trait HandlesTicketWorkflowActions
 
     $ticketPk = isset($_POST['ticket_pk']) ? (int) $_POST['ticket_pk'] : 0;
     if ($ticketPk <= 0) {
-      $this->jsonFail('Ticket invalido.');
+      $this->jsonFail('Tarea inválida.');
     }
 
     $clean = static function (string $key): string {

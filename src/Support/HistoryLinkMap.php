@@ -18,8 +18,8 @@ final class HistoryLinkMap
   {
     return [
       // Tickets
-      'id_ticket_cliente' => ['label' => 'Ver ticket cliente', 'base' => \SCM\Support\StaffTaskLink::openBase()],
-      'id_ticket_danos_entrega' => ['label' => 'Ver ticket de danos encontrados', 'base' => \SCM\Support\StaffTaskLink::openBase()],
+      'id_ticket_cliente' => ['label' => 'Ver tarea cliente', 'base' => \SCM\Support\StaffTaskLink::openBase()],
+      'id_ticket_danos_entrega' => ['label' => 'Ver tarea de danos encontrados', 'base' => \SCM\Support\StaffTaskLink::openBase()],
       'id_ticket_danos_recibo' => ['label' => 'Ver acta de revision de desocupacion', 'base' => 'https://sucasainmobiliaria.com.co/acta-de-revision-de-desocupacion/?numero='],
 
       // Revisiones

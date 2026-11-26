@@ -18,7 +18,7 @@ trait AdministrativeTicketCreationConcern
     $schema = new SchemaInspector($db);
     $ticketsTable = $db->table('jet_cct_tickets');
     if (!$schema->tableExists($ticketsTable)) {
-      return ['ok' => '0', 'message' => 'No existe la tabla de tickets.'];
+      return ['ok' => '0', 'message' => 'No existe la tabla de tareas.'];
     }
 
     $contractRef = trim((string) ($input['contract_pk'] ?? $input['id_contrato'] ?? ''));
@@ -51,7 +51,7 @@ trait AdministrativeTicketCreationConcern
     ];
 
     if ($mode === 'preventiva' && $descripcion === '') {
-      $descripcion = 'Se crea este ticket para coordinar y documentar la revisión preventiva anual del inmueble conforme a la fecha de inicio del contrato de arrendamiento.';
+      $descripcion = 'Se crea esta tarea para coordinar y documentar la revisión preventiva anual del inmueble conforme a la fecha de inicio del contrato de arrendamiento.';
     }
     if ($tema === '' || $departamento === '' || $prioridad === '' || $asunto === '' || $descripcion === '') {
       return ['ok' => '0', 'message' => 'Completa responsable, prioridad, departamento, tema, asunto y descripcion.'];
@@ -177,7 +177,7 @@ trait AdministrativeTicketCreationConcern
 
     $insertPayload = $schema->filterTableData($ticketsTable, $ticketPayload);
     if (empty($insertPayload)) {
-      return ['ok' => '0', 'message' => 'No se pudo preparar la informacion del ticket.'];
+      return ['ok' => '0', 'message' => 'No se pudo preparar la informacion de la tarea.'];
     }
 
     $pdo = $db->pdo();
@@ -194,7 +194,7 @@ trait AdministrativeTicketCreationConcern
       $db->insert($ticketsTable, $insertPayload);
       $ticketId = (int) $db->lastInsertId();
       if ($ticketId <= 0) {
-        throw new \RuntimeException('No se pudo obtener el ID del ticket creado.');
+        throw new \RuntimeException('No se pudo obtener el ID de la tarea creada.');
       }
 
       if ($schema->columnExists($ticketsTable, 'id_ticket')) {
@@ -225,11 +225,11 @@ trait AdministrativeTicketCreationConcern
       if ($startedTransaction && $pdo->inTransaction()) {
         $pdo->rollBack();
       }
-      return ['ok' => '0', 'message' => 'No se pudo crear el ticket: ' . $e->getMessage()];
+      return ['ok' => '0', 'message' => 'No se pudo crear la tarea: ' . $e->getMessage()];
     }
 
     $queued = $this->queueCreationEmails($ticketId, $ticketPayload, $notifyRecipients, $mode, $generatedPdfs);
-    $message = 'Ticket #' . $ticketId . ' creado correctamente.';
+    $message = 'Tarea #' . $ticketId . ' creada correctamente.';
     if (!empty($warnings)) {
       $message .= ' ' . implode(' ', $warnings);
     }
@@ -401,8 +401,8 @@ trait AdministrativeTicketCreationConcern
       'id_ticket' => $ticketId,
       'fecha' => $nowTs,
       'nombre' => $userName,
-      'respuesta' => 'Ticket administrativo creado: ' . (string) ($ticketPayload['asunto'] ?? ''),
-      'observacion' => 'Ticket administrativo creado: ' . (string) ($ticketPayload['asunto'] ?? ''),
+      'respuesta' => 'Tarea administrativa creada: ' . (string) ($ticketPayload['asunto'] ?? ''),
+      'observacion' => 'Tarea administrativa creada: ' . (string) ($ticketPayload['asunto'] ?? ''),
       'cct_author_id' => $idEmpleado,
       'cct_created' => $nowMysql,
       'cct_modified' => $nowMysql,
@@ -431,8 +431,8 @@ trait AdministrativeTicketCreationConcern
     }
 
     $observacion = $mode === 'preventiva'
-      ? 'Se ha creado un ticket para la realizacion de la revision preventiva del inmueble.'
-      : 'Se ha creado un ticket administrativo.';
+      ? 'Se ha creado una tarea para la realizacion de la revision preventiva del inmueble.'
+      : 'Se ha creado una tarea administrativa.';
     $payload = [
       'cct_status' => 'publish',
       'id_ticket' => $ticketId,

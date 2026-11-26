@@ -349,7 +349,7 @@ final class GuideModalView
         'titulo' => 'Nuevo',
         'icono'  => 'fa-star',
         'color'  => 'scm-gc-yellow',
-        'desc'   => 'Estado inicial generado automáticamente cuando se crea un ticket.',
+        'desc'   => 'Estado inicial generado automáticamente cuando se crea una tarea.',
       ],
       [
         'titulo' => 'Contactado',
@@ -504,7 +504,7 @@ final class GuideModalView
         'titulo'    => 'Finalizado',
         'icono'     => 'fa-flag-checkered',
         'color'     => 'scm-gc-green-dk',
-        'contenido' => '<strong>Definición:</strong> Reparación terminada y acta firmada.<br><br><strong>Política:</strong> Solo cerrar ticket con Acta de Satisfacción firmada. <em>Encuesta se envía con el acta.</em>',
+        'contenido' => '<strong>Definición:</strong> Reparación terminada y acta firmada.<br><br><strong>Política:</strong> Solo cerrar tarea con Acta de Satisfacción firmada. <em>Encuesta se envía con el acta.</em>',
       ],
       [
         'titulo'    => 'Entregado',

@@ -71,7 +71,7 @@ final class PublicTaskData
     foreach ($rows as $row) {
       $text = preg_replace('/<\/(p|div|li|h[1-6])>|<br\s*\/?\s*>/i', "\n", (string) ($row['respuesta'] ?? '')) ?? '';
       $text = trim(html_entity_decode(strip_tags(preg_replace('/<(script|style)\b[^>]*>.*?<\/\1>/is', '', $text) ?? ''), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
-      $text = preg_replace("/\n{3,}/", "\n\n", $text) ?? $text;
+      $text = \SCM\Commercial\CommercialTicketsRepository::taskWording(preg_replace("/\n{3,}/", "\n\n", $text) ?? $text);
       $images = [];
       $rawImages = (string) ($row['imagen'] ?? '');
       $list = str_starts_with($rawImages, 'a:') ? @unserialize($rawImages, ['allowed_classes' => false]) : explode(',', $rawImages);

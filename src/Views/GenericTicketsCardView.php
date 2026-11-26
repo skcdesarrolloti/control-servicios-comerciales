@@ -348,7 +348,7 @@ final class GenericTicketsCardView
     $caseSource .= '<div class="scm-seg-wrap">' . (string) call_user_func($this->renderSeguimientoForm, $ticketPk, Auth::isLoggedIn(), $cotizacionPendienteRespuesta) . '</div>';
     $caseSource .= (string) call_user_func($this->renderHistorialBlock, $historialItems);
     $caseSource .= (string) call_user_func($this->renderRecordSection, 'Seguimientos realizados', $seguimientosItems, '', ['evidencia' => 'Evidencia']);
-    $caseSource .= (string) call_user_func($this->renderRecordSection, 'Notas del ticket', $notasItems);
+    $caseSource .= (string) call_user_func($this->renderRecordSection, 'Notas de la tarea', $notasItems);
     $caseSource .= '<div class="scm-case-action-buttons"><button type="button" class="btn btn-primary btn-sm" data-scm-open-section="scm-sec-contrato">Ver contrato</button><button type="button" class="btn btn-primary btn-sm" data-scm-open-section="scm-sec-inmueble">Ver inmueble</button><button type="button" class="btn btn-primary btn-sm" data-scm-open-section="scm-sec-hist-inmueble">Ver historial del inmueble</button></div>';
     $caseSource .= '<div class="scm-case-hidden-sections" style="display:none;">';
     $caseSource .= (string) call_user_func($this->renderSingleRecordSection, 'Contrato', $contratoData, 'scm-sec-contrato');
@@ -446,7 +446,7 @@ final class GenericTicketsCardView
       $c .= '<button class="btn btn-outline btn-sm" type="button" data-scm-open-card-llaves>Llaves</button>';
     }
     if (in_array($statusBucket, ['postergados', 'cerrados'], true)) {
-      $c .= '<button class="btn btn-outline btn-sm scm-activate-ticket-btn" type="button" data-scm-activate-ticket>Activar ticket</button>';
+      $c .= '<button class="btn btn-outline btn-sm scm-activate-ticket-btn" type="button" data-scm-activate-ticket>Activar tarea</button>';
     }
     $c .= '<button class="scm-btn-case btn btn-primary btn-sm" type="button" onclick="scmOpenCase(this)" ' . $dataAttrs . '>Ver caso</button>';
     $c .= '</div>';
@@ -481,7 +481,7 @@ final class GenericTicketsCardView
   public function renderGenericCards(array $rows, array $config, string $tabKey, string $statusBucket = ''): string
   {
     if (empty($rows)) {
-      return '<div class="scm-empty"><p>No se encontraron tickets.</p></div>';
+      return '<div class="scm-empty"><p>No se encontraron tareas.</p></div>';
     }
     $html = '';
     foreach ($rows as $row) {

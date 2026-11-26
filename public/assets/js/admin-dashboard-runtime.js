@@ -2292,7 +2292,7 @@
         settings = settings || {};
         return '<form class="scm-calendar-due-settings-form scm-calendar-due-settings-form--modal" data-scm-calendar-due-settings-modal autocomplete="off">' +
           '<label class="scm-field"><span>Cotizaciones sin enviar</span><input class="input input-bordered input-sm scm-input" type="number" min="1" max="120" name="cotizaciones_sin_enviar_dias" data-scm-due-setting value="' + escHtml(dueSettingValue(settings, "cotizaciones_sin_enviar_dias", 3)) + '"><small>Días desde la creación.</small></label>' +
-          '<label class="scm-field"><span>Tickets sin cita preventiva</span><input class="input input-bordered input-sm scm-input" type="number" min="1" max="120" name="tickets_preventivos_sin_cita_dias" data-scm-due-setting value="' + escHtml(dueSettingValue(settings, "tickets_preventivos_sin_cita_dias", 3)) + '"><small>Días desde que se crea el ticket preventivo.</small></label>' +
+          '<label class="scm-field"><span>Tareas sin cita preventiva</span><input class="input input-bordered input-sm scm-input" type="number" min="1" max="120" name="tickets_preventivos_sin_cita_dias" data-scm-due-setting value="' + escHtml(dueSettingValue(settings, "tickets_preventivos_sin_cita_dias", 3)) + '"><small>Días desde que se crea la tarea preventiva.</small></label>' +
           '<label class="scm-field"><span>Preventivas sin enviar</span><input class="input input-bordered input-sm scm-input" type="number" min="1" max="120" name="preventivas_dias" data-scm-due-setting value="' + escHtml(dueSettingValue(settings, "preventivas_dias", 3)) + '"><small>Días desde que se crea la revisión preventiva.</small></label>' +
           '<label class="scm-field"><span>Cotizaciones enviadas sin respuesta</span><input class="input input-bordered input-sm scm-input" type="number" min="1" max="180" name="cotizaciones_enviadas_sin_respuesta_dias" data-scm-due-setting value="' + escHtml(dueSettingValue(settings, "cotizaciones_enviadas_sin_respuesta_dias", 10)) + '"><small>Días desde el envío.</small></label>' +
           "</form>";
@@ -2630,9 +2630,9 @@
         if (!ticket) return "";
         var id = String(ticket._ID || ticket.id_ticket || ticket.id || "").trim();
         if (String(ticket.departamento || "").trim() === "Servicio al cliente") {
-          return "Ticket #" + id + " - Solicitante: " + String(ticket.solicitante || "").trim();
+          return "Tarea #" + id + " - Solicitante: " + String(ticket.solicitante || "").trim();
         }
-        return "Ticket #" + id + " - Contrato #" + String(ticket.contrato || "-").trim() + " - Inmueble #" + String(ticket.inmueble || "-").trim();
+        return "Tarea #" + id + " - Contrato #" + String(ticket.contrato || "-").trim() + " - Inmueble #" + String(ticket.inmueble || "-").trim();
       }
 
       function loadTicketsForEmployee(employeeId) {
@@ -2675,7 +2675,7 @@
           if (!query) return true;
           return normalizeText(ticketLabel(ticket) + " " + (ticket.direccion || "") + " " + (ticket.solicitante || "")).indexOf(query) !== -1;
         }).slice(0, 500);
-        select.innerHTML = '<option value="">Sin ticket relacionado</option>' + filtered.map(function (ticket) {
+        select.innerHTML = '<option value="">Sin tarea relacionada</option>' + filtered.map(function (ticket) {
           var id = String(ticket._ID || ticket.id_ticket || ticket.id || "").trim();
           return id ? '<option value="' + escHtml(id) + '">' + escHtml(ticketLabel(ticket)) + "</option>" : "";
         }).join("");
@@ -2854,7 +2854,7 @@
           var created = eventCreatedValue(row);
           return '<article class="scm-calendar-report-event">' +
             '<div><strong>' + escHtml(row.titulo || "Evento") + '</strong><span>Creado: ' + escHtml(created ? formatDateTime(created) : "Sin fecha") + '</span></div>' +
-            '<p><b>Programado:</b> ' + escHtml(formatDateTime(row.fecha_inicio)) + (row.fecha_fin ? " - " + escHtml(formatDateTime(row.fecha_fin)) : "") + ' <b>Categor&iacute;a:</b> ' + escHtml(categoryNameForRow(row)) + ' <b>Funcionario:</b> ' + escHtml(employeeNameForRow(row)) + (ticket ? ' <b>Ticket:</b> #' + escHtml(ticket) : "") + '</p>' +
+            '<p><b>Programado:</b> ' + escHtml(formatDateTime(row.fecha_inicio)) + (row.fecha_fin ? " - " + escHtml(formatDateTime(row.fecha_fin)) : "") + ' <b>Categor&iacute;a:</b> ' + escHtml(categoryNameForRow(row)) + ' <b>Funcionario:</b> ' + escHtml(employeeNameForRow(row)) + (ticket ? ' <b>Tarea:</b> #' + escHtml(ticket) : "") + '</p>' +
             '</article>';
         }).join("") + '</div></section>';
       }
@@ -3675,7 +3675,7 @@
         options = options || {};
         ticketId = String(ticketId || "").trim();
         if (!ticketId) {
-          showToast("warning", "Este evento no tiene ticket relacionado.");
+          showToast("warning", "Este evento no tiene tarea relacionada.");
           return true;
         }
         if (openCommercialTaskModal(ticketId)) return true;
@@ -3728,7 +3728,7 @@
         var location = String(row.ubicacion || row.lugar || row.direccion || "").trim();
         var html = '<form class="scm-calendar-reschedule-modern scm-calendar-reschedule-form" autocomplete="off">' +
           '<header class="scm-calendar-reschedule-head">' +
-          '<div class="scm-calendar-reschedule-title"><span class="scm-calendar-reschedule-icon material-symbols-outlined" aria-hidden="true">update</span><div><h3>Trasladar evento <em>Reprogramaci&oacute;n</em></h3><p>Ajuste de fecha, ventana horaria y sincronizaci&oacute;n con ticket operativo</p></div></div>' +
+          '<div class="scm-calendar-reschedule-title"><span class="scm-calendar-reschedule-icon material-symbols-outlined" aria-hidden="true">update</span><div><h3>Trasladar evento <em>Reprogramaci&oacute;n</em></h3><p>Ajuste de fecha, ventana horaria y sincronizaci&oacute;n con tarea operativo</p></div></div>' +
           '<button type="button" class="scm-calendar-modern-close" data-scm-calendar-reschedule-cancel aria-label="Cerrar"><span class="material-symbols-outlined" aria-hidden="true">close</span></button>' +
           '</header>' +
           '<section class="scm-calendar-reschedule-body">' +
@@ -3743,8 +3743,8 @@
           '</div>' +
           '<label class="scm-calendar-reschedule-field"><span><i class="material-symbols-outlined" aria-hidden="true">location_away</i>¿Es cita presencial?<small>Impacta agenda del equipo de campo</small></span><select name="es_cita"><option value="si"' + (ticket ? " selected" : "") + '>Si, requiere presencia en el inmueble</option><option value="no"' + (!ticket ? " selected" : "") + '>No, coordinaci&oacute;n remota / tarea interna</option></select></label>' +
           '<label class="scm-calendar-reschedule-field"><span><i class="material-symbols-outlined" aria-hidden="true">edit_note</i>Motivo del traslado<b>Requerido para auditor&iacute;a</b></span><textarea name="observacion" rows="3" required placeholder="Explica claramente por qu&eacute; se traslada este evento..."></textarea></label>' +
-          '<label class="scm-calendar-reschedule-field scm-calendar-reschedule-message-field" data-scm-calendar-message-field><span><i class="material-symbols-outlined" aria-hidden="true">mark_chat_unread</i>Mensaje para el ticket / cliente<button type="button" data-scm-calendar-template-default>Plantilla por defecto</button></span><textarea name="descripcion" rows="4" placeholder="Este texto se enviar&aacute; al proceso del ticket si el evento est&aacute; relacionado."></textarea></label>' +
-          '<p class="scm-calendar-reschedule-note"><span class="material-symbols-outlined" aria-hidden="true">notifications_active</span>Si es una cita vinculada a ticket, este texto se enviar&aacute; autom&aacute;ticamente como actualizaci&oacute;n por correo y WhatsApp institucional.</p>' +
+          '<label class="scm-calendar-reschedule-field scm-calendar-reschedule-message-field" data-scm-calendar-message-field><span><i class="material-symbols-outlined" aria-hidden="true">mark_chat_unread</i>Mensaje para la tarea / cliente<button type="button" data-scm-calendar-template-default>Plantilla por defecto</button></span><textarea name="descripcion" rows="4" placeholder="Este texto se enviar&aacute; al proceso de la tarea si el evento est&aacute; relacionado."></textarea></label>' +
+          '<p class="scm-calendar-reschedule-note"><span class="material-symbols-outlined" aria-hidden="true">notifications_active</span>Si es una cita vinculada a tarea, este texto se enviar&aacute; autom&aacute;ticamente como actualizaci&oacute;n por correo y WhatsApp institucional.</p>' +
           '</section>' +
           '<footer class="scm-calendar-reschedule-foot">' +
           '<button type="button" class="scm-calendar-modern-btn scm-calendar-modern-btn--soft" data-scm-calendar-reschedule-cancel><span class="material-symbols-outlined" aria-hidden="true">arrow_back</span>Cancelar</button>' +
@@ -3915,7 +3915,7 @@
           '</header>' +
           '<section class="scm-calendar-complete-body">' +
           '<article class="scm-calendar-complete-summary">' +
-          '<div><span class="scm-calendar-complete-status"><i></i>En progreso</span>' + (ticket ? '<small>Ticket #' + escHtml(ticket) + '</small>' : "") + '</div>' +
+          '<div><span class="scm-calendar-complete-status"><i></i>En progreso</span>' + (ticket ? '<small>Tarea #' + escHtml(ticket) + '</small>' : "") + '</div>' +
           '<h4>' + escHtml(title) + '</h4>' +
           '<p><span class="material-symbols-outlined" aria-hidden="true">calendar_today</span>' + escHtml(formatDateTime(row.fecha_inicio || "")) + '<span class="material-symbols-outlined" aria-hidden="true">person</span>' + escHtml(employeeNameForRow(row)) + '<b>' + escHtml(categoryName) + '</b></p>' +
           '</article>' +
@@ -3988,7 +3988,7 @@
             var legacyTicket = String(row.id_ticket || "").trim();
             return '<article class="scm-calendar-report-event scm-calendar-pending-event-card">' +
               '<div class="scm-calendar-pending-event-head"><strong>' + escHtml(row.titulo || "Evento") + '</strong><span>' + escHtml(formatDateTime(row.fecha_inicio)) + (row.fecha_fin ? " - " + escHtml(formatDateTime(row.fecha_fin)) : "") + '</span></div>' +
-              '<p class="scm-calendar-pending-event-meta"><b>Categor&iacute;a:</b> ' + escHtml(categoryNameForRow(row)) + ' <b>Funcionario:</b> ' + escHtml(employeeNameForRow(row)) + (legacyTicket ? ' <b>Ticket:</b> #' + escHtml(legacyTicket) : "") + '</p>' +
+              '<p class="scm-calendar-pending-event-meta"><b>Categor&iacute;a:</b> ' + escHtml(categoryNameForRow(row)) + ' <b>Funcionario:</b> ' + escHtml(employeeNameForRow(row)) + (legacyTicket ? ' <b>Tarea:</b> #' + escHtml(legacyTicket) : "") + '</p>' +
               '<div class="scm-calendar-event-actions scm-calendar-pending-event-actions">' +
               (legacyId ? '<button type="button" class="scm-calendar-action-btn scm-calendar-action-btn--ghost" data-scm-calendar-view-event data-event-id="' + escHtml(legacyId) + '">Ver evento</button>' : "") +
               (legacyTicket ? '<button type="button" class="scm-calendar-action-btn scm-calendar-action-btn--ghost" data-scm-calendar-view-ticket data-event-id="' + escHtml(legacyId) + '" data-ticket-id="' + escHtml(legacyTicket) + '">Ver caso</button>' : "") +
@@ -5504,7 +5504,7 @@
       }
       var title = loader.querySelector("strong");
       if (title) {
-        title.textContent = label || "Cargando tickets...";
+        title.textContent = label || "Cargando tareas...";
       }
       wrap.classList.toggle("scm-list-is-loading", !!isLoading);
       loader.classList.toggle("active", !!isLoading);
@@ -7004,7 +7004,7 @@
       modal.innerHTML =
         '<div class="scm-admin-ticket-dialog" role="dialog" aria-modal="true" aria-labelledby="scm-admin-ticket-title">' +
         '<div class="scm-case-submodal-head">' +
-        '<div><h4 class="scm-case-submodal-title" id="scm-admin-ticket-title">Crear ticket</h4><p class="scm-case-submodal-meta">Ticket administrativo desde contrato</p></div>' +
+        '<div><h4 class="scm-case-submodal-title" id="scm-admin-ticket-title">Crear tarea</h4><p class="scm-case-submodal-meta">Tarea administrativa desde contrato</p></div>' +
         '<button type="button" class="scm-case-submodal-close" data-admin-ticket-close aria-label="Cerrar">&times;</button>' +
         "</div>" +
         '<div class="scm-admin-ticket-body"></div>' +
@@ -7035,7 +7035,7 @@
     function openAdminTicketModal(btn) {
       if (!btn) return;
       if (!actionCrearTicketAdministrativo) {
-        showToast("error", "Accion de crear ticket no configurada.");
+        showToast("error", "Accion de crear tarea no configurada.");
         return;
       }
       var mode = contractDataset(btn, "ticketMode") || "administrativo";
@@ -7053,7 +7053,7 @@
       var defaultPrioridad = isPreventiva ? "Prioridad urgente" : "";
       var defaultAsunto = isPreventiva ? "REVISION PREVENTIVA" : "";
       var defaultDescripcion = isPreventiva
-        ? "Se crea este ticket para coordinar y documentar la revision preventiva anual del inmueble conforme a la fecha de inicio del contrato de arrendamiento."
+        ? "Se crea esta tarea para coordinar y documentar la revision preventiva anual del inmueble conforme a la fecha de inicio del contrato de arrendamiento."
         : "";
       var evidenceFields = isPreventiva
         ? ""
@@ -7062,7 +7062,7 @@
           renderTicketDocumentFields();
 
       if (title) {
-        title.textContent = contractDataset(btn, "ticketTitle") || "Crear ticket";
+        title.textContent = contractDataset(btn, "ticketTitle") || "Crear tarea";
       }
       if (meta) {
         meta.textContent =
@@ -7203,7 +7203,7 @@
           "</div>" +
           "</section>" +
           renderNotifyTargets(["solicitante"], ["arrendatario", "empleado"]) +
-          '<div class="scm-seg-actions"><button type="submit" class="scm-btn-primary">Crear ticket</button><span class="scm-seg-msg" aria-live="polite"></span></div>' +
+          '<div class="scm-seg-actions"><button type="submit" class="scm-btn-primary">Crear tarea</button><span class="scm-seg-msg" aria-live="polite"></span></div>' +
           "</form>";
       } else {
       body.innerHTML =
@@ -7247,7 +7247,7 @@
         "</span>" +
         "</div>" +
         '<section class="scm-admin-ticket-section">' +
-        '<h5 class="scm-admin-ticket-section-title">Informacion del ticket</h5>' +
+        '<h5 class="scm-admin-ticket-section-title">Informacion de la tarea</h5>' +
         '<div class="scm-admin-ticket-grid">' +
         '<label class="scm-seg-field"><span>Responsable</span><select name="id_empleado" required>' +
         adminTicketEmployeeOptions(defaultEmpleado) +
@@ -7323,7 +7323,7 @@
           isPreventiva ? ["solicitante"] : [],
           isPreventiva ? ["arrendatario", "empleado"] : null
         ) +
-        '<div class="scm-seg-actions"><button type="submit" class="scm-btn-primary">Crear ticket</button><span class="scm-seg-msg" aria-live="polite"></span></div>' +
+        '<div class="scm-seg-actions"><button type="submit" class="scm-btn-primary">Crear tarea</button><span class="scm-seg-msg" aria-live="polite"></span></div>' +
         "</form>";
       }
 
@@ -7422,7 +7422,7 @@
         closeCaseModal(openModal);
       }
       return refreshActiveTab().then(function () {
-        showToast("success", isPublicPqr ? "Solicitud activada." : "Ticket activado.");
+        showToast("success", isPublicPqr ? "Solicitud activada." : "Tarea activada.");
         if (triggerNode && triggerNode.focus) {
           triggerNode.focus();
         }
@@ -7432,7 +7432,7 @@
     function submitActivateTicket(caseBtn, motivo, triggerNode) {
       var ticketPk = String(caseBtn && caseBtn.dataset.ticketPk ? caseBtn.dataset.ticketPk : "").trim();
       if (!ticketPk) {
-        showToast("error", "No se encontro el ticket.");
+        showToast("error", "No se encontro la tarea.");
         return Promise.resolve();
       }
       if (!actionActivateTicket) {
@@ -7461,13 +7461,13 @@
           if (!json || !json.success) {
             throw new Error(
               (json && json.data && json.data.message) ||
-                "No se pudo activar el ticket.",
+                "No se pudo activar la tarea.",
             );
           }
           return finishActivateTicket(ticketPk, triggerNode, caseBtn);
         })
         .catch(function (err) {
-          showToast("error", err.message || "No se pudo activar el ticket.");
+          showToast("error", err.message || "No se pudo activar la tarea.");
         })
         .finally(function () {
           if (triggerNode) {
@@ -7478,18 +7478,18 @@
 
     function openActivateTicketPrompt(caseBtn, triggerNode) {
       if (!caseBtn) {
-        showToast("error", "No se encontro el ticket.");
+        showToast("error", "No se encontro la tarea.");
         return;
       }
       var isPublicPqr = (caseBtn.dataset.caseKind || "") === "public-pqr";
       if (window.Swal && typeof window.Swal.fire === "function") {
         window.Swal.fire({
-          title: isPublicPqr ? "Activar solicitud" : "Activar ticket",
+          title: isPublicPqr ? "Activar solicitud" : "Activar tarea",
           input: "textarea",
           inputLabel: "Mensaje de activacion",
           inputPlaceholder: isPublicPqr
             ? "Escribe el mensaje o motivo para activar la solicitud"
-            : "Escribe el mensaje o motivo para activar el ticket",
+            : "Escribe el mensaje o motivo para activar la tarea",
           inputAttributes: { "aria-label": "Mensaje de activacion" },
           showCancelButton: true,
           allowOutsideClick: false,
@@ -7515,7 +7515,7 @@
         return;
       }
 
-      var motivo = window.prompt("Mensaje para activar el ticket:");
+      var motivo = window.prompt("Mensaje para activar la tarea:");
       if (motivo === null) {
         return;
       }
@@ -8580,7 +8580,7 @@
       if (spinner) {
         spinner.classList.add("active");
       }
-      setListLoading(tbody, true, "Cargando tickets...");
+      setListLoading(tbody, true, "Cargando tareas...");
       form.classList.add("scm-loading");
 
       return fetch(ajaxUrl, {
@@ -8872,7 +8872,7 @@
             : null;
         }
         if (!activateCaseBtn) {
-          showToast("error", "No se encontro el ticket.");
+          showToast("error", "No se encontro la tarea.");
           return;
         }
         openActivateTicketPrompt(activateCaseBtn, activateTicketBtn);
@@ -9161,7 +9161,7 @@
         if (tabSpinner) {
           tabSpinner.classList.add("active");
         }
-        setListLoading(tabCards, true, "Cargando tickets...");
+        setListLoading(tabCards, true, "Cargando tareas...");
         tabForm.classList.add("scm-loading");
 
         return fetch(ajaxUrl, {
@@ -9492,7 +9492,7 @@
             }
           })
           .catch(function (err) {
-            console.error("SCM status tickets error:", err);
+            console.error("SCM status tareas error:", err);
             showToast("error", err.message || "No se pudo cargar la vista.");
           })
           .finally(function () {
@@ -9899,7 +9899,7 @@
         e.preventDefault();
         var ticketPk = responseBtn.getAttribute("data-ticket-pk") || "";
         if (!ticketPk) {
-          showToast("error", "No se encontro el ticket de la cotizacion.");
+          showToast("error", "No se encontro la tarea de la cotizacion.");
           return;
         }
         if (!window.Swal) {
@@ -10436,7 +10436,7 @@
       var msg = adminForm.querySelector(".scm-seg-msg");
       if (btn) btn.disabled = true;
       if (msg) {
-        msg.textContent = "Creando ticket...";
+        msg.textContent = "Creando tarea...";
         msg.classList.remove("error");
       }
 
@@ -10452,11 +10452,11 @@
           if (!json || !json.success) {
             throw new Error(
               (json && json.data && json.data.message) ||
-                "No se pudo crear el ticket.",
+                "No se pudo crear la tarea.",
             );
           }
           var data = json.data || {};
-          var okMsg = data.message || "Ticket creado correctamente.";
+          var okMsg = data.message || "Tarea creada correctamente.";
           if (msg) {
             msg.textContent = okMsg;
             msg.classList.remove("error");
@@ -10487,12 +10487,12 @@
         .catch(function (err) {
           if (msg) {
             msg.textContent =
-              err && err.message ? err.message : "No se pudo crear el ticket.";
+              err && err.message ? err.message : "No se pudo crear la tarea.";
             msg.classList.add("error");
           }
           showToast(
             "error",
-            err && err.message ? err.message : "No se pudo crear el ticket.",
+            err && err.message ? err.message : "No se pudo crear la tarea.",
           );
         })
         .finally(function () {
@@ -10526,7 +10526,7 @@
           e,
           "scm-close-ticket-form",
           actionCloseTicket,
-          "Error cerrando ticket.",
+          "Error cerrando tarea.",
         )
       ) {
         return;
@@ -10536,7 +10536,7 @@
           e,
           "scm-postpone-ticket-form",
           actionPostponeTicket,
-          "Error postergando ticket.",
+          "Error postergando tarea.",
         )
       ) {
         return;

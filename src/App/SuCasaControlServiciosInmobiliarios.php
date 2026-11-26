@@ -114,7 +114,7 @@ final class SuCasaControlServiciosInmobiliarios
       'abiertos' => 'Abiertos',
       'postergados' => 'Postergados',
       'cerrados' => 'Cerrados',
-      'mis_tickets' => 'Mis tickets',
+      'mis_tickets' => 'Mis tareas',
       'cotizaciones_mantenimiento' => 'Cotizaciones de Mantenimiento',
       'calendario_actividades' => 'Calendario',
       'notificaciones' => 'Notificaciones',
@@ -700,7 +700,7 @@ final class SuCasaControlServiciosInmobiliarios
     return $out;
   }
 
-  private function render_lazy_tickets_placeholder(string $message = 'Selecciona esta vista para cargar tickets.'): string
+  private function render_lazy_tickets_placeholder(string $message = 'Selecciona esta vista para cargar tareas.'): string
   {
     return '<div class="scm-empty scm-lazy-empty"><p>' . esc_html($message) . '</p></div>';
   }
@@ -720,7 +720,7 @@ final class SuCasaControlServiciosInmobiliarios
         'dom_key' => $this->status_dom_key($bucketKey, $topicKey),
         'prefix' => $this->status_prefix($bucketKey, $topicKey),
         'count' => 0,
-        'cards' => '<div class="scm-empty"><p>No se encontraron tickets.</p></div>',
+        'cards' => '<div class="scm-empty"><p>No se encontraron tareas.</p></div>',
         'pagination' => '',
         'form' => '',
         'stats' => ['total' => 0],
@@ -918,7 +918,7 @@ final class SuCasaControlServiciosInmobiliarios
               <h3><?php echo esc_html((string)($topicDef['label'] ?? $topicKey)); ?></h3>
               <p><?php echo esc_html((string)($bucketDef['label'] ?? 'Tickets')); ?></p>
             </div>
-            <span class="scm-status-count"><strong id="scm-<?php echo esc_attr($domKey); ?>-count"><?php echo esc_html((string)($data['count'] ?? 0)); ?></strong> tickets</span>
+            <span class="scm-status-count"><strong id="scm-<?php echo esc_attr($domKey); ?>-count"><?php echo esc_html((string)($data['count'] ?? 0)); ?></strong> tareas</span>
           </div>
           <?php echo (string)($data['form'] ?? ''); ?>
           <div class="scm-cards-wrap">

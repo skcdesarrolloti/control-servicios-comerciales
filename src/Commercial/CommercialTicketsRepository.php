@@ -537,10 +537,28 @@ final class CommercialTicketsRepository
       array_merge($keys, $keys, $keys)
     );
 
+    foreach ($timeline as &$entry) {
+      $entry['message'] = self::taskWording((string) ($entry['message'] ?? ''));
+    }
+    unset($entry);
+
     return [
       'ticket' => $ticket,
       'timeline' => $timeline,
     ];
+  }
+
+  /**
+   * Los registros anteriores del historial empiezan con "Ticket activado:", "Ticket postergado:"… (el flujo heredado ya
+   * guarda "Tarea …"): al mostrarlos se dicen como tarea, sin cambiar lo guardado ni el texto que escribió la persona.
+   */
+  public static function taskWording(string $message): string
+  {
+    return (string) preg_replace_callback(
+      '/^(\s*(?:<[^>]+>\s*)*)Ticket( administrativo)? (activado|postergado|cerrado|reabierto|creado)\b/u',
+      static fn(array $m): string => $m[1] . 'Tarea' . ($m[2] !== '' ? ' administrativa' : '') . ' ' . substr($m[3], 0, -1) . 'a',
+      $message
+    );
   }
 
   /** @param array<string,mixed> $filters @return array<string,int> */

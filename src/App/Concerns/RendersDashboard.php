@@ -81,7 +81,7 @@ trait RendersDashboard
     $myTicketsParams = $module->parseParams($_GET, 'scm_my_');
     $myTicketsParams['fEmpleado'] = $currentEmployeeId !== '' ? $currentEmployeeId : '__sin_funcionario__';
     $myTicketsParams['_scmEmpleadoExact'] = '1';
-    $myTicketsResult = ['tbody' => $this->render_lazy_tickets_placeholder('Abre esta pestaña para cargar tus tickets.'), 'pagination_html' => ''];
+    $myTicketsResult = ['tbody' => $this->render_lazy_tickets_placeholder('Abre esta pestaña para cargar tus tareas.'), 'pagination_html' => ''];
     $myTicketsStats = ['total' => 0];
     $cotizacionesParams = $this->parse_cotizaciones_mantenimiento_params($_GET, 'scmqt_');
     $cotizacionesResult = [
@@ -267,7 +267,7 @@ trait RendersDashboard
       'guide'   => [
         'enabled' => true,
         'title'   => 'Guia de uso',
-        'html'    => '<ul><li>Usa filtros para acotar resultados.</li><li>Atraso desde creacion = dias transcurridos desde que se creo el ticket.</li><li>Sin actualizar desde gestion = dias desde la ultima actualizacion o seguimiento.</li></ul>',
+        'html'    => '<ul><li>Usa filtros para acotar resultados.</li><li>Atraso desde creacion = dias transcurridos desde que se creo la tarea.</li><li>Sin actualizar desde gestion = dias desde la ultima actualizacion o seguimiento.</li></ul>',
       ],
       'actions' => [
         'mant'            => self::AJAX_ACTION,
@@ -838,7 +838,7 @@ trait RendersDashboard
             <div class="scm-bars" id="scm-chart-actualizados-funcionario"></div>
           </section>
           <section class="scm-metrics-card">
-            <h3>Tickets abiertos por Funcionario</h3>
+            <h3>Tareas abiertas por Funcionario</h3>
             <div class="scm-bars" id="scm-chart-abiertos-funcionario"></div>
           </section>
         </div>
@@ -875,7 +875,7 @@ trait RendersDashboard
           <div class="scm-case-head">
             <div>
               <h3 id="scm-case-title">Vista del caso</h3>
-              <p id="scm-case-subtitle">Ticket de servicios inmobiliarios</p>
+              <p id="scm-case-subtitle">Tarea de servicios inmobiliarios</p>
             </div>
             <div class="scm-case-head-actions" id="scm-case-head-actions"></div>
             <div class="scm-case-head-meta" id="scm-case-meta"></div>
@@ -1309,9 +1309,9 @@ trait RendersDashboard
   {
     $cards = (string) ($result['tbody'] ?? '');
     $pagination = (string) ($result['pagination_html'] ?? '');
-    $form = $this->render_status_maintenance_filter_form('mis_tickets', 'scm_my_', $params, $filterOptions, 'Mis tickets');
+    $form = $this->render_status_maintenance_filter_form('mis_tickets', 'scm_my_', $params, $filterOptions, 'Mis tareas');
     return '<span id="scm-mis_tickets-count" style="display:none;">' . esc_html((string) ($stats['total'] ?? 0)) . '</span>'
-      . '<div class="scm-status-topic-head"><div><h3>Mis tickets</h3><p>Tickets abiertos asignados a tu funcionario.</p></div><span class="scm-status-count"><strong>' . esc_html((string) ($stats['total'] ?? 0)) . '</strong> tickets</span></div>'
+      . '<div class="scm-status-topic-head"><div><h3>Mis tareas</h3><p>Tareas abiertas asignados a tu funcionario.</p></div><span class="scm-status-count"><strong>' . esc_html((string) ($stats['total'] ?? 0)) . '</strong> tareas</span></div>'
       . $form
       . '<div class="scm-cards-wrap"><div class="scm-ticket-cards" id="scm-cards-mis_tickets">' . $cards . '</div></div>'
       . '<div class="scm-pagination" id="scm-pagination-mis_tickets">' . $pagination . '</div>';
@@ -1824,7 +1824,7 @@ trait RendersDashboard
         <input type="hidden" id="scmqt_page" name="scmqt_page" value="<?php echo esc_attr((string) ($p['fPage'] ?? '1')); ?>">
         <div class="scm-grid">
           <div class="scm-field"><label for="scmqt_cotizacion">Cotizaci&oacute;n</label><input id="scmqt_cotizacion" name="scmqt_cotizacion" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string) ($p['fCotizacion'] ?? '')); ?>" placeholder="Ej: 528"></div>
-          <div class="scm-field"><label for="scmqt_ticket">Ticket</label><input id="scmqt_ticket" name="scmqt_ticket" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string) ($p['fTicket'] ?? '')); ?>" placeholder="Ej: 10055"></div>
+          <div class="scm-field"><label for="scmqt_ticket">Tarea</label><input id="scmqt_ticket" name="scmqt_ticket" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string) ($p['fTicket'] ?? '')); ?>" placeholder="Ej: 10055"></div>
           <div class="scm-field scm-date-range-field"><label id="scmqt_fecha_rango_label">Fecha</label><div class="scm-date-range-control" role="group" aria-labelledby="scmqt_fecha_rango_label"><div class="scm-date-range-part"><span>Desde</span><input id="scmqt_fecha_desde" name="scmqt_fecha_desde" type="date" value="<?php echo esc_attr((string) ($p['fFechaDesde'] ?? '')); ?>" aria-label="Fecha desde"></div><span class="scm-date-range-separator" aria-hidden="true">&rarr;</span><div class="scm-date-range-part"><span>Hasta</span><input id="scmqt_fecha_hasta" name="scmqt_fecha_hasta" type="date" value="<?php echo esc_attr((string) ($p['fFechaHasta'] ?? '')); ?>" aria-label="Fecha hasta"></div></div></div>
           <div class="scm-field"><label for="scmqt_destinatario">Destinatario</label><input id="scmqt_destinatario" name="scmqt_destinatario" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string) ($p['fDestinatario'] ?? '')); ?>"></div>
           <div class="scm-field"><label for="scmqt_funcionario">Funcionario</label><input id="scmqt_funcionario" name="scmqt_funcionario" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string) ($p['fFuncionario'] ?? '')); ?>" placeholder="ID empleado"></div>
@@ -1911,11 +1911,11 @@ trait RendersDashboard
     }
 
     return '<article class="scm-cotizacion-card card" data-cotizacion-id="' . esc_attr($id) . '">'
-      . '<div class="scm-cotizacion-main"><div><span class="scm-ticket-badge badge badge-primary">#' . esc_html($id) . '</span><h3>' . esc_html($direccion !== '' ? $direccion : 'Cotizacion de mantenimiento') . '</h3><p>Ticket <strong>#' . esc_html($ticket !== '' ? $ticket : '-') . '</strong> · Inmueble <strong>' . esc_html($inmueble !== '' ? $inmueble : '-') . '</strong> · Contrato <strong>' . esc_html($contrato !== '' ? $contrato : '-') . '</strong></p></div><div class="scm-cotizacion-status"><span class="scm-cotizacion-pill ' . ($enviada ? 'is-sent' : 'is-pending') . '">' . ($enviada ? 'Fue enviada' : 'No fue enviada') . '</span><span class="scm-cotizacion-pill is-state">' . esc_html($estado !== '' ? $estado : '-') . '</span></div></div>'
+      . '<div class="scm-cotizacion-main"><div><span class="scm-ticket-badge badge badge-primary">#' . esc_html($id) . '</span><h3>' . esc_html($direccion !== '' ? $direccion : 'Cotizacion de mantenimiento') . '</h3><p>Tarea <strong>#' . esc_html($ticket !== '' ? $ticket : '-') . '</strong> · Inmueble <strong>' . esc_html($inmueble !== '' ? $inmueble : '-') . '</strong> · Contrato <strong>' . esc_html($contrato !== '' ? $contrato : '-') . '</strong></p></div><div class="scm-cotizacion-status"><span class="scm-cotizacion-pill ' . ($enviada ? 'is-sent' : 'is-pending') . '">' . ($enviada ? 'Fue enviada' : 'No fue enviada') . '</span><span class="scm-cotizacion-pill is-state">' . esc_html($estado !== '' ? $estado : '-') . '</span></div></div>'
       . '<div class="scm-cotizacion-meta"><div><span>Fecha</span><strong>' . esc_html($fecha) . '</strong></div><div><span>Destinatario</span><strong>' . esc_html($destinatario !== '' ? $destinatario : '-') . '</strong></div><div><span>Contacto</span><strong>' . esc_html($contacto !== '' ? $contacto : '-') . '</strong></div><div><span>Empleado</span><strong>' . esc_html($empleado !== '' ? $empleado : '-') . '</strong></div><div><span>Mano de obra</span><strong>' . esc_html((string) ($row['saldo_obra'] ?? $row['total_mano_obra'] ?? '-')) . '</strong></div><div><span>Materiales</span><strong>' . esc_html((string) ($row['saldo_materiales'] ?? $row['total_materiales'] ?? '-')) . '</strong></div><div><span>Otros costos</span><strong>' . esc_html((string) ($row['saldo_otros_costo'] ?? $row['total_otros_costos'] ?? '-')) . '</strong></div><div><span>Ordenes</span><strong>' . esc_html((string) ($row['ordenes_total'] ?? count($orders))) . '</strong></div></div>'
       . '<div class="scm-cotizacion-actions">'
       . ($cotUrl !== '' ? '<button type="button" class="scm-case-work-btn" data-scm-open-iframe data-iframe-url="' . esc_attr($cotUrl) . '" data-iframe-title="Cotizacion #' . esc_attr($id) . '">Ver cotizacion</button>' : '')
-      . ($ticketUrl !== '' ? '<button type="button" class="scm-case-work-btn" data-scm-open-iframe data-iframe-url="' . esc_attr($ticketUrl) . '" data-iframe-title="Ticket #' . esc_attr($ticket) . '">Ver ticket</button>' : '')
+      . ($ticketUrl !== '' ? '<button type="button" class="scm-case-work-btn" data-scm-open-iframe data-iframe-url="' . esc_attr($ticketUrl) . '" data-iframe-title="Tarea #' . esc_attr($ticket) . '">Ver tarea</button>' : '')
       . '<button type="button" class="scm-case-work-btn" data-scm-view-cotizacion-orders>Ver ordenes</button>'
       . '<button type="button" class="scm-case-work-btn" data-scm-cotizacion-response-standalone data-ticket-pk="' . esc_attr($ticket) . '" data-ticket="' . esc_attr($ticket) . '" data-cotizacion-id="' . esc_attr($id) . '">Responder cotizacion</button>'
       . '<button type="button" class="scm-case-work-btn scm-danger-action" data-scm-delete-cotizacion data-cotizacion-id="' . esc_attr($id) . '">Eliminar cotizacion</button>'
