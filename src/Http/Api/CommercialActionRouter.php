@@ -270,6 +270,7 @@ final class CommercialActionRouter
       'commercial_tools_utm_options' => 'utmOptions',
       'commercial_property_entry_form' => 'propertyEntryForm',
       'commercial_property_entry_save' => 'propertyEntrySave',
+      'commercial_property_reserve_code' => 'propertyReserveCode',
       'commercial_property_neighborhood' => 'propertyNeighborhood',
       'commercial_property_media_form' => 'propertyMediaForm',
       'commercial_property_media_draft' => 'propertyMediaDraft',

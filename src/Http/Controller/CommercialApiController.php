@@ -1233,6 +1233,25 @@ final class CommercialApiController
     }
   }
 
+  /** Código adelantado desde la tarea: reserva el código (post + CCT) y lo vincula a la tarea. */
+  public function propertyReserveCode(array $input): never
+  {
+    $this->verify($input);
+    try {
+      $this->authorizeTaskTool(\SCM\Commercial\CommercialTaskTools::PROPERTY, (int) ($input['ticket_pk'] ?? 0));
+      $service = new \SCM\Commercial\CommercialPropertyEntryService($this->db, $this->policy, $this->config);
+      JsonResponse::success($service->reserve((int) ($input['ticket_pk'] ?? 0)));
+    } catch (\SCM\Commercial\CommercialSignAccessDenied $exception) {
+      JsonResponse::error($exception->getMessage(), 403);
+    } catch (\InvalidArgumentException $exception) {
+      JsonResponse::error($exception->getMessage(), 422);
+    } catch (\PDOException $exception) {
+      throw $exception;
+    } catch (\RuntimeException $exception) {
+      JsonResponse::error($exception->getMessage(), 422);
+    }
+  }
+
   public function propertyEntrySave(array $input): never
   {
     $this->verify($input);

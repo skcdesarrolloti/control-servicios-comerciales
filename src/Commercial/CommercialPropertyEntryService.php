@@ -273,6 +273,8 @@ final class CommercialPropertyEntryService
       $this->db->insert($receipt, ['request_id'=>$request,'user_id'=>Auth::userId(),'ticket_id'=>$taskId,'created_at'=>gmdate('Y-m-d H:i:s')]);
       $task = $this->task($taskId);
       $data = $this->validate($taskId, $input);
+      $draft = $this->linkedDraftCode($task);
+      if ($draft > 0 && (int) $data['codigo_adelantado'] !== $draft) throw new \InvalidArgumentException('Esta tarea tiene vinculado el código adelantado #' . $draft . ': completa la información con ese código.');
       $employee = $this->db->getRow('SELECT * FROM `' . $this->db->table('jet_cct_funcionarios') . '` WHERE _ID=?', [Auth::userId()]);
       if (!$employee || (string) $employee['id_empleado'] === '') throw new \RuntimeException('No se pudo identificar al funcionario.');
       $owner = $this->db->getRow('SELECT * FROM `' . $this->db->table('jet_cct_propietarios') . '` WHERE _ID=?', [$data['id_propietario']]);
@@ -379,5 +381,78 @@ final class CommercialPropertyEntryService
   private function result(int $code): array
   {
     return ['id_inmueble'=>$code,'message'=>'Datos del inmueble #' . $code . ' guardados. La tarea quedó por publicar.'];
+  }
+
+  /** Estados de un código adelantado que aún falta completar (la vacía solo cuenta cuando el post no tiene estado). */
+  public const DRAFT_STATES = ['En borrador','Codigo adelantado','Código adelantado'];
+
+  public static function isDraftState(string $state): bool
+  {
+    return in_array(trim($state), self::DRAFT_STATES, true);
+  }
+
+  /** Código del inmueble vinculado a la tarea (id_inmueble, o el de su fila CCT id_inmueble_data); 0 si no tiene. */
+  public function linkedCode(array $task): int
+  {
+    $code = trim((string) ($task['id_inmueble'] ?? ''), " \t\n\r\0\x0B\"[]");
+    if (ctype_digit($code) && (int) $code > 0) return (int) $code;
+    if ((int) ($task['id_inmueble_data'] ?? 0) > 0) return (int) $this->db->getVar('SELECT codigo FROM `' . $this->db->table('jet_cct_inmuebles') . '` WHERE _ID=?', [(int) $task['id_inmueble_data']]);
+    return 0;
+  }
+
+  /** Código adelantado en borrador vinculado a la tarea: el formulario lo completa en vez de generar otro código. */
+  public function linkedDraftCode(array $task): int
+  {
+    $code = $this->linkedCode($task);
+    if ($code <= 0) return 0;
+    $state = trim($this->meta($code, 'estado')) ?: (string) $this->db->getVar('SELECT estado FROM `' . $this->db->table('jet_cct_inmuebles') . '` WHERE codigo=? LIMIT 1', [$code]);
+    return self::isDraftState($state) ? $code : 0;
+  }
+
+  /** Lo que el aviso nuevo ya dejó en el código adelantado y el formulario propone al completarlo. */
+  public function draftDefaults(int $code): array
+  {
+    $row = $this->db->getRow('SELECT * FROM `' . $this->db->table('jet_cct_inmuebles') . '` WHERE codigo=? LIMIT 1', [$code]) ?? [];
+    $sign = trim((string) ($row['presenta_aviso'] ?? ''));
+    return array_filter(['presenta-aviso'=>in_array($sign, ['Si','No'], true) ? $sign : '', 'punto_referencia'=>trim((string) ($row['punto_referencia'] ?? ''))], static fn(string $value): bool => $value !== '');
+  }
+
+  /**
+   * Código adelantado desde la tarea: reserva el código del inmueble (post privado "En borrador", como el formulario
+   * "Añadir codigo adelantado" de JetFormBuilder, y además su fila CCT) y lo vincula a la tarea, para poder registrar
+   * el aviso nuevo antes de llenar la información del inmueble. Si la tarea ya tiene su código adelantado, lo devuelve.
+   */
+  public function reserve(int $taskId): array
+  {
+    $pdo = $this->db->pdo();
+    $pdo->beginTransaction();
+    try {
+      $task = $this->task($taskId);
+      $linked = $this->linkedCode($task);
+      if ($linked > 0) {
+        $draft = $this->linkedDraftCode($task);
+        if ($draft <= 0) throw new \InvalidArgumentException('La tarea ya tiene vinculado el inmueble #' . $linked . '.');
+        $pdo->rollBack();
+        return ['id_inmueble'=>$draft,'created'=>false,'message'=>'La tarea ya tiene el código adelantado #' . $draft . '.'];
+      }
+      $employee = $this->db->getRow('SELECT * FROM `' . $this->db->table('jet_cct_funcionarios') . '` WHERE _ID=?', [Auth::userId()]);
+      if (!$employee || (string) $employee['id_empleado'] === '') throw new \RuntimeException('No se pudo identificar al funcionario.');
+      $now = time(); $date = date('Y-m-d H:i:s'); $gmt = gmdate('Y-m-d H:i:s');
+      $author = (string) $employee['id_empleado'];
+      $common = ['cct_status'=>'publish','cct_author_id'=>$author,'cct_created'=>$date,'cct_modified'=>$date];
+      $code = $this->insert('posts', ['post_author'=>$author,'post_date'=>$date,'post_date_gmt'=>$gmt,'post_content'=>'','post_title'=>'Código adelantado','post_excerpt'=>'','post_status'=>'private','comment_status'=>'closed','ping_status'=>'closed','post_password'=>'','post_name'=>'','to_ping'=>'','pinged'=>'','post_modified'=>$date,'post_modified_gmt'=>$gmt,'post_content_filtered'=>'','post_parent'=>0,'guid'=>'','menu_order'=>0,'post_type'=>'inmuebles','post_mime_type'=>'','comment_count'=>0]);
+      $this->update('posts', ['post_title'=>'Código adelantado #' . $code,'post_name'=>'inmueble-' . $code,'guid'=>'https://sucasainmobiliaria.com.co/?post_type=inmuebles&p=' . $code], ['ID'=>$code]);
+      $propertyId = $this->insert('jet_cct_inmuebles', $common + self::definition()['cct_defaults'] + ['codigo'=>$code,'id_funcionario'=>$author,'funcionario'=>$employee['nombre'],'sucursal'=>$employee['id_sucursal'] ?? '','id_ticket'=>$taskId,'id_propietario'=>$task['id_propietario'] ?? '']);
+      foreach (['estado'=>'En borrador','id_empleado'=>$author,'empleado'=>$employee['nombre'],'sucursal'=>$employee['id_sucursal'] ?? '','email-empleado'=>$employee['correo'] ?? '','celular-empleado'=>$employee['celular'] ?? '','presenta-aviso'=>'No','id-ticket'=>$taskId,'id_inmueble_data'=>$propertyId] as $key => $value) $this->setMeta($code, $key, $value);
+      $relation = $this->db->table('jet_rel_941');
+      if (!$this->db->getVar('SELECT _ID FROM `' . $relation . '` WHERE parent_object_id=? AND child_object_id=?', [$author,$code])) $this->insert('jet_rel_941', ['created'=>$date,'rel_id'=>941,'parent_rel'=>0,'parent_object_id'=>$author,'child_object_id'=>$code]);
+      $this->update('jet_cct_tickets', ['fecha_actualizacion'=>$now,'id_inmueble'=>$code,'id_inmueble_data'=>$propertyId], ['_ID'=>$taskId]);
+      $this->insert('jet_cct_historial_del_inmueble', $common + ['fecha'=>$now,'id_ticket'=>$taskId,'id_inmueble'=>$code,'id_empleado'=>$author,'funcionario'=>$employee['nombre'],'tipo_reporte'=>'Código adelantado','observacion'=>'Código adelantado #' . $code . ' reservado desde la tarea #' . $taskId . '.']);
+      $pdo->commit();
+      return ['id_inmueble'=>$code,'created'=>true,'message'=>'Código adelantado #' . $code . ' reservado y vinculado a la tarea. Ya puedes registrar el aviso nuevo y, después, completar la información del inmueble.'];
+    } catch (\Throwable $exception) {
+      if ($pdo->inTransaction()) $pdo->rollBack();
+      throw $exception;
+    }
   }
 }

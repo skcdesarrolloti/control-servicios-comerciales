@@ -199,10 +199,21 @@ final class CommercialTicketModalView
         </div>
         <div class="grid grid-cols-2 gap-2.5">
           <?php /* Las herramientas de inmueble y cotización solo salen en los temas donde se usan (CommercialTaskTools). */ ?>
+          <?php
+            // Código adelantado: sin inmueble vinculado se puede reservar el código para pegar el aviso nuevo antes de
+            // llenar el inmueble; con el código en borrador vinculado, el botón del inmueble completa ese código.
+            $canEnterProperty = $policy->canAct('ingresar_inmueble') && CommercialTaskTools::allowsTask(CommercialTaskTools::PROPERTY, $ticket);
+            $draftCode = $propertyCode !== '' && \SCM\Commercial\CommercialPropertyEntryService::isDraftState((string) ($property['estado'] ?? '')) ? $propertyCode : '';
+          ?>
+          <?php if ($canEnterProperty && $propertyCode === '' && (int) ($ticket['id_inmueble_data'] ?? 0) <= 0): ?>
+            <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-surface-container-low hover:bg-[#EBF1FB] text-on-surface border border-surface-container text-xs font-semibold transition-all cursor-pointer" data-commercial-reserve-code data-ticket-pk="<?php echo esc_attr((string) $pk); ?>"><span class="material-symbols-outlined text-[16px]">pin</span><span>Código adelantado</span></button>
+          <?php endif; ?>
           <?php if ($policy->canView('anadir_aviso') && $policy->canAct('registrar_aviso') && CommercialTaskTools::allowsTask(CommercialTaskTools::SIGN, $ticket)): ?>
             <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-surface-container-low hover:bg-[#EBF1FB] text-on-surface border border-surface-container text-xs font-semibold transition-all cursor-pointer" data-commercial-task-form="sign" data-ticket-pk="<?php echo esc_attr((string) $pk); ?>"><span class="material-symbols-outlined text-[16px]">add_photo_alternate</span><span>Aviso nuevo</span></button>
           <?php endif; ?>
-          <?php if ($policy->canAct('ingresar_inmueble') && CommercialTaskTools::allowsTask(CommercialTaskTools::PROPERTY, $ticket)): ?>
+          <?php if ($canEnterProperty && $draftCode !== ''): ?>
+            <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-surface-container-low hover:bg-[#EBF1FB] text-on-surface border border-surface-container text-xs font-semibold transition-all cursor-pointer" data-commercial-task-form="property" data-property-code="<?php echo esc_attr($draftCode); ?>" data-ticket-pk="<?php echo esc_attr((string) $pk); ?>"><span class="material-symbols-outlined text-[16px]">edit_document</span><span>Completar inmueble #<?php echo esc_html($draftCode); ?></span></button>
+          <?php elseif ($canEnterProperty): ?>
             <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-surface-container-low hover:bg-[#EBF1FB] text-on-surface border border-surface-container text-xs font-semibold transition-all cursor-pointer" data-commercial-task-form="property" data-ticket-pk="<?php echo esc_attr((string) $pk); ?>"><span class="material-symbols-outlined text-[16px]">add_home_work</span><span>Ingresar inmueble</span></button>
           <?php endif; ?>
           <?php if ($policy->canAct('ingresar_inmueble') && CommercialTaskTools::allowsTask(CommercialTaskTools::MEDIA, $ticket) && ($propertyCode !== '' || (int) ($ticket['id_inmueble_data'] ?? 0) > 0)): ?>

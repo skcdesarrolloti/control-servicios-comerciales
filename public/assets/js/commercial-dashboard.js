@@ -934,6 +934,31 @@
     });
   }
 
+  // Código adelantado: reserva el código del inmueble (post + CCT), lo vincula a la tarea y vuelve a abrirla con
+  // Aviso nuevo y "Completar inmueble #código" listos.
+  function reserveAdvanceCode(button) {
+    var ticketPk = button.getAttribute("data-ticket-pk") || currentCasePk;
+    if (!ticketPk || button.disabled) return;
+    confirmInPanel({
+      tone: "primary",
+      icon: "pin",
+      title: "¿Reservar un código adelantado?",
+      text: "Se crea el código del inmueble en borrador y queda vinculado a esta tarea. Con él puedes registrar el aviso nuevo ahora y completar la información del inmueble después.",
+      confirm: "Reservar código",
+    }).then(function (ok) {
+      if (!ok || !document.contains(button)) return;
+      button.disabled = true;
+      return request("commercial_property_reserve_code", { ticket_pk: ticketPk }).then(function (response) {
+        notify("success", response.message || "Código adelantado reservado.");
+        root.dispatchEvent(new CustomEvent("scm:task-updated", { detail: { ticketPk: ticketPk } }));
+        loadCase(ticketPk, false);
+      });
+    }).catch(function (error) {
+      button.disabled = false;
+      notify("error", error.message || "No se pudo reservar el código adelantado.");
+    });
+  }
+
   root.addEventListener("scm:task-updated", function () { loadTickets(window.location.href, { history: false, focus: false }); });
   // Un módulo (Promoción) pide abrir otra pantalla del panel sin recargar la página: detail.url y detail.replace.
   root.addEventListener("scm:load-tab", function (event) {
@@ -1338,7 +1363,9 @@
   }
 
   // Confirmación con el diseño del panel (encima de la tarea; Escape o el fondo la cancelan sin cerrar la tarea).
+  // tone "primary": confirmación de una acción que no borra nada (con el color del panel en vez del rojo).
   function confirmInPanel(options) {
+    var primary = options.tone === "primary";
     var previous = document.querySelector("[data-commercial-confirm-dialog]");
     if (previous) previous.remove();
     var opener = document.activeElement;
@@ -1351,7 +1378,7 @@
     dialog.innerHTML =
       '<div class="bg-white w-full max-w-md rounded-3xl shadow-modal border border-surface-container overflow-hidden" role="document">' +
         '<div class="px-6 pt-6 pb-5 flex items-start gap-3">' +
-          '<span class="w-10 h-10 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-[20px]">' + escapeHtml(options.icon || "delete") + '</span></span>' +
+          '<span class="w-10 h-10 rounded-2xl ' + (primary ? "bg-primary/10 text-primary" : "bg-rose-50 text-rose-600") + ' flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-[20px]">' + escapeHtml(options.icon || "delete") + '</span></span>' +
           '<div class="min-w-0">' +
             '<h3 class="text-base font-bold text-[#061D49] leading-tight" id="commercial-confirm-title">' + escapeHtml(options.title || "¿Confirmas?") + '</h3>' +
             '<p class="text-xs text-secondary mt-1.5 leading-relaxed">' + escapeHtml(options.text || "") + '</p>' +
@@ -1360,7 +1387,7 @@
         '</div>' +
         '<footer class="px-6 py-3.5 bg-surface-container-low border-t border-surface-container flex items-center justify-end gap-2">' +
           '<button type="button" class="px-4 py-2 rounded-xl bg-white border border-surface-container hover:bg-surface-container text-on-surface text-xs font-semibold transition-colors cursor-pointer" data-commercial-confirm-cancel>Cancelar</button>' +
-          '<button type="button" class="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold shadow-sm flex items-center gap-1.5 transition-colors cursor-pointer" data-commercial-confirm-ok><span class="material-symbols-outlined text-[15px]">' + escapeHtml(options.icon || "delete") + '</span><span>' + escapeHtml(options.confirm || "Confirmar") + '</span></button>' +
+          '<button type="button" class="px-5 py-2 rounded-xl ' + (primary ? "bg-primary hover:bg-primary/90" : "bg-rose-600 hover:bg-rose-700") + ' text-white text-xs font-semibold shadow-sm flex items-center gap-1.5 transition-colors cursor-pointer" data-commercial-confirm-ok><span class="material-symbols-outlined text-[15px]">' + escapeHtml(options.icon || "delete") + '</span><span>' + escapeHtml(options.confirm || "Confirmar") + '</span></button>' +
         '</footer>' +
       '</div>';
     document.body.appendChild(dialog);
@@ -2223,6 +2250,8 @@
       var workflowButton = event.target.closest("[data-commercial-open-workflow]");
       var taskFormButton = event.target.closest("[data-commercial-task-form]");
       if (taskFormButton) { loadTaskForm(taskFormButton); return; }
+      var reserveButton = event.target.closest("[data-commercial-reserve-code]");
+      if (reserveButton) { reserveAdvanceCode(reserveButton); return; }
       var returnToCase = event.target.closest("[data-commercial-return-case]");
       if (returnToCase) { loadCase(returnToCase.getAttribute("data-commercial-return-case"), false); return; }
       if (workflowButton) {

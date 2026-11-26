@@ -124,6 +124,9 @@
     window.initCommercialPropertyMedia(root.querySelector("[data-media-embedded]"));
     refresh(root);
     step(root,0);
+    // Código adelantado vinculado a la tarea: trae la multimedia que ya tenga, como al escribir el código.
+    var linked = root.querySelector("[data-property-linked-code]");
+    if (linked && Number(linked.value) > 0) window.commercialPropertyMedia.loadDraft(root.querySelector("[data-media-embedded]"),Number(linked.value));
     root.addEventListener("click", function (event) {
       var tab = event.target.closest("[data-entry-tab]"); if (tab) step(root,tab.dataset.entryTab);
       if (event.target.closest("[data-entry-prev]")) step(root,root._step - 1);

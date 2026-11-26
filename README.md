@@ -328,6 +328,16 @@ activar `PROPERTY_VIDEO_URL`/`PROPERTY_VIDEO_TOKEN`, consultar
 en cinco secciones de un mismo formulario. **Guardar inmueble** registra los datos
 y sube la multimedia seleccionada; si una subida falla, el reintento conserva el código
 ya creado. Los códigos adelantados pueden recuperar su multimedia actual antes de guardar.
+
+**Código adelantado** (tareas de captación y recaptación sin inmueble vinculado, mismo permiso
+`ingresar_inmueble`) reserva el código antes de llenar el inmueble, como el formulario
+"Añadir codigo adelantado" de JetFormBuilder: crea el post `inmuebles` privado en
+"En borrador" (con `id_empleado`, `empleado` y `sucursal`) y además su fila en
+`jet_cct_inmuebles`, y lo vincula a la tarea (`id_inmueble` e `id_inmueble_data`). Así el
+**Aviso nuevo** se registra con ese código antes de ingresar el inmueble. Con el código en
+borrador vinculado, el botón **Ingresar inmueble** pasa a **Completar inmueble #código**:
+el formulario abre con ese código fijo, trae su multimedia y lo que dejó el aviso
+(¿presenta aviso?, punto de referencia), y el servidor no deja generar otro código para esa tarea.
 La tarea también muestra **Multimedia del inmueble** cuando ya tiene un inmueble asociado.
 Este paso usa el permiso `ingresar_inmueble` y comprueba la asignación de la tarea y
 la relación entre tarea, inmueble y adjuntos. Permite portada, galería ordenable y video

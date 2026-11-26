@@ -285,6 +285,77 @@ final class CommercialPropertyEntryTest extends TestCase
     self::assertSame(0, (int) $this->db->getVar('SELECT COUNT(*) FROM wp_scm_property_entry_requests'));
   }
 
+  public function testAdvanceCodeCreatesPrivatePostAndCctLinkedToTheTaskOnlyOnce(): void
+  {
+    $this->db->update('wp_jet_cct_tickets', ['id_inmueble'=>''], ['_ID'=>100]);
+    $result = $this->service->reserve(100);
+    $code = $result['id_inmueble'];
+    self::assertTrue($result['created']);
+    $post = $this->db->getRow('SELECT * FROM wp_posts WHERE ID=?', [$code]);
+    self::assertSame('private', $post['post_status']);
+    self::assertSame('inmuebles', $post['post_type']);
+    self::assertSame('101', $post['post_author']);
+    $meta = fn(string $key) => $this->db->getVar('SELECT meta_value FROM wp_postmeta WHERE post_id=? AND meta_key=?', [$code,$key]);
+    self::assertSame('En borrador', $meta('estado'));
+    self::assertSame('101', $meta('id_empleado'));
+    $property = $this->db->getRow('SELECT * FROM wp_jet_cct_inmuebles WHERE codigo=?', [$code]);
+    self::assertSame('En borrador', $property['estado']);
+    self::assertSame('101', $property['id_funcionario']);
+    self::assertSame('101', $property['cct_author_id'], 'cct_author_id guarda el id_empleado real.');
+    self::assertSame((string) $property['_ID'], $meta('id_inmueble_data'));
+    $task = $this->db->getRow('SELECT * FROM wp_jet_cct_tickets WHERE _ID=100');
+    self::assertSame((string) $code, $task['id_inmueble']);
+    self::assertSame((string) $property['_ID'], $task['id_inmueble_data']);
+    self::assertSame('101', $this->db->getVar('SELECT parent_object_id FROM wp_jet_rel_941 WHERE child_object_id=?', [$code]));
+    self::assertSame(1, (int) $this->db->getVar("SELECT COUNT(*) FROM wp_jet_cct_historial_del_inmueble WHERE id_inmueble=? AND tipo_reporte='Código adelantado'", [$code]));
+
+    $again = $this->service->reserve(100);
+    self::assertSame($code, $again['id_inmueble']);
+    self::assertFalse($again['created']);
+    self::assertSame(1, (int) $this->db->getVar("SELECT COUNT(*) FROM wp_posts WHERE post_status='private'"), 'Un segundo clic no crea otro código.');
+
+    // El aviso nuevo encuentra el código de la tarea antes de llenar el inmueble.
+    $sign = new \SCM\Commercial\CommercialSignService($this->db, $this->policy);
+    self::assertSame((string) $code, $sign->taskContext(100)['id_inmueble']);
+    self::assertSame((string) $code, (string) $sign->lookup(100, (string) $code)['property']['codigo']);
+  }
+
+  public function testAdvanceCodeIsRejectedWhenTheTaskAlreadyHasAProperty(): void
+  {
+    $this->expectException(\InvalidArgumentException::class);
+    $this->service->reserve(100);
+  }
+
+  public function testLinkedAdvanceCodeIsCompletedFromThePopup(): void
+  {
+    $this->db->update('wp_jet_cct_tickets', ['id_inmueble'=>''], ['_ID'=>100]);
+    $task = $this->db->getRow('SELECT * FROM wp_jet_cct_tickets WHERE _ID=100');
+    $fresh = CommercialTicketModalView::render(['ticket'=>$task,'timeline'=>[]], $this->policy, []);
+    self::assertStringContainsString('data-commercial-reserve-code', $fresh);
+    self::assertStringContainsString('Ingresar inmueble', $fresh);
+
+    $code = $this->service->reserve(100)['id_inmueble'];
+    $this->db->update('wp_jet_cct_inmuebles', ['presenta_aviso'=>'Si','punto_referencia'=>'Frente a la iglesia'], ['codigo'=>$code]);
+    $task = $this->db->getRow('SELECT * FROM wp_jet_cct_tickets WHERE _ID=100');
+    $linked = CommercialTicketModalView::render(['ticket'=>['_scm_inmueble_data'=>$this->db->getRow('SELECT * FROM wp_jet_cct_inmuebles WHERE codigo=?', [$code])] + $task,'timeline'=>[]], $this->policy, []);
+    self::assertStringNotContainsString('data-commercial-reserve-code', $linked);
+    self::assertStringContainsString('Completar inmueble #' . $code, $linked);
+    self::assertStringContainsString('data-property-code="' . $code . '"', $linked);
+    self::assertStringContainsString('data-commercial-task-form="sign"', $linked, 'El aviso nuevo se registra con el código antes de llenar el inmueble.');
+
+    $form = CommercialPropertyEntryView::render($this->service, 100);
+    self::assertStringContainsString('data-property-linked-code', $form);
+    self::assertStringContainsString('value="' . $code . '" readonly', $form);
+    self::assertStringNotContainsString('Nuevo inmueble · generar código', $form);
+    self::assertStringContainsString('value="Frente a la iglesia"', $form);
+
+    try { $this->service->save(100, $this->input()); self::fail('Se generó otro código con un código adelantado vinculado.'); } catch (\InvalidArgumentException $exception) {}
+    $result = $this->service->save(100, $this->input(['request_id'=>str_repeat('d',32),'modo_ingreso'=>'adelantado','codigo_adelantado'=>(string) $code,'presenta-aviso'=>'Si']));
+    self::assertSame($code, $result['id_inmueble']);
+    self::assertSame(1, (int) $this->db->getVar('SELECT COUNT(*) FROM wp_jet_cct_inmuebles WHERE codigo=?', [$code]));
+    self::assertSame('Casa de prueba', $this->db->getVar('SELECT post_title FROM wp_posts WHERE ID=?', [$code]));
+  }
+
   public function testASeparateSubmissionCanUpdateTheSameDraftWithoutAnEmailKeyCollision(): void
   {
     $input = $this->input(['modo_ingreso'=>'adelantado','codigo_adelantado'=>'800','presenta-aviso'=>'No']);
