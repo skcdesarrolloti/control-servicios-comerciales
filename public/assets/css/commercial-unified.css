@@ -68,6 +68,14 @@
   background: #fff; border-color: var(--scm-primary); outline: none; box-shadow: 0 0 0 1px var(--scm-primary);
 }
 .cqt-check, .ccl-check { font-size: 12px; color: var(--scm-ink); }
+/* Buscador de la cotización: filtros principales a la vista y "Más filtros" plegados. */
+.cqt-more { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; padding-top: 12px; border-top: 1px dashed var(--scm-field-line); }
+.cqt-more[hidden] { display: none; }
+.cqt-filters .cqt-more-toggle { color: var(--scm-primary); }
+.cqt-filter-actions .cqt-check { margin-right: auto; min-height: 38px; }
+.cqt-more-toggle[aria-expanded="true"] { background: var(--scm-line); }
+.cqt-more-count { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--scm-primary); color: #fff; font-size: 11px; }
+.cqt-more-count[hidden] { display: none; }
 
 /* Estados y conteos: píldoras como "Mis inmuebles por estado". */
 .ccl-chips, .cqt-chips {

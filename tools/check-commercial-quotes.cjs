@@ -75,6 +75,18 @@ async function routePhotos(context) {
     await task.locator('[data-cqt-search] [type="reset"]').click();
     await page.waitForFunction(() => document.querySelectorAll('[data-cqt-prop]').length === 3);
 
+    // Principales a la vista; el resto, en "Más filtros", que cuenta los que están puestos.
+    const moreToggle = task.locator('[data-cqt-more-toggle]');
+    assert.equal(await task.locator('[name="habitaciones"]').isVisible(), true, 'Habitaciones es principal');
+    assert.equal(await task.locator('[name="amoblado"]').isVisible(), false, 'Amoblado va en Más filtros');
+    await moreToggle.click();
+    assert.equal(await moreToggle.getAttribute('aria-expanded'), 'true');
+    await task.locator('[name="amoblado"]').selectOption('Si');
+    await page.waitForFunction(() => document.querySelector('[data-cqt-more-count]').textContent === '1');
+    assert.equal(await task.locator('[data-cqt-more-count]').isVisible(), true);
+    await task.locator('[name="amoblado"]').selectOption('');
+    await page.waitForFunction(() => document.querySelector('[data-cqt-more-count]').hidden);
+
     // Arriendo o venta: la permuta solo aparece cuando el negocio incluye venta.
     const swap = task.locator('[name="acepta_permuta"]');
     assert.equal(await swap.isVisible(), false, 'En una cotización de arriendo no hay permuta');

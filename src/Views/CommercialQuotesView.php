@@ -80,10 +80,13 @@ final class CommercialQuotesView
       . self::select('ciudad', 'Ciudad', self::pairs($options['ciudades']), '', 'Todas')
       . '<label class="cqt-field"><span>Precio desde</span><input name="precio_min" inputmode="numeric" data-cqt-money placeholder="$"></label>'
       . '<label class="cqt-field"><span>Precio hasta</span><input name="precio_max" inputmode="numeric" data-cqt-money placeholder="$"></label>'
-      . '<label class="cqt-field"><span>Área desde (m²)</span><input name="area_min" inputmode="numeric" placeholder="m²"></label>'
-      . '<label class="cqt-field"><span>Área hasta (m²)</span><input name="area_max" inputmode="numeric" placeholder="m²"></label>'
       . self::select('habitaciones', 'Habitaciones', PropertySearchFilters::MIN_OPTIONS, '', 'Cualquiera')
       . self::select('banos', 'Baños', PropertySearchFilters::MIN_OPTIONS, '', 'Cualquiera')
+      . self::select('orden', 'Ordenar', ['precio_asc' => 'Menor precio', 'precio_desc' => 'Mayor precio', 'area' => 'Mayor área'], '', 'Más recientes')
+      // Más filtros: plegados hasta que se piden; el botón cuenta los que están puestos (commercial-quotes.js).
+      . '<div class="cqt-more" id="cqt-more-' . $pk . '" data-cqt-more hidden>'
+      . '<label class="cqt-field"><span>Área desde (m²)</span><input name="area_min" inputmode="numeric" placeholder="m²"></label>'
+      . '<label class="cqt-field"><span>Área hasta (m²)</span><input name="area_max" inputmode="numeric" placeholder="m²"></label>'
       . self::select('parqueaderos', 'Parqueaderos', PropertySearchFilters::MIN_OPTIONS, '', 'Cualquiera')
       . self::select('estrato', 'Estrato', self::pairs($options['estratos'] ?? []), '', 'Todos')
       . self::select('destinacion', 'Destinación', self::pairs($options['destinaciones'] ?? []), '', 'Todas')
@@ -99,9 +102,10 @@ final class CommercialQuotesView
       . self::select('tipo_apartamento', 'Tipo de apartamento', PropertySearchFilters::APARTMENT_TYPES, '', 'Todos')
       . '<label class="cqt-field"><span>Piso desde</span><input name="piso_min" inputmode="numeric" placeholder="Piso"></label>'
       . '<label class="cqt-field"><span>Piso hasta</span><input name="piso_max" inputmode="numeric" placeholder="Piso"></label>'
-      . self::select('orden', 'Ordenar', ['precio_asc' => 'Menor precio', 'precio_desc' => 'Mayor precio', 'area' => 'Mayor área'], '', 'Más recientes')
+      . '</div>'
+      . '<div class="cqt-filter-actions"><button type="button" class="cqt-secondary cqt-more-toggle" data-cqt-more-toggle aria-expanded="false" aria-controls="cqt-more-' . $pk . '">' . self::icon('tune') . '<span data-cqt-more-label>Más filtros</span><span class="cqt-more-count" data-cqt-more-count hidden></span></button>'
       . '<label class="cqt-check"><input type="checkbox" name="ocultar_vencidos" value="1"> Ocultar los vencidos</label>'
-      . '<div class="cqt-filter-actions"><button type="submit" class="cqt-primary">' . self::icon('search') . 'Buscar</button><button type="reset" class="cqt-secondary">Limpiar</button></div>'
+      . '<button type="submit" class="cqt-primary">' . self::icon('search') . 'Buscar</button><button type="reset" class="cqt-secondary">Limpiar</button></div>'
       . '</form><div class="cqt-results" data-cqt-results aria-live="polite"><p class="cqt-empty">Cargando inmuebles…</p></div></section>'
       . '</div>'
       . '<aside class="cqt-tray" aria-labelledby="cqt-tray-title-' . $pk . '"><div class="cqt-tray-in">'
