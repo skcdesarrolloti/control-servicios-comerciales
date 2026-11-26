@@ -3542,8 +3542,9 @@ final class CommercialDashboardView
    * @param mixed $policy
    */
   /**
-   * "Más filtros" de las vistas de Inmuebles: precio, m², habitaciones, baños, parqueaderos, estrato, antigüedad,
-   * amoblado, permuta, depósito, vigilancia y negociable (PropertySearchFilters). Se abre solo si alguno está puesto.
+   * Características del inmueble en las vistas de Inmuebles, siempre visibles: precio, m², habitaciones, baños,
+   * parqueaderos, estrato, antigüedad, amoblado, depósito, vigilancia, negociable y, solo con negocio Venta o
+   * Arriendo/Venta, la permuta (PropertySearchFilters).
    * @param array<string,mixed> $filters
    * @param array<string,mixed> $options
    */
@@ -3570,13 +3571,13 @@ final class CommercialDashboardView
       return $values === [] ? [] : array_combine($values, $values);
     };
     $yesNo = ['Si' => 'Sí', 'No' => 'No'];
-    $active = PropertySearchFilters::activeCount($filters);
+    $swap = PropertySearchFilters::allowsSwap($value('tipo_negocio'));
+    $active = PropertySearchFilters::activeCount(PropertySearchFilters::withoutSwapUnless($swap, $filters));
 
-    $html = '<details class="group border-t border-surface-container pt-3"' . ($active > 0 ? ' open' : '') . ' data-commercial-property-more-filters>'
-      . '<summary class="inline-flex items-center gap-1.5 cursor-pointer select-none text-xs font-semibold text-primary list-none [&::-webkit-details-marker]:hidden">'
-      . '<span class="material-symbols-outlined text-[18px]">tune</span><span>Más filtros: precio, m², habitaciones, parqueaderos, amoblado, permuta…</span>'
-      . ($active > 0 ? '<span class="px-2 py-0.5 rounded-full text-label-sm bg-primary/10 text-primary">' . $active . '</span>' : '')
-      . '<span class="material-symbols-outlined text-[18px] transition-transform group-open:rotate-180">expand_more</span></summary>'
+    $html = '<div class="border-t border-surface-container pt-3" data-commercial-property-more-filters>'
+      . '<p class="inline-flex items-center gap-1.5 text-xs font-semibold text-primary">'
+      . '<span class="material-symbols-outlined text-[18px]">tune</span><span>Características del inmueble</span>'
+      . ($active > 0 ? '<span class="px-2 py-0.5 rounded-full text-label-sm bg-primary/10 text-primary">' . $active . '</span>' : '') . '</p>'
       . '<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 pt-3">'
       . $label('Precio desde', $number('precio_min', '$', true))
       . $label('Precio hasta', $number('precio_max', '$', true))
@@ -3588,12 +3589,13 @@ final class CommercialDashboardView
       . $label('Estrato', $select('estrato', $list($options['estratos'] ?? []), 'Todos'))
       . $label('Antigüedad', $select('edad_max', PropertySearchFilters::AGE_OPTIONS, 'Cualquiera'))
       . $label('Amoblado', $select('amoblado', $yesNo, 'Todos'))
-      . $label('Acepta permuta', $select('acepta_permuta', $yesNo, 'Todos'))
-      . $label('Qué recibe en permuta', $select('tipo_permuta', $list($options['tipos_permuta'] ?? []), 'Cualquiera'))
+      . ($swap ? $label('Acepta permuta', $select('acepta_permuta', $yesNo, 'Todos'))
+        . $label('Qué recibe en permuta', $select('tipo_permuta', $list($options['tipos_permuta'] ?? []), 'Cualquiera')) : '')
       . $label('Depósito', $select('deposito', $yesNo, 'Todos'))
       . $label('Vigilancia', $select('vigilancia', $yesNo, 'Todos'))
       . $label('Negociable', $select('negociable', $yesNo, 'Todos'))
-      . '</div><p class="pt-2 text-[11px] text-secondary">El precio se compara con el de arriendo o el de venta según el negocio elegido; sin negocio, con cualquiera de los dos.</p></details>';
+      . '</div><p class="pt-2 text-[11px] text-secondary">El precio se compara con el de arriendo o el de venta según el negocio elegido; sin negocio, con cualquiera de los dos.'
+      . ($swap ? '' : ' Los filtros de permuta aparecen al elegir Venta o Arriendo/Venta.') . '</p></div>';
     return $html;
   }
 

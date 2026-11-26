@@ -82,15 +82,33 @@ final class PropertySearchFiltersTest extends TestCase
     self::assertSame(['5', '%"Inmueble"%', 'Inmueble'], $args);
   }
 
-  public function testPropertiesViewRendersTheMoreFiltersPanel(): void
+  public function testSwapFiltersOnlyApplyToSales(): void
   {
+    self::assertTrue(PropertySearchFilters::allowsSwap('Venta'));
+    self::assertTrue(PropertySearchFilters::allowsSwap('Arriendo/Venta'));
+    self::assertFalse(PropertySearchFilters::allowsSwap('Arriendo', 'Venta'));
+    self::assertFalse(PropertySearchFilters::allowsSwap(''));
+    self::assertTrue(PropertySearchFilters::allowsSwap('', 'Venta'));
+    self::assertFalse(PropertySearchFilters::allowsSwap('', 'Arriendo'));
+
+    $filters = PropertySearchFilters::clean(['acepta_permuta' => 'Si', 'tipo_permuta' => 'Inmueble', 'amoblado' => 'Si']);
+    $dropped = PropertySearchFilters::withoutSwapUnless(false, $filters);
+    self::assertSame('', $dropped['acepta_permuta']);
+    self::assertSame('', $dropped['tipo_permuta']);
+    self::assertSame('Si', $dropped['amoblado']);
+    self::assertSame($filters, PropertySearchFilters::withoutSwapUnless(true, $filters));
+  }
+
+  public function testPropertiesViewShowsTheFeatureFiltersAndSwapOnlyForSales(): void
+  {
+    $options = ['estratos' => ['3', '4'], 'tipos_permuta' => ['Inmueble', 'Vehiculos']];
     $html = CommercialDashboardView::renderPropertyFeatureFilters(
-      PropertySearchFilters::clean(['amoblado' => 'Si', 'precio_min' => '2000000']),
-      ['estratos' => ['3', '4'], 'tipos_permuta' => ['Inmueble', 'Vehiculos']]
+      PropertySearchFilters::clean(['amoblado' => 'Si', 'precio_min' => '2000000']) + ['tipo_negocio' => 'Venta'],
+      $options
     );
 
     self::assertStringContainsString('data-commercial-property-more-filters', $html);
-    self::assertStringContainsString(' open', $html);
+    self::assertStringNotContainsString('<details', $html);
     foreach (['precio_min', 'precio_max', 'area_min', 'area_max', 'habitaciones', 'banos', 'parqueaderos', 'estrato', 'edad_max', 'amoblado', 'acepta_permuta', 'tipo_permuta', 'deposito', 'vigilancia', 'negociable'] as $name) {
       self::assertStringContainsString('name="' . $name . '"', $html);
     }
@@ -98,7 +116,12 @@ final class PropertySearchFiltersTest extends TestCase
     self::assertStringContainsString('<option value="Si" selected>Sí</option>', $html);
     self::assertStringContainsString('<option value="Vehiculos">Vehiculos</option>', $html);
 
-    $closed = CommercialDashboardView::renderPropertyFeatureFilters([], []);
-    self::assertStringNotContainsString(' open', $closed);
+    foreach (['', 'Arriendo'] as $business) {
+      $rent = CommercialDashboardView::renderPropertyFeatureFilters(['tipo_negocio' => $business, 'acepta_permuta' => 'Si'], $options);
+      self::assertStringContainsString('name="amoblado"', $rent);
+      self::assertStringNotContainsString('name="acepta_permuta"', $rent);
+      self::assertStringNotContainsString('name="tipo_permuta"', $rent);
+    }
+    self::assertStringContainsString('name="tipo_permuta"', CommercialDashboardView::renderPropertyFeatureFilters(['tipo_negocio' => 'Arriendo/Venta'], $options));
   }
 }

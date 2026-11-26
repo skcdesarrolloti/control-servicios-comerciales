@@ -196,6 +196,15 @@ final class CommercialQuotesTest extends TestCase
     self::assertSame(['501'], array_column($cheap['items'], 'codigo'));
     $rooms = $this->service()->searchProperties(['tipo' => 'Arriendo', 'habitaciones' => '4']);
     self::assertSame(['502'], array_column($rooms['items'], 'codigo'));
+
+    // "Arriendo o venta" del buscador manda sobre el tipo de cotización, y el precio se compara con el de ese negocio.
+    $sales = $this->service()->searchProperties(['tipo' => 'Arriendo', 'negocio' => 'Venta']);
+    self::assertSame(['505'], array_column($sales['items'], 'codigo'));
+    self::assertSame('Venta', $sales['items'][0]['precio_tipo']);
+    // La permuta solo filtra en venta: en arriendo se ignora aunque llegue.
+    $this->db->update('wp_jet_cct_inmuebles', ['acepta_permuta' => 'No'], ['codigo' => '505']);
+    self::assertSame([], $this->service()->searchProperties(['tipo' => 'Venta', 'acepta_permuta' => 'Si'])['items']);
+    self::assertCount(3, $this->service()->searchProperties(['tipo' => 'Arriendo', 'acepta_permuta' => 'Si'])['items']);
   }
 
   public function testSearchAndCreateRequireTheAction(): void

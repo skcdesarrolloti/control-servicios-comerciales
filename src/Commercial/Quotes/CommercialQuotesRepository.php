@@ -78,14 +78,15 @@ final class CommercialQuotesRepository
       $where[] = 'LOWER(i.`tipo_negocio`) LIKE ?';
       $args[] = '%' . mb_strtolower($business, 'UTF-8') . '%';
     }
-    foreach (['tipo_inmueble', 'barrio', 'ciudad', 'destinacion'] as $column) {
-      $value = trim($filters[$column] ?? '');
+    foreach (['negocio' => 'tipo_negocio', 'tipo_inmueble' => 'tipo_inmueble', 'barrio' => 'barrio', 'ciudad' => 'ciudad', 'destinacion' => 'destinacion'] as $key => $column) {
+      $value = trim((string) ($filters[$key] ?? ''));
       if ($value !== '') {
         $where[] = "TRIM(i.`{$column}`) = ?";
         $args[] = $value;
       }
     }
-    // Área, habitaciones, baños, parqueaderos, estrato, amoblado, permuta…; el precio lo compara el servicio.
+    // Área, habitaciones, baños, parqueaderos, estrato, amoblado, permuta…; el precio lo compara el servicio y la
+    // permuta llega vacía si no aplica (CommercialQuotesService::searchProperties).
     [$featureWhere, $featureArgs] = PropertySearchFilters::sql(PropertySearchFilters::clean($filters), '', false);
     array_push($where, ...$featureWhere);
     array_push($args, ...$featureArgs);

@@ -78,9 +78,25 @@
     showError(task, "");
     renderTray(task);
   }
+  // Permuta solo para venta: con "Arriendo o venta" elegido, si incluye venta; si no, según el tipo de cotización
+  // (PropertySearchFilters::allowsSwap). Oculta queda deshabilitada y no se envía.
+  function syncSwap(task, form) {
+    var type = task.querySelector("[data-cqt-type]");
+    var business = form.querySelector("[data-cqt-business]");
+    var chosen = business ? business.value : "";
+    var sale = chosen ? (chosen === "Venta" || chosen === "Arriendo/Venta") : (type ? type.value === "Venta" : false);
+    form.querySelectorAll("[data-cqt-swap]").forEach(function (box) {
+      box.style.display = sale ? "" : "none";
+      box.querySelectorAll("select").forEach(function (select) {
+        select.disabled = !sale;
+        if (!sale) select.value = "";
+      });
+    });
+  }
   function search(task, page) {
     var form = task.querySelector("[data-cqt-search]");
     var holder = task.querySelector("[data-cqt-results]");
+    syncSwap(task, form);
     var data = new FormData(form);
     var type = task.querySelector("[data-cqt-type]");
     data.set("tipo", type ? type.value : "");

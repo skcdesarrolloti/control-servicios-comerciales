@@ -52,6 +52,10 @@ final class CommercialQuotesView
     $options = $data['options'];
     $types = self::pairs(CommercialQuotesService::TYPES);
     $yesNo = ['Si' => 'Sí', 'No' => 'No'];
+    // Permuta solo para venta: commercial-quotes.js la muestra u oculta según el negocio o el tipo de cotización.
+    $swapOn = PropertySearchFilters::allowsSwap('', (string) $data['tipo']);
+    $swapOff = $swapOn ? '' : ' disabled';
+    $swapField = static fn(string $html): string => str_replace('<label class="cqt-field">', '<label class="cqt-field" data-cqt-swap' . ($swapOn ? '' : ' style="display:none"') . '>', $html);
     $html = '<section class="cqt cqt-task" data-cqt-task data-ticket-pk="' . $pk . '" data-max="' . (int) $data['max'] . '">'
       . '<header class="cqt-task-head"><button type="button" class="cqt-back" data-commercial-return-case="' . $pk . '">' . self::icon('arrow_back') . 'Volver a la tarea</button>'
       . '<div><p class="cqt-eyebrow">Tarea #' . $pk . ($data['asunto'] !== '' ? ' · ' . self::e($data['asunto']) : '') . '</p><h1 tabindex="-1">Cotización de inmuebles</h1>'
@@ -70,6 +74,7 @@ final class CommercialQuotesView
       . '<p class="cqt-hint">Solo salen inmuebles públicos. Los que tienen la actualización vencida no se pueden cotizar hasta actualizarlos.</p>'
       . '<form class="cqt-filters" data-cqt-search role="search">'
       . '<label class="cqt-field cqt-wide"><span>Buscar</span><input type="search" name="q" placeholder="Código, barrio, conjunto o tipo"></label>'
+      . self::select('negocio', 'Arriendo o venta', PropertySearchFilters::BUSINESS, '', 'Según la cotización', false, ' data-cqt-business')
       . self::select('tipo_inmueble', 'Tipo de inmueble', self::pairs($options['tipos_inmueble']), '', 'Todos')
       . self::select('barrio', 'Barrio', self::pairs($options['barrios']), '', 'Todos')
       . self::select('ciudad', 'Ciudad', self::pairs($options['ciudades']), '', 'Todas')
@@ -84,8 +89,8 @@ final class CommercialQuotesView
       . self::select('destinacion', 'Destinación', self::pairs($options['destinaciones'] ?? []), '', 'Todas')
       . self::select('edad_max', 'Antigüedad', PropertySearchFilters::AGE_OPTIONS, '', 'Cualquiera')
       . self::select('amoblado', 'Amoblado', $yesNo, '', 'Todos')
-      . self::select('acepta_permuta', 'Acepta permuta', $yesNo, '', 'Todos')
-      . self::select('tipo_permuta', 'Qué recibe en permuta', self::pairs($options['tipos_permuta'] ?? []), '', 'Cualquiera')
+      . $swapField(self::select('acepta_permuta', 'Acepta permuta', $yesNo, '', 'Todos', false, $swapOff))
+      . $swapField(self::select('tipo_permuta', 'Qué recibe en permuta', self::pairs($options['tipos_permuta'] ?? []), '', 'Cualquiera', false, $swapOff))
       . self::select('deposito', 'Depósito', $yesNo, '', 'Todos')
       . self::select('vigilancia', 'Vigilancia', $yesNo, '', 'Todos')
       . self::select('negociable', 'Negociable', $yesNo, '', 'Todos')

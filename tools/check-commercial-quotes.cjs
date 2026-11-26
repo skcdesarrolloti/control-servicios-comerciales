@@ -74,6 +74,19 @@ async function routePhotos(context) {
     assert.equal(await task.locator('[data-cqt-count]').innerText(), '2', 'Filtrar no borra lo elegido');
     await task.locator('[data-cqt-search] [type="reset"]').click();
     await page.waitForFunction(() => document.querySelectorAll('[data-cqt-prop]').length === 3);
+
+    // Arriendo o venta: la permuta solo aparece cuando el negocio incluye venta.
+    const swap = task.locator('[name="acepta_permuta"]');
+    assert.equal(await swap.isVisible(), false, 'En una cotización de arriendo no hay permuta');
+    await task.locator('[data-cqt-business]').selectOption('Venta');
+    await page.waitForFunction(() => [...document.querySelectorAll('[data-cqt-prop]')].map(card => card.dataset.code).join() === '505');
+    assert.equal(await swap.isVisible(), true, 'En venta se filtra por permuta');
+    assert.equal(await task.locator('[name="tipo_permuta"]').isEnabled(), true);
+    await task.locator('[data-cqt-business]').selectOption('Arriendo');
+    await page.waitForFunction(() => document.querySelectorAll('[data-cqt-prop]').length === 3);
+    assert.equal(await swap.isVisible(), false);
+    await task.locator('[data-cqt-search] [type="reset"]').click();
+    await page.waitForFunction(() => document.querySelectorAll('[data-cqt-prop]').length === 3);
     if (shots) await page.screenshot({ path: path.join(shots, 'cotizacion-formulario.png') });
 
     await task.locator('[name="observaciones"]').fill('Podemos visitarlos el sábado en la mañana.');

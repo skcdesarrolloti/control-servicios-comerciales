@@ -133,15 +133,18 @@ final class CommercialQuotesService
     $this->authorizeCreate();
     $text = static fn(string $key): string => is_scalar($input[$key] ?? null) ? trim((string) $input[$key]) : '';
     $type = in_array($text('tipo'), self::TYPES, true) ? $text('tipo') : '';
-    $rows = $this->repository->candidates(['q' => $text('q'), 'tipo' => $type, 'tipo_inmueble' => $text('tipo_inmueble'), 'barrio' => $text('barrio'), 'ciudad' => $text('ciudad'), 'destinacion' => $text('destinacion')]
-      + PropertySearchFilters::clean($input));
+    // "Arriendo o venta" del buscador manda; si no se eligió, sale lo del tipo de cotización.
+    $business = isset(PropertySearchFilters::BUSINESS[$text('negocio')]) ? $text('negocio') : '';
+    $features = PropertySearchFilters::withoutSwapUnless(PropertySearchFilters::allowsSwap($business, $type), PropertySearchFilters::clean($input));
+    $rows = $this->repository->candidates(['q' => $text('q'), 'tipo' => $business === '' ? $type : '', 'negocio' => $business, 'tipo_inmueble' => $text('tipo_inmueble'), 'barrio' => $text('barrio'), 'ciudad' => $text('ciudad'), 'destinacion' => $text('destinacion')]
+      + $features);
     $min = self::amount($text('precio_min'));
     $max = self::amount($text('precio_max'));
     $hideExpired = $text('ocultar_vencidos') === '1';
     $items = [];
     $expired = 0;
     foreach ($rows as $row) {
-      $item = QuoteComparison::normalize($row, $type !== '' ? $type : 'Arriendo');
+      $item = QuoteComparison::normalize($row, in_array($business, ['Arriendo', 'Venta'], true) ? $business : ($type !== '' ? $type : 'Arriendo'));
       if (($min > 0 && $item['precio'] < $min) || ($max > 0 && ($item['precio'] <= 0 || $item['precio'] > $max))) {
         continue;
       }

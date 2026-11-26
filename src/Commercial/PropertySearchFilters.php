@@ -64,6 +64,32 @@ final class PropertySearchFilters
     return $out;
   }
 
+  /** Filtros de permuta: solo aplican a inmuebles en venta (Venta o Arriendo/Venta). */
+  public const SWAP_KEYS = ['acepta_permuta', 'tipo_permuta'];
+  /** Valores de tipo_negocio que se filtran tal cual. */
+  public const BUSINESS = ['Arriendo' => 'Arriendo', 'Venta' => 'Venta', 'Arriendo/Venta' => 'Arriendo y venta'];
+
+  /**
+   * Si se filtra por permuta: con negocio elegido, cuando incluye venta; sin negocio, cuando la cotización es de venta
+   * ($fallback). En las vistas de Inmuebles sin negocio no se muestra.
+   */
+  public static function allowsSwap(string $business, string $fallback = ''): bool
+  {
+    $business = trim($business);
+    return $business !== '' ? in_array($business, ['Venta', 'Arriendo/Venta'], true) : trim($fallback) === 'Venta';
+  }
+
+  /** Quita los filtros de permuta cuando no aplican. @param array<string,mixed> $filters @return array<string,mixed> */
+  public static function withoutSwapUnless(bool $allowed, array $filters): array
+  {
+    if (!$allowed) {
+      foreach (self::SWAP_KEYS as $key) {
+        $filters[$key] = '';
+      }
+    }
+    return $filters;
+  }
+
   /** Cuántos de estos filtros están puestos (para abrir "Más filtros" y mostrar su conteo). @param array<string,mixed> $filters */
   public static function activeCount(array $filters): int
   {
