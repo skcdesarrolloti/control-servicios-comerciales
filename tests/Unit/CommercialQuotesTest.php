@@ -494,6 +494,10 @@ final class CommercialQuotesTest extends TestCase
     $results = CommercialQuotesView::propertyResults($this->service()->searchProperties(['tipo' => 'Arriendo']));
     self::assertStringContainsString('Ir a actualizar', $results);
     self::assertSame(2, substr_count($results, 'data-cqt-toggle'), 'Solo los que se pueden cotizar tienen botón Agregar.');
+    // "Ver ficha" abre la ficha completa del panel (la de Inmuebles), no el portal en otra pestaña.
+    $withTask = CommercialQuotesView::propertyResults($this->service()->searchProperties(['tipo' => 'Arriendo']), 700);
+    self::assertStringContainsString('data-commercial-property-detail="501" data-property-origin="cotizacion" data-ticket-pk="700">Ver ficha</button>', $withTask);
+    self::assertStringNotContainsString('Ver ficha</a>', $withTask);
 
     $this->create();
     $again = CommercialQuotesView::taskForm($this->service()->formData(700));

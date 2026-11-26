@@ -75,6 +75,14 @@ async function routePhotos(context) {
     await task.locator('[data-cqt-search] [type="reset"]').click();
     await page.waitForFunction(() => document.querySelectorAll('[data-cqt-prop]').length === 3);
 
+    // "Ver ficha" abre la ficha completa del panel encima de la cotización, con su botón a la página web.
+    await task.locator('[data-cqt-prop][data-code="501"] [data-commercial-property-detail]').click();
+    const detail = page.locator('#commercial-property-detail-modal');
+    await detail.getByText('Ver en la página web').waitFor();
+    assert.ok((await detail.innerText()).includes('Código #501'));
+    await detail.locator('[data-commercial-close-property-detail]').first().click();
+    await task.locator('[data-cqt-search]').waitFor({ state: 'visible' });
+
     // Principales a la vista; el resto, en "Más filtros", que cuenta los que están puestos.
     const moreToggle = task.locator('[data-cqt-more-toggle]');
     assert.equal(await task.locator('[name="habitaciones"]').isVisible(), true, 'Habitaciones es principal');

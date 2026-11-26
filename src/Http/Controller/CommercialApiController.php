@@ -1574,16 +1574,24 @@ final class CommercialApiController
     }
     // La tabla de control de la calculadora de mercado también abre la ficha del inmueble.
     $general = $this->policy->canView('inmuebles') || ($this->policy->canSubview('herramientas', 'calculadora_mercado') && $this->policy->canAct('mercado_vista_completa'));
+    // Destacados y portales solo para quien tiene la vista Inmuebles: sus acciones la piden en el servidor.
+    $highlights = $this->policy->canView('inmuebles');
     $repo = new CommercialPropertiesRepository($this->db);
-    $property = $repo->propertyDetail($identifier);
-    if (!$general && !(is_array($property) && ($this->canOpenPropertyFromStudy($property, (int) ($input['study_id'] ?? 0), (int) ($input['ticket_pk'] ?? 0)) || $this->canOpenPropertyFromContext($property, (int) ($input['ticket_pk'] ?? 0))))) {
+    $property = $repo->propertyDetail($identifier, $highlights);
+    $full = $general || (is_array($property) && ($this->canOpenPropertyFromStudy($property, (int) ($input['study_id'] ?? 0), (int) ($input['ticket_pk'] ?? 0)) || $this->canOpenPropertyFromContext($property, (int) ($input['ticket_pk'] ?? 0))));
+    // Desde el buscador de la cotización se ve la ficha del inmueble, sin los datos privados del propietario.
+    $fromQuote = !$full && is_array($property) && $this->canOpenPropertyFromQuote($property, $input);
+    if (!$full && !$fromQuote) {
       JsonResponse::error('No tienes permiso para consultar inmuebles.', 403);
     }
     if (!is_array($property) || $property === []) {
       JsonResponse::error('Inmueble no encontrado.', 404);
     }
-    // Destacados y portales solo para quien tiene la vista Inmuebles: sus acciones la piden en el servidor.
-    $highlights = $this->policy->canView('inmuebles');
+    if ($fromQuote) {
+      foreach (self::PROPERTY_PRIVATE_FIELDS as $field) {
+        $property[$field] = '';
+      }
+    }
     $html = CommercialDashboardView::renderPropertyDetailModalContent($property, $highlights);
     if (!$highlights) {
       unset($property['active_portals'], $property['user_quotas'], $property['pending_requests'], $property['highlight_history']);
@@ -1618,6 +1626,30 @@ final class CommercialApiController
     }
     $code = trim((string) ($study['id_inmueble'] ?? ''));
     return $code !== '' && $code === trim((string) ($property['codigo'] ?? ''));
+  }
+
+  /** Datos del propietario, el arrendatario, la matrícula y las llaves: no salen en la ficha abierta desde la cotización. */
+  private const PROPERTY_PRIVATE_FIELDS = [
+    'propietario', 'id_propietario', 'propietario_celular', 'propietario_correo', 'propietario_documento', 'arrendatario', 'id_arrendatario',
+    'matricula_inmobiliaria', 'referencia_catastral', 'contacto_llaves', 'telefono_contacto_llaves', 'ubicacion_llaves', 'en_donde_estan_las_llaves',
+  ];
+
+  /**
+   * Desde el buscador de la cotización de una tarea ("Ver ficha"): quien puede crear cotizaciones ve la ficha de los
+   * inmuebles que se pueden cotizar, los mismos que le muestra el buscador.
+   * @param array<string,mixed> $property
+   * @param array<string,mixed> $input
+   */
+  private function canOpenPropertyFromQuote(array $property, array $input): bool
+  {
+    if (($input['origen'] ?? '') !== 'cotizacion' || !$this->policy->canAct(\SCM\Commercial\Quotes\CommercialQuotesService::ACTION) || !$this->policy->canAct('ver_ticket')) {
+      return false;
+    }
+    $ticketPk = (int) ($input['ticket_pk'] ?? 0);
+    if ($ticketPk > 0) {
+      $this->authorizeTicketScope($ticketPk);
+    }
+    return \SCM\Commercial\Quotes\CommercialQuotesRepository::isQuotable($property);
   }
 
   /**

@@ -20,7 +20,13 @@ final class CommercialQuotesDatabase
   private const TABLES = [
     'jet_cct_confi_sistema' => ['funcion', 'valor', 'imagen', 'departamento'],
     'jet_cct_cargos' => ['nombre_cargo'],
-    'jet_cct_funcionarios' => ['id_empleado', 'nombre', 'correo', 'celular', 'activo', 'id_cargo', 'id_sucursal', 'ficha'],
+    'jet_cct_funcionarios' => ['id_empleado', 'nombre', 'correo', 'celular', 'activo', 'id_cargo', 'id_sucursal', 'ficha', 'rol'],
+    // Ficha del inmueble ("Ver ficha" del buscador de la cotización).
+    'jet_cct_propietarios' => ['nombre', 'celular', 'correo', 'documento'],
+    'jet_cct_caract_internas' => ['valor', 'etiqueta', 'icono'],
+    'jet_cct_caract_externas' => ['valor', 'etiqueta', 'icono'],
+    'jet_cct_zonas_sociales' => ['valor', 'etiqueta', 'icono'],
+    'jet_cct_alrededores' => ['valor', 'etiqueta', 'icono'],
     'jet_cct_sucursales' => ['nombre', 'gerente_comercial', 'celular_ge_comercial'],
     'jet_cct_clientes' => ['nombre', 'celular', 'correo', 'indicativo', 'tipo_cliente', 'id_cliente', 'bloqueo_email', 'bloqueo_whatsapp'],
     'jet_cct_inmuebles' => ['codigo', 'estado', 'tipo_negocio', 'tipo_inmueble', 'barrio', 'ciudad', 'direccion', 'copropiedad', 'precio_arriendo', 'precio_venta', 'precio_admin', 'habitaciones', 'banos', 'parqueaderos', 'area_construida', 'area_privada', 'area_terreno', 'estrato', 'edad', 'destinacion', 'amoblado', 'acepta_permuta', 'tipo_permuta', 'deposito', 'vigilancia', 'negociable', 'interiores', 'exteriores', 'zonas_sociales', 'alrededores', 'descripcion', 'foto_portada', 'galeria', 'video', 'id_funcionario', 'id_propietario', 'funcionario', 'propietario', 'fecha_actualizacion', 'fecha_publicacion'],

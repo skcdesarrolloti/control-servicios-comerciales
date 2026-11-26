@@ -1687,14 +1687,15 @@
     });
   }
 
-  function openPropertyDetail(propCode, ticketPk, studyId) {
+  // origin "cotizacion": desde el buscador de la cotización (CommercialApiController::canOpenPropertyFromQuote).
+  function openPropertyDetail(propCode, ticketPk, studyId, origin) {
     if (!propCode) return;
     var propModal = document.getElementById("commercial-property-detail-modal");
     var propContainer = propModal && propModal.querySelector("[data-commercial-property-detail-container]");
     if (propModal && propContainer) {
       propContainer.innerHTML = '<div class="flex items-center justify-center py-28 text-secondary gap-3"><span class="w-3 h-3 rounded-full bg-[#1E3C76] animate-ping"></span><p class="font-body-md text-sm font-medium">Cargando información del inmueble…</p></div>';
       setStandaloneModal(propModal, true);
-      request("commercial_property_detail", { codigo: propCode, ticket_pk: ticketPk || "", study_id: studyId || "" })
+      request("commercial_property_detail", { codigo: propCode, ticket_pk: ticketPk || "", study_id: studyId || "", origen: origin || "" })
         .then(function (res) {
           if (res && res.html) {
             propContainer.innerHTML = res.html;
@@ -1802,7 +1803,7 @@
     if (propertyDetailBtn) {
       event.preventDefault();
       var propCode = propertyDetailBtn.getAttribute("data-commercial-property-detail") || "";
-      openPropertyDetail(propCode, propertyDetailBtn.getAttribute("data-ticket-pk") || "", propertyDetailBtn.getAttribute("data-study-id") || "");
+      openPropertyDetail(propCode, propertyDetailBtn.getAttribute("data-ticket-pk") || "", propertyDetailBtn.getAttribute("data-study-id") || "", propertyDetailBtn.getAttribute("data-property-origin") || "");
       return;
     }
     var closePropDetail = event.target.closest("[data-commercial-close-property-detail]");

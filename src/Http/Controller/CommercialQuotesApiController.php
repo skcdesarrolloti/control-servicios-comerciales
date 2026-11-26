@@ -95,9 +95,9 @@ final class CommercialQuotesApiController
   public function properties(array $input): never
   {
     $this->guarded($input, function () use ($input): array {
-      $this->taskPk($input);
+      $ticketPk = $this->taskPk($input);
       $result = $this->service->searchProperties($input);
-      return ['html' => CommercialQuotesView::propertyResults($result), 'total' => $result['total']];
+      return ['html' => CommercialQuotesView::propertyResults($result, $ticketPk), 'total' => $result['total']];
     });
   }
 

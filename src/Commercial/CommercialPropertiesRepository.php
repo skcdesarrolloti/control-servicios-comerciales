@@ -298,9 +298,10 @@ final class CommercialPropertiesRepository
    * Get single property details with resolved gallery image URLs.
    *
    * @param int|string $identifier Can be _ID or codigo
+   * @param bool $withHighlights Destacados, historial y cupos: solo para quien tiene la vista Inmuebles.
    * @return array<string,mixed>|null
    */
-  public function propertyDetail($identifier): ?array
+  public function propertyDetail($identifier, bool $withHighlights = true): ?array
   {
     $table = $this->db->table('jet_cct_inmuebles');
     $funcionarios = $this->db->table('jet_cct_funcionarios');
@@ -383,6 +384,9 @@ final class CommercialPropertiesRepository
     $property['foto_portada_url'] = $coverUrl;
     $property['galeria_urls'] = $galleryUrls;
     $property['amenities_map'] = $this->amenitiesIconMap();
+    if (!$withHighlights) {
+      return $property;
+    }
     $property['active_portals'] = $this->getActivePortalKeys($property);
     $property['highlight_history'] = $this->getPropertyHighlightHistory($propertyCode);
     $employeeId = trim(Auth::employeeId());

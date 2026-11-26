@@ -127,7 +127,7 @@ final class CommercialQuotesView
   }
 
   /** @param array{items:list<array<string,mixed>>,total:int,page:int,pages:int,vencidos:int} $result */
-  public static function propertyResults(array $result): string
+  public static function propertyResults(array $result, int $ticketPk = 0): string
   {
     if ($result['items'] === []) {
       return '<p class="cqt-empty">No hay inmuebles públicos con estos filtros.</p>';
@@ -156,7 +156,8 @@ final class CommercialQuotesView
         . ($specs !== [] ? '<p class="cqt-specs">' . self::e(implode(' · ', $specs)) . '</p>' : '');
       if ($item['quotable']) {
         $html .= '<div class="cqt-prop-actions"><button type="button" class="cqt-add" data-cqt-toggle aria-pressed="false" aria-label="Agregar ' . self::e($label . ', código ' . $code) . '">' . self::icon('add') . '<span>Agregar</span></button>'
-          . '<a class="cqt-link" href="' . self::e($item['url_portal']) . '" target="_blank" rel="noopener noreferrer">Ver ficha</a></div>';
+          // La ficha completa del panel (la de Inmuebles), con su botón para verla en la web.
+          . '<button type="button" class="cqt-link" data-commercial-property-detail="' . self::e($code) . '" data-property-origin="cotizacion"' . ($ticketPk > 0 ? ' data-ticket-pk="' . $ticketPk . '"' : '') . '>Ver ficha</button></div>';
       } else {
         $html .= '<div class="cqt-blocked" role="note">' . self::icon('warning') . '<div><strong>Actualización vencida</strong><span>' . (int) $state['days'] . ' días sin actualizar. No se puede cotizar hasta actualizarlo.</span>'
           . ($item['url_actualizar'] !== '' ? '<a href="' . self::e($item['url_actualizar']) . '" target="_blank" rel="noopener noreferrer">Ir a actualizar</a>' : '') . '</div></div>';
