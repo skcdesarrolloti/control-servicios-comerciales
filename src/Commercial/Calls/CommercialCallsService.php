@@ -28,7 +28,7 @@ final class CommercialCallsService
   public const PER_PAGE = 24;
   public const PPH_MEDIO = 'Club PPH';
 
-  private const CLIENT_TOPICS = ['Arriendo' => 'Cliente para arriendo', 'Venta' => 'Cliente para venta', 'Arriendo o venta' => 'Cliente para arriendo - venta'];
+  public const CLIENT_TOPICS = ['Arriendo' => 'Cliente para arriendo', 'Venta' => 'Cliente para venta', 'Arriendo o venta' => 'Cliente para arriendo - venta'];
   private const LISTING_TOPICS = ['Captacion', 'Recaptacion'];
   private const DEFAULT_PRIORITY = 'Prioridad comercial';
   private const DUPLICATE_SECONDS = 60;
@@ -354,8 +354,12 @@ final class CommercialCallsService
     }
     // En captación la llamada solo lleva tipo, uso y barrio: sin destinación, factores ni precio.
     $listing = in_array($topic, self::LISTING_TOPICS, true);
+    $description = is_scalar($input['descripcion'] ?? null) ? trim(strip_tags((string) $input['descripcion'])) : '';
+    if ($listing) {
+      $description = self::offerNote($choice('oferta', array_keys(self::CLIENT_TOPICS), 'para qué ofrece el inmueble'), $description);
+    }
     $factors = $listing ? [] : array_values(array_intersect((array) ($input['factores_importantes'] ?? []), $options['factores']));
-    [$budget, $description] = self::budget($input, is_scalar($input['descripcion'] ?? null) ? trim(strip_tags((string) $input['descripcion'])) : '', $offer);
+    [$budget, $description] = self::budget($input, $description, $offer);
     return $contact + [
       'tema_ayuda' => $topic,
       'comisionista' => $offer ? $yesNo('comisionista', 'si es comisionista') : '',
@@ -373,6 +377,20 @@ final class CommercialCallsService
       'merece_ticket' => $yesNo('merece_ticket', 'si merece tarea'),
       'id_empleado' => trim((string) $employee['id_empleado']),
     ] + $this->originFields($input, null, $options);
+  }
+
+  /**
+   * Captación: para qué ofrece el inmueble (arriendo, venta o ambos). La llamada no tiene columna propia,
+   * así que queda al inicio de la descripción si no lo dice ya (commercial-calls.js arma la misma frase).
+   */
+  public static function offerNote(string $offer, string $description): string
+  {
+    $verb = ['Arriendo' => 'arrendar', 'Venta' => 'vender', 'Arriendo o venta' => 'arrendar o vender'][$offer] ?? '';
+    $note = 'Ofrece su inmueble para ' . $verb;
+    if ($verb === '' || str_starts_with($description, $note . ':') || str_starts_with($description, $note . '.')) {
+      return $description;
+    }
+    return trim($note . '. ' . $description);
   }
 
   /**

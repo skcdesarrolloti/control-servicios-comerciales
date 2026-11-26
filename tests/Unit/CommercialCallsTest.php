@@ -133,7 +133,7 @@ final class CommercialCallsTest extends TestCase
     self::assertSame('1500000', $rent['presupuesto']);
     self::assertSame('', $rent['precio']);
     self::assertSame('45', $rent['id_inmueble']);
-    $listing = $this->row($this->create(['tema_ayuda' => 'Captacion', 'celular' => '3003334444', 'presupuesto' => '1.000', 'precio' => '250.000.000', 'id_inmueble' => '45']));
+    $listing = $this->row($this->create(['tema_ayuda' => 'Captacion', 'oferta' => 'Venta', 'celular' => '3003334444', 'presupuesto' => '1.000', 'precio' => '250.000.000', 'id_inmueble' => '45']));
     self::assertSame('', $listing['precio']);
     self::assertSame('', $listing['presupuesto']);
     self::assertSame('', $listing['id_inmueble']);
@@ -176,7 +176,7 @@ final class CommercialCallsTest extends TestCase
 
   public function testClientTypeOnlyAppliesToRentAndSale(): void
   {
-    $row = $this->row($this->create(['tema_ayuda' => 'Captacion', 'celular' => '3001000003', 'comisionista' => '', 'cliente_inmediato' => '', 'mes_inmueble' => 'Febrero']));
+    $row = $this->row($this->create(['tema_ayuda' => 'Captacion', 'oferta' => 'Venta', 'celular' => '3001000003', 'comisionista' => '', 'cliente_inmediato' => '', 'mes_inmueble' => 'Febrero']));
     self::assertSame(['', '', ''], [$row['comisionista'], $row['cliente_inmediato'], $row['mes_inmueble']]);
     $this->expectExceptionMessage('si el cliente es inmediato');
     $this->create(['tema_ayuda' => 'Venta', 'celular' => '3001000004', 'cliente_inmediato' => '']);
@@ -190,11 +190,24 @@ final class CommercialCallsTest extends TestCase
     self::assertStringContainsString('<div data-ccl-topic-field="detalle"><label class="ccl-field "><span>Destinación', $html);
     self::assertStringContainsString('<div data-ccl-topic-field="detalle"><fieldset class="ccl-checks"><legend>Factores importantes', $html);
     self::assertStringNotContainsString('name="precio"', $html);
+    self::assertStringContainsString('<div data-ccl-topic-field="captacion" hidden><label class="ccl-field "><span>¿Para qué ofrece el inmueble?', $html);
+    // Tipo de cliente va debajo de la solicitud, para no confundirlo con el motivo.
+    self::assertGreaterThan((int) strpos($html, 'Factores importantes'), (int) strpos($html, 'Tipo de cliente'));
+  }
+
+  public function testListingCallAsksWhatTheOwnerOffers(): void
+  {
+    $row = $this->row($this->create(['tema_ayuda' => 'Captacion', 'oferta' => 'Arriendo', 'celular' => '3001000006', 'descripcion' => 'Apartamento en Laureles.']));
+    self::assertSame('Ofrece su inmueble para arrendar. Apartamento en Laureles.', $row['descripcion']);
+    $same = $this->row($this->create(['tema_ayuda' => 'Captacion', 'oferta' => 'Arriendo o venta', 'celular' => '3001000007', 'descripcion' => 'Ofrece su inmueble para arrendar o vender: casa.']));
+    self::assertSame('Ofrece su inmueble para arrendar o vender: casa.', $same['descripcion']);
+    $this->expectExceptionMessage('Selecciona para qué ofrece el inmueble.');
+    $this->create(['tema_ayuda' => 'Captacion', 'celular' => '3001000008']);
   }
 
   public function testListingCallKeepsOnlyTypeUseAndNeighborhood(): void
   {
-    $row = $this->row($this->create(['tema_ayuda' => 'Captacion', 'celular' => '3001000005', 'destinacion' => 'Vivienda', 'factores_importantes' => ['Vista'], 'precio' => '250.000.000']));
+    $row = $this->row($this->create(['tema_ayuda' => 'Captacion', 'oferta' => 'Venta', 'celular' => '3001000005', 'destinacion' => 'Vivienda', 'factores_importantes' => ['Vista'], 'precio' => '250.000.000']));
     self::assertSame(['', '', ''], [$row['destinacion'], $row['factores_importantes'], $row['precio']]);
   }
 
@@ -329,7 +342,7 @@ final class CommercialCallsTest extends TestCase
     $client = $this->db->getRow('SELECT * FROM wp_jet_cct_clientes');
     self::assertSame('Cliente para arriendo', $client['tipo_cliente']);
     self::assertSame((string) $client['_ID'], $this->row($id)['id_cliente']);
-    $this->create(['tema_ayuda' => 'Captacion', 'celular' => '3008888888']);
+    $this->create(['tema_ayuda' => 'Captacion', 'oferta' => 'Venta', 'celular' => '3008888888']);
     self::assertSame(1, (int) $this->db->getVar('SELECT COUNT(*) FROM wp_jet_cct_clientes'));
   }
 

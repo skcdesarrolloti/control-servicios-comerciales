@@ -93,9 +93,13 @@
     var topic = value(form, "tema_ayuda");
     var offer = ["Arriendo", "Venta", "Arriendo o venta"].indexOf(topic) >= 0;
     var listing = topic === "Captacion" || topic === "Recaptacion";
-    var visible = { codigo: offer, presupuesto: offer, factores: offer, cliente: offer, precio: listing, detalle: !listing };
+    var visible = { codigo: offer, presupuesto: offer, factores: offer, cliente: offer, captacion: listing, precio: listing, detalle: !listing };
     form.querySelectorAll("[data-ccl-topic-field]").forEach(function (node) { node.hidden = !visible[node.getAttribute("data-ccl-topic-field")]; });
     // Registrar llamada en captación: solo tipo, uso y barrio; destinación y factores no se envían.
+    if (form.elements.oferta) {
+      form.elements.oferta.required = listing;
+      if (!listing) form.elements.oferta.value = "";
+    }
     if (listing && form.matches("[data-ccl-form]")) {
       if (form.elements.destinacion) form.elements.destinacion.value = "";
       form.querySelectorAll('[name="factores_importantes[]"], [name="factores_importantes"]').forEach(function (box) { box.checked = false; });
@@ -300,6 +304,8 @@
   function listText(items) {
     return items.length > 1 ? items.slice(0, -1).join(", ") + " y " + items[items.length - 1] : (items[0] || "");
   }
+  // Captación: para qué ofrece el inmueble (lo mismo arma el servidor en CommercialCallsService::offerNote).
+  var OFFER_VERBS = { "Arriendo": "arrendar", "Venta": "vender", "Arriendo o venta": "arrendar o vender" };
   function composeDescription(form) {
     var topic = value(form, "tema_ayuda");
     var kind = lower(value(form, "tipo_inmueble"));
@@ -310,7 +316,7 @@
     var parts = [];
     var seeking = { "Arriendo": "Busca en arriendo", "Venta": "Busca para comprar", "Arriendo o venta": "Busca en arriendo o para comprar" }[topic];
     if (seeking) parts.push(seeking + ": " + what + ".");
-    else if (topic === "Captacion" || topic === "Recaptacion") parts.push("Ofrece su inmueble para arrendar o vender: " + what + ".");
+    else if (topic === "Captacion" || topic === "Recaptacion") parts.push("Ofrece su inmueble para " + (OFFER_VERBS[value(form, "oferta")] || "arrendar o vender") + ": " + what + ".");
     else if (topic) parts.push("Motivo: " + topic + (kind || destination ? ", " + what : "") + ".");
     // En la llamada el código va tras "¿tiene código?"; en la tarea se escribe directo.
     if ((!form.elements.tiene_codigo || value(form, "tiene_codigo") === "Si") && value(form, "id_inmueble")) {
@@ -333,7 +339,7 @@
     var budget = value(form, "tiene_presupuesto") === "Si" && value(form, "presupuesto") ? " · $" + value(form, "presupuesto") : "";
     var seeking = { "Arriendo": "arriendo", "Venta": "compra", "Arriendo o venta": "arriendo o compra" }[topic];
     if (seeking) return "Cliente para " + seeking + ": " + where + budget;
-    if (topic === "Captacion") return "Captación de " + where;
+    var offered = { "Arriendo": " para arriendo", "Venta": " para venta", "Arriendo o venta": " para arriendo o venta" }[value(form, "oferta")] || "";
     if (topic === "Recaptacion") return "Recaptación de " + where;
     return topic ? topic + ": " + where : "";
   }

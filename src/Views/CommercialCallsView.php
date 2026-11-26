@@ -226,16 +226,12 @@ final class CommercialCallsView
     $merit = $mode === 'repeat' && !empty($data['deserved'])
       ? '<input type="hidden" name="merece_ticket" value="Si"><p class="ccl-hint ccl-wide">Al guardar se abre su tarea para la persona asignada.</p>'
       : self::selectField('merece_ticket', '¿Merece tarea?', $yesNo, '', true);
-    // Tipo de cliente solo aplica a quien busca en arriendo o venta (commercial-calls.js lo muestra y lo vuelve obligatorio).
     return $html
-      . '<div data-ccl-topic-field="cliente" hidden><h3>Tipo de cliente</h3><div class="ccl-grid">'
-      . self::selectField('comisionista', '¿Es comisionista?', $yesNo, '', true)
-      . self::selectField('cliente_inmediato', '¿Cliente inmediato?', $yesNo, '', true)
-      . '<div data-ccl-month hidden>' . self::selectField('mes_inmueble', 'Mes en que necesita el inmueble', $options['meses'], '', false) . '</div>'
-      . '</div></div>'
       . '<h3>Solicitud</h3><div class="ccl-grid">'
       . self::input('fecha', 'Fecha', (new \DateTimeImmutable('now', new \DateTimeZone('America/Bogota')))->format('Y-m-d'), 'date', true)
       . self::selectField('tema_ayuda', 'Motivo', $options['temas'], '', true)
+      // En captación se pregunta para qué ofrece el inmueble; queda en la descripción (la llamada no tiene columna propia).
+      . '<div data-ccl-topic-field="captacion" hidden>' . self::selectField('oferta', '¿Para qué ofrece el inmueble?', array_keys(CommercialCallsService::CLIENT_TOPICS), '', true) . '</div>'
       . '<div data-ccl-topic-field="codigo" hidden>' . self::selectField('tiene_codigo', '¿Pregunta por un inmueble con código?', $yesNo, '', false) . '</div>'
       . '<div data-ccl-code-field hidden>' . self::input('id_inmueble', 'Código del inmueble', '', 'text', false, 'inputmode="numeric" data-ccl-property-code') . '</div>'
       . '</div>'
@@ -251,6 +247,12 @@ final class CommercialCallsView
       . '</div>'
       . '<div data-ccl-topic-field="detalle">' . self::checks('factores_importantes', 'Factores importantes', $options['factores'], $data['factores']) . '</div>'
       . '</div>'
+      // Tipo de cliente va abajo y solo para quien busca en arriendo o venta (commercial-calls.js lo muestra y lo vuelve obligatorio).
+      . '<div data-ccl-topic-field="cliente" hidden><h3>Tipo de cliente</h3><div class="ccl-grid">'
+      . self::selectField('comisionista', '¿Es comisionista?', $yesNo, '', true)
+      . self::selectField('cliente_inmediato', '¿Cliente inmediato?', $yesNo, '', true)
+      . '<div data-ccl-month hidden>' . self::selectField('mes_inmueble', 'Mes en que necesita el inmueble', $options['meses'], '', false) . '</div>'
+      . '</div></div>'
       // La descripción se arma sola con los datos de arriba mientras nadie la escriba a mano (commercial-calls.js).
       . '<div class="ccl-field"><div class="ccl-desc-head"><label for="ccl-descripcion">Descripción</label>'
       . '<button type="button" class="ccl-desc-compose" data-ccl-compose><span class="material-symbols-outlined" aria-hidden="true">auto_fix_high</span>Armar con los datos</button></div>'
