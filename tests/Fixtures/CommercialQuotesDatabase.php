@@ -41,6 +41,7 @@ final class CommercialQuotesDatabase
       $pdo->exec('CREATE TABLE IF NOT EXISTS `wp_' . $name . '` (' . implode(',', $fields) . ')');
     }
     $pdo->exec('CREATE TABLE IF NOT EXISTS wp_posts (ID INTEGER PRIMARY KEY, guid TEXT, post_type TEXT)');
+    $pdo->exec('CREATE TABLE IF NOT EXISTS wp_postmeta (meta_id INTEGER PRIMARY KEY AUTOINCREMENT, post_id INTEGER, meta_key TEXT, meta_value TEXT)');
     $db = new Database($pdo);
     if ((int) $db->getVar('SELECT COUNT(*) FROM wp_jet_cct_funcionarios') > 0) {
       return $db;

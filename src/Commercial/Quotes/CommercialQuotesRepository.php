@@ -87,7 +87,7 @@ final class CommercialQuotesRepository
     }
     // Área, habitaciones, baños, parqueaderos, estrato, amoblado, permuta…; el precio lo compara el servicio y la
     // permuta llega vacía si no aplica (CommercialQuotesService::searchProperties).
-    [$featureWhere, $featureArgs] = PropertySearchFilters::sql(PropertySearchFilters::clean($filters), '', false);
+    [$featureWhere, $featureArgs] = PropertySearchFilters::sql(PropertySearchFilters::clean($filters), '', false, $this->db->table('postmeta'));
     array_push($where, ...$featureWhere);
     array_push($args, ...$featureArgs);
     return $this->db->getResults(

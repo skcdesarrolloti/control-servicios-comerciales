@@ -3594,6 +3594,11 @@ final class CommercialDashboardView
       . $label('Depósito', $select('deposito', $yesNo, 'Todos'))
       . $label('Vigilancia', $select('vigilancia', $yesNo, 'Todos'))
       . $label('Negociable', $select('negociable', $yesNo, 'Todos'))
+      . $label('Turístico (con RNT)', $select('turistico', $yesNo, 'Todos'))
+      . $label('Administración incluida', $select('administracion_incluida', $yesNo, 'Todos'))
+      . $label('Tipo de apartamento', $select('tipo_apartamento', PropertySearchFilters::APARTMENT_TYPES, 'Todos'))
+      . $label('Piso desde', $number('piso_min', 'Piso', false))
+      . $label('Piso hasta', $number('piso_max', 'Piso', false))
       . '</div><p class="pt-2 text-[11px] text-secondary">El precio se compara con el de arriendo o el de venta según el negocio elegido; sin negocio, con cualquiera de los dos.'
       . ($swap ? '' : ' Los filtros de permuta aparecen al elegir Venta o Arriendo/Venta.') . '</p></div>';
     return $html;

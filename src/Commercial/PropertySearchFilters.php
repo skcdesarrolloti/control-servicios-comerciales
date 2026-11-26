@@ -9,7 +9,8 @@ use SCM\Views\CommercialDashboardView;
 
 /**
  * Filtros de las características de un inmueble (precio, área en m², habitaciones, baños, parqueaderos, estrato,
- * antigüedad, amoblado, permuta, depósito, vigilancia, negociable) que comparten las vistas de Inmuebles y el buscador
+ * antigüedad, amoblado, permuta, depósito, vigilancia, negociable y, del post del inmueble, turístico (RNT),
+ * administración incluida, tipo de apartamento y piso) que comparten las vistas de Inmuebles y el buscador
  * de la cotización. Trabaja sobre `jet_cct_inmuebles` con el alias `i`; los números se guardan como texto (el arriendo
  * a veces con puntos de miles), así que se convierten en SQL igual que CommercialDashboardView::parsePrice.
  */
@@ -27,7 +28,14 @@ final class PropertySearchFilters
     'vigilancia' => 'Vigilancia',
     'negociable' => 'Negociable',
   ];
-  public const KEYS = ['precio_min', 'precio_max', 'area_min', 'area_max', 'habitaciones', 'banos', 'parqueaderos', 'estrato', 'edad_max', 'amoblado', 'acepta_permuta', 'tipo_permuta', 'deposito', 'vigilancia', 'negociable'];
+  /**
+   * Datos que solo están en el post del inmueble (wp_postmeta, post_id = codigo), no en jet_cct_inmuebles:
+   * filtro => meta_key. "Turístico" es tener RNT (Registro Nacional de Turismo, pestaña Turismo del inmueble).
+   */
+  public const META_YES_NO = ['turistico' => 'tiene-rnt', 'administracion_incluida' => 'administracion-incluida'];
+  /** Tipo de apartamento (meta tipo-apartamento): valor guardado => texto visible. */
+  public const APARTMENT_TYPES = ['Loft' => 'Loft', 'Duplex' => 'Dúplex', 'PentHouse' => 'Penthouse'];
+  public const KEYS = ['precio_min', 'precio_max', 'area_min', 'area_max', 'habitaciones', 'banos', 'parqueaderos', 'estrato', 'edad_max', 'amoblado', 'acepta_permuta', 'tipo_permuta', 'deposito', 'vigilancia', 'negociable', 'turistico', 'administracion_incluida', 'tipo_apartamento', 'piso_min', 'piso_max'];
   /** Opciones de "N o más". */
   public const MIN_OPTIONS = ['1' => '1 o más', '2' => '2 o más', '3' => '3 o más', '4' => '4 o más', '5' => '5 o más'];
   /** Antigüedad máxima en años. */
@@ -57,9 +65,14 @@ final class PropertySearchFilters
     $out['edad_max'] = $age > 0 ? (string) min($age, 200) : '';
     $out['estrato'] = mb_substr($text('estrato'), 0, 40);
     $out['tipo_permuta'] = mb_substr($text('tipo_permuta'), 0, 60);
-    foreach (array_keys(self::YES_NO) as $key) {
+    foreach (array_merge(array_keys(self::YES_NO), array_keys(self::META_YES_NO)) as $key) {
       $value = mb_strtolower($text($key), 'UTF-8');
       $out[$key] = in_array($value, ['si', 'sí'], true) ? 'Si' : ($value === 'no' ? 'No' : '');
+    }
+    $out['tipo_apartamento'] = isset(self::APARTMENT_TYPES[$text('tipo_apartamento')]) ? $text('tipo_apartamento') : '';
+    foreach (['piso_min', 'piso_max'] as $key) {
+      $value = (int) $text($key);
+      $out[$key] = $value > 0 ? (string) min($value, 200) : '';
     }
     return $out;
   }
@@ -108,7 +121,7 @@ final class PropertySearchFilters
    * @param array<string,mixed> $filters Salida de clean().
    * @return array{0:list<string>,1:list<mixed>}
    */
-  public static function sql(array $filters, string $priceKind = '', bool $withPrice = true): array
+  public static function sql(array $filters, string $priceKind = '', bool $withPrice = true, string $metaTable = 'wp_postmeta'): array
   {
     $where = [];
     $args = [];
@@ -165,6 +178,28 @@ final class PropertySearchFilters
       } elseif ($answer === 'No') {
         $where[] = "(TRIM(COALESCE(i.`{$column}`, '')) = 'No' OR (i.`{$column}` LIKE '%\"No\"%' AND i.`{$column}` NOT LIKE '%\"Si\"%'))";
       }
+    }
+
+    // Datos del post del inmueble: el código del inmueble es el ID de su post.
+    $meta = static fn(string $key, string $condition): string => "EXISTS (SELECT 1 FROM `{$metaTable}` pm WHERE pm.`post_id` = i.`codigo` AND pm.`meta_key` = '{$key}' AND ({$condition}))";
+    foreach (self::META_YES_NO as $filter => $key) {
+      $yes = "TRIM(pm.`meta_value`) = 'Si' OR pm.`meta_value` LIKE '%\"Si\"%'";
+      if ($value($filter) === 'Si') {
+        $where[] = $meta($key, $yes);
+      } elseif ($value($filter) === 'No') {
+        // Sin el dato cuenta como No.
+        $where[] = 'NOT ' . $meta($key, $yes);
+      }
+    }
+    $apartment = $value('tipo_apartamento');
+    if (isset(self::APARTMENT_TYPES[$apartment])) {
+      // Lista (a:1:{i:0;s:4:"Loft";}) o casillas (a:3:{s:4:"Loft";s:4:"true";…}).
+      $where[] = $meta('tipo-apartamento', "pm.`meta_value` LIKE '%\"{$apartment}\"%' AND pm.`meta_value` NOT LIKE '%\"{$apartment}\";s:5:\"false\"%'");
+    }
+    $floorMin = (int) $value('piso_min');
+    $floorMax = (int) $value('piso_max');
+    if ($floorMin > 0 || $floorMax > 0) {
+      $where[] = $meta('piso', self::between(self::number('pm.`meta_value`'), (float) $floorMin, (float) $floorMax));
     }
 
     return [$where, $args];

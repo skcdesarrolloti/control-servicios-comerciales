@@ -205,6 +205,15 @@ final class CommercialQuotesTest extends TestCase
     $this->db->update('wp_jet_cct_inmuebles', ['acepta_permuta' => 'No'], ['codigo' => '505']);
     self::assertSame([], $this->service()->searchProperties(['tipo' => 'Venta', 'acepta_permuta' => 'Si'])['items']);
     self::assertCount(3, $this->service()->searchProperties(['tipo' => 'Arriendo', 'acepta_permuta' => 'Si'])['items']);
+    // Turístico y piso salen del post del inmueble (wp_postmeta, post_id = código).
+    $this->db->insert('wp_postmeta', ['post_id' => 501, 'meta_key' => 'tiene-rnt', 'meta_value' => 'Si']);
+    $this->db->insert('wp_postmeta', ['post_id' => 502, 'meta_key' => 'tiene-rnt', 'meta_value' => 'No']);
+    $this->db->insert('wp_postmeta', ['post_id' => 502, 'meta_key' => 'piso', 'meta_value' => '7']);
+    self::assertSame(['501'], array_column($this->service()->searchProperties(['tipo' => 'Arriendo', 'turistico' => 'Si'])['items'], 'codigo'));
+    $notTourist = array_column($this->service()->searchProperties(['tipo' => 'Arriendo', 'turistico' => 'No'])['items'], 'codigo');
+    sort($notTourist);
+    self::assertSame(['502', '503'], $notTourist, 'Sin el dato cuenta como no turístico.');
+    self::assertSame(['502'], array_column($this->service()->searchProperties(['tipo' => 'Arriendo', 'piso_min' => '5'])['items'], 'codigo'));
   }
 
   public function testSearchAndCreateRequireTheAction(): void

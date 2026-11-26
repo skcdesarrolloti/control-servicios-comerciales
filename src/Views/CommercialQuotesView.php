@@ -94,6 +94,11 @@ final class CommercialQuotesView
       . self::select('deposito', 'Depósito', $yesNo, '', 'Todos')
       . self::select('vigilancia', 'Vigilancia', $yesNo, '', 'Todos')
       . self::select('negociable', 'Negociable', $yesNo, '', 'Todos')
+      . self::select('turistico', 'Turístico (con RNT)', $yesNo, '', 'Todos')
+      . self::select('administracion_incluida', 'Administración incluida', $yesNo, '', 'Todos')
+      . self::select('tipo_apartamento', 'Tipo de apartamento', PropertySearchFilters::APARTMENT_TYPES, '', 'Todos')
+      . '<label class="cqt-field"><span>Piso desde</span><input name="piso_min" inputmode="numeric" placeholder="Piso"></label>'
+      . '<label class="cqt-field"><span>Piso hasta</span><input name="piso_max" inputmode="numeric" placeholder="Piso"></label>'
       . self::select('orden', 'Ordenar', ['precio_asc' => 'Menor precio', 'precio_desc' => 'Mayor precio', 'area' => 'Mayor área'], '', 'Más recientes')
       . '<label class="cqt-check"><input type="checkbox" name="ocultar_vencidos" value="1"> Ocultar los vencidos</label>'
       . '<div class="cqt-filter-actions"><button type="submit" class="cqt-primary">' . self::icon('search') . 'Buscar</button><button type="reset" class="cqt-secondary">Limpiar</button></div>'

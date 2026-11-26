@@ -27,7 +27,7 @@ final class PropertySearchFiltersTest extends TestCase
     self::assertSame('', $clean['deposito']);
     self::assertSame('Vehiculos', $clean['tipo_permuta']);
     self::assertSame('10', $clean['edad_max']);
-    self::assertSame(['precio_min', 'precio_max', 'area_min', 'area_max', 'habitaciones', 'banos', 'parqueaderos', 'edad_max', 'estrato', 'tipo_permuta', 'amoblado', 'acepta_permuta', 'deposito', 'vigilancia', 'negociable'], array_keys($clean));
+    self::assertEqualsCanonicalizing(PropertySearchFilters::KEYS, array_keys($clean));
   }
 
   public function testNoFiltersMeansNoConditions(): void
@@ -82,6 +82,24 @@ final class PropertySearchFiltersTest extends TestCase
     self::assertSame(['5', '%"Inmueble"%', 'Inmueble'], $args);
   }
 
+  public function testPostMetaFiltersUseThePropertyPost(): void
+  {
+    $filters = PropertySearchFilters::clean(['turistico' => 'Si', 'administracion_incluida' => 'no', 'tipo_apartamento' => 'Loft', 'piso_min' => '3', 'piso_max' => '8']);
+    self::assertSame('Si', $filters['turistico']);
+    self::assertSame('No', $filters['administracion_incluida']);
+    self::assertSame('', PropertySearchFilters::clean(['tipo_apartamento' => "Loft' OR 1=1"])['tipo_apartamento']);
+
+    [$where, $args] = PropertySearchFilters::sql($filters, '', true, 'pre_postmeta');
+    $sql = implode(' AND ', $where);
+    self::assertCount(4, $where);
+    self::assertSame([], $args);
+    self::assertStringContainsString("FROM `pre_postmeta` pm WHERE pm.`post_id` = i.`codigo` AND pm.`meta_key` = 'tiene-rnt'", $sql);
+    self::assertStringContainsString("NOT EXISTS (SELECT 1 FROM `pre_postmeta` pm WHERE pm.`post_id` = i.`codigo` AND pm.`meta_key` = 'administracion-incluida'", $sql);
+    self::assertStringContainsString('"Loft";s:5:"false"', $sql);
+    self::assertStringContainsString(">= 3", $sql);
+    self::assertStringContainsString("<= 8", $sql);
+  }
+
   public function testSwapFiltersOnlyApplyToSales(): void
   {
     self::assertTrue(PropertySearchFilters::allowsSwap('Venta'));
@@ -109,7 +127,7 @@ final class PropertySearchFiltersTest extends TestCase
 
     self::assertStringContainsString('data-commercial-property-more-filters', $html);
     self::assertStringNotContainsString('<details', $html);
-    foreach (['precio_min', 'precio_max', 'area_min', 'area_max', 'habitaciones', 'banos', 'parqueaderos', 'estrato', 'edad_max', 'amoblado', 'acepta_permuta', 'tipo_permuta', 'deposito', 'vigilancia', 'negociable'] as $name) {
+    foreach (PropertySearchFilters::KEYS as $name) {
       self::assertStringContainsString('name="' . $name . '"', $html);
     }
     self::assertStringContainsString('value="2.000.000"', $html);

@@ -627,7 +627,7 @@ final class CommercialPropertiesRepository
     // Características: precio, m², habitaciones, baños, parqueaderos, estrato, antigüedad, amoblado, permuta…
     $negocio = in_array($tipoNegocio, ['Arriendo', 'Venta'], true) ? $tipoNegocio : '';
     $features = PropertySearchFilters::withoutSwapUnless(PropertySearchFilters::allowsSwap($tipoNegocio), PropertySearchFilters::clean($filters));
-    [$featureWhere, $featureArgs] = PropertySearchFilters::sql($features, $negocio);
+    [$featureWhere, $featureArgs] = PropertySearchFilters::sql($features, $negocio, true, $this->db->table('postmeta'));
     array_push($where, ...$featureWhere);
     array_push($args, ...$featureArgs);
 
