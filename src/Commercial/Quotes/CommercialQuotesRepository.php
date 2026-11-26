@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SCM\Commercial\Quotes;
 
+use SCM\Commercial\PropertySearchFilters;
 use SCM\Core\Database;
 use SCM\Precaptacion\Repository as ColumnsReader;
 
@@ -59,7 +60,7 @@ final class CommercialQuotesRepository
   /**
    * Inmuebles públicos para elegir, con los filtros de texto en SQL; precio, habitaciones y estado de actualización se
    * filtran después en el servicio.
-   * @param array<string,string> $filters
+   * @param array<string,mixed> $filters
    * @return list<array<string,mixed>>
    */
   public function candidates(array $filters): array
@@ -77,13 +78,17 @@ final class CommercialQuotesRepository
       $where[] = 'LOWER(i.`tipo_negocio`) LIKE ?';
       $args[] = '%' . mb_strtolower($business, 'UTF-8') . '%';
     }
-    foreach (['tipo_inmueble', 'barrio', 'ciudad'] as $column) {
+    foreach (['tipo_inmueble', 'barrio', 'ciudad', 'destinacion'] as $column) {
       $value = trim($filters[$column] ?? '');
       if ($value !== '') {
         $where[] = "TRIM(i.`{$column}`) = ?";
         $args[] = $value;
       }
     }
+    // Área, habitaciones, baños, parqueaderos, estrato, amoblado, permuta…; el precio lo compara el servicio.
+    [$featureWhere, $featureArgs] = PropertySearchFilters::sql(PropertySearchFilters::clean($filters), '', false);
+    array_push($where, ...$featureWhere);
+    array_push($args, ...$featureArgs);
     return $this->db->getResults(
       'SELECT i.*, f.`id_sucursal` AS func_sucursal FROM `' . $this->db->table('jet_cct_inmuebles') . '` i
          LEFT JOIN `' . $this->db->table('jet_cct_funcionarios') . "` f ON (TRIM(COALESCE(i.`id_funcionario`, '')) <> '' AND TRIM(f.`id_empleado`) = TRIM(i.`id_funcionario`))
@@ -96,14 +101,14 @@ final class CommercialQuotesRepository
 
   /**
    * Valores para los filtros del buscador, solo de inmuebles públicos.
-   * @return array{tipos_inmueble:list<string>,barrios:list<string>,ciudades:list<string>}
+   * @return array{tipos_inmueble:list<string>,barrios:list<string>,ciudades:list<string>,destinaciones:list<string>,estratos:list<string>,tipos_permuta:list<string>}
    */
   public function options(): array
   {
     [$quotable, $quotableArgs] = self::quotableSql('`estado`', '`codigo`');
     $table = $this->db->table('jet_cct_inmuebles');
     $out = [];
-    foreach (['tipo_inmueble' => 'tipos_inmueble', 'barrio' => 'barrios', 'ciudad' => 'ciudades'] as $column => $key) {
+    foreach (['tipo_inmueble' => 'tipos_inmueble', 'barrio' => 'barrios', 'ciudad' => 'ciudades', 'destinacion' => 'destinaciones'] as $column => $key) {
       $values = array_values(array_filter(array_map(static fn($value): string => trim((string) $value), $this->db->getCol(
         "SELECT DISTINCT TRIM(`{$column}`) FROM `{$table}` WHERE {$quotable} AND TRIM(COALESCE(`{$column}`, '')) <> ''",
         $quotableArgs
@@ -111,7 +116,7 @@ final class CommercialQuotesRepository
       natcasesort($values);
       $out[$key] = array_values(array_unique($values));
     }
-    return $out;
+    return $out + PropertySearchFilters::options($this->db, $quotable, $quotableArgs);
   }
 
   /**

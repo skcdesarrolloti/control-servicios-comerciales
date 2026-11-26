@@ -169,7 +169,7 @@ final class CommercialDashboardController
       'id_funcionario' => $clean('id_funcionario'),
       'page' => max(1, (int) ($input['page'] ?? 1)),
       'per_page' => 24,
-    ];
+    ] + \SCM\Commercial\PropertySearchFilters::clean($input);
   }
 
   /** @param array<string,mixed> $input @return array<string,mixed> */

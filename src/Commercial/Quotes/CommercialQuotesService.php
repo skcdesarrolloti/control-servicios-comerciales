@@ -9,6 +9,7 @@ use SCM\Commercial\CommercialSettingsService;
 use SCM\Commercial\CommercialStatusCatalog;
 use SCM\Commercial\CommercialTaskTools;
 use SCM\Commercial\PropertyUpdateState;
+use SCM\Commercial\PropertySearchFilters;
 use SCM\Core\Auth;
 use SCM\Core\Settings;
 use SCM\Support\PublicQuoteAccess;
@@ -116,7 +117,7 @@ final class CommercialQuotesService
     ];
   }
 
-  /** @return array{tipos_inmueble:list<string>,barrios:list<string>,ciudades:list<string>} */
+  /** @return array{tipos_inmueble:list<string>,barrios:list<string>,ciudades:list<string>,destinaciones:list<string>,estratos:list<string>,tipos_permuta:list<string>} */
   public function propertyOptions(): array
   {
     return $this->repository->options();
@@ -132,17 +133,16 @@ final class CommercialQuotesService
     $this->authorizeCreate();
     $text = static fn(string $key): string => is_scalar($input[$key] ?? null) ? trim((string) $input[$key]) : '';
     $type = in_array($text('tipo'), self::TYPES, true) ? $text('tipo') : '';
-    $rows = $this->repository->candidates(['q' => $text('q'), 'tipo' => $type, 'tipo_inmueble' => $text('tipo_inmueble'), 'barrio' => $text('barrio'), 'ciudad' => $text('ciudad')]);
+    $rows = $this->repository->candidates(['q' => $text('q'), 'tipo' => $type, 'tipo_inmueble' => $text('tipo_inmueble'), 'barrio' => $text('barrio'), 'ciudad' => $text('ciudad'), 'destinacion' => $text('destinacion')]
+      + PropertySearchFilters::clean($input));
     $min = self::amount($text('precio_min'));
     $max = self::amount($text('precio_max'));
-    $rooms = (int) $text('habitaciones');
-    $baths = (int) $text('banos');
     $hideExpired = $text('ocultar_vencidos') === '1';
     $items = [];
     $expired = 0;
     foreach ($rows as $row) {
       $item = QuoteComparison::normalize($row, $type !== '' ? $type : 'Arriendo');
-      if (($min > 0 && $item['precio'] < $min) || ($max > 0 && ($item['precio'] <= 0 || $item['precio'] > $max)) || ($rooms > 0 && $item['habitaciones'] < $rooms) || ($baths > 0 && $item['banos'] < $baths)) {
+      if (($min > 0 && $item['precio'] < $min) || ($max > 0 && ($item['precio'] <= 0 || $item['precio'] > $max))) {
         continue;
       }
       $state = PropertyUpdateState::evaluate($row, $this->limits());

@@ -23,7 +23,7 @@ final class CommercialQuotesDatabase
     'jet_cct_funcionarios' => ['id_empleado', 'nombre', 'correo', 'celular', 'activo', 'id_cargo', 'id_sucursal', 'ficha'],
     'jet_cct_sucursales' => ['nombre', 'gerente_comercial', 'celular_ge_comercial'],
     'jet_cct_clientes' => ['nombre', 'celular', 'correo', 'indicativo', 'tipo_cliente', 'id_cliente', 'bloqueo_email', 'bloqueo_whatsapp'],
-    'jet_cct_inmuebles' => ['codigo', 'estado', 'tipo_negocio', 'tipo_inmueble', 'barrio', 'ciudad', 'direccion', 'copropiedad', 'precio_arriendo', 'precio_venta', 'precio_admin', 'habitaciones', 'banos', 'parqueaderos', 'area_construida', 'area_privada', 'area_terreno', 'estrato', 'edad', 'interiores', 'exteriores', 'zonas_sociales', 'alrededores', 'descripcion', 'foto_portada', 'galeria', 'video', 'id_funcionario', 'id_propietario', 'funcionario', 'propietario', 'fecha_actualizacion', 'fecha_publicacion'],
+    'jet_cct_inmuebles' => ['codigo', 'estado', 'tipo_negocio', 'tipo_inmueble', 'barrio', 'ciudad', 'direccion', 'copropiedad', 'precio_arriendo', 'precio_venta', 'precio_admin', 'habitaciones', 'banos', 'parqueaderos', 'area_construida', 'area_privada', 'area_terreno', 'estrato', 'edad', 'destinacion', 'amoblado', 'acepta_permuta', 'tipo_permuta', 'deposito', 'vigilancia', 'negociable', 'interiores', 'exteriores', 'zonas_sociales', 'alrededores', 'descripcion', 'foto_portada', 'galeria', 'video', 'id_funcionario', 'id_propietario', 'funcionario', 'propietario', 'fecha_actualizacion', 'fecha_publicacion'],
     'jet_cct_cotizacion_inmuebles' => ['id_empleado', 'creador', 'inmuebles', 'destinatario', 'direccion', 'email', 'celular', 'observaciones', 'sucursal', 'id_ticket', 'email_creador', 'celular_creador', 'tipo', 'id_cliente', 'url_cotizacion', 'url_pdf'],
     'jet_cct_tickets' => ['id_empleado', 'nombre_empleado', 'correo_empleado', 'celular_empleado', 'asunto', 'tema_ayuda', 'estado', 'estado_comercial', 'estado_administrativo', 'solicitante', 'correo_solicitante', 'celular_solicitante', 'id_solicitante', 'indicativo', 'celular_wsp', 'id_cotizacion_comercial', 'fecha_actualizacion'],
     'jet_cct_historial_del_ticket' => ['id_ticket', 'nombre', 'correo', 'celular', 'respuesta', 'id_empleado', 'fue_editada', 'id_cotizacion_comercial'],
@@ -34,6 +34,8 @@ final class CommercialQuotesDatabase
   {
     $pdo = new PDO($dsn);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    // MySQL trae REGEXP (los filtros de PropertySearchFilters); SQLite lo pide como función: "x REGEXP p" = regexp(p, x).
+    $pdo->sqliteCreateFunction('regexp', static fn($pattern, $value): bool => preg_match('/' . str_replace('/', '\/', (string) $pattern) . '/u', (string) $value) === 1, 2);
     foreach (self::TABLES as $name => $columns) {
       $fields = array_merge(['_ID INTEGER PRIMARY KEY AUTOINCREMENT', 'fecha INTEGER'], array_map(static fn(string $field): string => '`' . $field . '` TEXT', array_merge($columns, ['cct_status', 'cct_author_id', 'cct_created', 'cct_modified'])));
       $pdo->exec('CREATE TABLE IF NOT EXISTS `wp_' . $name . '` (' . implode(',', $fields) . ')');

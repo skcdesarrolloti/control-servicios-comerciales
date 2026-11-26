@@ -287,6 +287,7 @@ final class CommercialPropertiesRepository
       'barrios' => array_values(array_filter(array_map('strval', $barrios))),
       'destinaciones' => array_values(array_filter(array_map('strval', $destinaciones))),
       'estados_no_publicos' => self::STATUSES_NON_PUBLIC,
+    ] + PropertySearchFilters::options($this->db) + [
       'funcionarios' => $funcs,
       'user_quotas' => $this->getUserQuotas(trim(Auth::employeeId())),
       'user_requests' => $this->getUserRequests(trim(Auth::employeeId()), 150),
@@ -622,6 +623,12 @@ final class CommercialPropertiesRepository
       $where[] = 'TRIM(i.`destinacion`) = ?';
       $args[] = $destinacion;
     }
+
+    // Características: precio, m², habitaciones, baños, parqueaderos, estrato, antigüedad, amoblado, permuta…
+    $negocio = in_array($tipoNegocio, ['Arriendo', 'Venta'], true) ? $tipoNegocio : '';
+    [$featureWhere, $featureArgs] = PropertySearchFilters::sql(PropertySearchFilters::clean($filters), $negocio);
+    array_push($where, ...$featureWhere);
+    array_push($args, ...$featureArgs);
 
     $destacado = trim((string) ($filters['destacado'] ?? ''));
     if ($destacado !== '') {

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SCM\Views;
 
 use SCM\Commercial\CommercialAccessPolicy;
+use SCM\Commercial\PropertySearchFilters;
 use SCM\Commercial\Quotes\CommercialQuotesService;
 use SCM\Commercial\Quotes\QuoteComparison;
 use SCM\Commercial\Quotes\QuotePdf;
@@ -38,7 +39,7 @@ final class CommercialQuotesView
   /** @param list<string> $values @return array<int|string,string> */
   private static function pairs(array $values): array
   {
-    return array_combine($values, $values);
+    return $values === [] ? [] : array_combine($values, $values);
   }
 
   // ── Popup de la tarea ───────────────────────────────
@@ -50,6 +51,7 @@ final class CommercialQuotesView
     $formId = 'cqt-create-' . $pk;
     $options = $data['options'];
     $types = self::pairs(CommercialQuotesService::TYPES);
+    $yesNo = ['Si' => 'Sí', 'No' => 'No'];
     $html = '<section class="cqt cqt-task" data-cqt-task data-ticket-pk="' . $pk . '" data-max="' . (int) $data['max'] . '">'
       . '<header class="cqt-task-head"><button type="button" class="cqt-back" data-commercial-return-case="' . $pk . '">' . self::icon('arrow_back') . 'Volver a la tarea</button>'
       . '<div><p class="cqt-eyebrow">Tarea #' . $pk . ($data['asunto'] !== '' ? ' · ' . self::e($data['asunto']) : '') . '</p><h1 tabindex="-1">Cotización de inmuebles</h1>'
@@ -73,8 +75,20 @@ final class CommercialQuotesView
       . self::select('ciudad', 'Ciudad', self::pairs($options['ciudades']), '', 'Todas')
       . '<label class="cqt-field"><span>Precio desde</span><input name="precio_min" inputmode="numeric" data-cqt-money placeholder="$"></label>'
       . '<label class="cqt-field"><span>Precio hasta</span><input name="precio_max" inputmode="numeric" data-cqt-money placeholder="$"></label>'
-      . self::select('habitaciones', 'Habitaciones', ['1' => '1 o más', '2' => '2 o más', '3' => '3 o más', '4' => '4 o más'], '', 'Cualquiera')
-      . self::select('banos', 'Baños', ['1' => '1 o más', '2' => '2 o más', '3' => '3 o más'], '', 'Cualquiera')
+      . '<label class="cqt-field"><span>Área desde (m²)</span><input name="area_min" inputmode="numeric" placeholder="m²"></label>'
+      . '<label class="cqt-field"><span>Área hasta (m²)</span><input name="area_max" inputmode="numeric" placeholder="m²"></label>'
+      . self::select('habitaciones', 'Habitaciones', PropertySearchFilters::MIN_OPTIONS, '', 'Cualquiera')
+      . self::select('banos', 'Baños', PropertySearchFilters::MIN_OPTIONS, '', 'Cualquiera')
+      . self::select('parqueaderos', 'Parqueaderos', PropertySearchFilters::MIN_OPTIONS, '', 'Cualquiera')
+      . self::select('estrato', 'Estrato', self::pairs($options['estratos'] ?? []), '', 'Todos')
+      . self::select('destinacion', 'Destinación', self::pairs($options['destinaciones'] ?? []), '', 'Todas')
+      . self::select('edad_max', 'Antigüedad', PropertySearchFilters::AGE_OPTIONS, '', 'Cualquiera')
+      . self::select('amoblado', 'Amoblado', $yesNo, '', 'Todos')
+      . self::select('acepta_permuta', 'Acepta permuta', $yesNo, '', 'Todos')
+      . self::select('tipo_permuta', 'Qué recibe en permuta', self::pairs($options['tipos_permuta'] ?? []), '', 'Cualquiera')
+      . self::select('deposito', 'Depósito', $yesNo, '', 'Todos')
+      . self::select('vigilancia', 'Vigilancia', $yesNo, '', 'Todos')
+      . self::select('negociable', 'Negociable', $yesNo, '', 'Todos')
       . self::select('orden', 'Ordenar', ['precio_asc' => 'Menor precio', 'precio_desc' => 'Mayor precio', 'area' => 'Mayor área'], '', 'Más recientes')
       . '<label class="cqt-check"><input type="checkbox" name="ocultar_vencidos" value="1"> Ocultar los vencidos</label>'
       . '<div class="cqt-filter-actions"><button type="submit" class="cqt-primary">' . self::icon('search') . 'Buscar</button><button type="reset" class="cqt-secondary">Limpiar</button></div>'

@@ -7,6 +7,7 @@ namespace SCM\Views;
 use SCM\Commercial\CommercialAccessPolicy;
 use SCM\Commercial\CommercialPropertiesRepository;
 use SCM\Commercial\CommercialStatusCatalog;
+use SCM\Commercial\PropertySearchFilters;
 use SCM\Core\Auth;
 
 final class CommercialDashboardView
@@ -3540,6 +3541,62 @@ final class CommercialDashboardView
    * @param array<string,mixed> $options
    * @param mixed $policy
    */
+  /**
+   * "Más filtros" de las vistas de Inmuebles: precio, m², habitaciones, baños, parqueaderos, estrato, antigüedad,
+   * amoblado, permuta, depósito, vigilancia y negociable (PropertySearchFilters). Se abre solo si alguno está puesto.
+   * @param array<string,mixed> $filters
+   * @param array<string,mixed> $options
+   */
+  public static function renderPropertyFeatureFilters(array $filters, array $options): string
+  {
+    $value = static fn(string $key): string => trim((string) ($filters[$key] ?? ''));
+    $field = 'w-full px-3 py-2 rounded-xl border border-outline-variant/40 bg-surface-container-low text-on-surface text-xs focus:bg-white focus:border-primary transition-all';
+    $label = static fn(string $text, string $control): string => '<label class="flex flex-col gap-1"><span class="text-[11px] font-semibold text-secondary">' . esc_html($text) . '</span>' . $control . '</label>';
+    $number = static function (string $name, string $placeholder, bool $money) use ($value, $field): string {
+      $current = $value($name);
+      $shown = $current !== '' && $money ? number_format((float) $current, 0, ',', '.') : $current;
+      return '<input type="text" name="' . esc_attr($name) . '" value="' . esc_attr($shown) . '" inputmode="numeric" autocomplete="off" placeholder="' . esc_attr($placeholder) . '" class="' . $field . '">';
+    };
+    $select = static function (string $name, array $choices, string $empty) use ($value, $field): string {
+      $html = '<select name="' . esc_attr($name) . '" class="' . $field . '"><option value="">' . esc_html($empty) . '</option>';
+      foreach ($choices as $key => $text) {
+        $key = (string) $key;
+        $html .= '<option value="' . esc_attr($key) . '"' . ($value($name) === $key ? ' selected' : '') . '>' . esc_html((string) $text) . '</option>';
+      }
+      return $html . '</select>';
+    };
+    $list = static function ($values): array {
+      $values = is_array($values) ? array_values(array_map('strval', $values)) : [];
+      return $values === [] ? [] : array_combine($values, $values);
+    };
+    $yesNo = ['Si' => 'Sí', 'No' => 'No'];
+    $active = PropertySearchFilters::activeCount($filters);
+
+    $html = '<details class="group border-t border-surface-container pt-3"' . ($active > 0 ? ' open' : '') . ' data-commercial-property-more-filters>'
+      . '<summary class="inline-flex items-center gap-1.5 cursor-pointer select-none text-xs font-semibold text-primary list-none [&::-webkit-details-marker]:hidden">'
+      . '<span class="material-symbols-outlined text-[18px]">tune</span><span>Más filtros: precio, m², habitaciones, parqueaderos, amoblado, permuta…</span>'
+      . ($active > 0 ? '<span class="px-2 py-0.5 rounded-full text-label-sm bg-primary/10 text-primary">' . $active . '</span>' : '')
+      . '<span class="material-symbols-outlined text-[18px] transition-transform group-open:rotate-180">expand_more</span></summary>'
+      . '<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 pt-3">'
+      . $label('Precio desde', $number('precio_min', '$', true))
+      . $label('Precio hasta', $number('precio_max', '$', true))
+      . $label('Área desde (m²)', $number('area_min', 'm²', false))
+      . $label('Área hasta (m²)', $number('area_max', 'm²', false))
+      . $label('Habitaciones', $select('habitaciones', PropertySearchFilters::MIN_OPTIONS, 'Cualquiera'))
+      . $label('Baños', $select('banos', PropertySearchFilters::MIN_OPTIONS, 'Cualquiera'))
+      . $label('Parqueaderos', $select('parqueaderos', PropertySearchFilters::MIN_OPTIONS, 'Cualquiera'))
+      . $label('Estrato', $select('estrato', $list($options['estratos'] ?? []), 'Todos'))
+      . $label('Antigüedad', $select('edad_max', PropertySearchFilters::AGE_OPTIONS, 'Cualquiera'))
+      . $label('Amoblado', $select('amoblado', $yesNo, 'Todos'))
+      . $label('Acepta permuta', $select('acepta_permuta', $yesNo, 'Todos'))
+      . $label('Qué recibe en permuta', $select('tipo_permuta', $list($options['tipos_permuta'] ?? []), 'Cualquiera'))
+      . $label('Depósito', $select('deposito', $yesNo, 'Todos'))
+      . $label('Vigilancia', $select('vigilancia', $yesNo, 'Todos'))
+      . $label('Negociable', $select('negociable', $yesNo, 'Todos'))
+      . '</div><p class="pt-2 text-[11px] text-secondary">El precio se compara con el de arriendo o el de venta según el negocio elegido; sin negocio, con cualquiera de los dos.</p></details>';
+    return $html;
+  }
+
   public static function renderPropertiesPage(
     array $result,
     array $filters,
@@ -3758,6 +3815,8 @@ final class CommercialDashboardView
               </a>
             </div>
           </div>
+
+          <?php echo self::renderPropertyFeatureFilters($filters, $options); ?>
         </form>
 
         <!-- Resumen de Resultados y Grid -->
