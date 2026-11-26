@@ -174,6 +174,21 @@ final class CommercialCallsTest extends TestCase
     self::assertStringContainsString('>Comisionista<', $html);
   }
 
+  public function testClientTypeOnlyAppliesToRentAndSale(): void
+  {
+    $row = $this->row($this->create(['tema_ayuda' => 'Captacion', 'celular' => '3001000003', 'comisionista' => '', 'cliente_inmediato' => '', 'mes_inmueble' => 'Febrero']));
+    self::assertSame(['', '', ''], [$row['comisionista'], $row['cliente_inmediato'], $row['mes_inmueble']]);
+    $this->expectExceptionMessage('si el cliente es inmediato');
+    $this->create(['tema_ayuda' => 'Venta', 'celular' => '3001000004', 'cliente_inmediato' => '']);
+  }
+
+  public function testCallFormShowsClientTypeOnlyForRentAndSale(): void
+  {
+    $service = $this->service();
+    $html = CommercialCallsView::form($service->formData([]), $service->options());
+    self::assertStringContainsString('<div data-ccl-topic-field="cliente" hidden><h3>Tipo de cliente</h3>', $html);
+  }
+
   public function testOldCallWithoutMedioCanBeCompletedOnce(): void
   {
     $this->db->insert('wp_jet_cct_cct_llamadas', ['_ID' => 50, 'id_empleado' => '101', 'cct_author_id' => '101', 'cliente' => 'Antigua', 'celular' => '3005556666', 'medio' => '']);

@@ -92,8 +92,15 @@
   function syncTopic(form) {
     var topic = value(form, "tema_ayuda");
     var offer = ["Arriendo", "Venta", "Arriendo o venta"].indexOf(topic) >= 0;
-    var visible = { codigo: offer, presupuesto: offer, factores: offer, precio: topic === "Captacion" || topic === "Recaptacion" };
+    var visible = { codigo: offer, presupuesto: offer, factores: offer, cliente: offer, precio: topic === "Captacion" || topic === "Recaptacion" };
     form.querySelectorAll("[data-ccl-topic-field]").forEach(function (node) { node.hidden = !visible[node.getAttribute("data-ccl-topic-field")]; });
+    // Tipo de cliente (comisionista, inmediato) solo se pide en arriendo y venta; en otros motivos no se envía.
+    ["comisionista", "cliente_inmediato"].forEach(function (name) {
+      var field = form.elements[name];
+      if (!field) return;
+      field.required = offer;
+      if (!offer) field.value = "";
+    });
     // Registrar llamada: primero se pregunta si tiene código; con código se traen sus datos, sin código se llenan a mano.
     var codeBox = form.querySelector("[data-ccl-code-field]");
     if (codeBox && form.elements.tiene_codigo) {

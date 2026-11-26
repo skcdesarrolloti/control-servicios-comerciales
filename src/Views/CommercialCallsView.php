@@ -226,12 +226,13 @@ final class CommercialCallsView
     $merit = $mode === 'repeat' && !empty($data['deserved'])
       ? '<input type="hidden" name="merece_ticket" value="Si"><p class="ccl-hint ccl-wide">Al guardar se abre su tarea para la persona asignada.</p>'
       : self::selectField('merece_ticket', '¿Merece tarea?', $yesNo, '', true);
+    // Tipo de cliente solo aplica a quien busca en arriendo o venta (commercial-calls.js lo muestra y lo vuelve obligatorio).
     return $html
-      . '<h3>Tipo de cliente</h3><div class="ccl-grid">'
+      . '<div data-ccl-topic-field="cliente" hidden><h3>Tipo de cliente</h3><div class="ccl-grid">'
       . self::selectField('comisionista', '¿Es comisionista?', $yesNo, '', true)
       . self::selectField('cliente_inmediato', '¿Cliente inmediato?', $yesNo, '', true)
       . '<div data-ccl-month hidden>' . self::selectField('mes_inmueble', 'Mes en que necesita el inmueble', $options['meses'], '', false) . '</div>'
-      . '</div>'
+      . '</div></div>'
       . '<h3>Solicitud</h3><div class="ccl-grid">'
       . self::input('fecha', 'Fecha', (new \DateTimeImmutable('now', new \DateTimeZone('America/Bogota')))->format('Y-m-d'), 'date', true)
       . self::selectField('tema_ayuda', 'Motivo', $options['temas'], '', true)

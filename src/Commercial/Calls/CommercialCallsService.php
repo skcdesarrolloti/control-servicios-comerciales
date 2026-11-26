@@ -343,9 +343,10 @@ final class CommercialCallsService
       return $contact + $this->originFields($input, $current, $options);
     }
 
-    $immediate = $yesNo('cliente_inmediato', 'si el cliente es inmediato');
     $topic = $choice('tema_ayuda', $options['temas'], 'el motivo');
     $offer = isset(self::CLIENT_TOPICS[$topic]);
+    // Tipo de cliente (comisionista, inmediato) solo aplica a arriendo y venta.
+    $immediate = $offer ? $yesNo('cliente_inmediato', 'si el cliente es inmediato') : '';
     $code = (int) $text('id_inmueble');
     $employee = $this->repository->employee($text('id_empleado'));
     if ($employee === null || ($employee['activo'] ?? '') !== 'Si') {
@@ -355,7 +356,7 @@ final class CommercialCallsService
     [$budget, $description] = self::budget($input, is_scalar($input['descripcion'] ?? null) ? trim(strip_tags((string) $input['descripcion'])) : '', $offer);
     return $contact + [
       'tema_ayuda' => $topic,
-      'comisionista' => $yesNo('comisionista', 'si es comisionista'),
+      'comisionista' => $offer ? $yesNo('comisionista', 'si es comisionista') : '',
       'cliente_inmediato' => $immediate,
       'mes_inmueble' => $immediate === 'No' ? $choice('mes_inmueble', $options['meses'], 'el mes en que necesita el inmueble') : '',
       'tipo_inmueble' => $choice('tipo_inmueble', $options['tipos'], 'el tipo de inmueble', false),
