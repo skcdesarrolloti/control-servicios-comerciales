@@ -328,7 +328,14 @@ final class CommercialCallsTest extends TestCase
   {
     $id = $this->create(['merece_ticket' => 'No']);
     $html = CommercialCallsView::results($this->service()->listing([]), $this->service(), CommercialCallsDatabase::policy($this->db));
-    self::assertStringContainsString('data-ccl-task="' . $id . '"', $html, 'Sin tarea siempre se puede crear.');
+    self::assertStringNotContainsString('data-ccl-task="' . $id . '"', $html, 'Marcada que no merece tarea, no ofrece crearla.');
+    self::assertStringContainsString('No merece tarea', $html);
+    self::assertSame([], $this->service()->pendingTasks($id)['items']);
+    $history = CommercialCallsView::history($this->service()->history(['id' => (string) $id]), CommercialCallsDatabase::policy($this->db));
+    self::assertStringNotContainsString('data-ccl-task="' . $id . '"', $history);
+    $this->db->update('wp_jet_cct_cct_llamadas', ['merece_ticket' => ''], ['_ID' => $id]);
+    $html = CommercialCallsView::results($this->service()->listing([]), $this->service(), CommercialCallsDatabase::policy($this->db));
+    self::assertStringContainsString('data-ccl-task="' . $id . '"', $html, 'Sin definir (registros antiguos) sí se puede crear.');
     $task = $this->service()->createTask($this->taskInput($id));
     self::assertGreaterThan(0, $task['id']);
     self::assertSame('Si', $this->row($id)['merece_ticket'], 'Al crearla queda que la merecía.');
@@ -408,8 +415,8 @@ final class CommercialCallsTest extends TestCase
 
   public function testHistoryCreatesTaskForEachRequestWithoutOne(): void
   {
-    $first = $this->create(['merece_ticket' => 'No']);
-    $second = $this->create(['merece_ticket' => 'No', 'medio' => 'Aviso']);
+    $first = $this->create();
+    $second = $this->create(['medio' => 'Aviso']);
     $service = $this->service();
     $service->createTask($this->taskInput($second));
     $html = CommercialCallsView::history($service->history(['id' => (string) $first]), CommercialCallsDatabase::policy($this->db));
@@ -419,8 +426,9 @@ final class CommercialCallsTest extends TestCase
 
   public function testCreateTaskAsksWhichRequestOnlyWhenSeveralLackOne(): void
   {
-    $first = $this->create(['merece_ticket' => 'No', 'tema_ayuda' => 'Venta']);
-    $second = $this->create(['merece_ticket' => 'No', 'medio' => 'Aviso']);
+    $this->create(['merece_ticket' => 'No', 'medio' => 'Instagram']);
+    $first = $this->create(['tema_ayuda' => 'Venta']);
+    $second = $this->create(['medio' => 'Aviso']);
     $service = $this->service();
     $listing = CommercialCallsView::results($service->listing([]), $service, CommercialCallsDatabase::policy($this->db));
     self::assertStringContainsString('data-ccl-task="' . $second . '" data-ccl-pick>Crear tarea', $listing);

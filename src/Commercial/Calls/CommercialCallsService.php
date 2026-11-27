@@ -725,7 +725,7 @@ final class CommercialCallsService
   {
     $this->requireAct('llamadas_tarea', 'No tienes permiso para crear tareas desde llamadas.');
     $history = $this->history(['id' => (string) $id]);
-    $items = array_values(array_filter($history['items'], static fn(array $item): bool => $item['tipo'] === 'Llamada' && (int) $item['tarea'] === 0 && !empty($item['editable'])));
+    $items = array_values(array_filter($history['items'], static fn(array $item): bool => $item['tipo'] === 'Llamada' && (int) $item['tarea'] === 0 && $item['merece'] !== 'No' && !empty($item['editable'])));
     return ['contact' => (string) ($history['contact']['cliente'] ?? ''), 'items' => $items];
   }
 
@@ -774,7 +774,7 @@ final class CommercialCallsService
         }
       }
       $items[] = [
-        'tipo' => 'Llamada', 'id' => (int) $call['_ID'], 'ts' => (int) ($call['fecha'] ?? 0), 'fecha' => self::dateLabel($call['fecha'] ?? 0),
+        'tipo' => 'Llamada', 'merece' => trim((string) ($call['merece_ticket'] ?? '')), 'id' => (int) $call['_ID'], 'ts' => (int) ($call['fecha'] ?? 0), 'fecha' => self::dateLabel($call['fecha'] ?? 0),
         'medio' => (string) ($call['medio'] ?? ''), 'tema' => (string) ($call['tema_ayuda'] ?? ''),
         'responsable' => $names[trim((string) ($call['id_empleado'] ?? ''))] ?? '',
         'tarea' => $task, 'tarea_estado' => $statuses[(string) $task] ?? '',

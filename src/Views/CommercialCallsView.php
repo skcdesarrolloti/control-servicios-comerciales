@@ -87,12 +87,12 @@ final class CommercialCallsView
       if ($row['tarea'] > 0) {
         $status = '<span class="ccl-status">' . self::e($row['tarea_estado'] ?: 'Sin estado') . '</span>';
         $task = ($canOpenTask ? '<button type="button" class="ccl-link" data-commercial-open-case="' . (int) $row['tarea'] . '">#' . (int) $row['tarea'] . '</button>' : '<span>#' . (int) $row['tarea'] . '</span>') . $status;
-      } elseif ($row['merece'] === 'Si') {
-        $task = $canTask && $row['editable'] ? '<button type="button" class="ccl-task-button" data-ccl-task="' . $id . '" data-ccl-pick>Crear tarea</button>' : '<span class="ccl-status is-warning">Pendiente</span>';
+      } elseif ($row['merece'] === 'No') {
+        // Marcada que no merece tarea: solo se dice. Para crearla, primero se edita la llamada y se marca que sí la merece.
+        $task = '<span class="ccl-muted">No merece tarea</span>';
       } else {
-        // Sin tarea y sin marcar que la merece (o marcada que no): igual se puede crear; al crearla queda que sí la merecía.
-        $label = '<span class="ccl-muted">' . ($row['merece'] === 'No' ? 'No merecía' : 'Sin definir') . '</span>';
-        $task = $canTask && $row['editable'] ? '<button type="button" class="ccl-task-button" data-ccl-task="' . $id . '" data-ccl-pick>Crear tarea</button>' . $label : $label;
+        // Merece tarea (o no se definió en registros antiguos) y aún no la tiene: al crearla queda que sí la merecía.
+        $task = $canTask && $row['editable'] ? '<button type="button" class="ccl-task-button" data-ccl-task="' . $id . '" data-ccl-pick>Crear tarea</button>' : '<span class="ccl-status is-warning">Pendiente</span>';
       }
       $actions = '<button type="button" class="ccl-icon" data-ccl-history="' . $id . '" aria-label="Historial del contacto de ' . self::e($row['cliente']) . '" title="Historial del contacto"><span class="material-symbols-outlined" aria-hidden="true">history</span></button>';
       if ($row['editable']) {
@@ -368,10 +368,12 @@ final class CommercialCallsView
     foreach ($history['items'] as $item) {
       $task = $item['tarea'] > 0
         ? ($policy->canAct('ver_ticket') && $item['propia'] ? '<button type="button" class="ccl-link" data-commercial-open-case="' . (int) $item['tarea'] . '">Tarea #' . (int) $item['tarea'] . '</button>' : '<span>Tarea #' . (int) $item['tarea'] . '</span>') . ($item['tarea_estado'] !== '' ? ' <span class="ccl-status">' . self::e($item['tarea_estado']) . '</span>' : '')
-        : ($item['tipo'] === 'Llamada' && !empty($item['editable']) && $policy->canAct('llamadas_tarea')
+        : ($item['tipo'] === 'Llamada' && ($item['merece'] ?? '') === 'No'
+          ? '<span class="ccl-muted">No merece tarea</span>'
+          : ($item['tipo'] === 'Llamada' && !empty($item['editable']) && $policy->canAct('llamadas_tarea')
           // Cada solicitud sin tarea se la puede crear aquí, sin dudar de cuál es.
           ? '<button type="button" class="ccl-task-button" data-ccl-task="' . (int) $item['id'] . '">Crear tarea</button><span class="ccl-muted">Sin tarea</span>'
-          : '<span class="ccl-muted">Sin tarea</span>');
+          : '<span class="ccl-muted">Sin tarea</span>'));
       $html .= '<li><div class="ccl-history-top"><span class="ccl-history-date">' . self::e($item['fecha'] ?: 'Sin fecha') . '</span><strong>' . self::e($item['tema'] ?: $item['tipo']) . '</strong><span class="ccl-medio">' . self::e($item['medio'] ?: 'Sin medio') . '</span></div>'
         . '<p class="ccl-history-meta">' . self::e($item['tipo']) . ' · ' . self::e($item['responsable'] ?: 'Sin asignar') . ($item['aliado'] !== '' ? ' · Aliado: ' . self::e($item['aliado']) : '') . '</p>'
         . ($item['descripcion'] !== '' ? '<p class="ccl-history-text">' . self::e($item['descripcion']) . '</p>' : '')
