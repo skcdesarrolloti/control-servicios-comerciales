@@ -219,6 +219,11 @@ final class CommercialCallsView
       . '<h3>Origen</h3><div class="ccl-origin">' . $origin . '</div>';
     if ($editing) {
       $repeat = !empty($data['can_repeat']) ? '<button type="button" class="ccl-secondary" data-ccl-repeat="' . (int) $call['_ID'] . '">Nueva solicitud</button>' : '';
+      // Sin tarea y marcada que no la merece: se puede cambiar a que sí (nunca al revés), si sigue siendo la misma solicitud.
+      if (!empty($data['can_mark'])) {
+        $html .= '<h3>Tarea</h3><fieldset class="ccl-checks"><label><input type="checkbox" name="ahora_merece" value="Si"><span>Ahora sí merece tarea</span></label></fieldset>'
+          . '<p class="ccl-hint">Márcalo solo si es la misma solicitud (mismo motivo, inmueble y medio); al guardar se abre su tarea. Si el cliente pide algo distinto, usa <strong>Nueva solicitud</strong>.</p>';
+      }
       return $html . '</div><footer class="ccl-modal-foot"><button type="button" class="ccl-secondary" data-ccl-close>Cancelar</button>' . $repeat . '<button type="submit" class="ccl-primary">Guardar cambios</button></footer></form>';
     }
     $money = 'inputmode="numeric" autocomplete="off" data-ccl-money';

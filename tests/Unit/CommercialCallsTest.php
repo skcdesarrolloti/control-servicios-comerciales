@@ -349,6 +349,23 @@ final class CommercialCallsTest extends TestCase
     $this->service()->createTask($this->taskInput($id));
   }
 
+  public function testEditingCanMarkThatACallNowDeservesATask(): void
+  {
+    $id = $this->create(['merece_ticket' => 'No']);
+    $form = CommercialCallsView::form($this->service()->formData(['id' => (string) $id]), $this->service()->options());
+    self::assertStringContainsString('name="ahora_merece"', $form);
+    $plain = $this->service()->save(CommercialCallsDatabase::validInput(['id' => (string) $id, 'merece_ticket' => 'Si']));
+    self::assertSame('list', $plain['next']);
+    self::assertSame('No', $this->row($id)['merece_ticket'], 'Sin marcar la casilla no cambia.');
+    $marked = $this->service()->save(CommercialCallsDatabase::validInput(['id' => (string) $id, 'ahora_merece' => 'Si']));
+    self::assertSame('task', $marked['next'], 'Al marcarla se abre su tarea.');
+    self::assertSame('Si', $this->row($id)['merece_ticket']);
+    $form = CommercialCallsView::form($this->service()->formData(['id' => (string) $id]), $this->service()->options());
+    self::assertStringNotContainsString('name="ahora_merece"', $form, 'Ya la merece: no se puede devolver a que no.');
+    $deserved = $this->create(['medio' => 'Aviso']);
+    self::assertStringNotContainsString('name="ahora_merece"', CommercialCallsView::form($this->service()->formData(['id' => (string) $deserved]), $this->service()->options()));
+  }
+
   public function testSaveOffersTaskOnlyWhenItDeservesOne(): void
   {
     self::assertSame('task', $this->service()->save(CommercialCallsDatabase::validInput())['next']);

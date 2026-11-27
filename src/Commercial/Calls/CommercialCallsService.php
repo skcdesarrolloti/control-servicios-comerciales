@@ -214,7 +214,7 @@ final class CommercialCallsService
     if ($id > 0) {
       $this->requireAct('llamadas_editar', 'No tienes permiso para editar llamadas.');
       $call = $this->accessible($id);
-      return ['mode' => 'edit', 'call' => $call, 'factores' => [], 'can_repeat' => $this->policy->canAct('llamadas_crear')];
+      return ['mode' => 'edit', 'call' => $call, 'factores' => [], 'can_repeat' => $this->policy->canAct('llamadas_crear'), 'can_mark' => $this->canMarkDeserved($call)];
     }
     $this->requireAct('llamadas_crear', 'No tienes permiso para registrar llamadas.');
     $call = ['id_empleado' => $this->me(), 'fecha' => time(), 'indicativo' => '57'];
@@ -228,6 +228,15 @@ final class CommercialCallsService
       $deserved = $this->contactDeservedTask(CommercialCallsRepository::digits((string) ($source['celular'] ?? '')));
     }
     return ['mode' => $from > 0 ? 'repeat' : 'new', 'call' => $call, 'factores' => [], 'can_repeat' => false, 'deserved' => $deserved];
+  }
+
+  /**
+   * Al editar, una llamada sin tarea marcada que no la merece puede pasar a merecerla (misma solicitud); nunca al revés.
+   * @param array<string,mixed> $call
+   */
+  private function canMarkDeserved(array $call): bool
+  {
+    return trim((string) ($call['merece_ticket'] ?? '')) === 'No' && self::taskId($call) === 0 && $this->policy->canAct('llamadas_tarea');
   }
 
   /** Si el contacto ya mereció tarea: alguna llamada suya la mereció o ya tiene una tarea. */
@@ -256,6 +265,7 @@ final class CommercialCallsService
     $this->requireAct($id > 0 ? 'llamadas_editar' : 'llamadas_crear', 'No tienes permiso para guardar esta llamada.');
     $me = $this->requireMe();
     $pdo = $this->db->pdo();
+    $nowDeserves = false;
     $pdo->beginTransaction();
     try {
       $current = null;
@@ -277,6 +287,10 @@ final class CommercialCallsService
           $this->repository->update($id, ['id_cliente' => (string) $clientId]);
         }
       } else {
+        $nowDeserves = ($input['ahora_merece'] ?? '') === 'Si' && $this->canMarkDeserved($current);
+        if ($nowDeserves) {
+          $data['merece_ticket'] = 'Si';
+        }
         $this->repository->update($id, $data);
       }
       $pdo->commit();
@@ -286,7 +300,7 @@ final class CommercialCallsService
       }
       throw $exception;
     }
-    $next = $current === null && $data['merece_ticket'] === 'Si' && $this->policy->canAct('llamadas_tarea') ? 'task' : 'list';
+    $next = ($current === null ? ($data['merece_ticket'] ?? '') === 'Si' : $nowDeserves) && $this->policy->canAct('llamadas_tarea') ? 'task' : 'list';
     return ['id' => $id, 'next' => $next, 'message' => $current === null ? 'Llamada registrada.' : 'Llamada actualizada.'];
   }
 
