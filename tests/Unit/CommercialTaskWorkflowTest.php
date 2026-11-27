@@ -595,7 +595,7 @@ final class CommercialTaskWorkflowTest extends TestCase
     // Servidor: sin la vista Inmuebles, solo desde una tarea visible de ese inmueble o si el inmueble está a su cargo.
     $source = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Http/Controller/CommercialApiController.php');
     self::assertMatchesRegularExpression('/function canOpenPropertyFromContext.*?id_funcionario.*?authorizeTicketScope\(\$ticketPk\)/s', $source);
-    self::assertStringContainsString("renderPropertyDetailModalContent(\$property, \$highlights)", $source);
+    self::assertStringContainsString('renderPropertyDetailModalContent($property, $highlights, $this->policy->canAct(\'destacados_gestionar\'))', $source);
     self::assertMatchesRegularExpression("/\\\$highlights = \\\$this->policy->canView\('inmuebles'\);/", $source);
 
     // Sin la vista Inmuebles la ficha no ofrece destacados (solicitar, cancelar ni liberar cupo).

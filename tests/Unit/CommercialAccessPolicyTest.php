@@ -171,4 +171,99 @@ final class CommercialAccessPolicyTest extends TestCase
     self::assertSame([], array_diff(array_keys(CommercialAccessPolicy::SCOPED_VIEWS), array_keys(CommercialAccessPolicy::VIEWS)));
     self::assertArrayNotHasKey('mis_tickets', CommercialAccessPolicy::SCOPED_VIEWS);
   }
+
+  public function testCargosSavedBeforeTheSplitKeepWhatTheyCouldDo(): void
+  {
+    $policy = $this->policy(['views' => ['abiertos', 'calendario', 'inmuebles'], 'actions' => ['ver_ticket', 'ingresar_inmueble']]);
+    foreach (['tarea_agendar', 'tarea_analisis', 'tarea_exportar', 'inmueble_multimedia', 'destacados_gestionar'] as $action) {
+      self::assertTrue($policy->canAct($action), $action . ' se hereda de lo que ya podía hacer.');
+    }
+
+    $policy = $this->policy(['views' => ['inicio'], 'actions' => []]);
+    foreach (['tarea_agendar', 'tarea_analisis', 'tarea_exportar', 'inmueble_multimedia', 'destacados_gestionar'] as $action) {
+      self::assertFalse($policy->canAct($action), $action . ' no se concede sin la acción o la vista de origen.');
+    }
+  }
+
+  public function testSavedChoicesAreNotInheritedAgain(): void
+  {
+    $policy = $this->policy([
+      'views' => ['abiertos', 'calendario', 'inmuebles'],
+      'actions' => ['ver_ticket', 'ingresar_inmueble'],
+      'actions_known' => array_keys(CommercialAccessPolicy::ACTIONS),
+    ]);
+    self::assertTrue($policy->canAct('ver_ticket'));
+    foreach (['tarea_agendar', 'tarea_analisis', 'tarea_exportar', 'inmueble_multimedia', 'destacados_gestionar'] as $action) {
+      self::assertFalse($policy->canAct($action), $action . ' desmarcada al guardar queda negada.');
+    }
+  }
+
+  public function testSavingMarksTheWholeCatalogAsDecided(): void
+  {
+    $pdo = new PDO('sqlite::memory:');
+    $pdo->exec('CREATE TABLE wp_jet_cct_confi_sistema (_ID INTEGER PRIMARY KEY AUTOINCREMENT, cct_status TEXT, cct_author_id INTEGER, cct_created TEXT, cct_modified TEXT, funcion TEXT, valor TEXT, departamento TEXT)');
+    $db = new Database($pdo);
+    $policy = new CommercialAccessPolicy(new Settings($db), $db, ['13']);
+    $_SESSION = ['scm_user_cargo' => '13'];
+    $policy->save(['9' => ['configured' => '1', 'views' => ['abiertos', 'calendario'], 'actions' => ['ver_ticket']]], ['13']);
+    $saved = $policy->permissions()['9'];
+    self::assertSame(['ver_ticket'], $saved['actions'], 'Lo desmarcado al guardar no se hereda.');
+    self::assertSame(array_keys(CommercialAccessPolicy::ACTIONS), $saved['actions_known']);
+  }
+
+  public function testEveryActionIsInThePermissionsModal(): void
+  {
+    $groups = (new \ReflectionClassConstant(CommercialDashboardView::class, 'PERMISSION_ACTION_GROUPS'))->getValue();
+    self::assertSame([], array_diff(array_keys(CommercialAccessPolicy::ACTIONS), array_merge(...array_values($groups))));
+  }
+
+  public function testTaskWithoutTheNewActionsHidesAnalysisSchedulingAndExport(): void
+  {
+    $ticket = ['_ID' => 5, 'id_ticket' => '5', 'asunto' => 'Prueba', 'estado_comercial' => 'Nuevo', 'tema_ayuda' => 'Arriendo'];
+    $allowed = $this->policy(['views' => ['abiertos', 'calendario'], 'actions' => ['ver_ticket']]);
+    $html = \SCM\Views\CommercialTicketModalView::render(['ticket' => $ticket, 'timeline' => [], 'analyses' => [['id' => 1, 'resumen' => 'R']]], $allowed, []);
+    self::assertStringContainsString('data-commercial-calendar-schedule', $html);
+    self::assertStringContainsString('Generar Resumen Ejecutivo con IA', $html);
+    self::assertStringContainsString('data-commercial-delete-analysis', $html);
+
+    $denied = $this->policy(['views' => ['abiertos', 'calendario'], 'actions' => ['ver_ticket'], 'actions_known' => array_keys(CommercialAccessPolicy::ACTIONS)]);
+    $html = \SCM\Views\CommercialTicketModalView::render(['ticket' => $ticket, 'timeline' => [], 'analyses' => [['id' => 1, 'resumen' => 'R']]], $denied, []);
+    self::assertStringContainsString('data-commercial-calendar-agenda', $html, 'Ver agenda sigue con la pestaña Calendario.');
+    self::assertStringNotContainsString('data-commercial-calendar-schedule', $html);
+    self::assertStringNotContainsString('Generar Resumen Ejecutivo con IA', $html);
+    self::assertStringNotContainsString('data-commercial-delete-analysis', $html);
+    self::assertStringContainsString('data-commercial-open-analysis', $html, 'Los análisis guardados se siguen viendo.');
+
+    $table = CommercialDashboardView::renderTickets('abiertos', [], [], [], [], [], $denied, 'http://x');
+    self::assertStringNotContainsString('btn-export-csv', $table);
+    self::assertStringNotContainsString('btn-export-report', $table);
+    self::assertStringContainsString('btn-export-csv', CommercialDashboardView::renderTickets('abiertos', [], [], [], [], [], $allowed, 'http://x'));
+  }
+
+  public function testPropertyDetailHidesHighlightActionsWithoutPermission(): void
+  {
+    $property = ['codigo' => '100', 'estado' => 'Publico', 'active_portals' => [['key' => 'fincaraiz', 'label' => 'Finca Raíz']]];
+    $with = CommercialDashboardView::renderPropertyDetailModalContent($property, true, true);
+    $without = CommercialDashboardView::renderPropertyDetailModalContent($property, true, false);
+    self::assertStringContainsString('Liberar cupo', $with);
+    self::assertStringContainsString('Solicitar Nuevo Destacado', $with);
+    self::assertStringNotContainsString('Liberar cupo', $without);
+    self::assertStringNotContainsString('Solicitar Nuevo Destacado', $without);
+    self::assertStringContainsString('Finca Raíz', $without, 'Los portales activos se siguen mostrando.');
+  }
+
+  public function testPermissionsModalWarnsWhenTaskListsCannotBeOpened(): void
+  {
+    $render = function (array $actions): string {
+      $policy = $this->policy(['views' => ['abiertos'], 'actions' => $actions]);
+      $pdo = (new \ReflectionProperty(CommercialAccessPolicy::class, 'db'))->getValue($policy)->pdo();
+      $pdo->sqliteCreateFunction('CONCAT', static fn(...$parts): string => implode('', array_map('strval', $parts)));
+      $pdo->exec('CREATE TABLE wp_jet_cct_funcionarios (id_empleado TEXT, id_cargo TEXT, activo TEXT)');
+      $pdo->exec("INSERT INTO wp_jet_cct_funcionarios VALUES ('901', '9', 'Si')");
+      $method = new \ReflectionMethod(CommercialDashboardView::class, 'renderPermissions');
+      return (string) $method->invoke(null, $policy, []);
+    };
+    self::assertMatchesRegularExpression('/data-perm-ticket-warning data-task-views="[^"]*"(?! hidden)>/', $render([]));
+    self::assertMatchesRegularExpression('/data-perm-ticket-warning data-task-views="[^"]*" hidden>/', $render(['ver_ticket']));
+  }
 }

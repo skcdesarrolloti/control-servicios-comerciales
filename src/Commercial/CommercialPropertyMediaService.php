@@ -14,7 +14,7 @@ final class CommercialPropertyMediaService
 
   private function property(int $taskId, int $code = 0): array
   {
-    $task = (new CommercialPropertyEntryService($this->db, $this->policy, $this->config))->task($taskId);
+    $task = (new CommercialPropertyEntryService($this->db, $this->policy, $this->config))->task($taskId, 'inmueble_multimedia');
     $linked = trim((string) ($task['id_inmueble'] ?? ''), " \t\n\r\0\x0B\"'[]");
     if ($code <= 0 && ctype_digit($linked)) $code = (int) $linked;
     $property = $code > 0 ? $this->db->getRow('SELECT * FROM `' . $this->db->table('jet_cct_inmuebles') . '` WHERE codigo=?', [$code]) : null;
@@ -88,7 +88,7 @@ final class CommercialPropertyMediaService
 
   public function draftContext(int $taskId, int $code): array
   {
-    (new CommercialPropertyEntryService($this->db, $this->policy, $this->config))->task($taskId);
+    (new CommercialPropertyEntryService($this->db, $this->policy, $this->config))->task($taskId, 'inmueble_multimedia');
     $post = $this->db->getRow('SELECT ID,post_author FROM `' . $this->db->table('posts') . '` WHERE ID=? AND post_type=? AND post_status<>?', [$code,'inmuebles','trash']);
     if (!$post) throw new \InvalidArgumentException('No se encontró el código adelantado.');
     $property = $this->db->getRow('SELECT * FROM `' . $this->db->table('jet_cct_inmuebles') . '` WHERE codigo=?', [$code]) ?? ['codigo'=>$code];

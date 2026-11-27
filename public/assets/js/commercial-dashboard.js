@@ -2443,7 +2443,24 @@
       });
       scope.querySelectorAll("[data-perm-subviews]").forEach(function (list) { list.classList.toggle("opacity-50", !checked); });
     });
+    // Aviso: el cargo ve listas de tareas sin "Ver detalle de la tarea" (las ve pero no puede abrirlas).
+    function updateTicketWarning(cargoPanel) {
+      var warning = cargoPanel && cargoPanel.querySelector("[data-perm-ticket-warning]");
+      if (!warning) return;
+      var admin = cargoPanel.querySelector('input[name="admin_cargos[]"]');
+      var views = (warning.getAttribute("data-task-views") || "").split(",");
+      var seesTasks = views.some(function (view) {
+        var input = cargoPanel.querySelector('[data-perm-view-input][value="' + view + '"]');
+        return input && input.checked;
+      });
+      var detail = cargoPanel.querySelector('input[name$="[actions][]"][value="ver_ticket"]');
+      warning.hidden = !!(admin && admin.checked) || !seesTasks || !!(detail && detail.checked);
+    }
+    permissionForm.addEventListener("click", function (event) {
+      if (event.target.closest("[data-commercial-permissions-toggle]")) updateTicketWarning(event.target.closest("[data-cargo]"));
+    });
     permissionForm.addEventListener("change", function (event) {
+      updateTicketWarning(event.target.closest("[data-cargo]"));
       if (event.target.matches("[data-perm-view-input]")) {
         var subviews = event.target.closest("[data-perm-view]").querySelector("[data-perm-subviews]");
         if (subviews) subviews.classList.toggle("opacity-50", !event.target.checked);

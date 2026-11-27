@@ -2396,9 +2396,11 @@ final class CommercialDashboardView
             <button type="button" class="p-2 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface transition-colors cursor-pointer" title="Actualizar vista" onclick="window.location.reload()">
               <span class="material-symbols-outlined text-[18px]">sync</span>
             </button>
+            <?php if (!$policy instanceof CommercialAccessPolicy || $policy->canAct('tarea_exportar')): ?>
             <button type="button" class="p-2 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface transition-colors cursor-pointer" id="btn-export-csv" title="Exportar CSV">
               <span class="material-symbols-outlined text-[18px]">file_download</span>
             </button>
+            <?php endif; ?>
           </div>
         </div>
 
@@ -2863,10 +2865,12 @@ final class CommercialDashboardView
             </p>
           </div>
           <div class="flex flex-wrap items-center gap-space-sm pt-space-xs lg:pt-0">
+            <?php if (!$policy instanceof CommercialAccessPolicy || $policy->canAct('tarea_exportar')): ?>
             <button type="button" class="flex items-center gap-space-xs bg-surface-container-low hover:bg-surface-container text-on-surface px-space-md py-2.5 rounded-xl font-label-md text-label-md transition-all shadow-sm cursor-pointer" id="btn-export-report">
               <span class="material-symbols-outlined text-[18px] text-secondary">download</span>
               <span>Exportar Vista</span>
             </button>
+            <?php endif; ?>
             <?php if ($isMyTasks && !empty($slaSummary['atrasados'])): ?>
               <a href="<?php echo esc_url(self::url($baseUrl, ['tab' => 'mis_tickets', 'sla_filter' => 'atrasado'])); ?>" data-commercial-filter-link class="flex items-center gap-space-xs bg-error-container hover:bg-error/20 text-on-error-container px-space-md py-2.5 rounded-xl font-label-md text-label-md transition-all shadow-sm cursor-pointer">
                 <span class="material-symbols-outlined text-[18px]">warning</span>
@@ -3360,6 +3364,7 @@ final class CommercialDashboardView
     ob_start();
 ?>
     <div class="scm-calendar-panel w-full max-w-[1680px] mx-auto px-4 sm:px-6 pt-5 pb-10 space-y-5 text-on-surface" data-scm-calendar-panel
+      data-calendar-can-link-task="<?php echo !$policy instanceof CommercialAccessPolicy || $policy->canAct('tarea_agendar') ? '1' : '0'; ?>"
       data-calendar-mode="<?php echo esc_attr($mode); ?>"
       data-calendar-view="<?php echo esc_attr($view); ?>"
       data-calendar-lock-current="<?php echo $mode === 'personal' ? '1' : '0'; ?>"
@@ -4165,7 +4170,7 @@ final class CommercialDashboardView
                     </button>
                   </div>
 
-                  <?php if ($reqEstado === 'pendiente'): ?>
+                  <?php if ($reqEstado === 'pendiente' && (!$policy instanceof CommercialAccessPolicy || $policy->canAct('destacados_gestionar'))): ?>
                     <button type="button" data-commercial-cancel-highlight-request="<?php echo esc_attr((string) $reqId); ?>" class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-red-600 hover:bg-red-50 hover:text-red-700 text-xs font-semibold transition-all cursor-pointer" title="Cancelar solicitud">
                       <span class="material-symbols-outlined text-[16px]">cancel</span>
                       <span>Cancelar</span>
@@ -4200,6 +4205,7 @@ final class CommercialDashboardView
     $canChangeStatus = !$policy instanceof CommercialAccessPolicy || $policy->canAct('inmueble_cambiar_estado');
     $canSeeHistory = !$policy instanceof CommercialAccessPolicy || $policy->canAct('inmueble_ver_historial');
     $canTransfer = !$policy instanceof CommercialAccessPolicy || $policy->canAct('inmueble_transferir');
+    $canHighlight = !$policy instanceof CommercialAccessPolicy || $policy->canAct('destacados_gestionar');
     $statusScopeAll = !$policy instanceof CommercialAccessPolicy || $policy->canSeeAll('inmuebles');
     $myEmployeeId = trim(Auth::employeeId());
     $secondaryButton = 'w-8 h-8 rounded-lg bg-surface-container-low text-on-surface hover:bg-surface-container border border-outline-variant/40 transition-all cursor-pointer flex items-center justify-center active:scale-95';
@@ -4419,7 +4425,7 @@ final class CommercialDashboardView
         </div>
 
         <div style="margin-top: auto;">
-        <?php if (!empty($activePortals)): ?>
+        <?php if (!empty($activePortals) && $canHighlight): ?>
           <!-- Barra rápida para liberar cupos de portales -->
           <div class="px-4 py-2 bg-amber-50 border-t border-amber-200/60 flex flex-wrap items-center justify-between gap-1.5 text-[11px]">
             <span class="font-semibold text-amber-900 flex items-center gap-1">
@@ -4483,7 +4489,7 @@ final class CommercialDashboardView
    * @param array<string,mixed> $property
    * @param bool $highlights Muestra destacados y portales (solicitar, cancelar, liberar), que piden la vista Inmuebles.
    */
-  public static function renderPropertyDetailModalContent(array $property, bool $highlights = true): string
+  public static function renderPropertyDetailModalContent(array $property, bool $highlights = true, bool $highlightActions = true): string
   {
     $codigo = trim((string) ($property['codigo'] ?? $property['_ID'] ?? ''));
     $tipo = trim((string) ($property['tipo_inmueble'] ?? 'Inmueble'));
@@ -4886,15 +4892,16 @@ final class CommercialDashboardView
                 <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-semibold shadow-2xs">
                   <span class="material-symbols-outlined text-[16px] text-amber-600">star</span>
                   <span class="font-bold"><?php echo esc_html($pLabel); ?></span>
-                  <button type="button" class="ml-1 px-2.5 py-1 rounded-lg bg-red-100 hover:bg-red-600 hover:text-white text-red-700 text-xs font-semibold transition-colors cursor-pointer" data-commercial-release-highlight data-code="<?php echo esc_attr($codigo); ?>" data-portal="<?php echo esc_attr($pKey); ?>" title="Liberar cupo de este portal">
+                  <?php if ($highlightActions): ?><button type="button" class="ml-1 px-2.5 py-1 rounded-lg bg-red-100 hover:bg-red-600 hover:text-white text-red-700 text-xs font-semibold transition-colors cursor-pointer" data-commercial-release-highlight data-code="<?php echo esc_attr($codigo); ?>" data-portal="<?php echo esc_attr($pKey); ?>" title="Liberar cupo de este portal">
                     Liberar cupo
-                  </button>
+                  </button><?php endif; ?>
                 </div>
               <?php endforeach; ?>
             </div>
           <?php endif; ?>
         </div>
 
+        <?php if ($highlightActions): ?>
         <!-- Formulario para Solicitar Destacado -->
         <div class="pt-3 border-t border-surface-container">
           <span class="text-xs font-semibold text-secondary uppercase tracking-wider block mb-2">Solicitar Nuevo Destacado:</span>
@@ -4989,6 +4996,7 @@ final class CommercialDashboardView
             </form>
           <?php endif; ?>
         </div>
+        <?php endif; ?>
 
         <!-- Historial de Destacados -->
         <?php if (!empty($history)): ?>
@@ -5191,14 +5199,14 @@ final class CommercialDashboardView
   /** Acciones de la configuración de accesos, agrupadas por módulo. Toda acción de CommercialAccessPolicy::ACTIONS va en un grupo. */
   private const PERMISSION_ACTION_GROUPS = [
     'Reportes comerciales' => ['reportes_pagar', 'reportes_editar_valor'],
-    'Tareas' => ['ver_ticket', 'responder', 'agregar_nota', 'seguimiento', 'postergar', 'activar', 'cerrar', 'cambiar_estado', 'reasignar', 'respuestas_guia_editar', 'historial_editar'],
+    'Tareas' => ['ver_ticket', 'responder', 'agregar_nota', 'seguimiento', 'postergar', 'activar', 'cerrar', 'cambiar_estado', 'reasignar', 'tarea_agendar', 'tarea_analisis', 'tarea_exportar', 'respuestas_guia_editar', 'historial_editar'],
     'Notificaciones' => ['enviar_notificacion', 'eliminar_notificacion', 'campanas_enviar', 'campanas_eliminar', 'plantillas_editar'],
     'Llamadas' => ['llamadas_crear', 'llamadas_editar', 'llamadas_tarea'],
     'Cotizaciones' => ['cotizacion_crear'],
     'Estudios de aseguradora' => ['estudio_crear', 'estudio_responder', 'estudio_desistir'],
     'Contratos de mandato' => ['mandato_crear', 'mandato_enviar_revision', 'mandato_responder_observaciones', 'mandato_enviar_firma', 'mandato_hoja_cierre'],
     'Precaptación' => ['precaptacion_crear', 'precaptacion_editar', 'precaptacion_ticket', 'precaptacion_catalogos'],
-    'Inmuebles y avisos' => ['ingresar_inmueble', 'inmueble_cambiar_estado', 'inmueble_ver_historial', 'inmueble_transferir', 'registrar_aviso', 'editar_actor'],
+    'Inmuebles y avisos' => ['ingresar_inmueble', 'inmueble_multimedia', 'inmueble_cambiar_estado', 'inmueble_ver_historial', 'inmueble_transferir', 'destacados_gestionar', 'registrar_aviso', 'editar_actor'],
     'Herramientas' => ['mercado_vista_completa', 'aseo_vista_interna', 'plan_estrategico_editar'],
     'Promoción' => ['promocion_ver_ip', 'pop_gestionar', 'pop_anular', 'pop_ver_costos', 'redes_ver_inversion', 'redes_sincronizar', 'piezas_gestionar', 'piezas_archivar', 'fichas_gestionar'],
   ];
@@ -5264,6 +5272,11 @@ final class CommercialDashboardView
                   </span>
                 </label>
                 <input type="hidden" name="<?php echo esc_attr($field); ?>[configured]" value="1">
+                <?php $ticketWarning = !$isAdmin && array_intersect(CommercialAccessPolicy::TASK_LIST_VIEWS, $current['views']) !== [] && !in_array('ver_ticket', $current['actions'], true); ?>
+                <div class="flex items-start gap-2 p-2 rounded-lg bg-tertiary-fixed text-on-tertiary-fixed text-[11px]" role="status" data-perm-ticket-warning data-task-views="<?php echo esc_attr(implode(',', CommercialAccessPolicy::TASK_LIST_VIEWS)); ?>"<?php echo $ticketWarning ? '' : ' hidden'; ?>>
+                  <span class="material-symbols-outlined text-[16px]" aria-hidden="true">warning</span>
+                  <span>Este cargo ve listas de tareas pero no tiene <strong>Ver detalle de la tarea</strong> (pestaña Acciones): verá las tareas sin poder abrirlas ni gestionarlas.</span>
+                </div>
 
                 <div class="flex flex-wrap gap-1 p-1 bg-surface-container rounded-xl w-fit" role="tablist" aria-label="Permisos de <?php echo esc_attr($cargo['name']); ?>">
                   <button type="button" role="tab" aria-selected="true" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-secondary hover:text-on-surface aria-selected:bg-inverse-surface aria-selected:text-on-secondary aria-selected:shadow-sm transition-colors cursor-pointer" data-perm-section-tab="vistas">Acceso a pestañas</button>

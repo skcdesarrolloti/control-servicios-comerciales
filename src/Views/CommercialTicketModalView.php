@@ -165,6 +165,7 @@ final class CommercialTicketModalView
     <!-- BEGIN: LeftColumnManagement -->
     <section class="lg:col-span-5 flex flex-col gap-5">
       <!-- AI Insight Banner & Action Card -->
+      <?php if ($policy->canAct('tarea_analisis')): ?>
       <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-amber-50 via-white to-amber-100/50 p-4 border border-amber-200/70 shadow-sm" data-purpose="ai-analysis-card">
         <div class="flex items-start justify-between gap-3 mb-2">
           <div class="flex items-center gap-2">
@@ -192,6 +193,7 @@ final class CommercialTicketModalView
           <span>Generar Resumen Ejecutivo con IA</span>
         </button>
       </div>
+      <?php endif; ?>
 
       <!-- Quick Action Buttons Grid -->
       <div class="bg-white rounded-2xl p-5 border border-surface-container/80 shadow-card" data-purpose="case-action-grid">
@@ -221,7 +223,7 @@ final class CommercialTicketModalView
           <?php elseif ($canEnterProperty): ?>
             <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-surface-container-low hover:bg-[#EBF1FB] text-on-surface border border-surface-container text-xs font-semibold transition-all cursor-pointer" data-commercial-task-form="property" data-ticket-pk="<?php echo esc_attr((string) $pk); ?>"><span class="material-symbols-outlined text-[16px]">add_home_work</span><span>Ingresar inmueble</span></button>
           <?php endif; ?>
-          <?php if ($policy->canAct('ingresar_inmueble') && CommercialTaskTools::allowsTask(CommercialTaskTools::MEDIA, $ticket) && ($propertyCode !== '' || (int) ($ticket['id_inmueble_data'] ?? 0) > 0)): ?>
+          <?php if ($policy->canAct('inmueble_multimedia') && CommercialTaskTools::allowsTask(CommercialTaskTools::MEDIA, $ticket) && ($propertyCode !== '' || (int) ($ticket['id_inmueble_data'] ?? 0) > 0)): ?>
             <button type="button" class="csg-secondary" data-commercial-task-form="media" data-ticket-pk="<?php echo esc_attr((string) $pk); ?>"><span class="material-symbols-outlined text-[16px]">photo_library</span><span>Multimedia del inmueble</span></button>
           <?php endif; ?>
           <?php if ($policy->canAct('cotizacion_crear') && CommercialTaskTools::allowsTask(CommercialTaskTools::QUOTE, $ticket)): ?>
@@ -311,10 +313,12 @@ final class CommercialTicketModalView
             <span class="text-[11px] text-[#1E3C76] font-medium" data-commercial-calendar-task-status>Calendario de <?php echo esc_html($assignee); ?></span>
           </div>
           <div class="grid grid-cols-2 gap-2.5">
+            <?php if ($policy->canAct('tarea_agendar')): ?>
             <button type="button" class="col-span-2 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-[#F8CF4A] hover:bg-[#E5BD3B] text-[#061D49] text-xs font-bold transition-all cursor-pointer" data-commercial-calendar-schedule>
               <span class="material-symbols-outlined text-[16px]">event_available</span>
               <span>Agendar cita de la tarea</span>
             </button>
+            <?php endif; ?>
             <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-surface-container-low hover:bg-[#EBF1FB] text-on-surface border border-surface-container text-xs font-semibold transition-all cursor-pointer" data-commercial-calendar-agenda>
               <span class="material-symbols-outlined text-[16px]">calendar_month</span>
               <span>Ver agenda</span>
@@ -436,7 +440,7 @@ final class CommercialTicketModalView
       </div>
 
       <!-- Saved Analyses -->
-      <?php echo self::renderAnalysesList($pk, $analyses); ?>
+      <?php echo self::renderAnalysesList($pk, $analyses, $policy->canAct('tarea_analisis')); ?>
     </section>
     <!-- END: LeftColumnManagement -->
 
@@ -619,7 +623,7 @@ final class CommercialTicketModalView
   }
 
   /** @param array<int,array<string,mixed>> $analyses */
-  private static function renderAnalysesList(int $pk, array $analyses): string
+  private static function renderAnalysesList(int $pk, array $analyses, bool $canDelete = true): string
   {
     ob_start();
 ?>
@@ -632,7 +636,7 @@ final class CommercialTicketModalView
         <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-surface-container text-secondary" data-commercial-analysis-count><?php echo esc_html((string) count($analyses)); ?>/3</span>
       </div>
       <div class="space-y-2" data-commercial-analysis-list>
-        <?php echo self::analysisListItems($pk, $analyses); ?>
+        <?php echo self::analysisListItems($pk, $analyses, $canDelete); ?>
       </div>
     </section>
 <?php
@@ -640,7 +644,7 @@ final class CommercialTicketModalView
   }
 
   /** @param array<int,array<string,mixed>> $analyses */
-  private static function analysisListItems(int $pk, array $analyses): string
+  private static function analysisListItems(int $pk, array $analyses, bool $canDelete = true): string
   {
     if ($analyses === []) {
       return '<div class="py-4 text-center text-secondary/70 text-xs"><p>Aún no hay análisis guardados con IA.</p></div>';
@@ -660,7 +664,7 @@ final class CommercialTicketModalView
         . '<span class="block text-secondary text-[11px] line-clamp-1 mt-0.5">' . esc_html(mb_strimwidth($summary, 0, 70, '…', 'UTF-8')) . '</span>'
         . '<small class="text-[10px] text-secondary/70 mt-0.5 block">' . esc_html($author) . '</small>'
         . '</button>'
-        . '<button type="button" class="p-1.5 text-secondary/70 hover:text-rose-600 rounded-lg transition-colors cursor-pointer" data-commercial-delete-analysis data-ticket-pk="' . esc_attr((string) $pk) . '" data-analysis-id="' . esc_attr((string) $id) . '" title="Eliminar análisis"><span class="material-symbols-outlined text-[16px]">delete</span></button>'
+        . ($canDelete ? '<button type="button" class="p-1.5 text-secondary/70 hover:text-rose-600 rounded-lg transition-colors cursor-pointer" data-commercial-delete-analysis data-ticket-pk="' . esc_attr((string) $pk) . '" data-analysis-id="' . esc_attr((string) $id) . '" title="Eliminar análisis"><span class="material-symbols-outlined text-[16px]">delete</span></button>' : '')
         . '</div>';
     }
     return $html;

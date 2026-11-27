@@ -34,15 +34,18 @@ final class CommercialAccessPolicy
   ];
 
   public const ACTIONS = [
-    'ver_ticket' => 'Ver detalle de la tarea',
-    'responder' => 'Responder al solicitante',
-    'agregar_nota' => 'Agregar notas internas',
-    'seguimiento' => 'Registrar seguimientos',
-    'postergar' => 'Postergar tareas',
-    'activar' => 'Activar tareas',
+    'ver_ticket' => 'Ver detalle de la tarea (sin esto no puede abrirla ni hacer nada en ella)',
+    'responder' => 'Responder al cliente desde la tarea (le llega por correo y WhatsApp)',
+    'agregar_nota' => 'Agregar notas internas a la tarea (no las ve el cliente)',
+    'seguimiento' => 'Registrar seguimientos de la tarea (revisión interna entre coordinación y consultor/a)',
+    'postergar' => 'Postergar tareas con fecha para retomar',
+    'activar' => 'Activar tareas postergadas o cerradas',
     'cerrar' => 'Cerrar tareas',
-    'cambiar_estado' => 'Cambiar estado comercial',
-    'reasignar' => 'Trasladar tareas',
+    'cambiar_estado' => 'Cambiar el estado comercial de la tarea',
+    'reasignar' => 'Trasladar tareas a otro funcionario',
+    'tarea_agendar' => 'Agendar citas de la tarea en el calendario comercial (además necesita la pestaña Calendario)',
+    'tarea_analisis' => 'Análisis de la tarea con IA: generar y eliminar resúmenes ejecutivos',
+    'tarea_exportar' => 'Exportar a CSV las tareas de la vista',
     'respuestas_guia_editar' => 'Respuestas guía: crear, editar y eliminar las respuestas comerciales desde la tarea',
     'historial_editar' => 'Historial de la tarea: editar (hasta 2 veces) y eliminar sus propias respuestas, seguimientos y notas',
     'enviar_notificacion' => 'Enviar notificaciones comerciales',
@@ -66,6 +69,8 @@ final class CommercialAccessPolicy
     'precaptacion_catalogos' => 'Crear barrios e inmobiliarias',
     'registrar_aviso' => 'Registrar avisos nuevos y retoques',
     'ingresar_inmueble' => 'Ingresar inmuebles desde una tarea',
+    'inmueble_multimedia' => 'Inmuebles: subir y ordenar fotos, limpiar imágenes y crear el video del inmueble desde la tarea',
+    'destacados_gestionar' => 'Inmuebles: solicitar destacados en portales, cancelar sus solicitudes y liberar cupos',
     'inmueble_cambiar_estado' => 'Inmuebles: cambiar el estado del inmueble (público, en cierre, arrendado…) en el CCT y en la web',
     'inmueble_ver_historial' => 'Inmuebles: ver el historial consolidado del inmueble (casos, contratos, cobros, revisiones) y su PDF',
     'inmueble_transferir' => 'Inmuebles: transferir el inmueble a otro funcionario',
@@ -201,6 +206,21 @@ final class CommercialAccessPolicy
 
   /** Pestañas de tareas: ver todo el equipo en alguna permite abrir cualquier tarea comercial. */
   private const TASK_VIEWS = ['inicio', 'abiertos', 'postergados', 'cerrados'];
+
+  /** Pestañas con la lista de tareas: sin "Ver detalle de la tarea" el cargo las ve pero no puede abrir ninguna. */
+  public const TASK_LIST_VIEWS = ['abiertos', 'postergados', 'cerrados', 'mis_tickets'];
+
+  /**
+   * Acciones separadas después de guardar permisos: un cargo guardado antes de que existieran conserva lo que ya podía
+   * hacer (la acción o la vista de la que salieron, `view:`) hasta que se vuelvan a guardar sus permisos.
+   */
+  private const INHERITED_ACTIONS = [
+    'tarea_agendar' => ['view:calendario'],
+    'tarea_analisis' => ['ver_ticket'],
+    'tarea_exportar' => ['view:abiertos', 'view:postergados', 'view:cerrados', 'view:mis_tickets'],
+    'inmueble_multimedia' => ['ingresar_inmueble'],
+    'destacados_gestionar' => ['view:inmuebles'],
+  ];
 
   /** Claves anteriores de las herramientas: los permisos guardados y los enlaces viejos siguen funcionando. */
   private const LEGACY_TOOLS = ['preaprobado' => 'simulador_ingreso_neto'];
@@ -392,7 +412,7 @@ final class CommercialAccessPolicy
     return in_array($action, $this->allowed('actions', array_values(array_diff(array_keys(self::ACTIONS), self::OPT_IN_ACTIONS))), true);
   }
 
-  /** @return array<string,array{views:array<int,string>,actions:array<int,string>,subviews:array<string,array<int,string>>,scope_all:array<int,string>}> */
+  /** @return array<string,array{views:array<int,string>,actions:array<int,string>,subviews:array<string,array<int,string>>,scope_all:array<int,string>,actions_known:array<int,string>}> */
   public function permissions(): array
   {
     $raw = $this->settings->get('commercial_permissions', []);
@@ -421,6 +441,12 @@ final class CommercialAccessPolicy
     $adminCargoIds = $this->sanitizeCargoIds($adminCargos);
     if ($adminCargoIds === []) {
       throw new \InvalidArgumentException('Selecciona al menos un cargo con acceso total para no dejar el panel sin administradores.');
+    }
+    // Lo guardado desde el formulario ya decidió cada acción del catálogo actual: ninguna se hereda después.
+    foreach ($raw as $cargo => $definition) {
+      if (is_array($definition)) {
+        $raw[$cargo]['actions_known'] = array_keys(self::ACTIONS);
+      }
     }
     $this->settings->set('commercial_permissions', $this->sanitize($raw), Auth::userId());
     $this->settings->set('commercial_admin_cargos', $adminCargoIds, Auth::userId());
@@ -462,7 +488,7 @@ final class CommercialAccessPolicy
     return array_values($values);
   }
 
-  /** @param array<string,mixed> $raw @return array<string,array{views:array<int,string>,actions:array<int,string>,subviews:array<string,array<int,string>>,scope_all:array<int,string>}> */
+  /** @param array<string,mixed> $raw @return array<string,array{views:array<int,string>,actions:array<int,string>,subviews:array<string,array<int,string>>,scope_all:array<int,string>,actions_known:array<int,string>}> */
   private function sanitize(array $raw): array
   {
     $out = [];
@@ -476,7 +502,24 @@ final class CommercialAccessPolicy
         'actions' => array_values(array_intersect(array_keys(self::ACTIONS), array_map('strval', (array) ($definition['actions'] ?? [])))),
         'subviews' => [],
         'scope_all' => [],
+        'actions_known' => [],
       ];
+      $known = array_values(array_intersect(array_keys(self::ACTIONS), array_map('strval', (array) ($definition['actions_known'] ?? []))));
+      $out[$cargo]['actions_known'] = $known;
+      foreach (self::INHERITED_ACTIONS as $action => $sources) {
+        if (in_array($action, $known, true) || in_array($action, $out[$cargo]['actions'], true)) {
+          continue;
+        }
+        foreach ($sources as $source) {
+          $granted = str_starts_with($source, 'view:')
+            ? in_array(substr($source, 5), $out[$cargo]['views'], true)
+            : in_array($source, $out[$cargo]['actions'], true);
+          if ($granted) {
+            $out[$cargo]['actions'][] = $action;
+            break;
+          }
+        }
+      }
       // El formulario envía scope[vista] = own|all; lo guardado es la lista scope_all.
       $scopeAll = is_array($definition['scope'] ?? null)
         ? array_keys(array_filter($definition['scope'], static fn($value): bool => $value === 'all'))

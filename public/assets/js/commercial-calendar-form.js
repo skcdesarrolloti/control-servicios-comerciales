@@ -196,6 +196,12 @@
     }).join("");
   }
 
+  // Vincular una tarea a la cita pide "Agendar citas de la tarea" (tarea_agendar); el servidor también lo valida.
+  function canLinkTask() {
+    var panel = document.querySelector("[data-scm-calendar-panel]");
+    return !panel || panel.getAttribute("data-calendar-can-link-task") !== "0";
+  }
+
   function ticketComboHtml() {
     return '<div data-form-ticket>' +
       '<label class="scm-cal-label" for="scm-cal-ticket">Tarea relacionada</label>' +
@@ -215,7 +221,7 @@
     var taskRow = task
       ? '<div><div class="scm-cal-label">Tarea relacionada</div><p class="scm-cal-task"><span class="material-symbols-outlined" aria-hidden="true">link</span>Tarea #' + esc(task.ticket) + (task.requester ? " · " + esc(task.requester) : "") + "</p>" +
         '<small class="scm-cal-hint">Queda en la agenda de ' + esc(task.employee || employeeName(state.employee)) + ", asignado a la tarea.</small></div>"
-      : ticketComboHtml();
+      : (canLinkTask() ? ticketComboHtml() : "");
     return '<div class="scm-calendar-create-shell scm-cal-shell">' +
       '<div class="scm-cal-head"><strong data-form-title>' + esc(TITLES[state.kind]) + '</strong><span data-form-subtitle>' + esc(SUBTITLES[state.kind]) + "</span></div>" +
       '<form class="scm-calendar-popup-form scm-calendar-create-form scm-cal-form" data-commercial-schedule-form autocomplete="off">' +

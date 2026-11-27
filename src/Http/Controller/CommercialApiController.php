@@ -482,6 +482,7 @@ final class CommercialApiController
   {
     $this->verify($input);
     $this->authorize('ver_ticket', 'No tienes permiso para analizar esta tarea.');
+    $this->authorize('tarea_analisis', 'No tienes permiso para generar análisis de las tareas.');
     $ticketPk = (int) ($input['ticket_pk'] ?? 0);
     $this->authorizeTicketScope($ticketPk);
     try {
@@ -534,6 +535,7 @@ final class CommercialApiController
   {
     $this->verify($input);
     $this->authorize('ver_ticket', 'No tienes permiso para eliminar análisis de esta tarea.');
+    $this->authorize('tarea_analisis', 'No tienes permiso para eliminar análisis de las tareas.');
     $ticketPk = (int) ($input['ticket_pk'] ?? 0);
     $analysisId = (int) ($input['analysis_id'] ?? 0);
     $this->authorizeTicketScope($ticketPk);
@@ -1311,9 +1313,10 @@ final class CommercialApiController
   private function propertyVideoRequest(array $input, string $operation): never
   {
     $this->verify($input);
+    $this->authorize('inmueble_multimedia', 'No tienes permiso para la multimedia del inmueble.');
     try {
       $task = (int) ($input['ticket_pk'] ?? 0);
-      (new \SCM\Commercial\CommercialPropertyEntryService($this->db,$this->policy,$this->config))->task($task);
+      (new \SCM\Commercial\CommercialPropertyEntryService($this->db,$this->policy,$this->config))->task($task, 'inmueble_multimedia');
       $service = new \SCM\Commercial\CommercialPropertyVideoService($this->config);
       if ($operation === 'config') JsonResponse::success(['available'=>$service->available()]);
       if ($operation === 'create') {
@@ -1355,8 +1358,9 @@ final class CommercialApiController
   private function imageCleanupRequest(array $input, bool $process): never
   {
     $this->verify($input);
+    $this->authorize('inmueble_multimedia', 'No tienes permiso para la multimedia del inmueble.');
     try {
-      (new \SCM\Commercial\CommercialPropertyEntryService($this->db,$this->policy,$this->config))->task((int) ($input['ticket_pk'] ?? 0));
+      (new \SCM\Commercial\CommercialPropertyEntryService($this->db,$this->policy,$this->config))->task((int) ($input['ticket_pk'] ?? 0), 'inmueble_multimedia');
       $service = new \SCM\Commercial\CommercialImageCleanupService($this->config);
       if (!$process) JsonResponse::success(['available'=>$service->available()]);
       foreach (['image_file','mask_file'] as $field) if ((int) ($_FILES[$field]['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || !is_uploaded_file((string) ($_FILES[$field]['tmp_name'] ?? ''))) throw new \InvalidArgumentException('Selecciona la fotografía y pinta la zona que deseas eliminar.');
@@ -1369,6 +1373,7 @@ final class CommercialApiController
   private function propertyMediaRequest(array $input, string $operation): never
   {
     $this->verify($input);
+    $this->authorize('inmueble_multimedia', 'No tienes permiso para la multimedia del inmueble.');
     try {
       $service = new \SCM\Commercial\CommercialPropertyMediaService($this->db, $this->policy, $this->config);
       $task = (int) ($input['ticket_pk'] ?? 0); $code = (int) ($input['id_inmueble'] ?? 0);
@@ -1624,7 +1629,7 @@ final class CommercialApiController
     if (!is_array($property) || $property === []) {
       JsonResponse::error('Inmueble no encontrado.', 404);
     }
-    $html = CommercialDashboardView::renderPropertyDetailModalContent($property, $highlights);
+    $html = CommercialDashboardView::renderPropertyDetailModalContent($property, $highlights, $this->policy->canAct('destacados_gestionar'));
     if (!$highlights) {
       unset($property['active_portals'], $property['user_quotas'], $property['pending_requests'], $property['highlight_history']);
     }
@@ -1710,8 +1715,8 @@ final class CommercialApiController
   public function requestHighlight(array $input): never
   {
     $this->verify($input);
-    if (!$this->policy->canView('inmuebles')) {
-      JsonResponse::error('No tienes permiso para gestionar inmuebles.', 403);
+    if (!$this->policy->canView('inmuebles') || !$this->policy->canAct('destacados_gestionar')) {
+      JsonResponse::error('No tienes permiso para gestionar destacados.', 403);
     }
     $code = trim((string) ($input['codigo'] ?? ''));
     $portal = trim((string) ($input['portal'] ?? ''));
@@ -1735,8 +1740,8 @@ final class CommercialApiController
   public function cancelHighlightRequest(array $input): never
   {
     $this->verify($input);
-    if (!$this->policy->canView('inmuebles')) {
-      JsonResponse::error('No tienes permiso para gestionar inmuebles.', 403);
+    if (!$this->policy->canView('inmuebles') || !$this->policy->canAct('destacados_gestionar')) {
+      JsonResponse::error('No tienes permiso para gestionar destacados.', 403);
     }
     $requestId = (int) ($input['request_id'] ?? 0);
     if ($requestId <= 0) {
@@ -1780,8 +1785,8 @@ final class CommercialApiController
   public function releaseHighlight(array $input): never
   {
     $this->verify($input);
-    if (!$this->policy->canView('inmuebles')) {
-      JsonResponse::error('No tienes permiso para gestionar inmuebles.', 403);
+    if (!$this->policy->canView('inmuebles') || !$this->policy->canAct('destacados_gestionar')) {
+      JsonResponse::error('No tienes permiso para gestionar destacados.', 403);
     }
     $code = trim((string) ($input['codigo'] ?? ''));
     $portal = trim((string) ($input['portal'] ?? ''));

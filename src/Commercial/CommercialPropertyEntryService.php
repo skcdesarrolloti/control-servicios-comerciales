@@ -22,9 +22,10 @@ final class CommercialPropertyEntryService
     return $definition ??= json_decode((string) file_get_contents(dirname(__DIR__, 2) . '/resources/forms/property-entry.json'), true, 512, JSON_THROW_ON_ERROR);
   }
 
-  public function task(int $id): array
+  /** Tarea de la herramienta: ingresar el inmueble (ingresar_inmueble) o su multimedia (inmueble_multimedia). */
+  public function task(int $id, string $action = 'ingresar_inmueble'): array
   {
-    if (!$this->policy->canAct('ver_ticket') || !$this->policy->canAct('ingresar_inmueble')) throw new CommercialSignAccessDenied('No tienes permiso para ingresar inmuebles desde las tareas.');
+    if (!$this->policy->canAct('ver_ticket') || !$this->policy->canAct($action)) throw new CommercialSignAccessDenied($action === 'inmueble_multimedia' ? 'No tienes permiso para la multimedia del inmueble.' : 'No tienes permiso para ingresar inmuebles desde las tareas.');
     $task = $this->db->getRow('SELECT * FROM `' . $this->db->table('jet_cct_tickets') . '` WHERE _ID = ?' . $this->lock(), [$id]);
     if (!$task) throw new \InvalidArgumentException('No se encontró la tarea.');
     $repository = new CommercialTicketsRepository($this->db);

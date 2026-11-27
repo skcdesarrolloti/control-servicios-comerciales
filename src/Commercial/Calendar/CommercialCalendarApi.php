@@ -623,6 +623,9 @@ final class CommercialCalendarApi
    */
   private function assertCanAssign(array $employees, int $ticket): void
   {
+    if ($ticket > 0 && !$this->policy->canAct('tarea_agendar')) {
+      throw new \DomainException('No tienes permiso para agendar citas de las tareas.');
+    }
     if ($ticket > 0 && !$this->canSeeTicket($ticket)) {
       throw new \DomainException('Esta tarea no está asignada a tu usuario.');
     }
