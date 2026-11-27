@@ -297,6 +297,14 @@ final class CommercialApiController
     } catch (\Throwable $exception) {
       error_log('[tareas:respuestas-guia] ' . $exception->getMessage());
     }
+    // Listas de "Editar datos" (temas y prioridades de Llamadas), solo para quien puede editar.
+    if ($this->policy->canAct('tarea_editar_datos')) {
+      try {
+        $detail['edit_options'] = $this->tickets->taskEditOptions();
+      } catch (\Throwable $exception) {
+        error_log('[tareas:editar-datos] ' . $exception->getMessage());
+      }
+    }
     // Gestión operativa en orden: Estudio de aseguradora sale si la tarea tiene cotización (o ya tiene estudios), Contrato
     // de mandato si tiene un estudio aprobado (o ya tiene mandatos) y Hoja de cierre si ya tiene mandato.
     $progress = $this->taskProgress($ticketPk, $detail['ticket']);
@@ -574,8 +582,57 @@ final class CommercialApiController
     }
     $ticketPk = (int) ($input['ticket_pk'] ?? 0);
     $this->authorizeTicketScope($ticketPk);
+    JsonResponse::success([
+      'message' => $this->transferTask($ticketPk, trim((string) ($input['id_empleado'] ?? '')), trim((string) ($input['observacion'] ?? ''))),
+      'refresh' => true,
+    ]);
+  }
+
+  /**
+   * Editar datos de la tarea: asunto, descripción, tema y prioridad (tarea_editar_datos). Si cambia el responsable es un
+   * traslado (reasignar, con motivo) y avisa igual que Trasladar: al nuevo consultor/a y al cliente.
+   * @param array<string,mixed> $input
+   */
+  public function editTicketData(array $input): never
+  {
+    $this->verify($input);
+    $this->authorize('ver_ticket', 'No tienes permiso para ver esta tarea.');
+    $this->authorize('tarea_editar_datos', 'No tienes permiso para editar los datos de la tarea.');
+    $ticketPk = (int) ($input['ticket_pk'] ?? 0);
+    $this->authorizeTicketScope($ticketPk);
+    $current = $this->db->getRow('SELECT `id_empleado` FROM `' . $this->db->table('jet_cct_tickets') . '` WHERE `_ID` = ? LIMIT 1', [$ticketPk]);
+    if (!is_array($current)) {
+      JsonResponse::error('La tarea comercial no existe.', 404);
+    }
     $newEmployeeId = trim((string) ($input['id_empleado'] ?? ''));
+    $transfer = $newEmployeeId !== '' && $newEmployeeId !== trim((string) ($current['id_empleado'] ?? ''));
     $observacion = trim((string) ($input['observacion'] ?? ''));
+    // Se valida todo antes de guardar, para no dejar la edición a medias.
+    if ($transfer && !$this->policy->canAct('reasignar')) {
+      JsonResponse::error('No tienes permiso para cambiar el responsable de la tarea (Trasladar tareas).', 403);
+    }
+    if ($transfer && $observacion === '') {
+      JsonResponse::error('Escribe el motivo del cambio de responsable: queda en el historial y le llega al nuevo responsable (al cliente no).', 422);
+    }
+    try {
+      $changes = $this->tickets->updateTaskData($ticketPk, $input, $this->tickets->taskEditOptions());
+    } catch (\InvalidArgumentException $exception) {
+      JsonResponse::error($exception->getMessage(), 422);
+    }
+    $messages = $changes !== [] ? ['Datos de la tarea actualizados.'] : [];
+    if ($transfer) {
+      $messages[] = $this->transferTask($ticketPk, $newEmployeeId, $observacion);
+    }
+    JsonResponse::success([
+      'message' => $messages !== [] ? implode(' ', $messages) : 'No hubo cambios en los datos de la tarea.',
+      'changes' => $changes,
+      'refresh' => true,
+    ]);
+  }
+
+  /** Traslada la tarea y avisa al nuevo responsable (y al cliente). Devuelve el mensaje para la persona. */
+  private function transferTask(int $ticketPk, string $newEmployeeId, string $observacion): string
+  {
     if ($observacion === '') {
       JsonResponse::error('Escribe el motivo del traslado: queda en el historial y le llega al nuevo responsable (al cliente no).', 422);
     }
@@ -610,16 +667,11 @@ final class CommercialApiController
       error_log('[tareas:traslado] ' . $exception->getMessage());
     }
 
-    $hasWhatsapp = trim($newEmpCelular) !== '';
     $message = 'Tarea trasladada a ' . ($newEmpNombre ?: 'nuevo responsable') . '.';
-    if ($hasWhatsapp) {
+    if (trim($newEmpCelular) !== '') {
       $message .= ' Notificación por WhatsApp encolada.';
     }
-
-    JsonResponse::success([
-      'message' => $message,
-      'refresh' => true,
-    ]);
+    return $message;
   }
 
   /** @param array<string,mixed> $input */

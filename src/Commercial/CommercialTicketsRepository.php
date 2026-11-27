@@ -2550,6 +2550,86 @@ final class CommercialTicketsRepository
     ];
   }
 
+  /** Campos de "Editar datos de la tarea" con su etiqueta (el responsable se cambia con reassign). */
+  public const EDITABLE_FIELDS = ['asunto' => 'Asunto', 'descripcion' => 'Descripción', 'tema_ayuda' => 'Tema', 'prioridad' => 'Prioridad'];
+
+  /**
+   * Listas del formulario de edición: temas comerciales (glosario 816 hasta los de Entrega) y prioridades (glosario 447),
+   * los mismos de Llamadas.
+   * @return array{tema_ayuda:array<int,string>,prioridad:array<int,string>}
+   */
+  public function taskEditOptions(): array
+  {
+    $glossary = new \SCM\Commercial\Calls\CommercialCallsRepository($this->db);
+    $topics = [];
+    foreach (array_column($glossary->glossary(816), 'value') as $topic) {
+      if (str_starts_with(\SCM\Commercial\Medios\MedioResolver::key((string) $topic), \SCM\Commercial\Medios\MedioResolver::key('Entrega'))) {
+        break;
+      }
+      $topics[] = (string) $topic;
+    }
+    $priorities = array_map('strval', array_column($glossary->glossary(447), 'value'));
+    return [
+      'tema_ayuda' => $topics !== [] ? $topics : self::COMMERCIAL_TOPICS,
+      'prioridad' => $priorities !== [] ? $priorities : ['Prioridad comercial'],
+    ];
+  }
+
+  /**
+   * Corrige los datos de la tarea (copiado de ajax_handler_edit_case_data del panel inmobiliario,
+   * src/App/Concerns/HandlesMaintenanceActions.php): solo cambia lo que llega distinto, valida contra las listas (un valor
+   * histórico que ya no está se conserva mientras no se cambie) y deja la trazabilidad como nota interna.
+   * @param array<string,mixed> $input
+   * @param array<string,array<int,string>> $options
+   * @return array<int,string> Cambios hechos ("Campo: "antes" → "después""); vacío si no hubo.
+   */
+  public function updateTaskData(int $ticketPk, array $input, array $options): array
+  {
+    $ticket = $this->ticket($ticketPk);
+    $table = $this->db->table('jet_cct_tickets');
+    $update = [];
+    $changes = [];
+    foreach (self::EDITABLE_FIELDS as $column => $label) {
+      if (!array_key_exists($column, $input) || !$this->schema->columnExists($table, $column)) {
+        continue;
+      }
+      $before = trim((string) ($ticket[$column] ?? ''));
+      $value = $column === 'descripcion'
+        ? trim(sanitize_textarea_field((string) $input[$column]))
+        : trim(sanitize_text_field((string) $input[$column]));
+      if ($column === 'asunto' && ($value === '' || mb_strlen($value) > 200)) {
+        throw new \InvalidArgumentException('El asunto es obligatorio y debe tener máximo 200 caracteres.');
+      }
+      if ($column === 'descripcion' && mb_strlen($value) > 5000) {
+        throw new \InvalidArgumentException('La descripción debe tener máximo 5000 caracteres.');
+      }
+      if (isset($options[$column]) && $value !== $before && !in_array($value, $options[$column], true)) {
+        throw new \InvalidArgumentException($label . ' no válido.');
+      }
+      if ($value !== $before) {
+        $update[$column] = $value;
+        $shown = static fn(string $text): string => $text === '' ? '-' : mb_strimwidth($text, 0, 120, '…', 'UTF-8');
+        $changes[] = $label . ': "' . $shown($before) . '" → "' . $shown($value) . '"';
+      }
+    }
+    if ($update === []) {
+      return [];
+    }
+    $pdo = $this->db->pdo();
+    $pdo->beginTransaction();
+    try {
+      $this->db->update($table, $update + ['fecha_actualizacion' => time()], ['_ID' => $ticketPk]);
+      $this->insertStatusNote($ticketPk, "Datos de la tarea editados:\n" . implode("\n", $changes));
+      $pdo->commit();
+    } catch (\Throwable $exception) {
+      if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+      }
+      throw $exception;
+    }
+    return $changes;
+  }
+
   /** @return array<string,mixed> */
   private function ticket(int $ticketPk): array
   {

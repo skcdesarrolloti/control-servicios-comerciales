@@ -231,6 +231,7 @@ final class CommercialActionRouter
       'commercial_ticket_analysis_delete' => 'deleteAnalysis',
       'commercial_ticket_status' => 'changeStatus',
       'commercial_ticket_reassign' => 'reassign',
+      'commercial_ticket_edit' => 'editTicketData',
       'commercial_ticket_reply' => 'reply',
       'commercial_ticket_note' => 'addNote',
       'commercial_ticket_follow_up' => 'followUp',

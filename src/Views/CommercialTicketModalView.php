@@ -14,7 +14,7 @@ use SCM\Commercial\CommercialTimelineEditor;
 final class CommercialTicketModalView
 {
   /**
-   * @param array{ticket:array<string,mixed>,timeline:array<int,array<string,mixed>>,analyses?:array<int,array<string,mixed>>,reply_guides?:array<int,array<string,mixed>>,quotes_count?:int,studies_count?:int,studies_approved?:int,mandates_count?:int,closing_mandate?:array{id:int,hoja:array{id:int,estado:string},total:int}|null,draft_code?:int} $detail
+   * @param array{ticket:array<string,mixed>,timeline:array<int,array<string,mixed>>,analyses?:array<int,array<string,mixed>>,reply_guides?:array<int,array<string,mixed>>,quotes_count?:int,studies_count?:int,studies_approved?:int,mandates_count?:int,closing_mandate?:array{id:int,hoja:array{id:int,estado:string},total:int}|null,draft_code?:int,edit_options?:array<string,array<int,string>>} $detail
    * @param array<int,array<string,string>> $employees
    */
   public static function render(array $detail, CommercialAccessPolicy $policy, array $employees): string
@@ -92,7 +92,7 @@ final class CommercialTicketModalView
         <?php if ($priority !== ''): ?>
           <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
             <span class="material-symbols-outlined text-[14px] text-amber-500">flag</span>
-            <span>Prioridad <?php echo esc_html($priority); ?></span>
+            <span><?php echo esc_html(stripos($priority, 'prioridad') === 0 ? $priority : 'Prioridad ' . $priority); ?></span>
           </span>
         <?php endif; ?>
         <?php if ($theme !== ''): ?>
@@ -276,6 +276,12 @@ final class CommercialTicketModalView
             <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-surface-container-low hover:bg-surface-container text-on-surface border border-surface-container text-xs font-semibold transition-all group cursor-pointer" data-commercial-open-workflow="reassign">
               <span class="material-symbols-outlined text-[16px] text-secondary group-hover:text-[#061D49]">manage_accounts</span>
               <span>Trasladar</span>
+            </button>
+          <?php endif; ?>
+          <?php if ($policy->canAct('tarea_editar_datos')): ?>
+            <button type="button" class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-surface-container-low hover:bg-surface-container text-on-surface border border-surface-container text-xs font-semibold transition-all group cursor-pointer" data-commercial-open-workflow="edit">
+              <span class="material-symbols-outlined text-[16px] text-secondary group-hover:text-[#061D49]">edit_note</span>
+              <span>Editar datos</span>
             </button>
           <?php endif; ?>
           <?php if ($policy->canAct('activar') && $isPostponedOrClosed): ?>
@@ -468,6 +474,9 @@ final class CommercialTicketModalView
         <?php endif; ?>
         <?php if ($policy->canAct('reasignar')): ?>
           <?php echo self::employeeForm($pk, $employees, (string) ($ticket['id_empleado'] ?? '')); ?>
+        <?php endif; ?>
+        <?php if ($policy->canAct('tarea_editar_datos')): ?>
+          <?php echo self::editForm($pk, $ticket, $detail['edit_options'] ?? [], $policy->canAct('reasignar') ? $employees : []); ?>
         <?php endif; ?>
       </div>
 
@@ -1313,6 +1322,93 @@ final class CommercialTicketModalView
         <span class="text-xs text-rose-600 mr-auto font-medium" data-commercial-form-message aria-live="polite"></span>
         <button type="button" class="px-4 py-2 bg-surface-container hover:bg-surface-container-high text-on-surface rounded-xl text-xs font-semibold transition-colors cursor-pointer" data-commercial-close-workflow>Cancelar</button>
         <button type="submit" class="px-5 py-2 bg-[#061D49] hover:bg-[#1E3C76] text-white rounded-xl text-xs font-semibold transition-all shadow-sm cursor-pointer"><?php echo esc_html($submit); ?></button>
+      </div>
+    </form>
+<?php
+    return (string) ob_get_clean();
+  }
+
+  /**
+   * Editar datos de la tarea (como "Editar datos del caso" del panel inmobiliario). El responsable solo sale con
+   * Trasladar tareas: cambiarlo pide el motivo y avisa igual que un traslado.
+   * @param array<string,mixed> $ticket
+   * @param array<string,array<int,string>> $options
+   * @param array<int,array<string,string>> $employees
+   */
+  private static function editForm(int $pk, array $ticket, array $options, array $employees): string
+  {
+    $field = 'w-full text-xs sm:text-sm rounded-xl border border-surface-container focus:border-[#1E3C76] p-2.5 outline-none bg-white font-medium text-on-surface';
+    $select = static function (string $name, string $current, array $values) use ($field): string {
+      // Un valor histórico que ya no está en la lista se conserva como opción mientras no se cambie.
+      if ($current !== '' && !in_array($current, $values, true)) {
+        array_unshift($values, $current);
+      }
+      $html = '<select name="' . esc_attr($name) . '" class="' . esc_attr($field) . '">';
+      if ($current === '') {
+        $html .= '<option value="">Sin definir</option>';
+      }
+      foreach ($values as $value) {
+        $html .= '<option value="' . esc_attr((string) $value) . '"' . ((string) $value === $current ? ' selected' : '') . '>' . esc_html((string) $value) . '</option>';
+      }
+      return $html . '</select>';
+    };
+    $currentEmployee = trim((string) ($ticket['id_empleado'] ?? ''));
+    ob_start();
+?>
+    <form class="bg-white rounded-2xl p-5 border border-surface-container/80 shadow-card space-y-4 commercial-workflow-form" data-commercial-workflow-form="edit" hidden>
+      <div class="flex items-center justify-between pb-2 border-b border-surface-container">
+        <div>
+          <h3 class="text-sm font-bold text-[#061D49] flex items-center gap-2">
+            <span class="material-symbols-outlined text-[18px] text-[#1E3C76]">edit_note</span>
+            <span>Editar datos de la tarea</span>
+          </h3>
+          <p class="text-xs text-secondary mt-0.5">Corrige lo que se registró mal. Los cambios quedan en el historial como nota interna (el cliente no la ve).<?php echo $employees !== [] ? ' Si cambias el responsable, se le avisa por WhatsApp y correo al nuevo consultor/a y al cliente le llega su contacto, igual que al trasladar.' : ''; ?></p>
+        </div>
+        <button type="button" class="w-7 h-7 rounded-full bg-surface-container hover:bg-surface-container-high text-secondary hover:text-on-surface flex items-center justify-center cursor-pointer transition-colors" data-commercial-close-workflow aria-label="Cerrar formulario">
+          <span class="material-symbols-outlined text-[16px]">close</span>
+        </button>
+      </div>
+      <input type="hidden" name="ticket_pk" value="<?php echo esc_attr((string) $pk); ?>">
+      <div class="space-y-1">
+        <label class="block text-xs font-semibold text-on-surface">Asunto <em class="text-rose-600">*</em></label>
+        <input type="text" name="asunto" required maxlength="200" value="<?php echo esc_attr(trim((string) ($ticket['asunto'] ?? ''))); ?>" class="<?php echo esc_attr($field); ?>">
+      </div>
+      <div class="space-y-1">
+        <label class="block text-xs font-semibold text-on-surface">Descripción</label>
+        <textarea name="descripcion" rows="4" maxlength="5000" class="<?php echo esc_attr($field); ?>"><?php echo esc_html(trim(wp_strip_all_tags((string) ($ticket['descripcion'] ?? '')))); ?></textarea>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div class="space-y-1">
+          <label class="block text-xs font-semibold text-on-surface">Tema</label>
+          <?php echo $select('tema_ayuda', trim((string) ($ticket['tema_ayuda'] ?? '')), $options['tema_ayuda'] ?? []); ?>
+        </div>
+        <div class="space-y-1">
+          <label class="block text-xs font-semibold text-on-surface">Prioridad</label>
+          <?php echo $select('prioridad', trim((string) ($ticket['prioridad'] ?? '')), $options['prioridad'] ?? []); ?>
+        </div>
+      </div>
+      <?php if ($employees !== []): ?>
+        <div class="space-y-1">
+          <label class="block text-xs font-semibold text-on-surface">Responsable</label>
+          <select name="id_empleado" class="<?php echo esc_attr($field); ?>" data-commercial-edit-employee data-current="<?php echo esc_attr($currentEmployee); ?>">
+            <?php if ($currentEmployee === ''): ?><option value="" selected>Sin asignar</option><?php endif; ?>
+            <?php foreach ($employees as $employee): $id = (string) ($employee['id'] ?? $employee['id_empleado'] ?? ''); ?>
+              <option value="<?php echo esc_attr($id); ?>"<?php echo $id === $currentEmployee ? ' selected' : ''; ?>><?php echo esc_html((string) ($employee['nombre'] ?? 'Funcionario')); ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+        <div class="space-y-1" data-commercial-edit-reason hidden>
+          <label class="block text-xs font-semibold text-on-surface">Motivo del cambio de responsable <em class="text-rose-600">*</em></label>
+          <textarea name="observacion" rows="2" placeholder="Ej: Se asignó por error; le corresponde a la zona de…" class="<?php echo esc_attr($field); ?>"></textarea>
+        </div>
+      <?php endif; ?>
+      <div class="flex items-center justify-end gap-2 pt-2 border-t border-surface-container">
+        <span class="text-xs text-rose-600 mr-auto font-medium" data-commercial-form-message aria-live="polite"></span>
+        <button type="button" class="px-4 py-2 bg-surface-container hover:bg-surface-container-high text-on-surface rounded-xl text-xs font-semibold transition-colors cursor-pointer" data-commercial-close-workflow>Cancelar</button>
+        <button type="submit" class="px-5 py-2 bg-[#061D49] hover:bg-[#1E3C76] text-white rounded-xl text-xs font-semibold transition-all shadow-sm cursor-pointer flex items-center gap-1.5">
+          <span class="material-symbols-outlined text-[15px]">save</span>
+          <span>Guardar cambios</span>
+        </button>
       </div>
     </form>
 <?php

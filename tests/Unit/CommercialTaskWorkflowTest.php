@@ -701,4 +701,59 @@ final class CommercialTaskWorkflowTest extends TestCase
     self::assertMatchesRegularExpression("/function timelineEditor\(.*?authorize\('historial_editar'.*?authorizeTicketScope/s", $source);
     $repository = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Commercial/CommercialTicketsRepository.php');
     self::assertSame(3, substr_count($repository, 'Edits},'), 'La cronología trae las ediciones de las tres tablas.');
-  }}
+  }
+  public function testEditTaskDataUpdatesOnlyChangedFieldsAndLeavesAnInternalNote(): void
+  {
+    $repository = new \SCM\Commercial\CommercialTicketsRepository($this->db);
+    $options = ['tema_ayuda' => ['Arriendo', 'Venta'], 'prioridad' => ['Prioridad comercial', 'Prioridad urgente']];
+    $changes = $repository->updateTaskData(900, ['asunto' => 'Busca casa', 'descripcion' => "Línea 1\nLínea 2", 'tema_ayuda' => 'Venta', 'prioridad' => 'Prioridad urgente'], $options);
+    self::assertSame(['Asunto: "Busca apartamento" → "Busca casa"', 'Descripción: "-" → "Línea 1' . "\n" . 'Línea 2"', 'Tema: "Arriendo" → "Venta"', 'Prioridad: "-" → "Prioridad urgente"'], $changes);
+    $task = $this->task();
+    self::assertSame('Busca casa', $task['asunto']);
+    self::assertSame("Línea 1\nLínea 2", $task['descripcion']);
+    self::assertSame('Venta', $task['tema_ayuda']);
+    self::assertSame('Prioridad urgente', $task['prioridad']);
+    $note = $this->db->getRow('SELECT * FROM wp_jet_cct_notas_ticket WHERE id_ticket = ? ORDER BY _ID DESC LIMIT 1', ['900']);
+    self::assertStringStartsWith("Datos de la tarea editados:\nAsunto:", (string) $note['observacion']);
+    self::assertSame('101', (string) $note['cct_author_id'], 'Autor: id_empleado real.');
+
+    self::assertSame([], $repository->updateTaskData(900, ['asunto' => 'Busca casa', 'tema_ayuda' => 'Venta'], $options), 'Sin cambios no escribe nada.');
+    try {
+      $repository->updateTaskData(900, ['tema_ayuda' => 'Inventado'], $options);
+      self::fail('Se aceptó un tema fuera de la lista.');
+    } catch (\InvalidArgumentException $exception) {
+      self::assertSame('Tema no válido.', $exception->getMessage());
+    }
+    $this->expectException(\InvalidArgumentException::class);
+    $repository->updateTaskData(900, ['asunto' => ''], $options);
+  }
+
+  public function testEditTaskDataFormAndPermissions(): void
+  {
+    $employees = [['id' => '101', 'nombre' => 'Consultora Uno'], ['id' => '202', 'nombre' => 'Consultor Dos']];
+    $detail = ['ticket' => $this->task(), 'timeline' => [], 'edit_options' => ['tema_ayuda' => ['Arriendo', 'Venta'], 'prioridad' => ['Prioridad comercial']]];
+    $html = CommercialTicketModalView::render($detail, CommercialCallsDatabase::policy($this->db), $employees);
+    self::assertStringContainsString('data-commercial-open-workflow="edit"', $html);
+    self::assertSame(1, preg_match('/data-commercial-workflow-form="edit".*?<\/form>/s', $html, $form));
+    self::assertStringContainsString('name="asunto" required maxlength="200" value="Busca apartamento"', $form[0]);
+    self::assertStringContainsString('<option value="Arriendo" selected>Arriendo</option>', $form[0]);
+    self::assertStringContainsString('data-commercial-edit-employee', $form[0], 'Con Trasladar tareas puede cambiar el responsable.');
+    self::assertStringContainsString('name="observacion"', $form[0]);
+
+    // Sin la acción no hay botón ni formulario; sin Trasladar no se puede cambiar el responsable.
+    $_SESSION['scm_user_cargo'] = '9';
+    $settings = new Settings($this->db);
+    $settings->set('commercial_permissions', ['9' => ['views' => ['abiertos'], 'actions' => ['ver_ticket'], 'actions_known' => array_keys(\SCM\Commercial\CommercialAccessPolicy::ACTIONS)]]);
+    $html = CommercialTicketModalView::render($detail, CommercialCallsDatabase::policy($this->db), $employees);
+    self::assertStringNotContainsString('data-commercial-workflow-form="edit"', $html);
+    $settings->set('commercial_permissions', ['9' => ['views' => ['abiertos'], 'actions' => ['ver_ticket', 'tarea_editar_datos'], 'actions_known' => array_keys(\SCM\Commercial\CommercialAccessPolicy::ACTIONS)]]);
+    $html = CommercialTicketModalView::render($detail, CommercialCallsDatabase::policy($this->db), $employees);
+    self::assertStringContainsString('data-commercial-workflow-form="edit"', $html);
+    self::assertStringNotContainsString('data-commercial-edit-employee', $html);
+
+    // Servidor: el cambio de responsable pide Trasladar y motivo, y usa el mismo aviso del traslado.
+    $source = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Http/Controller/CommercialApiController.php');
+    self::assertMatchesRegularExpression("/function editTicketData.*?authorize\('tarea_editar_datos'.*?canAct\('reasignar'\).*?transferTask\(/s", $source);
+    self::assertMatchesRegularExpression('/function transferTask.*?->taskReassigned\(/s', $source);
+  }
+}

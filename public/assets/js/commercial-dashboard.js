@@ -32,6 +32,7 @@
     close: "commercial_ticket_close",
     status: "commercial_ticket_status",
     reassign: "commercial_ticket_reassign",
+    edit: "commercial_ticket_edit",
   };
 
   function loadingMarkup() {
@@ -2385,6 +2386,18 @@
   }
 
   document.addEventListener("paste", handlePasteEvidence);
+
+  // Editar datos de la tarea: cambiar el responsable es un traslado y pide el motivo.
+  document.addEventListener("change", function (event) {
+    var employee = event.target.closest("[data-commercial-edit-employee]");
+    if (!employee) return;
+    var reason = employee.form && employee.form.querySelector("[data-commercial-edit-reason]");
+    if (!reason) return;
+    var changed = employee.value !== "" && employee.value !== (employee.getAttribute("data-current") || "");
+    reason.hidden = !changed;
+    var text = reason.querySelector("textarea");
+    if (text) text.required = changed;
+  });
 
   var permissionModal = document.getElementById("commercial-permissions-modal");
   var permissionOpen = document.getElementById("commercial-open-permissions");
