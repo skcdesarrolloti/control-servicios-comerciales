@@ -3468,7 +3468,7 @@ final class CommercialDashboardView
               <div class="flex flex-wrap items-center gap-1" data-scm-calendar-layer-filters aria-label="Qué mostrar">
                 <?php if ($mode !== 'personal'): ?>
                   <?php foreach (['team' => 'Equipo', 'mine' => 'Solo yo'] as $scopeKey => $scopeLabel): ?>
-                    <label class="cursor-pointer">
+                    <label class="relative cursor-pointer">
                       <input type="radio" name="calendar_scope" value="<?php echo esc_attr($scopeKey); ?>" class="peer sr-only" <?php echo $scopeKey === 'team' ? 'checked' : ''; ?>>
                       <span class="inline-flex items-center h-8 px-2.5 rounded-lg text-[13px] text-secondary hover:bg-surface-container-low peer-checked:bg-surface-container peer-checked:text-on-surface peer-checked:font-medium peer-focus-visible:ring-2 peer-focus-visible:ring-[#1E3C76]/30"><?php echo esc_html($scopeLabel); ?></span>
                     </label>
@@ -3478,7 +3478,7 @@ final class CommercialDashboardView
                   <input type="radio" name="calendar_scope" value="mine" checked class="hidden">
                 <?php endif; ?>
                 <?php foreach ([['item_type', 'evento', 'Eventos'], ['item_type', 'recordatorio', 'Recordatorios'], ['item_status', 'pending', 'Pendientes'], ['item_status', 'completed', 'Realizados']] as [$layerName, $layerValue, $layerLabel]): ?>
-                  <label class="cursor-pointer">
+                  <label class="relative cursor-pointer">
                     <input type="checkbox" name="<?php echo esc_attr($layerName); ?>" value="<?php echo esc_attr($layerValue); ?>" checked class="peer sr-only">
                     <span class="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-[13px] text-secondary/70 hover:bg-surface-container-low peer-checked:text-on-surface peer-focus-visible:ring-2 peer-focus-visible:ring-[#1E3C76]/30 [&>i]:border-outline-variant/40 peer-checked:[&>i]:bg-[#1E3C76] peer-checked:[&>i]:border-[#1E3C76]">
                       <i class="w-3.5 h-3.5 rounded border flex items-center justify-center" aria-hidden="true"><span class="material-symbols-outlined text-[12px] text-white">check</span></i><?php echo esc_html($layerLabel); ?>
@@ -3505,7 +3505,7 @@ final class CommercialDashboardView
                 </select>
               <?php endif; ?>
               <?php foreach ($dueTypes as $dueKey => $dueType): ?>
-                <label class="cursor-pointer">
+                <label class="relative cursor-pointer">
                   <input type="checkbox" name="due_type" value="<?php echo esc_attr((string) $dueKey); ?>" checked class="peer sr-only">
                   <span class="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-[13px] text-secondary/70 line-through decoration-secondary/40 hover:bg-surface-container-low peer-checked:no-underline peer-checked:text-on-surface peer-focus-visible:ring-2 peer-focus-visible:ring-[#1E3C76]/30">
                     <i class="w-2 h-2 rounded-full" style="background:<?php echo esc_attr((string) ($dueType['color'] ?? '#64748b')); ?>" aria-hidden="true"></i>
@@ -5300,7 +5300,7 @@ final class CommercialDashboardView
                               <?php if ($scopeOptions !== null): ?>
                                 <div class="ml-6 mt-1 flex flex-wrap gap-1 p-0.5 bg-surface-container rounded-lg w-fit" role="radiogroup" aria-label="Alcance de <?php echo esc_attr($viewLabel); ?>">
                                   <?php foreach (['own' => $scopeOptions[0], 'all' => $scopeOptions[1]] as $scopeValue => $scopeLabel): ?>
-                                    <label class="cursor-pointer">
+                                    <label class="relative cursor-pointer">
                                       <input type="radio" name="<?php echo esc_attr($field); ?>[scope][<?php echo esc_attr($viewKey); ?>]" value="<?php echo esc_attr($scopeValue); ?>"<?php checked($seesAll === ($scopeValue === 'all')); ?> class="peer sr-only">
                                       <span class="block px-2 py-1 rounded-md text-[11px] text-secondary peer-checked:bg-surface-container-lowest peer-checked:text-on-surface peer-checked:font-semibold peer-checked:shadow-sm peer-focus-visible:ring-2 peer-focus-visible:ring-primary"><?php echo esc_html($scopeLabel); ?></span>
                                     </label>
