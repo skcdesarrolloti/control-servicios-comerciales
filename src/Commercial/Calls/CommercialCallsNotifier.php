@@ -34,6 +34,7 @@ final class CommercialCallsNotifier
   public const TEMPLATE_CLOSED = 'scm_tarea_comercial_cerrada_v1';
   public const TEMPLATE_FOLLOW_UP = 'scm_tarea_comercial_seguimiento_v1';
   public const EVENT_FOLLOW_UP = 'tarea_seguimiento_registrado';
+  public const EVENT_OFFICER_REPLY = 'tarea_respuesta_funcionario';
   /** Al cliente cuando su tarea cerrada o postergada vuelve a gestión activa (Activar en el popup). */
   public const TEMPLATE_REOPENED = 'scm_tarea_comercial_reabierta_v1';
   /** A funcionarios cuando una tarea se posterga, se cierra o se reabre: una sola plantilla con el movimiento en una variable. */
@@ -163,7 +164,8 @@ final class CommercialCallsNotifier
   }
 
   /**
-   * El funcionario respondió desde el panel marcando avisar al cliente.
+   * El funcionario respondió desde el panel: al cliente (salvo el canal que haya bloqueado) y, como movimiento de la tarea,
+   * al responsable (si respondió otra persona) y a los marcados en Notificaciones internas › Respuesta enviada al cliente.
    * @param array<string,mixed> $task
    */
   public function officerReplied(int $id, array $task, string $message, string $author, string $employee = ''): void
@@ -184,6 +186,7 @@ final class CommercialCallsNotifier
       $this->whatsappTo(self::clientPhone($task), (string) ($task['indicativo'] ?? ''), self::TEMPLATE_OFFICER_REPLY,
         [$task['solicitante'] ?? '', (string) $id, self::contactLine(['nombre_empleado' => $author, 'correo_empleado' => $email, 'celular_empleado' => $phone])], PublicTaskAccess::reference($id), $key . ':whatsapp');
     }
+    $this->taskMoved($id, $task, self::EVENT_OFFICER_REPLY, 'Respuesta enviada al cliente', $message, $author, $employee);
   }
 
   /**

@@ -264,7 +264,7 @@ Botón `Ver tarea`. URL del sitio web `https://sucasainmobiliaria.com.co/dashboa
 
 ## 16. `scm_tarea_comercial_movimiento_v1`
 
-Para funcionarios cuando una tarea se posterga, se cierra (también Duplicado y Trasladado) o se reabre. La recibe el consultor/a asignado cuando lo hace otra persona, y quienes estén marcados en **Configuración › Notificaciones internas** en **Tarea postergada**, **Tarea cerrada** o **Tarea reabierta**. Quien lo hace no recibe aviso de lo suyo. `{{5}}` es el movimiento que arma el sistema (`Postergada hasta el lunes 7 de diciembre de 2026`, `Cerrada como Ganado`, `Reabierta en Contactado`) y `{{6}}` el motivo u observación. Código: `CommercialCallsNotifier::TEMPLATE_STAFF_MOVED`. Sin encabezado.
+Para funcionarios cuando una tarea se posterga, se cierra (también Duplicado y Trasladado), se reabre o un funcionario le responde al cliente. La recibe el consultor/a asignado cuando lo hace otra persona, y quienes estén marcados en **Configuración › Notificaciones internas** en **Tarea postergada**, **Tarea cerrada**, **Tarea reabierta** o **Respuesta enviada al cliente**. Quien lo hace no recibe aviso de lo suyo. `{{5}}` es el movimiento que arma el sistema (`Postergada hasta el lunes 7 de diciembre de 2026`, `Cerrada como Ganado`, `Reabierta en Contactado`, `Respuesta enviada al cliente`) y `{{6}}` el motivo, la observación o el texto de la respuesta. Código: `CommercialCallsNotifier::TEMPLATE_STAFF_MOVED`. Sin encabezado.
 
 ```text
 Hola *{{1}}.*

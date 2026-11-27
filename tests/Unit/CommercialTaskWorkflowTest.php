@@ -132,6 +132,29 @@ final class CommercialTaskWorkflowTest extends TestCase
     self::assertNotContains('+573000000101', array_column($log->whatsapp, 0));
   }
 
+  public function testOfficerReplyCopiesTheAssignedConsultantAndTheConfiguredStaff(): void
+  {
+    self::assertContains(CommercialCallsNotifier::EVENT_OFFICER_REPLY, \SCM\Commercial\CommercialInternalNotifications::events());
+    (new \SCM\Commercial\CommercialInternalNotifications($this->db, new Settings($this->db)))->save([CommercialCallsNotifier::EVENT_OFFICER_REPLY => ['404', '303']]);
+
+    // Responde la coordinación (303): el cliente, el responsable (101) con su enlace firmado y la copia a 404; a 303 nada.
+    [$notifier, $log] = $this->recorder();
+    $notifier->officerReplied(900, $this->task(), 'Te comparto la ficha del inmueble', 'Coordinación', '303');
+    self::assertSame(['laura@example.test', '101@example.test', ['404@example.test']], array_column($log->mail, 0));
+    self::assertStringContainsString('Respuesta enviada al cliente · tarea #900', $log->mail[1][1]);
+    self::assertStringContainsString('ticket_id=900.', $log->mail[1][2], 'El responsable recibe su enlace individual.');
+    self::assertStringContainsString('Te comparto la ficha del inmueble', $log->mail[2][2]);
+    self::assertSame(['+573001234567', '+573000000101', '+573000000404'], array_column($log->whatsapp, 0));
+    self::assertSame([CommercialCallsNotifier::TEMPLATE_OFFICER_REPLY, CommercialCallsNotifier::TEMPLATE_STAFF_MOVED, CommercialCallsNotifier::TEMPLATE_STAFF_MOVED], array_column($log->whatsapp, 1));
+    self::assertSame(['Consultora Uno', 'Coordinación', '900', 'Laura Prueba', 'Respuesta enviada al cliente', 'Te comparto la ficha del inmueble'], array_column($log->whatsapp[1][2][0]['parameters'], 'text'));
+
+    // Responde el mismo responsable: él no recibe copia; los marcados sí.
+    [$notifier, $log] = $this->recorder();
+    $notifier->officerReplied(900, $this->task(), 'Confirmo la visita', 'Consultora Uno', '101');
+    self::assertSame(['laura@example.test', ['303@example.test', '404@example.test']], array_column($log->mail, 0));
+    self::assertNotContains('+573000000101', array_column($log->whatsapp, 0));
+  }
+
   public function testPostponeCloseAndReopenNotifyTheConfiguredStaff(): void
   {
     $events = [CommercialCallsNotifier::EVENT_POSTPONED, CommercialCallsNotifier::EVENT_CLOSED, CommercialCallsNotifier::EVENT_REOPENED];
