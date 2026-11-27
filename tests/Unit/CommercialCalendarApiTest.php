@@ -433,6 +433,12 @@ final class CommercialCalendarApiTest extends TestCase
     self::assertSame(['ana@skc.test', 'g@skc.test', 'luis@skc.test'], $to);
   }
 
+  public function testEventEmailsGoToTheOwnerWithTheRestInCopy(): void
+  {
+    self::assertSame(['to' => 'ana@skc.test', 'cc' => ['G@skc.test', 'luis@skc.test']], CalendarMailer::addressing(['ana@skc.test', 'G@skc.test', 'malo', 'g@skc.test', 'luis@skc.test']));
+    self::assertNull(CalendarMailer::addressing([''])['to']);
+  }
+
   public function testNonAdminCannotConfigure(): void
   {
     $this->api('9', '100', self::TEAM);

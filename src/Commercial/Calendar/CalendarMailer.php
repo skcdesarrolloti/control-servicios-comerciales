@@ -212,19 +212,39 @@ class CalendarMailer
    */
   protected function sendEmail(array $destinations, string $subject, string $title, string $body, string $module, string $dedupe, array $meta): void
   {
-    $destinations = array_values(array_unique(array_filter(array_map('trim', $destinations), static fn(string $mail): bool => (bool) filter_var($mail, FILTER_VALIDATE_EMAIL))));
+    ['to' => $to, 'cc' => $cc] = self::addressing($destinations);
     $queue = $this->bridge->queue();
-    if ($destinations === [] || $queue === null) {
+    if ($to === null || $queue === null) {
       return;
     }
     try {
       $queue->cancelByDedupeKey($dedupe, 'Cancelado por una notificacion mas reciente del calendario.');
-      $queue->enqueueEmail($destinations, $subject, EmailTemplate::render($title, $body), [
-        'project_code' => self::PROJECT, 'source_module' => $module, 'created_by' => CalendarStore::ORIGIN, 'provider' => 'email_smtp', 'dedupe_key' => $dedupe, 'meta' => $meta,
+      $queue->enqueueEmail([$to], $subject, EmailTemplate::render($title, $body), [
+        'project_code' => self::PROJECT, 'source_module' => $module, 'created_by' => CalendarStore::ORIGIN, 'provider' => 'email_smtp', 'dedupe_key' => $dedupe, 'meta' => $meta + ['cc' => $cc],
+        'payload' => ['cc' => $cc],
       ]);
     } catch (\Throwable $exception) {
       error_log('[commercial-calendar] correo ' . $module . ': ' . $exception->getMessage());
     }
+  }
+
+  /**
+   * Un solo correo por aviso: el primero (el responsable del evento) como destinatario y los demás en copia (CC), sin
+   * repetir ni correos inválidos. Igual que control-servicios-inmobiliarios/src/Modules/Calendar/CalendarMailer::addressing.
+   * @param array<int,string> $destinations
+   * @return array{to:?string,cc:array<int,string>}
+   */
+  public static function addressing(array $destinations): array
+  {
+    $unique = [];
+    foreach ($destinations as $mail) {
+      $mail = trim((string) $mail);
+      if (filter_var($mail, FILTER_VALIDATE_EMAIL) && !isset($unique[strtolower($mail)])) {
+        $unique[strtolower($mail)] = $mail;
+      }
+    }
+    $list = array_values($unique);
+    return ['to' => $list[0] ?? null, 'cc' => array_slice($list, 1)];
   }
 
   /**
