@@ -451,7 +451,7 @@ final class CommercialTicketModalView
           <?php echo self::messageForm($pk, 'note', 'Agregar nota interna privada', 'Esta nota sólo será visible para el equipo interno y auditoría.', 'observacion', 'Escribe los detalles internos confidenciales de la tarea…', 'Guardar nota interna'); ?>
         <?php endif; ?>
         <?php if ($policy->canAct('seguimiento')): ?>
-          <?php echo self::messageForm($pk, 'follow_up', 'Registrar gestión de seguimiento', 'Deja constancia de llamadas, acuerdos o gestiones comerciales realizadas. El cliente lo recibe por correo.', 'observacion', 'Describe detalladamente la gestión comercial efectuada…', 'Guardar seguimiento', false, true); ?>
+          <?php echo self::messageForm($pk, 'follow_up', 'Registrar gestión de seguimiento', 'Revisión interna de la tarea: qué pasó, en qué va o qué falta. Le llega al consultor/a responsable y a quienes estén marcados en Notificaciones internas; el cliente no lo recibe.', 'observacion', 'Describe detalladamente la gestión comercial efectuada…', 'Guardar seguimiento', false, true); ?>
         <?php endif; ?>
         <?php if ($policy->canAct('postergar')): ?>
           <?php echo self::messageForm($pk, 'postpone', 'Postergar tarea', 'La tarea pasa a Postergado hasta la fecha que elijas: ese día a las 7:00 a. m. (o el siguiente día hábil si es domingo o festivo) vuelve sola a Nuevo y te llega un correo para retomarla. El cliente recibe el motivo y la fecha por correo y WhatsApp, y se avisa a los funcionarios de Notificaciones internas.', 'observacion', 'Indica el motivo o justificación de la postergación…', 'Postergar tarea', true, true, self::resumeField()); ?>

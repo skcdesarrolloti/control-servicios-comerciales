@@ -845,26 +845,18 @@ final class CommercialCallsTest extends TestCase
     self::assertStringContainsString('ya terminó', $closed);
   }
 
-  public function testFollowUpAndPostponeReachClientWithPublicView(): void
+  public function testFollowUpIsInternalAndNeverReachesTheClient(): void
   {
     [$notifier, $log] = $this->recorder();
     $id = $this->taskFromCall($notifier);
     $task = $this->db->getRow('SELECT * FROM wp_jet_cct_tickets WHERE _ID = ?', [$id]);
     [$notifier, $log] = $this->recorder();
-    $notifier->clientUpdate($id, $task, 'seguimiento', 'Te envío opciones <b>mañana</b>', 'Consultora Uno', '101');
-    $notifier->clientUpdate($id, $task, 'postergada', 'Viaja hasta enero', 'Consultora Uno', '101');
-    self::assertSame(['laura@example.test', 'laura@example.test'], array_column($log->mail, 0));
-    self::assertSame(['Seguimiento de tu tarea #' . $id, 'Tu tarea #' . $id . ' fue postergada'], array_column($log->mail, 1));
-    foreach ($log->mail as $mail) {
-      self::assertStringContainsString('tarea.php?t=' . $id . '.', $mail[2], 'El cliente va a la vista pública de su tarea.');
-      self::assertStringNotContainsString('sucasainmobiliaria.com.co/ticket/', $mail[2], 'Nunca la página de tickets anterior.');
-      self::assertStringNotContainsString('ticket_id=', $mail[2], 'Nunca el enlace del panel.');
-    }
-    self::assertStringNotContainsString('<b>mañana', $log->mail[0][2]);
-    $this->db->insert('wp_jet_cct_clientes', ['nombre' => 'Laura', 'celular' => '3001234567', 'bloqueo_email' => '1']);
-    [$notifier, $log] = $this->recorder();
-    $notifier->clientUpdate($id, $task, 'seguimiento', 'Otro', 'Consultora Uno', '101');
-    self::assertSame([], $log->mail, 'Quien bloqueó el correo no lo recibe.');
+    $notifier->followUpRegistered($id, $task, '¿Qué pasó con la visita?', 'Coordinación', '303');
+    self::assertNotContains('laura@example.test', array_merge(...array_map(static fn(array $mail): array => (array) $mail[0], $log->mail)), 'El cliente no recibe el seguimiento.');
+    self::assertNotContains('+573001234567', array_column($log->whatsapp, 0));
+    self::assertFalse(method_exists($notifier, 'clientUpdate'));
+    $source = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Http/Controller/CommercialApiController.php');
+    self::assertDoesNotMatchRegularExpression('/function followUp\(.*?clientNotice.*?function postpone/s', $source, 'Registrar seguimiento no avisa al cliente.');
   }
 
   public function testOfficerReplyNotifiesClientWithContactLine(): void

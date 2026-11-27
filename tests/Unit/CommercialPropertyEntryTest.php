@@ -220,7 +220,7 @@ final class CommercialPropertyEntryTest extends TestCase
     $html = CommercialTicketModalView::render(['ticket'=>$task,'timeline'=>[]], $this->policy, []);
     self::assertStringNotContainsString('name="notificar_', $html, 'Los avisos al cliente y al nuevo responsable van siempre, sin casilla.');
     self::assertStringContainsString('data-commercial-workflow-form="follow_up"', $html);
-    self::assertStringContainsString('El cliente lo recibe por correo.', $html);
+    self::assertStringContainsString('el cliente no lo recibe.', $html, 'El seguimiento es interno.');
   }
 
   public function testTaskToolsTopicRules(): void

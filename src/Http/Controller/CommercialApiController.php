@@ -773,8 +773,8 @@ final class CommercialApiController
       $this->uploadedDocuments()
     );
     $this->ensureWorkflowSucceeded($result);
-    $notice = $this->clientUpdate($ticketPk, 'seguimiento', $message);
-    // Al responsable (si lo registró otra persona) y a las copias de Configuración › Notificaciones internas.
+    // El seguimiento es interno (la revisión de la tarea entre coordinación y consultor/a): el cliente no lo recibe ni lo
+    // ve en su enlace. Le llega al responsable (si lo registró otra persona) y a las copias de Notificaciones internas.
     try {
       $task = $this->db->getRow('SELECT * FROM `' . $this->db->table('jet_cct_tickets') . '` WHERE `_ID` = ? LIMIT 1', [$ticketPk]);
       if ($task !== null) {
@@ -783,7 +783,7 @@ final class CommercialApiController
     } catch (\Throwable $exception) {
       error_log('[tareas:seguimiento-interno] ' . $exception->getMessage());
     }
-    JsonResponse::success(['message' => 'Seguimiento guardado.' . $notice, 'refresh' => true]);
+    JsonResponse::success(['message' => 'Seguimiento guardado.', 'refresh' => true]);
   }
 
   /** @param array<string,mixed> $input */
@@ -1436,15 +1436,6 @@ final class CommercialApiController
     if (!$this->tickets->ticketMatchesEmployeeFilter($ticketPk, $employeeFilter)) {
       JsonResponse::error('Esta tarea no está asignada a tu usuario.', 403);
     }
-  }
-
-  /**
-   * Aviso al cliente de un seguimiento o una postergación, con el enlace a la vista pública de su tarea.
-   * @return string Lo que se agrega al mensaje de la acción.
-   */
-  private function clientUpdate(int $ticketPk, string $kind, string $message): string
-  {
-    return $this->clientNotice($ticketPk, static fn(\SCM\Commercial\Calls\CommercialCallsNotifier $notifier, array $task) => $notifier->clientUpdate($ticketPk, $task, $kind, wp_strip_all_tags($message, true), \SCM\Core\Auth::user(), \SCM\Core\Auth::employeeId()));
   }
 
   /**
