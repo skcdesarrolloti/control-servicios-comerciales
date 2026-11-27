@@ -69,7 +69,18 @@ final class CommercialCallsApiController
   /** @param array<string,mixed> $input */
   public function taskForm(array $input): never
   {
-    $this->guarded($input, fn(): array => ['html' => CommercialCallsView::taskForm($this->service->taskData((int) ($input['id'] ?? 0), is_scalar($input['barrio'] ?? null) ? (string) $input['barrio'] : ''), $this->service->options())]);
+    $this->guarded($input, function () use ($input): array {
+      $id = (int) ($input['id'] ?? 0);
+      // Desde la tabla (elegir=1): con varias solicitudes sin tarea se pregunta de cuál; con una, se abre su formulario.
+      if (!empty($input['elegir'])) {
+        $pending = $this->service->pendingTasks($id);
+        if (count($pending['items']) > 1) {
+          return ['html' => CommercialCallsView::taskChooser($pending['items'], $pending['contact'])];
+        }
+        $id = (int) ($pending['items'][0]['id'] ?? $id);
+      }
+      return ['html' => CommercialCallsView::taskForm($this->service->taskData($id, is_scalar($input['barrio'] ?? null) ? (string) $input['barrio'] : ''), $this->service->options())];
+    });
   }
 
   /** @param array<string,mixed> $input */

@@ -83,17 +83,16 @@ final class CommercialCallsView
     foreach ($listing['rows'] as $row) {
       $id = (int) $row['id'];
       $partner = $row['tarjeta'] !== '' || $row['aliado'] !== '' ? '<small class="ccl-partner">' . self::e(trim($row['aliado'] . ' · ' . $row['tarjeta'], ' ·')) . '</small>' : '';
-      // Con varias solicitudes, el botón dice de cuál es (la más reciente; las demás, en el historial).
-      $which = (int) ($row['solicitudes'] ?? 1) > 1 ? '<span class="ccl-muted">De la solicitud del ' . self::e($row['fecha'] ?: 'sin fecha') . ($row['tema'] !== '' ? ' (' . self::e($row['tema']) . ')' : '') . '</span>' : '';
+      // Si el contacto tiene varias solicitudes sin tarea, el botón pregunta de cuál (data-ccl-pick); con una sola, la abre.
       if ($row['tarea'] > 0) {
         $status = '<span class="ccl-status">' . self::e($row['tarea_estado'] ?: 'Sin estado') . '</span>';
         $task = ($canOpenTask ? '<button type="button" class="ccl-link" data-commercial-open-case="' . (int) $row['tarea'] . '">#' . (int) $row['tarea'] . '</button>' : '<span>#' . (int) $row['tarea'] . '</span>') . $status;
       } elseif ($row['merece'] === 'Si') {
-        $task = $canTask && $row['editable'] ? '<button type="button" class="ccl-task-button" data-ccl-task="' . $id . '">Crear tarea</button>' . $which : '<span class="ccl-status is-warning">Pendiente</span>';
+        $task = $canTask && $row['editable'] ? '<button type="button" class="ccl-task-button" data-ccl-task="' . $id . '" data-ccl-pick>Crear tarea</button>' : '<span class="ccl-status is-warning">Pendiente</span>';
       } else {
         // Sin tarea y sin marcar que la merece (o marcada que no): igual se puede crear; al crearla queda que sí la merecía.
         $label = '<span class="ccl-muted">' . ($row['merece'] === 'No' ? 'No merecía' : 'Sin definir') . '</span>';
-        $task = $canTask && $row['editable'] ? '<button type="button" class="ccl-task-button" data-ccl-task="' . $id . '">Crear tarea</button>' . $which . $label : $label;
+        $task = $canTask && $row['editable'] ? '<button type="button" class="ccl-task-button" data-ccl-task="' . $id . '" data-ccl-pick>Crear tarea</button>' . $label : $label;
       }
       $actions = '<button type="button" class="ccl-icon" data-ccl-history="' . $id . '" aria-label="Historial del contacto de ' . self::e($row['cliente']) . '" title="Historial del contacto"><span class="material-symbols-outlined" aria-hidden="true">history</span></button>';
       if ($row['editable']) {
@@ -337,6 +336,23 @@ final class CommercialCallsView
       . '<button type="button" class="ccl-desc-compose" data-ccl-compose><span class="material-symbols-outlined" aria-hidden="true">auto_fix_high</span>Armar con los datos</button></div>'
       . '<textarea id="ccl-task-resumen" name="descripcion" rows="4" required data-ccl-auto-desc="' . ($v('descripcion') === '' ? '1' : '0') . '">' . self::e($v('descripcion')) . '</textarea></div>'
       . '</div><footer class="ccl-modal-foot"><button type="button" class="ccl-secondary" data-ccl-close>Crear más tarde</button><button type="submit" class="ccl-primary">Crear tarea</button></footer></form>';
+  }
+
+  /**
+   * Crear tarea con varias solicitudes sin tarea: se escoge de cuál (cada botón abre el formulario de esa solicitud).
+   * @param list<array<string,mixed>> $pending
+   */
+  public static function taskChooser(array $pending, string $contact): string
+  {
+    $html = self::modalHead('¿De qué solicitud es la tarea?', $contact . ' · ' . count($pending) . ' solicitudes sin tarea')
+      . '<div class="ccl-modal-body"><ol class="ccl-history">';
+    foreach ($pending as $item) {
+      $html .= '<li><div class="ccl-history-top"><span class="ccl-history-date">' . self::e($item['fecha'] ?: 'Sin fecha') . '</span><strong>' . self::e($item['tema'] ?: 'Sin motivo') . '</strong><span class="ccl-medio">' . self::e($item['medio'] ?: 'Sin medio') . '</span></div>'
+        . '<p class="ccl-history-meta">' . self::e($item['responsable'] ?: 'Sin asignar') . '</p>'
+        . ($item['descripcion'] !== '' ? '<p class="ccl-history-text">' . self::e($item['descripcion']) . '</p>' : '')
+        . '<div class="ccl-task"><button type="button" class="ccl-task-button" data-ccl-task="' . (int) $item['id'] . '">Crear tarea de esta solicitud</button></div></li>';
+    }
+    return $html . '</ol></div><footer class="ccl-modal-foot"><button type="button" class="ccl-secondary" data-ccl-close>Cancelar</button></footer>';
   }
 
   /** @param array<string,mixed> $history */

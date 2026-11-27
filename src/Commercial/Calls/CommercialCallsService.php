@@ -718,6 +718,18 @@ final class CommercialCallsService
   }
 
   /**
+   * Solicitudes del mismo contacto que aún no tienen tarea y a las que esta persona puede crearle una (para escoger de cuál).
+   * @return array{contact:string,items:list<array<string,mixed>>}
+   */
+  public function pendingTasks(int $id): array
+  {
+    $this->requireAct('llamadas_tarea', 'No tienes permiso para crear tareas desde llamadas.');
+    $history = $this->history(['id' => (string) $id]);
+    $items = array_values(array_filter($history['items'], static fn(array $item): bool => $item['tipo'] === 'Llamada' && (int) $item['tarea'] === 0 && !empty($item['editable'])));
+    return ['contact' => (string) ($history['contact']['cliente'] ?? ''), 'items' => $items];
+  }
+
+  /**
    * Historial del contacto. A quien solo ve lo suyo, de las solicitudes de otros funcionarios le llega lo justo para saber
    * que ya existen: fecha, medio, motivo, responsable y número de tarea.
    * @param array<string,mixed> $input

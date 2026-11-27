@@ -415,8 +415,21 @@ final class CommercialCallsTest extends TestCase
     $html = CommercialCallsView::history($service->history(['id' => (string) $first]), CommercialCallsDatabase::policy($this->db));
     self::assertStringContainsString('data-ccl-task="' . $first . '">Crear tarea</button>', $html);
     self::assertStringNotContainsString('data-ccl-task="' . $second . '"', $html);
+  }
+
+  public function testCreateTaskAsksWhichRequestOnlyWhenSeveralLackOne(): void
+  {
+    $first = $this->create(['merece_ticket' => 'No', 'tema_ayuda' => 'Venta']);
+    $second = $this->create(['merece_ticket' => 'No', 'medio' => 'Aviso']);
+    $service = $this->service();
     $listing = CommercialCallsView::results($service->listing([]), $service, CommercialCallsDatabase::policy($this->db));
-    self::assertStringNotContainsString('De la solicitud del', $listing, 'La fila con tarea no ofrece crearla.');
+    self::assertStringContainsString('data-ccl-task="' . $second . '" data-ccl-pick>Crear tarea', $listing);
+    self::assertSame([$second, $first], array_column($service->pendingTasks($second)['items'], 'id'));
+    $html = CommercialCallsView::taskChooser($service->pendingTasks($second)['items'], 'Laura');
+    self::assertStringContainsString('¿De qué solicitud es la tarea?', $html);
+    self::assertStringContainsString('data-ccl-task="' . $first . '">Crear tarea de esta solicitud', $html);
+    $service->createTask($this->taskInput($first));
+    self::assertSame([$second], array_column($service->pendingTasks($second)['items'], 'id'), 'Con una sola sin tarea se abre directo.');
   }
 
   public function testHistoryIncludesTasksWithoutCall(): void

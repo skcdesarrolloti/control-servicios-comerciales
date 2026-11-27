@@ -485,7 +485,8 @@
     if (target.hasAttribute("data-ccl-edit")) return void open("commercial_calls_form", { id: target.getAttribute("data-ccl-edit") });
     if (target.hasAttribute("data-ccl-repeat")) return void open("commercial_calls_form", { desde_llamada: target.getAttribute("data-ccl-repeat") });
     if (target.hasAttribute("data-ccl-history")) return void open("commercial_calls_history", { id: target.getAttribute("data-ccl-history") });
-    if (target.hasAttribute("data-ccl-task")) return void open("commercial_calls_task_form", { id: target.getAttribute("data-ccl-task") });
+    // Desde la tabla (data-ccl-pick) el servidor pregunta de qué solicitud si hay varias sin tarea.
+    if (target.hasAttribute("data-ccl-task")) return void open("commercial_calls_task_form", target.hasAttribute("data-ccl-pick") ? { id: target.getAttribute("data-ccl-task"), elegir: 1 } : { id: target.getAttribute("data-ccl-task") });
     if (target.hasAttribute("data-ccl-state")) {
       var form = filtersForm();
       if (form) { form.elements.ll_estado.value = target.getAttribute("data-ccl-state"); refresh(1); }
